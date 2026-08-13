@@ -40,18 +40,21 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // beyond + allowed candle type". The prior-close-inside condition is a
         // LEGACY research parameter and must default FALSE (exact-spec mode).
         public bool RequirePriorCloseInside = false;
-        // Ambiguity FB-3: REGULAR breakout + REGULAR reclaim = "invalid" — default:
-        // the reclaim simply does not count and the setup keeps waiting.
+        // V6 U4 — LOCKED: an invalid 15m reclaim does NOT cancel the parent setup.
+        // Ignore it and keep waiting for another valid 15m reclaim while the parent
+        // is inside its validity clock. LEGACY research flag, must stay FALSE.
         public bool InvalidReclaimCancelsSetup = false;
-        // Ambiguity FB-2: suggested state flow implies the 15m reclaim/freeze must
-        // occur before 1m/3m entry scanning starts.
-        public bool Require15mReclaimBeforeLtfEntry = true;
-        // Ambiguity FB-5: 15m EMA(9) confluence fails at the LTF entry signal:
-        // cancel that LTF setup (default) or keep waiting for a later EMA close.
+        // V6 U5 — LOCKED: a completed 15m reclaim/freeze is NOT required before the
+        // 1m/3m entry engine may scan or enter. The 1m/3m engines scan as soon as a
+        // valid 15m parent exists. Must be FALSE in exact-spec mode.
+        public bool Require15mReclaimBeforeLtfEntry = false;
+        // NOT locked by V6: what happens when the 15m EMA(9) confluence (§7) fails at
+        // the moment of a lower-timeframe entry signal. Default cancels that LTF
+        // setup; scanning continues for a fresh one while the parent is alive.
         public bool ConfluenceFailCancelsLtfSetup = true;
-        // Spec section 12/E: break definition of the first target is configurable
-        // (V5 unresolved item 1 — still not finalized by the master spec).
-        public FbTargetBreakMode TargetBreakMode = FbTargetBreakMode.ThreeMinuteCloseBeyond;
+        // V6 U1 — LOCKED: first target is broken ONLY by a completed 1m close beyond
+        // it (a wick/touch does not count). Then the 3m EMA(9) runner activates.
+        public FbTargetBreakMode TargetBreakMode = FbTargetBreakMode.OneMinuteCloseBeyond;
         // V5 correction Fix 7: A- = entry in the FIRST 15m candle in which a
         // fresh lower-timeframe entry is actually eligible (premarket validity
         // candles, where entries are forbidden, cannot be the A- opportunity).
@@ -135,6 +138,8 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             public string EntrySignal { get { return IsLong ? "FB_LONG" : "FB_SHORT"; } }
             public string StopSignal { get { return IsLong ? "FB_STOP_L" : "FB_STOP_S"; } }
             public string RunSignal { get { return IsLong ? "FB_RUN_L" : "FB_RUN_S"; } }
+            // V6 U9 strategy handoff flatten (this position is closed so VBR may enter)
+            public string HandoffSignal { get { return IsLong ? "FB_HANDOFF_L" : "FB_HANDOFF_S"; } }
 
             public void ResetAll()
             {
@@ -593,10 +598,12 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 return;
             }
 
-            // simultaneous-position policy (spec: configurable, SH-2)
+            // V6 U9: a VBR position open at this moment does NOT block the entry —
+            // the host flattens VBR first and then submits this order (handoff).
+            // CanOpenPosition is only the instrument/enabled gate.
             if (!host.CanOpenPosition(StrategyId.FAKE_BREAKOUT))
             {
-                host.Diag(StrategyId.FAKE_BREAKOUT, "entry blocked: another strategy position is open (concurrency policy) — LTF setup cancelled");
+                host.Diag(StrategyId.FAKE_BREAKOUT, "entry blocked: trading disabled for this instrument — LTF setup cancelled");
                 s.Reset();
                 return;
             }
@@ -784,8 +791,30 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             FbSlot slot = orderName.EndsWith("_L") ? longSlot : orderName.EndsWith("_S") ? shortSlot : null;
             if (slot == null || !slot.HasPosition) return;
 
-            string reason = orderName.Contains("STOP") ? "STOP_LOSS" : "RUNNER_EMA3M";
-            ApplyExit(slot, price, qty, etTime, reason, orderName.Contains("STOP") ? "STOP" : "RUNNER_EMA3M");
+            string leg;
+            if (orderName.Contains("STOP")) leg = "STOP";
+            else if (orderName.Contains("HANDOFF")) leg = "HANDOFF_FLATTEN"; // V6 U9
+            else leg = "RUNNER_EMA3M";
+            string reason = leg == "STOP" ? "STOP_LOSS" : leg;
+            ApplyExit(slot, price, qty, etTime, reason, leg);
+        }
+
+        // V6 U9: flatten this engine's open position so the OTHER strategy may enter.
+        // Called by the host's handoff coordinator; the replacement entry is only
+        // submitted after this fill confirms the account flat.
+        public void FlattenForHandoff()
+        {
+            FbSlot[] slots = new FbSlot[] { longSlot, shortSlot };
+            foreach (FbSlot slot in slots)
+            {
+                if (!slot.HasPosition || slot.QtyOpen <= 0) continue;
+                host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(
+                    "HANDOFF FLATTEN: exiting {0} contracts of {1} for VECTOR_BREAK_RETEST (V6 U9)",
+                    slot.QtyOpen, slot.EntrySignal));
+                host.ExitMarket(StrategyId.FAKE_BREAKOUT,
+                    slot.IsLong ? TradeDirection.Long : TradeDirection.Short,
+                    slot.QtyOpen, slot.HandoffSignal, slot.EntrySignal);
+            }
         }
 
         public void OnSessionCloseExecution(double price, int qty, DateTime etTime)

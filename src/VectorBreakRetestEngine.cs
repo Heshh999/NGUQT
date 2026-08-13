@@ -44,57 +44,64 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // must NOT restart/replace/extend it. LEGACY research parameter,
         // defaults FALSE.
         public bool RetriggerReplacesActiveSetup = false;
-        // V5 unresolved item 2: exact "target reached" definition is not fixed by
-        // the master spec — configurable, default intrabar touch.
+        // V6 U2 — LOCKED: a target is REACHED on wick/touch (no close required).
         public TargetReachedMode TargetReached = TargetReachedMode.IntrabarTouch;
-        // Ambiguity VBR-3: Pattern B reclaim whose close fails the EMA condition:
-        // default = no entry, structure cleared (spec defines no waiting for VBR).
-        public bool PatternBWaitForEma = false;
-        // Ambiguity VBR-4: re-entry scanning is limited to the single FOLLOWING
-        // 15m candle (literal reading) vs. the remainder of the 4-candle window.
-        public bool ReentryScanOnlyFollowingCandle = true;
-        // Ambiguity VBR-5: swing strength (bars each side) for the "most recent
-        // confirmed 1m supporting swing" final-10% runner exit.
-        public int RunnerSwingStrength = 2;
-        // Ambiguity VBR-6: with 1 contract, floor(0.9*1)=0 — treat the whole
-        // contract as the runner (default) instead of exiting 100% at the EMA.
-        public bool SingleContractBecomesRunner = true;
+        // V6 U6 — LOCKED: Pattern B WAITS for the EMA instead of discarding the
+        // structure. Entry requires a completed 1m close beyond BOTH Daily Open and
+        // the 1m EMA(9). Must stay TRUE in exact-spec mode.
+        public bool PatternBWaitForEma = true;
+        // V6 U7 — LOCKED: re-entry permission rolls forward one 15m validity candle
+        // at a time inside the ORIGINAL 4-candle clock (not "following candle only").
+        // LEGACY research flag, must stay FALSE.
+        public bool ReentryScanOnlyFollowingCandle = false;
+        // V6 U8 — LOCKED: with a 1-contract position the 1m EMA(9) profit signal
+        // exits the ENTIRE contract; the contract does NOT become a runner.
+        // LEGACY research flag, must stay FALSE.
+        public bool SingleContractBecomesRunner = false;
 
         public double ChainMaxDistancePoints = 50.0;      // spec §9 / section D: 50-point rule
     }
 
-    // Rolling confirmed-swing detector on completed 1m bars (runner exit, spec §9).
-    // A swing low is a bar whose low is strictly below the lows of `k` bars on each
-    // side; it is confirmed `k` bars later. Mirror for swing highs.
-    public class SwingTracker
+    // V6 U3 — 1-MINUTE SUPPORTING-STRUCTURE TRACKER (final 10% runner exit).
+    //
+    // "Do NOT require a strength-2 or multi-bar fractal. A single completed
+    //  1-minute candle may establish the current supporting swing-low / swing-high
+    //  reference; do not wait for two bars on each side."
+    //
+    // LONG : the most recent completed 1m candle that made a HIGHER LOW than the
+    //        candle before it supplies the supporting reference = that candle's LOW.
+    //        The final 10% exits only when a LATER completed 1m candle CLOSES BELOW
+    //        that low (a wick below does not count).
+    // SHORT: mirror — most recent LOWER HIGH candle supplies its HIGH.
+    //
+    // Bar indices are tracked so the candle that establishes the reference can
+    // never also be the candle that breaks it ("a LATER completed 1m candle").
+    public class SupportingStructureTracker
     {
-        private readonly int k;
-        private readonly List<double> highs = new List<double>();
-        private readonly List<double> lows = new List<double>();
-        public double LastSwingLow = double.NaN;
-        public double LastSwingHigh = double.NaN;
+        private double prevHigh = double.NaN;
+        private double prevLow = double.NaN;
 
-        public SwingTracker(int strength) { k = Math.Max(1, strength); }
+        public double SupportLow = double.NaN;    // long: most recent higher-low candle's LOW
+        public double SupportHigh = double.NaN;   // short: most recent lower-high candle's HIGH
+        public int SupportLowBar = -1;
+        public int SupportHighBar = -1;
+        public int BarIndex = -1;
 
         public void Add(double high, double low)
         {
-            highs.Add(high);
-            lows.Add(low);
-            int n = lows.Count;
-            if (n >= 2 * k + 1)
+            BarIndex++;
+            if (!double.IsNaN(prevLow) && low > prevLow)   // higher low established by ONE candle
             {
-                int c = n - 1 - k; // candidate confirmed by this bar
-                bool isLow = true, isHigh = true;
-                for (int i = c - k; i <= c + k; i++)
-                {
-                    if (i == c) continue;
-                    if (lows[i] <= lows[c]) isLow = false;
-                    if (highs[i] >= highs[c]) isHigh = false;
-                }
-                if (isLow) LastSwingLow = lows[c];
-                if (isHigh) LastSwingHigh = highs[c];
+                SupportLow = low;
+                SupportLowBar = BarIndex;
             }
-            if (n > 600) { highs.RemoveRange(0, 300); lows.RemoveRange(0, 300); }
+            if (!double.IsNaN(prevHigh) && high < prevHigh) // lower high established by ONE candle
+            {
+                SupportHigh = high;
+                SupportHighBar = BarIndex;
+            }
+            prevHigh = high;
+            prevLow = low;
         }
     }
 
@@ -151,13 +158,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         private bool trailActivated;
         private bool tp90Done;
 
-        private SwingTracker swings;
+        private SupportingStructureTracker structure;   // V6 U3
 
         public VectorBreakRetestEngine(IMnqHost host, VbrConfig cfg)
         {
             this.host = host;
             this.cfg = cfg;
-            swings = new SwingTracker(cfg.RunnerSwingStrength);
+            structure = new SupportingStructureTracker();
         }
 
         public bool HasOpenOrPendingPosition { get { return state == VbrState.POSITION_OPEN; } }
@@ -239,18 +246,46 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 }
                 else if (state == VbrState.REENTRY_SCAN && validityCount >= reentryScanCandleNum)
                 {
+                    // The authorized scan candle completed with no entry.
                     if (cfg.ReentryScanOnlyFollowingCandle)
                     {
-                        // treat a fresh stop-out inside the scan candle via OnExitExecution;
-                        // reaching here means the scan candle completed with no entry.
                         host.Diag(StrategyId.VECTOR_BREAK_RETEST,
-                            "re-entry scan candle completed with no entry — setup finished (VBR-4 literal reading)");
+                            "re-entry scan candle completed with no entry — setup finished (LEGACY flag, not V6)");
                         ResetSetup();
                     }
-                    else if (validityCount >= 4)
+                    else
                     {
-                        host.Diag(StrategyId.VECTOR_BREAK_RETEST, "4-candle window ended — setup EXPIRED");
-                        ResetSetup();
+                        // V6 U7 ROLLING RE-QUALIFICATION: permission propagates one
+                        // 15m candle at a time inside the ORIGINAL 4-candle clock.
+                        // "#4 may scan only if #3 itself closes on the correct side"
+                        // — the rolling candle needs only the correct-side close; the
+                        // wick-into-Daily-Open test applies to the stop-out candle.
+                        bool correctSideClose = isLong
+                            ? bar.Close > dailyOpenAtTrigger
+                            : bar.Close < dailyOpenAtTrigger;
+
+                        if (!correctSideClose)
+                        {
+                            host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                                "ROLLING RE-ENTRY BROKEN: candle #{0} closed {1:0.00} on the WRONG side of DAILY_OPEN {2:0.00} — no further re-entry (V6 U7)",
+                                validityCount, bar.Close, dailyOpenAtTrigger));
+                            ResetSetup();
+                        }
+                        else if (validityCount >= 4)
+                        {
+                            // clock never restarts or extends
+                            host.Diag(StrategyId.VECTOR_BREAK_RETEST,
+                                "ORIGINAL 4-candle clock ended — setup EXPIRED (V6 U7: clock never restarts or extends)");
+                            ResetSetup();
+                        }
+                        else
+                        {
+                            reentryScanCandleNum = validityCount + 1;
+                            ResetPattern();
+                            host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                                "ROLLING RE-ENTRY: candle #{0} closed {1:0.00} on the correct side of DAILY_OPEN — candle #{2} may scan for a FRESH 1m setup (V6 U7)",
+                                validityCount, bar.Close, reentryScanCandleNum));
+                        }
                     }
                 }
                 else if (state == VbrState.PARENT_15M_ACTIVE_SEARCHING_1M && validityCount >= 4)
@@ -313,7 +348,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // ==================================================================
         public void OnOneMinuteBar(BarSnap bar)
         {
-            swings.Add(bar.High, bar.Low); // continuous swing tracking for the runner exit
+            structure.Add(bar.High, bar.Low); // V6 U3 one-candle supporting structure
 
             if (state == VbrState.POSITION_OPEN)
             {
@@ -328,7 +363,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             int formingCandle = validityCount + 1;
             if (formingCandle > 4) return;
             // re-entry scan restricted to its designated following candle (§8/VBR-4)
-            if (state == VbrState.REENTRY_SCAN && cfg.ReentryScanOnlyFollowingCandle && formingCandle != reentryScanCandleNum)
+            // Re-entry scanning is confined to the currently authorized validity
+            // candle (V6 U7: permission rolls forward one candle at a time).
+            if (state == VbrState.REENTRY_SCAN && formingCandle != reentryScanCandleNum)
                 return;
 
             double dOpen = dailyOpenAtTrigger;
@@ -349,7 +386,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 if (isLong) { if (bar.Low < structExtreme) structExtreme = bar.Low; }
                 else { if (bar.High > structExtreme) structExtreme = bar.High; }
 
-                // §5/§7 EMA condition: reclaim close through 1m EMA9 / already through
+                // V6 U6: entry requires a completed 1m close beyond BOTH Daily Open
+                // and the 1m EMA(9). The reclaim close is already beyond Daily Open
+                // here, so only the EMA leg is outstanding.
                 bool emaOk = isLong ? bar.Close > bar.Ema9 : bar.Close < bar.Ema9;
                 if (emaOk)
                 {
@@ -357,28 +396,46 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 }
                 else if (cfg.PatternBWaitForEma)
                 {
+                    // V6 U6 steps 5-6: KEEP WAITING — do not discard the structure.
                     waitingEmaB = true;
                     structActive = false;
-                    host.Diag(StrategyId.VECTOR_BREAK_RETEST, "Pattern B reclaim without EMA condition — waiting for 1m EMA close (VBR-3 config)");
+                    host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                        "Pattern B reclaim close {0:0.00} is beyond DAILY_OPEN {1:0.00} but not through 1m EMA9 {2:0.00} — WAITING for a later 1m close beyond BOTH (V6 U6)",
+                        bar.Close, dOpen, bar.Ema9));
                 }
                 else
                 {
-                    host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                        "Pattern B reclaim close {0:0.00} failed 1m EMA9 condition ({1:0.00}) — no entry, structure cleared (VBR-3)",
-                        bar.Close, bar.Ema9));
+                    host.Diag(StrategyId.VECTOR_BREAK_RETEST,
+                        "Pattern B reclaim failed the EMA condition — structure cleared (LEGACY flag, not V6)");
                     ResetPattern();
                 }
                 return;
             }
 
-            // ---------- optional Pattern B EMA-wait mode (VBR-3 config) ----------
+            // ---------- V6 U6 Pattern B EMA wait ----------
+            // Enter only when a later completed 1m candle closes beyond BOTH the
+            // Daily Open and the 1m EMA(9). A candle beyond the EMA but on the wrong
+            // side of Daily Open is NOT a valid entry (U6 step 7). A candle that
+            // closes back through Daily Open re-opens the structure leg (U6 step 1).
             if (waitingEmaB)
             {
-                bool cancelled = isLong ? bar.Close < structExtreme : bar.Close > structExtreme;
-                bool onTradeSide = isLong ? bar.Close > dOpen : bar.Close < dOpen;
+                bool backThroughDo = isLong ? bar.Close < dOpen : bar.Close > dOpen;
+                if (backThroughDo)
+                {
+                    // a new 1m move beyond Daily Open begins — resume structure tracking
+                    waitingEmaB = false;
+                    structActive = true;
+                    if (isLong) { if (double.IsNaN(structExtreme) || bar.Low < structExtreme) structExtreme = bar.Low; }
+                    else { if (double.IsNaN(structExtreme) || bar.High > structExtreme) structExtreme = bar.High; }
+                    host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                        "Pattern B: 1m close {0:0.00} back through DAILY_OPEN while waiting for EMA — structure leg resumed (structExtreme={1:0.00})",
+                        bar.Close, structExtreme));
+                    return;
+                }
+
                 bool emaOk = isLong ? bar.Close > bar.Ema9 : bar.Close < bar.Ema9;
-                if (cancelled) { ResetPattern(); return; }
-                if (onTradeSide && emaOk) TryEnter(bar, "CLOSE_RECLAIM_B", structExtreme);
+                if (emaOk)
+                    TryEnter(bar, "CLOSE_RECLAIM_B", structExtreme);   // beyond DO and beyond EMA9
                 return;
             }
 
@@ -433,9 +490,11 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 return;
             }
 
+            // V6 U9: an open FB position does NOT block this entry — the host
+            // flattens FB first and submits this order only once flat is confirmed.
             if (!host.CanOpenPosition(StrategyId.VECTOR_BREAK_RETEST))
             {
-                host.Diag(StrategyId.VECTOR_BREAK_RETEST, "entry blocked: another strategy position is open (concurrency policy)");
+                host.Diag(StrategyId.VECTOR_BREAK_RETEST, "entry blocked: trading disabled for this instrument");
                 ResetPattern();
                 return;
             }
@@ -556,34 +615,40 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                     }
                     else if (cfg.SingleContractBecomesRunner)
                     {
-                        tp90Done = true; // VBR-6: the single contract becomes the runner
+                        tp90Done = true; // LEGACY research only — not V6 behavior
                         host.Diag(StrategyId.VECTOR_BREAK_RETEST,
-                            "TRAIL signal with 1 contract: floor(0.9)=0 — contract held as runner (VBR-6 config)");
+                            "TRAIL signal with 1 contract: contract held as runner (LEGACY flag, not V6)");
                     }
                     else
                     {
+                        // V6 U8: a 1-contract position cannot be split 90/10 — the 1m
+                        // EMA(9) profit signal exits the ENTIRE contract, no runner.
                         tp90Done = true;
-                        host.Diag(StrategyId.VECTOR_BREAK_RETEST,
-                            "TRAIL signal with 1 contract: exiting 100% at EMA (VBR-6 config)");
+                        host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                            "TRAIL EXIT: 1m close {0:0.00} through 1m EMA9 {1:0.00} with a 1-contract position — exiting the ENTIRE contract, no runner (V6 U8)",
+                            bar.Close, bar.Ema9));
                         host.ExitMarket(StrategyId.VECTOR_BREAK_RETEST,
                             isLong ? TradeDirection.Long : TradeDirection.Short, qtyOpen, Tp90Signal, EntrySignal);
                     }
                 }
             }
 
-            // ---- FINAL 10% RUNNER: completed 1m close through the most recent
-            //      confirmed supporting swing (spec §9) ----
+            // ---- FINAL 10% RUNNER (V6 U3): exit when a LATER completed 1m candle
+            //      CLOSES through the one-candle supporting structure. Wicks do not
+            //      count; no multi-bar fractal confirmation is required. ----
             if (tp90Done && qtyOpen > 0)
             {
-                double swing = isLong ? swings.LastSwingLow : swings.LastSwingHigh;
-                if (!double.IsNaN(swing))
+                double support = isLong ? structure.SupportLow : structure.SupportHigh;
+                int supportBar = isLong ? structure.SupportLowBar : structure.SupportHighBar;
+                // the establishing candle can never be the breaking candle
+                if (!double.IsNaN(support) && structure.BarIndex > supportBar)
                 {
-                    bool structBreak = isLong ? bar.Close < swing : bar.Close > swing;
+                    bool structBreak = isLong ? bar.Close < support : bar.Close > support;
                     if (structBreak)
                     {
                         host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                            "RUNNER EXIT: 1m close {0:0.00} through confirmed 1m swing {1:0.00} — exiting final {2} contracts (spec §9)",
-                            bar.Close, swing, qtyOpen));
+                            "RUNNER EXIT: 1m close {0:0.00} through 1m supporting structure {1:0.00} — exiting final {2} contracts (V6 U3)",
+                            bar.Close, support, qtyOpen));
                         host.ExitMarket(StrategyId.VECTOR_BREAK_RETEST,
                             isLong ? TradeDirection.Long : TradeDirection.Short, qtyOpen, RunSignal, EntrySignal);
                     }
@@ -661,9 +726,22 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             string reason;
             if (orderName.Contains("STOP")) { leg = "STOP"; reason = "STOP_LOSS"; }
             else if (orderName.Contains("TP90")) { leg = "TP90"; reason = "TRAIL_90_EMA1M"; }
+            else if (orderName.Contains("HANDOFF")) { leg = "HANDOFF_FLATTEN"; reason = "HANDOFF_FLATTEN"; } // V6 U9
             else { leg = "RUNNER"; reason = "RUNNER_STRUCTURE_BREAK"; }
 
             ApplyExitLeg(price, qty, etTime, leg, reason);
+        }
+
+        // V6 U9: flatten this engine's open position so FAKE_BREAKOUT may enter.
+        // A handoff flatten is NOT a stop-out, so it never arms the re-entry rule.
+        public void FlattenForHandoff()
+        {
+            if (state != VbrState.POSITION_OPEN || qtyOpen <= 0) return;
+            host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(
+                "HANDOFF FLATTEN: exiting {0} contracts of {1} for FAKE_BREAKOUT (V6 U9)", qtyOpen, EntrySignal));
+            host.ExitMarket(StrategyId.VECTOR_BREAK_RETEST,
+                isLong ? TradeDirection.Long : TradeDirection.Short,
+                qtyOpen, isLong ? "VBR_HANDOFF_L" : "VBR_HANDOFF_S", EntrySignal);
         }
 
         public void OnSessionCloseExecution(double price, int qty, DateTime etTime)

@@ -69,14 +69,15 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
     public enum TradeDirection { Long, Short }
 
-    // Spec (Fake Breakout section 12 / shared engine section E):
-    // 'If the exact definition of "first target successfully broken" has not been
-    //  finalized, keep that break-confirmation method configurable.'
+    // V6 U1 — LOCKED: the Fake Breakout first target is "successfully broken" ONLY
+    // by a COMPLETED 1-MINUTE CLOSE beyond it in the trade direction; a wick/touch
+    // does NOT count. OneMinuteCloseBeyond is therefore the exact-spec default; the
+    // other members are retained for research only.
     public enum FbTargetBreakMode
     {
-        Touch,                    // price touches the target level (1m high/low)
-        OneMinuteCloseBeyond,     // completed 1m close beyond the target
-        ThreeMinuteCloseBeyond    // completed 3m close beyond the target
+        Touch,                    // LEGACY research: price touches the level (1m high/low)
+        OneMinuteCloseBeyond,     // V6 U1 exact-spec: completed 1m close beyond the target
+        ThreeMinuteCloseBeyond    // LEGACY research: completed 3m close beyond the target
     }
 
     // FB grade basis. V5 correction Fix 7 makes FirstTradableCandle the mandated
@@ -88,12 +89,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         FirstTradableCandle       // V5 default: first candle where entries are permitted
     }
 
-    // V5 correction (unresolved item 2): the exact VBR "target reached" definition
-    // is not fixed by the master spec — kept configurable, default intrabar touch.
+    // V6 U2 — LOCKED: a VBR key level is REACHED on a wick/touch of the target
+    // price; a completed close beyond it is NOT required. IntrabarTouch is the
+    // exact-spec default.
     public enum TargetReachedMode
     {
-        IntrabarTouch,            // 1m high/low touches the target price
-        OneMinuteCloseBeyond      // completed 1m close beyond the target price
+        IntrabarTouch,            // V6 U2 exact-spec: 1m high/low touches the target price
+        OneMinuteCloseBeyond      // LEGACY research: completed 1m close beyond the target
     }
 
     // Traders Reality calcPsyLevels psyType ('forex' vs 'crypto' path in the
@@ -722,6 +724,101 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 try { csv.Flush(); csv.Close(); } catch (Exception) { }
                 csv = null;
             }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // V6 U9 — STRATEGY HANDOFF
+    //
+    // FAKE_BREAKOUT and VECTOR_BREAK_RETEST must never hold MNQ positions at the
+    // same time. When one strategy is open and the OTHER produces a fully valid
+    // entry, the sequence is strictly:
+    //     1. flatten the currently open strategy completely
+    //     2. wait for the flatten fill / account-flat confirmation
+    //     3. only then submit the newly signalled strategy's entry
+    //
+    // The replacement order must NEVER be submitted before the flat confirmation
+    // (NinjaTrader would net the two positions and contaminate both engines'
+    // state). This coordinator owns that ordering and lives in shared code so the
+    // NinjaTrader host and the deterministic test host execute the SAME logic.
+    //
+    // Note this is pure execution sequencing: no setup state, grade, stop, size or
+    // target is shared between the engines — the replacement strategy uses only
+    // its own values (V6 U9).
+    // ------------------------------------------------------------------
+    public class HandoffCoordinator
+    {
+        private class PendingEntry
+        {
+            public StrategyId Id;
+            public TradeDirection Dir;
+            public int Qty;
+            public string Signal;
+        }
+
+        private readonly Func<StrategyId, bool> hasPosition;                    // does this engine hold a position?
+        private readonly Action<StrategyId> flattenStrategy;                    // flatten that engine's position
+        private readonly Action<StrategyId, TradeDirection, int, string> submit; // actually place the entry order
+        private readonly Action<StrategyId, string> diag;
+
+        private PendingEntry pending;
+        private StrategyId awaitingFlatOf;
+
+        public HandoffCoordinator(Func<StrategyId, bool> hasPosition,
+                                  Action<StrategyId> flattenStrategy,
+                                  Action<StrategyId, TradeDirection, int, string> submit,
+                                  Action<StrategyId, string> diag)
+        {
+            this.hasPosition = hasPosition;
+            this.flattenStrategy = flattenStrategy;
+            this.submit = submit;
+            this.diag = diag;
+        }
+
+        /// True while a flatten has been sent and the replacement entry is parked.
+        public bool HandoffInProgress { get { return pending != null; } }
+
+        public static StrategyId Other(StrategyId id)
+        {
+            return id == StrategyId.FAKE_BREAKOUT ? StrategyId.VECTOR_BREAK_RETEST : StrategyId.FAKE_BREAKOUT;
+        }
+
+        /// Entry request from an engine. Submits immediately when the account is
+        /// free, otherwise starts the handoff and defers the order.
+        public void RequestEntry(StrategyId id, TradeDirection dir, int qty, string signal)
+        {
+            StrategyId other = Other(id);
+            bool otherOpen = hasPosition != null && hasPosition(other);
+
+            if (!otherOpen && !HandoffInProgress)
+            {
+                submit(id, dir, qty, signal);
+                return;
+            }
+
+            // V6 U9: park the entry, flatten the other strategy, wait for flat.
+            pending = new PendingEntry { Id = id, Dir = dir, Qty = qty, Signal = signal };
+            awaitingFlatOf = other;
+            if (diag != null)
+                diag(id, string.Format(CultureInfo.InvariantCulture,
+                    "HANDOFF: {0} holds an open position — flattening it first; {1} entry ({2} x{3}) is PARKED until flat is confirmed (V6 U9)",
+                    other, signal, dir, qty));
+            if (otherOpen)
+                flattenStrategy(other);
+        }
+
+        /// Called by the host once the ACCOUNT is confirmed flat (position update /
+        /// exit fill). Releases the parked replacement entry — and only then.
+        public void NotifyFlat()
+        {
+            if (pending == null) return;
+            PendingEntry p = pending;
+            pending = null;
+            if (diag != null)
+                diag(p.Id, string.Format(CultureInfo.InvariantCulture,
+                    "HANDOFF: {0} flat confirmed — submitting parked {1} entry ({2} x{3}) (V6 U9)",
+                    awaitingFlatOf, p.Signal, p.Dir, p.Qty));
+            submit(p.Id, p.Dir, p.Qty, p.Signal);
         }
     }
 

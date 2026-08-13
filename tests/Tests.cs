@@ -348,6 +348,412 @@ namespace MnqTwoTests
                 lv.PP, lv.R1, lv.S1, lv.R2, lv.S3, lv.M3, psy.PsyHigh, psy.PsyLow));
         }
 
+        // ======================================================================
+        // V6 FINAL RULE LOCKS — U1..U9
+        // ======================================================================
+
+        // Drive an FB short to a filled position at YDAY_HIGH=20100, entry ~20095.
+        // Returns the host; first target below entry is YDAY_LOW = 19900.
+        private static MockHost FbShortInPosition(out FakeBreakoutEngine fb)
+        {
+            MockHost host = new MockHost();
+            fb = FbFrozenShort(host, At(9, 15), At(9, 30), 20090);
+            FbBluePath(fb, VectorType.REGULAR_BEARISH);
+            // fill the entry
+            fb.OnEntryExecution("FB_SHORT", 20095, 118, At(9, 34));
+            return host;
+        }
+
+        // ---- U1: FB first target broken only by a completed 1m CLOSE ----------
+
+        private static void TestU1FbTargetBreak()
+        {
+            Console.WriteLine("V6 U1 — FB first target break (completed 1m close, not a wick):");
+
+            FakeBreakoutEngine fb;
+            MockHost h = FbShortInPosition(out fb);
+            // short from 20095: nearest directional 18-level target is M3 = (PP+R1)/2 = 20050
+            Check(h.AnyDiagContains("first target M3 @ 20050"),
+                "first target = nearest directional 18-level target (M3 @ 20050)");
+
+            // wick THROUGH the target but close above it -> must NOT activate runner
+            fb.OnOneMinuteBar(Bar(At(9, 40), 1, 20070, 20075, 20045, 20060, VectorType.REGULAR_BEARISH, 20080));
+            Check(!h.AnyDiagContains("FIRST TARGET BROKEN"),
+                "wick through the first target does NOT activate the runner (V6 U1)");
+            // a 3m close beyond must ALSO not activate it (V6 U1 is a 1-MINUTE rule)
+            fb.OnThreeMinuteBar(Bar(At(9, 42), 3, 20060, 20062, 20040, 20045, VectorType.REGULAR_BEARISH, 20080));
+            Check(!h.AnyDiagContains("FIRST TARGET BROKEN"),
+                "3m close beyond the target does NOT activate the runner under V6 U1");
+
+            // completed 1m CLOSE below the target -> runner activates
+            fb.OnOneMinuteBar(Bar(At(9, 45), 1, 20055, 20056, 20040, 20045, VectorType.REGULAR_BEARISH, 20070));
+            Check(h.AnyDiagContains("FIRST TARGET BROKEN"),
+                "completed 1m close beyond the first target activates the 3m EMA(9) runner");
+
+            // runner exits on completed 3m close above 3m EMA9
+            int exitsBefore = h.Exits.Count;
+            fb.OnThreeMinuteBar(Bar(At(9, 48), 3, 20045, 20080, 20044, 20075, VectorType.GREEN_VECTOR, 20060));
+            Check(h.Exits.Count == exitsBefore + 1 && h.Exits[h.Exits.Count - 1].StartsWith("FB_RUN_S"),
+                "SHORT runner exits on a completed 3m close above the 3m EMA9");
+        }
+
+        // ---- U4 / U5: FB reclaim rules ----------------------------------------
+
+        private static void TestU4U5FbReclaim()
+        {
+            Console.WriteLine("V6 U4/U5 — FB invalid reclaim keeps parent; LTF scan before reclaim:");
+
+            // U5: parent trigger ONLY — no 15m candle has closed back below the level,
+            // so no reclaim/freeze exists. A 1m BLUE->REGULAR short must still enter.
+            MockHost h = new MockHost();
+            h.LevelsEngine = StdLevels();
+            FakeBreakoutEngine fb = new FakeBreakoutEngine(h, new FbConfig());
+            // 15m GREEN parent trigger closes 20110 ABOVE YDAY_HIGH 20100 (no reclaim);
+            // close 20110 < 15m EMA 20130 satisfies the §7 short confluence.
+            fb.OnFifteenMinuteBar(Bar(At(9, 15), 15, 20080, 20120, 20070, 20110, VectorType.GREEN_VECTOR, 20130), 20090);
+            Check(h.AnyDiagContains("PARENT SETUP START"), "15m short parent trigger created");
+            Check(!h.AnyDiagContains("15m RECLAIM confirmed"),
+                "no completed 15m reclaim has occurred (price never closed back below the level)");
+            FbBluePath(fb, VectorType.REGULAR_BEARISH);
+            Check(h.Entries.Count == 1 && h.Entries[0].StartsWith("FB_SHORT"),
+                "U5: 1m/3m entry allowed BEFORE any completed 15m reclaim");
+
+            // U4: an INVALID 15m reclaim must not cancel the parent
+            MockHost h2 = new MockHost();
+            h2.LevelsEngine = StdLevels();
+            FakeBreakoutEngine fb2 = new FakeBreakoutEngine(h2, new FbConfig());
+            // REGULAR breakout above the level
+            fb2.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20095, 20120, 20090, 20110, VectorType.REGULAR_BULLISH, 20100), 20090);
+            Check(h2.AnyDiagContains("PARENT SETUP START"), "REGULAR 15m parent started");
+            // REGULAR reclaim below the level = REGULAR+REGULAR = invalid
+            fb2.OnFifteenMinuteBar(Bar(At(9, 15), 15, 20110, 20112, 20090, 20095, VectorType.REGULAR_BEARISH, 20100), 20110);
+            Check(h2.AnyDiagContains("reclaim IGNORED"), "invalid 15m reclaim is ignored");
+            Check(!h2.AnyDiagContains("CANCELLED"), "U4: invalid 15m reclaim does NOT cancel the parent setup");
+            // parent still alive -> a later valid LTF entry still works
+            fb2.OnFifteenMinuteBar(Bar(At(9, 30), 15, 20095, 20096, 20090, 20094, VectorType.REGULAR_BEARISH, 20100), 20095);
+            FbBluePath(fb2, VectorType.RED_VECTOR);
+            Check(h2.Entries.Count == 1, "parent survived the invalid reclaim and still produced an entry");
+        }
+
+        // ---- VBR helpers -------------------------------------------------------
+
+        // Level book where the previous day is degenerate (H=L=C=20000) so every
+        // pivot/M/YDay level collapses onto 20000. From a long entry at ~20005 the
+        // ONLY directional target above is LWEEK_HIGH 20500 — comfortably >50 points
+        // away, which is what activates the 1m EMA(9) trail (V6 U2).
+        private static KeyLevelEngine FarTargetLevels()
+        {
+            KeyLevelEngine lv = new KeyLevelEngine();
+            Feed(lv, new DateTime(2026, 7, 29, 12, 0, 0), 20000, 20500, 19500, 20000); // prev week
+            Feed(lv, new DateTime(2026, 8, 3, 19, 0, 0), 20000, 20000, 20000, 20000);  // degenerate prev day
+            Feed(lv, new DateTime(2026, 8, 4, 19, 0, 0), 20000, 20000, 20000, 20000);  // today: DAILY_OPEN 20000
+            return lv;
+        }
+
+        // Parent long trigger at 9:15 (DAILY_OPEN = 20000), so validity candles are
+        // #1 = 9:15-9:30, #2 = 9:30-9:45, #3 = 9:45-10:00, #4 = 10:00-10:15.
+        private static VectorBreakRetestEngine VbrLongParent(MockHost host, VbrConfig cfg)
+        {
+            host.LevelsEngine = StdLevels();
+            VectorBreakRetestEngine vbr = new VectorBreakRetestEngine(host, cfg ?? new VbrConfig());
+            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20040, 20060, 20010, 20050, VectorType.GREEN_VECTOR, 20030), 20040);
+            return vbr;
+        }
+
+        // ---- U6: Pattern B waits for EMA, needs BOTH DO and EMA ---------------
+
+        private static void TestU6PatternBWait()
+        {
+            Console.WriteLine("V6 U6 — VBR Pattern B waits for EMA; entry needs BOTH DO and EMA9:");
+
+            MockHost h = new MockHost();
+            VectorBreakRetestEngine vbr = VbrLongParent(h, null);
+            // 1. completed 1m close BELOW Daily Open (20000)
+            vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
+            // 2. close back ABOVE Daily Open but BELOW EMA9 -> must WAIT, not discard
+            vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20008, 19988, 20005, VectorType.REGULAR_BULLISH, 20010));
+            Check(h.Entries.Count == 0, "reclaim above DO but below EMA9 does not enter");
+            Check(h.AnyDiagContains("WAITING for a later 1m close beyond BOTH"),
+                "U6: structure is kept and the engine WAITS for the EMA");
+            // 3. a candle above EMA9 but BELOW Daily Open is NOT a valid entry
+            vbr.OnOneMinuteBar(Bar(At(9, 35), 1, 20005, 20006, 19990, 19995, VectorType.REGULAR_BEARISH, 19990));
+            Check(h.Entries.Count == 0, "U6 step 7: above EMA9 but below Daily Open is NOT a long entry");
+            // 4. later candle closing above BOTH -> ENTER
+            vbr.OnOneMinuteBar(Bar(At(9, 37), 1, 19995, 20030, 19994, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h.Entries.Count == 1 && h.Entries[0].StartsWith("VBR_LONG"),
+                "U6: entry on a later 1m close above BOTH Daily Open and 1m EMA9");
+        }
+
+        private static void TestU6PatternBWaitShort()
+        {
+            Console.WriteLine("V6 U6 — mirror short:");
+
+            MockHost h = new MockHost();
+            h.LevelsEngine = StdLevels();
+            VectorBreakRetestEngine vbr = new VectorBreakRetestEngine(h, new VbrConfig());
+            // short parent: 15m RED_VECTOR closes below DAILY_OPEN 20000
+            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 19960, 19990, 19940, 19950, VectorType.RED_VECTOR, 19970), 19960);
+            // 1. completed 1m close ABOVE Daily Open
+            vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 19995, 20015, 19994, 20010, VectorType.REGULAR_BULLISH, 19990));
+            // 2. close back BELOW Daily Open but ABOVE EMA9 -> WAIT
+            vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 20010, 20012, 19992, 19995, VectorType.REGULAR_BEARISH, 19990));
+            Check(h.Entries.Count == 0 && h.AnyDiagContains("WAITING for a later 1m close beyond BOTH"),
+                "short: rejection below DO but above EMA9 waits");
+            // 3. below EMA9 but ABOVE Daily Open is not valid
+            vbr.OnOneMinuteBar(Bar(At(9, 35), 1, 19995, 20012, 19994, 20008, VectorType.REGULAR_BULLISH, 20015));
+            Check(h.Entries.Count == 0, "short: below EMA9 but above Daily Open is NOT an entry");
+            // 4. close below BOTH -> ENTER SHORT
+            vbr.OnOneMinuteBar(Bar(At(9, 37), 1, 20005, 20006, 19970, 19975, VectorType.RED_VECTOR, 19990));
+            Check(h.Entries.Count == 1 && h.Entries[0].StartsWith("VBR_SHORT"),
+                "short: entry on a later 1m close below BOTH Daily Open and 1m EMA9");
+        }
+
+        // ---- U2 / U3 / U8: VBR profit management ------------------------------
+
+        private static void TestU2U3U8ProfitManagement()
+        {
+            Console.WriteLine("V6 U2/U3/U8 — target reach by touch, 50-pt chain, 1m structure runner:");
+
+            // Long VBR filled at 20005 with 20 contracts. Nearest levels above:
+            // YDAY_HIGH 20100 (95 pts away -> >50 -> trail activates immediately).
+            MockHost h = new MockHost();
+            VectorBreakRetestEngine vbr = VbrLongParent(h, null);
+            h.LevelsEngine = FarTargetLevels();   // nearest target above = LWEEK_HIGH 20500
+            vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
+            vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h.Entries.Count == 1, "VBR long entered");
+            vbr.OnEntryExecution("VBR_LONG", 20005, 20, At(9, 33));
+            Check(h.AnyDiagContains("TRAIL MODE (>50pts"),
+                "U2: next target > 50 points away activates the 1m EMA(9) trail immediately");
+
+            // trail: completed 1m close below EMA9 -> take 90% (18 of 20)
+            vbr.OnOneMinuteBar(Bar(At(9, 40), 1, 20050, 20055, 20040, 20042, VectorType.REGULAR_BEARISH, 20048));
+            Check(h.Exits.Count == 1 && h.Exits[0] == "VBR_TP90_L 18",
+                "90% profit exit on a completed 1m close below EMA9 (18 of 20)");
+            vbr.OnExitExecution("VBR_TP90_L", 20042, 18, At(9, 40));
+
+            // U3: ONE completed 1m candle establishes the supporting higher low.
+            // 9:41 low 20030; 9:42 low 20035 (higher low -> support = 20035).
+            vbr.OnOneMinuteBar(Bar(At(9, 41), 1, 20042, 20045, 20030, 20040, VectorType.REGULAR_BEARISH, 20044));
+            vbr.OnOneMinuteBar(Bar(At(9, 42), 1, 20040, 20048, 20035, 20046, VectorType.REGULAR_BULLISH, 20044));
+            // a wick below 20035 that closes above it must NOT exit
+            vbr.OnOneMinuteBar(Bar(At(9, 43), 1, 20046, 20047, 20020, 20040, VectorType.REGULAR_BEARISH, 20044));
+            Check(h.Exits.Count == 1, "U3: wick below the 1m supporting structure does NOT exit the final 10%");
+            // a later completed close BELOW 20035 exits the final 10%
+            vbr.OnOneMinuteBar(Bar(At(9, 44), 1, 20040, 20041, 20020, 20025, VectorType.REGULAR_BEARISH, 20040));
+            Check(h.Exits.Count == 2 && h.Exits[1] == "VBR_RUN_L 2",
+                "U3: later completed 1m close through the one-candle structure exits the final 10%");
+            Check(h.AnyDiagContains("(V6 U3)"), "runner exit is attributed to the V6 U3 structure rule");
+        }
+
+        private static void TestU2TargetChaining()
+        {
+            Console.WriteLine("V6 U2 — wick/touch reaches a target and advances the chain:");
+
+            // Build levels so the first target above entry is ~25 pts away (<=50 -> hold).
+            KeyLevelEngine lv = new KeyLevelEngine();
+            Feed(lv, new DateTime(2026, 7, 29, 12, 0, 0), 20000, 20500, 19500, 20000);
+            Feed(lv, new DateTime(2026, 8, 3, 19, 0, 0), 20000, 20030, 19970, 20000); // YDAY_HIGH 20030
+            Feed(lv, new DateTime(2026, 8, 4, 19, 0, 0), 20000, 20010, 19990, 20000); // DAILY_OPEN 20000
+
+            MockHost h = new MockHost();
+            h.LevelsEngine = lv;
+            VectorBreakRetestEngine vbr = new VectorBreakRetestEngine(h, new VbrConfig());
+            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20005, 20020, 19995, 20015, VectorType.GREEN_VECTOR, 20005), 20005);
+            vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 20002, 20003, 19985, 19990, VectorType.REGULAR_BEARISH, 20008));
+            vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20012, 19988, 20010, VectorType.GREEN_VECTOR, 20005));
+            vbr.OnEntryExecution("VBR_LONG", 20005, 10, At(9, 33));
+            Check(h.AnyDiagContains("HOLD for level (<=50pts"),
+                "first target within 50 points -> HOLD and ignore adverse EMA closes");
+
+            // adverse EMA close while the nearby target is active must NOT take profit
+            vbr.OnOneMinuteBar(Bar(At(9, 35), 1, 20010, 20012, 20004, 20006, VectorType.REGULAR_BEARISH, 20009));
+            Check(h.Exits.Count == 0, "U2: adverse 1m EMA close ignored while a <=50pt target is active");
+
+            // WICK/TOUCH of the target (high 20030, close below it) -> reached, chain advances
+            vbr.OnOneMinuteBar(Bar(At(9, 36), 1, 20006, 20030, 20005, 20020, VectorType.REGULAR_BULLISH, 20010));
+            Check(h.AnyDiagContains("TARGET REACHED"),
+                "U2: a wick/touch REACHES the target (no completed close required)");
+        }
+
+        private static void TestU8SingleContract()
+        {
+            Console.WriteLine("V6 U8 — 1-contract VBR position exits fully on the EMA signal:");
+
+            MockHost h = new MockHost();
+            VectorBreakRetestEngine vbr = VbrLongParent(h, null);
+            h.LevelsEngine = FarTargetLevels();   // ensures the EMA trail can activate
+            // stop 19985 vs entry close 20025 = 40 pts => $80/contract;
+            // 50% of $200 = $100 => floor(100/80) = exactly 1 contract
+            h.Balance = 200;
+            vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
+            vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h.Entries.Count == 1 && h.Entries[0] == "VBR_LONG 1", "sizing produced exactly 1 contract");
+            vbr.OnEntryExecution("VBR_LONG", 20005, 1, At(9, 33));
+            vbr.OnOneMinuteBar(Bar(At(9, 40), 1, 20050, 20055, 20040, 20042, VectorType.REGULAR_BEARISH, 20048));
+            Check(h.Exits.Count == 1 && h.Exits[0] == "VBR_TP90_L 1",
+                "U8: the EMA profit signal exits the ENTIRE 1-contract position");
+            Check(h.AnyDiagContains("no runner (V6 U8)"), "U8: no runner is held for a 1-contract position");
+        }
+
+        // ---- U7: rolling re-entry re-qualification ----------------------------
+
+        // Stop a VBR long out during validity candle #2 and return the engine.
+        private static VectorBreakRetestEngine VbrStoppedInCandle2(MockHost host)
+        {
+            VectorBreakRetestEngine vbr = VbrLongParent(host, null);
+            // candle #1 completes (9:15-9:30)
+            vbr.OnFifteenMinuteBar(Bar(At(9, 15), 15, 20050, 20060, 20040, 20055, VectorType.REGULAR_BULLISH, 20040), 20050);
+            // enter during candle #2 (9:30-9:45)
+            vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
+            vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+            vbr.OnEntryExecution("VBR_LONG", 20005, 10, At(9, 33));
+            // stopped out inside candle #2
+            vbr.OnExitExecution("VBR_STOP_L", 19985, 10, At(9, 36));
+            return vbr;
+        }
+
+        private static void TestU7RollingReentry()
+        {
+            Console.WriteLine("V6 U7 — rolling re-entry re-qualification inside the ORIGINAL clock:");
+
+            MockHost h = new MockHost();
+            VectorBreakRetestEngine vbr = VbrStoppedInCandle2(h);
+            Check(h.AnyDiagContains("STOPPED OUT during validity candle #2"), "stop-out recorded in candle #2");
+
+            // candle #2 completes: wicks into DO and closes above it -> #3 may scan
+            vbr.OnFifteenMinuteBar(Bar(At(9, 30), 15, 20020, 20040, 19995, 20030, VectorType.REGULAR_BULLISH, 20010), 20020);
+            Check(h.AnyDiagContains("candle #3"), "U7: qualifying candle #2 authorizes candle #3 to scan");
+
+            // no entry during #3, but #3 closes on the correct side -> #4 may scan
+            vbr.OnFifteenMinuteBar(Bar(At(9, 45), 15, 20030, 20045, 20025, 20040, VectorType.REGULAR_BULLISH, 20020), 20030);
+            Check(h.AnyDiagContains("candle #4 may scan") || h.AnyDiagContains("candle #4"),
+                "U7: correct-side close in #3 rolls the permission to candle #4");
+            Check(!h.AnyDiagContains("setup finished"), "U7: rolling permission did not end the setup after one candle");
+
+            // a fresh 1m pattern during #4 may still enter
+            vbr.OnOneMinuteBar(Bar(At(10, 1), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
+            vbr.OnOneMinuteBar(Bar(At(10, 3), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h.Entries.Count == 2, "U7: fresh 1m pattern in candle #4 produced the re-entry");
+
+            // Separate run: roll all the way to #4, take NO entry there, and close #4
+            // on the correct side. The ORIGINAL clock must still end the setup — the
+            // rolling permission can never create a candle #5.
+            MockHost h2 = new MockHost();
+            VectorBreakRetestEngine vbr2 = VbrStoppedInCandle2(h2);
+            vbr2.OnFifteenMinuteBar(Bar(At(9, 30), 15, 20020, 20040, 19995, 20030, VectorType.REGULAR_BULLISH, 20010), 20020); // #2 qualifies -> #3
+            vbr2.OnFifteenMinuteBar(Bar(At(9, 45), 15, 20030, 20045, 20025, 20040, VectorType.REGULAR_BULLISH, 20020), 20030); // #3 rolls -> #4
+            vbr2.OnFifteenMinuteBar(Bar(At(10, 0), 15, 20040, 20050, 20030, 20045, VectorType.REGULAR_BULLISH, 20030), 20040); // #4 correct side, no entry
+            Check(h2.AnyDiagContains("ORIGINAL 4-candle clock ended"),
+                "U7: the ORIGINAL 4-candle clock never restarts or extends (no candle #5)");
+            int before2 = h2.Entries.Count;
+            vbr2.OnOneMinuteBar(Bar(At(10, 16), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
+            vbr2.OnOneMinuteBar(Bar(At(10, 18), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h2.Entries.Count == before2, "U7: no entry is possible after the original clock ends");
+        }
+
+        private static void TestU7WrongSideBreaksRolling()
+        {
+            Console.WriteLine("V6 U7 — a wrong-side close breaks the rolling permission:");
+
+            MockHost h = new MockHost();
+            VectorBreakRetestEngine vbr = VbrStoppedInCandle2(h);
+            // candle #2 qualifies -> #3 may scan
+            vbr.OnFifteenMinuteBar(Bar(At(9, 30), 15, 20020, 20040, 19995, 20030, VectorType.REGULAR_BULLISH, 20010), 20020);
+            Check(h.AnyDiagContains("candle #3"), "candle #3 authorized");
+            // #3 completes with NO entry and closes BELOW Daily Open (wrong side)
+            vbr.OnFifteenMinuteBar(Bar(At(9, 45), 15, 20010, 20015, 19960, 19970, VectorType.REGULAR_BEARISH, 20000), 20010);
+            Check(h.AnyDiagContains("ROLLING RE-ENTRY BROKEN"),
+                "U7: wrong-side close ends the rolling re-entry permission");
+            // and no further entry can occur
+            int before = h.Entries.Count;
+            vbr.OnOneMinuteBar(Bar(At(10, 1), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
+            vbr.OnOneMinuteBar(Bar(At(10, 3), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h.Entries.Count == before, "no re-entry after the rolling permission is broken");
+        }
+
+        // ---- U9: strategy handoff ---------------------------------------------
+
+        private static void TestU9HandoffFbToVbr()
+        {
+            Console.WriteLine("V6 U9 — FB open + valid VBR entry => flatten FB first:");
+
+            MockHost h = new MockHost();
+            h.LevelsEngine = StdLevels();
+            FakeBreakoutEngine fb = new FakeBreakoutEngine(h, new FbConfig());
+            VectorBreakRetestEngine vbr = new VectorBreakRetestEngine(h, new VbrConfig());
+            h.Fb = fb; h.Vbr = vbr; h.WireHandoff();
+
+            // FB short parent + entry, filled
+            fb.OnFifteenMinuteBar(Bar(At(9, 15), 15, 20080, 20120, 20070, 20110, VectorType.GREEN_VECTOR, 20130), 20090);
+            fb.OnFifteenMinuteBar(Bar(At(9, 30), 15, 20110, 20115, 20090, 20095, VectorType.RED_VECTOR, 20100), 20110);
+            FbBluePath(fb, VectorType.REGULAR_BEARISH);
+            Check(h.Entries.Count == 1 && h.Entries[0].StartsWith("FB_SHORT"), "FB entered first");
+            fb.OnEntryExecution("FB_SHORT", 20095, 118, At(9, 34));
+
+            // now a valid VBR long forms
+            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20040, 20060, 20010, 20050, VectorType.GREEN_VECTOR, 20030), 20040);
+            vbr.OnOneMinuteBar(Bar(At(9, 36), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
+            vbr.OnOneMinuteBar(Bar(At(9, 38), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+
+            Check(h.AnyDiagContains("HANDOFF"), "U9: handoff initiated instead of blocking the VBR entry");
+            Check(h.Exits.Count >= 1 && h.Exits[h.Exits.Count - 1].StartsWith("FB_HANDOFF"),
+                "U9: FB position is flattened");
+            Check(h.Entries.Count == 1,
+                "U9: the VBR replacement order is NOT submitted before the flatten is confirmed");
+
+            // flatten fills -> account flat -> replacement entry released
+            fb.OnExitExecution("FB_HANDOFF_S", 20090, 118, At(9, 38));
+            h.ConfirmFlat();
+            Check(h.Entries.Count == 2 && h.Entries[1].StartsWith("VBR_LONG"),
+                "U9: VBR entry submitted only after flat confirmation");
+
+            int exitIdx = h.Sequence.FindIndex(delegate(string x) { return x.StartsWith("EXIT FB_HANDOFF"); });
+            int flatIdx = h.Sequence.IndexOf("FLAT_CONFIRMED");
+            int entIdx = h.Sequence.FindIndex(delegate(string x) { return x.StartsWith("ENTRY VBR_LONG"); });
+            Check(exitIdx >= 0 && flatIdx > exitIdx && entIdx > flatIdx,
+                "U9 ordering: FB exit -> flat confirmed -> VBR entry");
+        }
+
+        private static void TestU9HandoffVbrToFb()
+        {
+            Console.WriteLine("V6 U9 — VBR open + valid FB entry => flatten VBR first:");
+
+            MockHost h = new MockHost();
+            h.LevelsEngine = StdLevels();
+            FakeBreakoutEngine fb = new FakeBreakoutEngine(h, new FbConfig());
+            VectorBreakRetestEngine vbr = new VectorBreakRetestEngine(h, new VbrConfig());
+            h.Fb = fb; h.Vbr = vbr; h.WireHandoff();
+
+            // VBR long entered and filled
+            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20040, 20060, 20010, 20050, VectorType.GREEN_VECTOR, 20030), 20040);
+            vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
+            vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h.Entries.Count == 1 && h.Entries[0].StartsWith("VBR_LONG"), "VBR entered first");
+            vbr.OnEntryExecution("VBR_LONG", 20005, 10, At(9, 33));
+
+            // now a valid FB short forms
+            fb.OnFifteenMinuteBar(Bar(At(9, 15), 15, 20080, 20120, 20070, 20110, VectorType.GREEN_VECTOR, 20130), 20090);
+            fb.OnFifteenMinuteBar(Bar(At(9, 30), 15, 20110, 20115, 20090, 20095, VectorType.RED_VECTOR, 20100), 20110);
+            FbBluePath(fb, VectorType.REGULAR_BEARISH);
+
+            Check(h.Exits.Count >= 1 && h.Exits[h.Exits.Count - 1].StartsWith("VBR_HANDOFF"),
+                "U9: VBR position is flattened");
+            Check(h.Entries.Count == 1,
+                "U9: the FB replacement order is NOT submitted before the flatten is confirmed");
+
+            vbr.OnExitExecution("VBR_HANDOFF_L", 20020, 10, At(9, 34));
+            h.ConfirmFlat();
+            Check(h.Entries.Count == 2 && h.Entries[1].StartsWith("FB_SHORT"),
+                "U9: FB entry submitted only after flat confirmation");
+
+            int exitIdx = h.Sequence.FindIndex(delegate(string x) { return x.StartsWith("EXIT VBR_HANDOFF"); });
+            int flatIdx = h.Sequence.IndexOf("FLAT_CONFIRMED");
+            int entIdx = h.Sequence.FindIndex(delegate(string x) { return x.StartsWith("ENTRY FB_SHORT"); });
+            Check(exitIdx >= 0 && flatIdx > exitIdx && entIdx > flatIdx,
+                "U9 ordering: VBR exit -> flat confirmed -> FB entry");
+        }
+
         // ---- main ------------------------------------------------------------
 
         public static int Main()
@@ -359,6 +765,19 @@ namespace MnqTwoTests
             TestLaterEntryGradesBPlus();
             TestTargetSortingAndMerging();
             TestTradersRealityPorts();
+
+            // ---- V6 FINAL RULE LOCKS ----
+            TestU1FbTargetBreak();
+            TestU4U5FbReclaim();
+            TestU6PatternBWait();
+            TestU6PatternBWaitShort();
+            TestU2U3U8ProfitManagement();
+            TestU2TargetChaining();
+            TestU8SingleContract();
+            TestU7RollingReentry();
+            TestU7WrongSideBreaksRolling();
+            TestU9HandoffFbToVbr();
+            TestU9HandoffVbrToFb();
 
             Console.WriteLine();
             Console.WriteLine(string.Format("RESULT: {0} passed, {1} failed", passed, failed));

@@ -54,6 +54,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private EMA ema1m, ema3m, ema15m;
         private bool instrumentOk;
         private bool instrumentWarned;
+        private HandoffCoordinator handoff;   // V6 U9 strategy handoff sequencing
 
         // ==================================================================
         // Parameters — every flagged ambiguity is exposed here instead of
@@ -128,9 +129,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "B+ risk % (FB candles 2-6)", GroupName = "02. Account / Risk", Order = 6)]
         public double RiskPctBPlus { get; set; }
 
-        [NinjaScriptProperty]
-        [Display(Name = "Allow simultaneous FB+VBR positions (SH-2)", GroupName = "02. Account / Risk", Order = 7)]
-        public bool AllowSimultaneousStrategies { get; set; }
         #endregion
 
         #region 03. Fake Breakout
@@ -139,23 +137,23 @@ namespace NinjaTrader.NinjaScript.Strategies
         public bool FbRequirePriorCloseInside { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Invalid 15m reclaim cancels setup (FB-3)", GroupName = "03. Fake Breakout", Order = 2)]
+        [Display(Name = "LEGACY: invalid 15m reclaim cancels setup (V6 U4: keep FALSE)", GroupName = "03. Fake Breakout", Order = 2)]
         public bool FbInvalidReclaimCancelsSetup { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Require 15m reclaim before 1m/3m scan (FB-2)", GroupName = "03. Fake Breakout", Order = 3)]
+        [Display(Name = "LEGACY: require 15m reclaim before 1m/3m scan (V6 U5: keep FALSE)", GroupName = "03. Fake Breakout", Order = 3)]
         public bool FbRequire15mReclaimBeforeLtfEntry { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "15m EMA confluence fail cancels LTF setup (FB-5)", GroupName = "03. Fake Breakout", Order = 4)]
+        [Display(Name = "15m EMA confluence fail cancels LTF setup (not locked by V6)", GroupName = "03. Fake Breakout", Order = 4)]
         public bool FbConfluenceFailCancelsLtfSetup { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "First-target break definition (spec: configurable)", GroupName = "03. Fake Breakout", Order = 5)]
+        [Display(Name = "First-target break definition (V6 U1: 1m close beyond)", GroupName = "03. Fake Breakout", Order = 5)]
         public FbTargetBreakMode FbTargetBreakModeParam { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "A- grade basis (V5 Fix 7 default: first tradable candle)", GroupName = "03. Fake Breakout", Order = 6)]
+        [Display(Name = "A- grade basis (V6: first actually-eligible entry candle)", GroupName = "03. Fake Breakout", Order = 6)]
         public FbGradeBasis FbGradeBasisParam { get; set; }
         #endregion
 
@@ -169,24 +167,19 @@ namespace NinjaTrader.NinjaScript.Strategies
         public bool VbrRetriggerReplacesSetup { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Target 'reached' definition (V5 unresolved item 2)", GroupName = "04. Vector Break Retest", Order = 8)]
+        [Display(Name = "Target 'reached' definition (V6 U2: wick/touch)", GroupName = "04. Vector Break Retest", Order = 8)]
         public TargetReachedMode VbrTargetReachedModeParam { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Pattern B waits for EMA after reclaim (VBR-3)", GroupName = "04. Vector Break Retest", Order = 3)]
+        [Display(Name = "Pattern B waits for EMA after reclaim (V6 U6: keep TRUE)", GroupName = "04. Vector Break Retest", Order = 3)]
         public bool VbrPatternBWaitForEma { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Re-entry scan only the following 15m candle (VBR-4)", GroupName = "04. Vector Break Retest", Order = 4)]
+        [Display(Name = "LEGACY: re-entry only following candle (V6 U7 rolling: keep FALSE)", GroupName = "04. Vector Break Retest", Order = 4)]
         public bool VbrReentryScanOnlyFollowingCandle { get; set; }
 
         [NinjaScriptProperty]
-        [Range(1, 10)]
-        [Display(Name = "Runner swing strength (VBR-5)", GroupName = "04. Vector Break Retest", Order = 5)]
-        public int VbrRunnerSwingStrength { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Single contract becomes runner (VBR-6)", GroupName = "04. Vector Break Retest", Order = 6)]
+        [Display(Name = "LEGACY: single contract becomes runner (V6 U8: keep FALSE)", GroupName = "04. Vector Break Retest", Order = 6)]
         public bool VbrSingleContractBecomesRunner { get; set; }
 
         [NinjaScriptProperty]
@@ -274,22 +267,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RiskPctAPlus = 50;              // spec GLOBAL POSITION SIZING
                 RiskPctAMinus = 26;
                 RiskPctBPlus = 10;
-                AllowSimultaneousStrategies = false;
 
                 FbRequirePriorCloseInside = false;          // V5 Fix 2 (legacy, keep FALSE)
                 FbInvalidReclaimCancelsSetup = false;
-                FbRequire15mReclaimBeforeLtfEntry = true;
+                FbRequire15mReclaimBeforeLtfEntry = false;   // V6 U5
                 FbConfluenceFailCancelsLtfSetup = true;
-                FbTargetBreakModeParam = FbTargetBreakMode.ThreeMinuteCloseBeyond;
+                FbTargetBreakModeParam = FbTargetBreakMode.OneMinuteCloseBeyond; // V6 U1
                 FbGradeBasisParam = FbGradeBasis.FirstTradableCandle; // V5 Fix 7
 
                 VbrRequireCrossThrough = false;             // V5 Fix 3 (legacy, keep FALSE)
                 VbrRetriggerReplacesSetup = false;          // V5 Fix 5 (legacy, keep FALSE)
                 VbrTargetReachedModeParam = TargetReachedMode.IntrabarTouch;
-                VbrPatternBWaitForEma = false;
-                VbrReentryScanOnlyFollowingCandle = true;
-                VbrRunnerSwingStrength = 2;
-                VbrSingleContractBecomesRunner = true;
+                VbrPatternBWaitForEma = true;                // V6 U6
+                VbrReentryScanOnlyFollowingCandle = false;   // V6 U7 rolling
+                VbrSingleContractBecomesRunner = false;      // V6 U8
                 VbrChainMaxDistancePoints = 50;
 
                 TpEnableM0 = true; TpEnableM1 = true; TpEnableM2 = true; TpEnableM3 = true;
@@ -347,11 +338,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 vbrCfg.RetriggerReplacesActiveSetup = VbrRetriggerReplacesSetup;
                 vbrCfg.PatternBWaitForEma = VbrPatternBWaitForEma;
                 vbrCfg.ReentryScanOnlyFollowingCandle = VbrReentryScanOnlyFollowingCandle;
-                vbrCfg.RunnerSwingStrength = VbrRunnerSwingStrength;
                 vbrCfg.SingleContractBecomesRunner = VbrSingleContractBecomesRunner;
                 vbrCfg.ChainMaxDistancePoints = VbrChainMaxDistancePoints;
                 vbrCfg.TargetReached = VbrTargetReachedModeParam;
                 vbr = new VectorBreakRetestEngine(this, vbrCfg);
+
+                // V6 U9: shared handoff coordinator (same class the tests exercise)
+                handoff = new HandoffCoordinator(StrategyHasPosition, FlattenStrategy,
+                    SubmitEntryOrder, delegate(StrategyId sid, string msg) { Diag(sid, msg); });
 
                 string csvPath = Path.Combine(NinjaTrader.Core.Globals.UserDataDir,
                     string.Format("MnqTwoStrategies_trades_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now));
@@ -488,6 +482,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        // V6 U9: the ONLY place a parked handoff entry is released. NinjaTrader
+        // reports the strategy position as Flat once the flatten fill is processed;
+        // the replacement order is submitted at that point and never before.
+        protected override void OnPositionUpdate(Position position, double averagePrice,
+            int quantity, MarketPosition marketPosition)
+        {
+            if (handoff == null) return;
+            if (marketPosition == MarketPosition.Flat && handoff.HandoffInProgress)
+                handoff.NotifyFlat();
+        }
+
         protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice,
             int quantity, int filled, double averageFillPrice, OrderState orderState,
             DateTime time, ErrorCode error, string comment)
@@ -540,14 +545,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             return etTime.TimeOfDay.TotalMinutes > EntryEndMinutesEt;
         }
 
-        // SH-2: simultaneous-position policy (spec: expose as a setting)
+        // V6 U9: this is only the instrument/enabled gate. An open position held by
+        // the OTHER strategy never blocks an entry — EnterPosition routes it through
+        // the handoff coordinator (flatten first, confirm flat, then enter).
         public bool CanOpenPosition(StrategyId id)
         {
-            if (!instrumentOk) return false;
-            if (AllowSimultaneousStrategies) return true;
-            if (id == StrategyId.FAKE_BREAKOUT)
-                return !vbr.HasOpenOrPendingPosition;
-            return !fb.HasOpenOrPendingPosition;
+            return instrumentOk;
         }
 
         public bool TpLevelEnabled(TpLevelId id)
@@ -576,16 +579,37 @@ namespace NinjaTrader.NinjaScript.Strategies
             return false;
         }
 
-        // All orders are submitted against the 1m series (finest execution
-        // granularity); signal names carry the strategy prefix.
+        // V6 U9 STRATEGY HANDOFF: entries are routed through the coordinator. If the
+        // other engine holds a position, it is flattened FIRST and this order is
+        // parked until the account is confirmed flat (see OnPositionUpdate).
+        // All orders go against the 1m series (finest execution granularity);
+        // signal names carry the strategy prefix.
         public int EnterPosition(StrategyId id, TradeDirection dir, int qty, string signalName)
         {
             if (!instrumentOk || qty < 1) return 0;
+            handoff.RequestEntry(id, dir, qty, signalName);
+            return qty;
+        }
+
+        private void SubmitEntryOrder(StrategyId id, TradeDirection dir, int qty, string signalName)
+        {
             if (dir == TradeDirection.Long)
                 EnterLong(BipOneMin, qty, signalName);
             else
                 EnterShort(BipOneMin, qty, signalName);
-            return qty;
+        }
+
+        private bool StrategyHasPosition(StrategyId id)
+        {
+            return id == StrategyId.FAKE_BREAKOUT
+                ? fb.HasOpenOrPendingPosition
+                : vbr.HasOpenOrPendingPosition;
+        }
+
+        private void FlattenStrategy(StrategyId id)
+        {
+            if (id == StrategyId.FAKE_BREAKOUT) fb.FlattenForHandoff();
+            else vbr.FlattenForHandoff();
         }
 
         public void SubmitOrUpdateStop(StrategyId id, TradeDirection dir, int qty, double stopPrice,

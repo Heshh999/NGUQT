@@ -1,9 +1,9 @@
 # MnqTwoStrategies — NinjaTrader 8 (MNQ ONLY)
 
 Two completely independent automated strategies in one NT8 host strategy, implemented from
-the master specification **V5** (`two_automated_strategies_for_claude_v5_MNQ_ONLY.md`,
-supersedes V4). V5 corrections applied per `FABLE_5_CORRECTION_PROMPT_MNQ.md` — see
-`docs/CHANGELOG_V5.md` and `docs/COMPLIANCE_AUDIT.md`:
+the master specification **V6** (`two_automated_strategies_for_claude_v6_MNQ_ONLY_FINAL.md`,
+supersedes V5). V6 locks U1–U9 — see `docs/CHANGELOG_V6.md` and
+`docs/COMPLIANCE_AUDIT_V6.md`:
 
 1. **FAKE_BREAKOUT** — 15m failed-breakout reversal at YDay/LWeek highs/lows, 1m/3m entry
 2. **VECTOR_BREAK_RETEST** — 15m vector break of the Daily Open, 1m retest entry
@@ -20,9 +20,11 @@ the 18-level take-profit engine, MNQ ($2/pt) risk-based sizing, session/time hel
 | `src/VectorBreakRetestEngine.cs` | Strategy 2 state machine (independent) |
 | `src/MnqTwoStrategies.cs` | NT8 Strategy host: series wiring, MNQ gate, orders, parameters |
 | `docs/SPEC_ANALYSIS.md` | Pre-implementation analysis (A–E deliverables, V4-era) |
-| `docs/COMPLIANCE_AUDIT.md` | Rule-by-rule V5 audit table + unresolved-items register |
+| `docs/COMPLIANCE_AUDIT_V6.md` | **Current** rule-by-rule V6 audit + remaining issues |
+| `docs/CHANGELOG_V6.md` | V6 rule-lock pass (U1–U9): previous vs corrected behavior |
+| `docs/COMPLIANCE_AUDIT.md` | Superseded V5 audit (kept for history) |
 | `docs/CHANGELOG_V5.md` | V5 correction pass: every file/function changed, previous vs corrected behavior |
-| `tests/` | Deterministic engine tests (Mono/.NET, no NinjaTrader needed) — 41 assertions |
+| `tests/` | Deterministic engine tests (Mono/.NET, no NinjaTrader needed) — 93 assertions |
 
 ## Installation
 
@@ -61,18 +63,20 @@ the 18-level take-profit engine, MNQ ($2/pt) risk-based sizing, session/time hel
   indicator.
 - **Tests**: `cd tests && mcs -out:run_tests.exe ../src/MnqTwoStrategiesShared.cs
   ../src/FakeBreakoutEngine.cs ../src/VectorBreakRetestEngine.cs MockHost.cs Tests.cs &&
-  mono run_tests.exe` — the strategy engines have no NinjaTrader dependency, so the V5
-  scenario tests run anywhere .NET/Mono runs.
+  mono run_tests.exe` — the engines and the handoff coordinator have no NinjaTrader
+  dependency, so the V6 scenario tests run anywhere .NET/Mono runs (93 assertions).
 - **Backtest sizing** uses the *Backtest starting balance* parameter (default $5,000),
   optionally compounded with realized PnL. Live sizing uses the account cash value.
 - **Risk warning**: the spec mandates 50% / 26% / 10% account risk per trade. Those are the
   defaults because the spec says so — they are extremely aggressive.
-- **Netting caveat**: NT8 nets positions inside one strategy. With
-  *Allow simultaneous FB+VBR positions* = true, an FB short while VBR is long would offset at
-  the account level even though both engines track their own trades. Default is false: the
-  first strategy in a position blocks the other's entries (logged).
+- **Strategy handoff (V6 U9)**: FB and VBR never hold positions at the same time. If one is
+  open and the other produces a valid entry, the open position is flattened first, the
+  account-flat confirmation is awaited, and only then is the replacement order submitted —
+  which also avoids NT8 netting the two engines together. Watch the first live handoff to
+  confirm `OnPositionUpdate` fires as expected.
 - **CSV trade log** is written to `Documents\NinjaTrader 8\MnqTwoStrategies_trades_<ts>.csv`;
   diagnostics stream to the NinjaScript Output window. Per-strategy win/loss, R, MFE/MAE
   summaries print when the strategy stops.
-- Every ambiguity in the spec is an exposed parameter tagged FB-*/VBR-*/SH-* — see
-  `docs/COMPLIANCE_AUDIT.md` before trusting a backtest.
+- V6-locked behaviors are the defaults; legacy research flags are labelled
+  "LEGACY … keep FALSE/TRUE" in the parameter list. See `docs/COMPLIANCE_AUDIT_V6.md`
+  before trusting a backtest.

@@ -22,6 +22,43 @@ namespace MnqTwoTests
         public double Balance = 10000;
         public bool AllowOpen = true;
 
+        // ---- V6 U9 handoff wiring (uses the SAME shared coordinator as the NT host) ----
+        public FakeBreakoutEngine Fb;
+        public VectorBreakRetestEngine Vbr;
+        public HandoffCoordinator Handoff;
+        /// Ordered record of every execution-affecting action, so tests can assert
+        /// that a replacement entry is never submitted before the flatten fill.
+        public List<string> Sequence = new List<string>();
+
+        public void WireHandoff()
+        {
+            Handoff = new HandoffCoordinator(
+                delegate(StrategyId id)
+                {
+                    return id == StrategyId.FAKE_BREAKOUT
+                        ? (Fb != null && Fb.HasOpenOrPendingPosition)
+                        : (Vbr != null && Vbr.HasOpenOrPendingPosition);
+                },
+                delegate(StrategyId id)
+                {
+                    if (id == StrategyId.FAKE_BREAKOUT) { if (Fb != null) Fb.FlattenForHandoff(); }
+                    else { if (Vbr != null) Vbr.FlattenForHandoff(); }
+                },
+                delegate(StrategyId id, TradeDirection dir, int qty, string signal)
+                {
+                    Entries.Add(signal + " " + qty);
+                    Sequence.Add("ENTRY " + signal + " x" + qty);
+                },
+                delegate(StrategyId id, string msg) { Diag(id, msg); });
+        }
+
+        /// Simulate the broker confirming the account is flat after a flatten fill.
+        public void ConfirmFlat()
+        {
+            Sequence.Add("FLAT_CONFIRMED");
+            if (Handoff != null) Handoff.NotifyFlat();
+        }
+
         public KeyLevelEngine Levels { get { return LevelsEngine; } }
         public double AccountBalance { get { return Balance; } }
         public double TickSize { get { return 0.25; } }
@@ -39,7 +76,13 @@ namespace MnqTwoTests
 
         public int EnterPosition(StrategyId id, TradeDirection dir, int qty, string signalName)
         {
+            if (Handoff != null)
+            {
+                Handoff.RequestEntry(id, dir, qty, signalName); // V6 U9 sequencing
+                return qty;
+            }
             Entries.Add(signalName + " " + qty);
+            Sequence.Add("ENTRY " + signalName + " x" + qty);
             return qty;
         }
         public void SubmitOrUpdateStop(StrategyId id, TradeDirection dir, int qty, double stopPrice,
@@ -50,6 +93,7 @@ namespace MnqTwoTests
         public void ExitMarket(StrategyId id, TradeDirection dir, int qty, string exitName, string fromEntrySignal)
         {
             Exits.Add(exitName + " " + qty);
+            Sequence.Add("EXIT " + exitName + " x" + qty);
         }
         public void Diag(StrategyId id, string msg) { Diags.Add("[" + id + "] " + msg); }
         public void LogTrade(TradeRecord rec) { Trades.Add(rec); }
