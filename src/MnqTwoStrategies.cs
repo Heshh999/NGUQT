@@ -78,21 +78,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Range(0, 1439)]
-        [Display(Name = "Exchange day start (minutes ET, 0=midnight; SH-1)", GroupName = "01. Session / Time", Order = 4)]
+        [Display(Name = "Exchange day start (min ET; 1080=18:00 CME session=TR time('D') for MNQ, 0=lit. midnight)", GroupName = "01. Session / Time", Order = 4)]
         public int DayStartMinutesEt { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 10079)]
-        [Display(Name = "Week start (minutes ET from Sunday 00:00, 1080=Sun 18:00; SH-1)", GroupName = "01. Session / Time", Order = 5)]
+        [Display(Name = "Week start (minutes ET from Sunday 00:00, 1080=Sun 18:00)", GroupName = "01. Session / Time", Order = 5)]
         public int WeekStartMinutesEt { get; set; }
 
         [NinjaScriptProperty]
-        [Range(1, 48)]
-        [Display(Name = "Psy-level window hours (SH-1)", GroupName = "01. Session / Time", Order = 6)]
-        public int PsyWindowHours { get; set; }
+        [Display(Name = "Psy level type (TR calcPsyLevels psyType)", GroupName = "01. Session / Time", Order = 6)]
+        public PsyLevelType PsyLevelTypeParam { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Flatten on session close (SH-4)", GroupName = "01. Session / Time", Order = 7)]
+        [Display(Name = "PLATFORM flatten on session close (NOT a strategy rule; V5 Fix 6 default OFF)", GroupName = "01. Session / Time", Order = 7)]
         public bool ExitOnSessionCloseEnabled { get; set; }
         #endregion
 
@@ -132,7 +131,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region 03. Fake Breakout
         [NinjaScriptProperty]
-        [Display(Name = "Require prior 15m close inside level (FB-1)", GroupName = "03. Fake Breakout", Order = 1)]
+        [Display(Name = "LEGACY research: require prior 15m close inside level (V5 Fix 2: keep FALSE)", GroupName = "03. Fake Breakout", Order = 1)]
         public bool FbRequirePriorCloseInside { get; set; }
 
         [NinjaScriptProperty]
@@ -152,18 +151,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         public FbTargetBreakMode FbTargetBreakModeParam { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "A- grade basis (FB-6)", GroupName = "03. Fake Breakout", Order = 6)]
+        [Display(Name = "A- grade basis (V5 Fix 7 default: first tradable candle)", GroupName = "03. Fake Breakout", Order = 6)]
         public FbGradeBasis FbGradeBasisParam { get; set; }
         #endregion
 
         #region 04. Vector Break Retest
         [NinjaScriptProperty]
-        [Display(Name = "Vector must cross through Daily Open (VBR-1)", GroupName = "04. Vector Break Retest", Order = 1)]
+        [Display(Name = "LEGACY research: vector must cross through Daily Open (V5 Fix 3: keep FALSE)", GroupName = "04. Vector Break Retest", Order = 1)]
         public bool VbrRequireCrossThrough { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "New vector replaces active flat setup (VBR-2)", GroupName = "04. Vector Break Retest", Order = 2)]
+        [Display(Name = "LEGACY research: new vector replaces active flat setup (V5 Fix 5: keep FALSE)", GroupName = "04. Vector Break Retest", Order = 2)]
         public bool VbrRetriggerReplacesSetup { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Target 'reached' definition (V5 unresolved item 2)", GroupName = "04. Vector Break Retest", Order = 8)]
+        public TargetReachedMode VbrTargetReachedModeParam { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "Pattern B waits for EMA after reclaim (VBR-3)", GroupName = "04. Vector Break Retest", Order = 3)]
@@ -217,6 +220,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name = "Verbose diagnostics", GroupName = "06. Logging", Order = 2)]
         public bool VerboseDiagnostics { get; set; }
+
+        // V5 Fix 4 requirement: print all 18 target levels for a selected
+        // historical date so they can be compared with the Traders Reality
+        // TradingView indicator. Format yyyy-MM-dd (ET date); empty = off.
+        [NinjaScriptProperty]
+        [Display(Name = "Print 18 levels on ET date (yyyy-MM-dd, empty=off)", GroupName = "06. Logging", Order = 3)]
+        public string PrintLevelsDiagnosticDate { get; set; }
         #endregion
 
         // ==================================================================
@@ -232,7 +242,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 EntryHandling = EntryHandling.UniqueEntries; // FB_* and VBR_* independent
-                IsExitOnSessionClose = true;
+                // V5 Fix 6: 11:30 ET is a NEW-ENTRY cutoff only; no strategy-level
+                // forced flatten. Platform session-close exit defaults OFF.
+                IsExitOnSessionClose = false;
                 ExitOnSessionCloseSeconds = 30;
                 BarsRequiredToTrade = 30;
                 StartBehavior = StartBehavior.WaitUntilFlat;
@@ -246,10 +258,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EntryStartMinutesEt = 570;      // 9:30 ET
                 EntryEndMinutesEt = 690;        // 11:30 ET
                 AssumeBarTimesAreEastern = false;
-                DayStartMinutesEt = 0;          // TR getdayOpen: exchange midnight
-                WeekStartMinutesEt = 1080;      // Sunday 18:00 ET futures week open
-                PsyWindowHours = 8;
-                ExitOnSessionCloseEnabled = true;
+                DayStartMinutesEt = 1080;       // 18:00 ET = CME exchange-day open = TR time('D') boundary for MNQ (V5 Fix 4A)
+                WeekStartMinutesEt = 1080;      // Sunday 18:00 ET futures week open (TradingView weekly bar for MNQ)
+                PsyLevelTypeParam = PsyLevelType.Forex; // TR calcPsyLevels forex path (V5 Fix 4D)
+                ExitOnSessionCloseEnabled = false;      // V5 Fix 6
 
                 UseAccountCashValueLive = true;
                 SimAccountBalance = 5000;
@@ -259,15 +271,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RiskPctBPlus = 10;
                 AllowSimultaneousStrategies = false;
 
-                FbRequirePriorCloseInside = true;
+                FbRequirePriorCloseInside = false;          // V5 Fix 2 (legacy, keep FALSE)
                 FbInvalidReclaimCancelsSetup = false;
                 FbRequire15mReclaimBeforeLtfEntry = true;
                 FbConfluenceFailCancelsLtfSetup = true;
                 FbTargetBreakModeParam = FbTargetBreakMode.ThreeMinuteCloseBeyond;
-                FbGradeBasisParam = FbGradeBasis.ValidityCandleNumber;
+                FbGradeBasisParam = FbGradeBasis.FirstTradableCandle; // V5 Fix 7
 
-                VbrRequireCrossThrough = true;
-                VbrRetriggerReplacesSetup = true;
+                VbrRequireCrossThrough = false;             // V5 Fix 3 (legacy, keep FALSE)
+                VbrRetriggerReplacesSetup = false;          // V5 Fix 5 (legacy, keep FALSE)
+                VbrTargetReachedModeParam = TargetReachedMode.IntrabarTouch;
                 VbrPatternBWaitForEma = false;
                 VbrReentryScanOnlyFollowingCandle = true;
                 VbrRunnerSwingStrength = 2;
@@ -282,6 +295,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 WriteCsvTradeLog = true;
                 VerboseDiagnostics = true;
+                PrintLevelsDiagnosticDate = "";
             }
             else if (State == State.Configure)
             {
@@ -308,7 +322,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 levels = new KeyLevelEngine();
                 levels.DayStartMinutesEt = DayStartMinutesEt;
                 levels.WeekStartMinutesEt = WeekStartMinutesEt;
-                levels.PsyWindowHours = PsyWindowHours;
+                levels.PsyType = PsyLevelTypeParam;
 
                 FbConfig fbCfg = new FbConfig();
                 fbCfg.RiskPctAMinus = RiskPctAMinus;
@@ -330,6 +344,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 vbrCfg.RunnerSwingStrength = VbrRunnerSwingStrength;
                 vbrCfg.SingleContractBecomesRunner = VbrSingleContractBecomesRunner;
                 vbrCfg.ChainMaxDistancePoints = VbrChainMaxDistancePoints;
+                vbrCfg.TargetReached = VbrTargetReachedModeParam;
                 vbr = new VectorBreakRetestEngine(this, vbrCfg);
 
                 string csvPath = Path.Combine(NinjaTrader.Core.Globals.UserDataDir,
@@ -377,8 +392,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // key-level aggregation always runs (needs full history)
                 DateTime etClose = ToEt(Times[BipOneMin][0]);
                 DateTime etOpen = etClose.AddMinutes(-1);
-                bool newDay = levels.OnOneMinuteBar(etOpen, etClose,
+                DateTime utcOpen = ToUtc(Times[BipOneMin][0]).AddMinutes(-1); // psy sessions are GMT-defined (TR source)
+                bool newDay = levels.OnOneMinuteBar(etOpen, etClose, utcOpen,
                     Opens[BipOneMin][0], Highs[BipOneMin][0], Lows[BipOneMin][0], Closes[BipOneMin][0]);
+                MaybePrintLevelsDiagnostic(etClose);
                 if (newDay)
                 {
                     if (VerboseDiagnostics && logger != null)
@@ -611,6 +628,41 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (AssumeBarTimesAreEastern || etZone == null) return barTime;
             try { return TimeZoneInfo.ConvertTime(barTime, TimeZoneInfo.Local, etZone); }
             catch (Exception) { return barTime; }
+        }
+
+        private DateTime ToUtc(DateTime barTime)
+        {
+            try
+            {
+                DateTime t = DateTime.SpecifyKind(barTime, DateTimeKind.Unspecified);
+                if (AssumeBarTimesAreEastern && etZone != null)
+                    return TimeZoneInfo.ConvertTimeToUtc(t, etZone);
+                return TimeZoneInfo.ConvertTimeToUtc(t, TimeZoneInfo.Local);
+            }
+            catch (Exception) { return barTime; }
+        }
+
+        // V5 Fix 4: print all 18 target-level values (plus trigger levels) at the
+        // first 1m close at/after 9:30 ET on the configured diagnostic date so
+        // they can be compared with the Traders Reality TradingView indicator.
+        private DateTime lastLevelsDiagDate = DateTime.MinValue;
+        private void MaybePrintLevelsDiagnostic(DateTime etClose)
+        {
+            if (string.IsNullOrEmpty(PrintLevelsDiagnosticDate) || logger == null) return;
+            DateTime target;
+            if (!DateTime.TryParseExact(PrintLevelsDiagnosticDate, "yyyy-MM-dd",
+                CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out target)) return;
+            if (etClose.Date != target.Date || etClose.TimeOfDay.TotalMinutes < EntryStartMinutesEt) return;
+            if (lastLevelsDiagDate == etClose.Date) return;
+            lastLevelsDiagDate = etClose.Date;
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            sb.Append("TR LEVEL DIAGNOSTIC ").Append(etClose.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)).Append(" ET | ");
+            foreach (TpLevelId id in Enum.GetValues(typeof(TpLevelId)))
+                sb.Append(id).Append("=").Append(levels.GetTpLevelPrice(id).ToString("0.00", CultureInfo.InvariantCulture)).Append(" ");
+            sb.Append("| internal R2=").Append(levels.R2.ToString("0.00", CultureInfo.InvariantCulture));
+            sb.Append(" S3=").Append(levels.S3.ToString("0.00", CultureInfo.InvariantCulture));
+            logger.DiagGlobal(etClose, sb.ToString());
         }
 
         private void PrintLine(string s)

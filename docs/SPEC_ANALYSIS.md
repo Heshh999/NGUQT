@@ -1,5 +1,13 @@
 # SPEC ANALYSIS — Two Automated MNQ-Only Strategies (NinjaTrader 8)
 
+> **HISTORICAL (V4).** This analysis was written against the V4 spec. The controlling
+> specification is now **V5** (`two_automated_strategies_for_claude_v5_MNQ_ONLY.md`);
+> see `docs/CHANGELOG_V5.md` for the corrections and `docs/COMPLIANCE_AUDIT.md` for the
+> current V5 audit. Notable V5 changes: BLUE_VECTOR 1m/3m FB short path added; no
+> prior-close/cross conditions on either trigger; A- grading uses the first actually
+> eligible entry candle; TR library source supplied and ported; no session-close flatten
+> default; tick-exact target merging.
+
 Source of truth: `two_automated_strategies_for_claude_v4_MNQ_ONLY_3.md` (the master specification).
 This document is the pre-implementation deliverable requested by the user:
 

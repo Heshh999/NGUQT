@@ -1,0 +1,77 @@
+# CHANGELOG — V5 Correction Pass
+
+Controlling spec: `two_automated_strategies_for_claude_v5_MNQ_ONLY.md` (supersedes V4).
+Correction directives: `FABLE_5_CORRECTION_PROMPT_MNQ.md`.
+Supplied Traders Reality source: `Pasted text(1).txt` / `Pasted text(2).txt` — **note:
+both uploads are byte-identical copies of the TR *library* (`Traders_Reality_Lib`, Pine v5)**;
+the TR *main indicator* (with the `request.security` daily/weekly retrieval calls) was not
+among the uploads. Everything the library defines was ported; what only the main indicator
+defines is documented as an equivalent, not claimed as a line-for-line port.
+
+Existing architecture preserved — no rebuild. Every change below is a modification of the
+V4 implementation.
+
+## Every file/function changed
+
+### `src/MnqTwoStrategiesShared.cs`
+| Function/Section | Change |
+|---|---|
+| `FbGradeBasis` enum | Re-documented: `FirstTradableCandle` is now the V5-mandated default (Fix 7); `ValidityCandleNumber` demoted to legacy research |
+| `TargetReachedMode` enum | **New** — VBR "target reached" definition kept configurable (unresolved item 2) |
+| `PsyLevelType` enum | **New** — TR `calcPsyLevels` psyType (`forex` default for MNQ / `crypto`) |
+| `KeyLevelEngine` header + fields | Rewritten for the faithful TR port; removed the generic "first 8 hours of week" psy fields; `DayStartMinutesEt` default now 1080 (18:00 ET = CME exchange-day open = TR `time('D')` boundary for MNQ; 0 reproduces the library's literal "exchange midnight" comment) |
+| `KeyLevelEngine.CalcSydneyDst` | **New** — direct port of TR `calcDst()` Sydney-DST branch |
+| `KeyLevelEngine.IsInPsySession` | **New** — port of `calcPsyLevels` session windows: forex `'0000-0800:2'` GMT (Monday 00:00–08:00 GMT); crypto `'2200-0600:1'` GMT+1/GMT by Sydney DST |
+| `KeyLevelEngine.OnOneMinuteBar` | Signature gains `utcOpen`; psy hi/lo now initialize on session entry, extend by max/min in-session, hold last value out-of-session (exact `calcPsyLevels` behavior); old week-anchored psy accumulation deleted |
+| `KeyLevelEngine.GetSortedTargets` | Fix 8: takes a `normalizeToTick` delegate instead of a tolerance; every level price and the reference are tick-normalized first; merging happens ONLY on exact equality of normalized prices |
+
+### `src/FakeBreakoutEngine.cs`
+| Function/Section | Change |
+|---|---|
+| `FbConfig.RequirePriorCloseInside` | Fix 2: default **false**, documented as LEGACY research (exact-spec mode = off) |
+| `FbConfig.GradeBasis` | Fix 7: default **FirstTradableCandle** |
+| `ProcessLtf` break-candle filter | Fix 1: short-side break candle now accepts **BLUE_VECTOR** in addition to GREEN_VECTOR/REGULAR (1m and 3m — the same function serves both series) |
+| `ProcessLtf` reclaim-vector rules | Fix 1: new BLUE-first path — reclaim valid only if REGULAR or RED_VECTOR (VIOLET explicitly NOT valid on this path); GREEN-first path behavior preserved (any reclaim close below); REGULAR-first path unchanged (RED/VIOLET) |
+| `OnEntryExecution` | Passes `host.RoundToTick` into `GetSortedTargets` (Fix 8 signature) |
+
+EMA wait/cancel behavior and the structure-wick stop needed **no change** for the BLUE path:
+they were already vector-agnostic once a structure exists, which is exactly what V5 §10
+prescribes (wait for first close below EMA9; cancel on completed close above the fake-break
+high; stop at the structure HIGH/WICK).
+
+### `src/VectorBreakRetestEngine.cs`
+| Function/Section | Change |
+|---|---|
+| `VbrConfig.RequireCrossThrough` | Fix 3: default **false**, LEGACY research |
+| `VbrConfig.RetriggerReplacesActiveSetup` | Fix 5: default **false**, LEGACY research — an active parent keeps its ORIGINAL trigger and ORIGINAL 4-candle clock |
+| `VbrConfig.TargetReached` | **New** config (unresolved item 2), default `IntrabarTouch` |
+| `ManagePosition` chain loop | "Reached" test now dispatches on `TargetReached` mode |
+| `AdvanceTargetChain` | Passes `host.RoundToTick` into `GetSortedTargets` (Fix 8) |
+
+### `src/MnqTwoStrategies.cs`
+| Function/Section | Change |
+|---|---|
+| Parameters | `DayStartMinutesEt` default 1080; `PsyWindowHours` **removed**, replaced by `PsyLevelTypeParam`; `FbRequirePriorCloseInside`/`VbrRequireCrossThrough`/`VbrRetriggerReplacesSetup` defaults false + relabeled "LEGACY research (keep FALSE)"; `FbGradeBasisParam` default FirstTradableCandle; `VbrTargetReachedModeParam` **new**; `PrintLevelsDiagnosticDate` **new**; `ExitOnSessionCloseEnabled` default **false** + relabeled "PLATFORM flatten (NOT a strategy rule)" |
+| `OnStateChange/SetDefaults` | `IsExitOnSessionClose = false` (Fix 6); all defaults above |
+| `OnStateChange/DataLoaded` | Wires `PsyType` and `TargetReached` into the engines |
+| `OnBarUpdate` (1m branch) | Computes `utcOpen` and passes it to `levels.OnOneMinuteBar`; calls `MaybePrintLevelsDiagnostic` |
+| `ToUtc` | **New** helper (psy sessions are GMT-defined in the TR source) |
+| `MaybePrintLevelsDiagnostic` | **New** — Fix 4 requirement: prints all 18 target levels (plus internal R2/S3) at the first 1m close ≥ 9:30 ET on a configured historical date for TradingView comparison |
+
+### `tests/` (new)
+`MockHost.cs`, `Tests.cs` — deterministic scenario tests compiled against the actual engine
+sources (the engines have no NinjaTrader dependency by design). 34 assertions, all passing;
+see `docs/COMPLIANCE_AUDIT.md` §Corrections for the mapping.
+
+## Previous vs corrected behavior (with tests)
+
+| # | Previous behavior (V4 build) | Corrected behavior (V5) | Code file/function | Test performed |
+|---|---|---|---|---|
+| 1 | FB LTF short break candle: GREEN or REGULAR only; a BLUE break candle was silently ignored | BLUE_VECTOR is a valid short break candle; reclaim valid iff REGULAR or RED_VECTOR (VIOLET rejected on this path); same EMA wait/cancel and structure-wick stop; applies identically to 1m and 3m; 15m parent initiators unchanged (no BLUE) | `FakeBreakoutEngine.ProcessLtf` (break + reclaim filters) | `BLUE->REGULAR = VALID` ✅, `BLUE->RED = VALID` ✅, `BLUE->VIOLET = NO entry` ✅ (34/34 pass, `tests/Tests.cs`) |
+| 2 | FB parent trigger required previous 15m close inside the level (default true) | Trigger = trades beyond + closes beyond + allowed candle type, nothing else; legacy parameter defaults FALSE | `FbConfig.RequirePriorCloseInside`, `FakeBreakoutEngine.TryTrigger` | Trigger fires with prior close already beyond the level ✅ |
+| 3 | VBR trigger required a cross-through of Daily Open (default true) | GREEN/RED vector close beyond Daily Open is sufficient; legacy parameter defaults FALSE | `VbrConfig.RequireCrossThrough`, `VectorBreakRetestEngine.OnFifteenMinuteBar` | Trigger fires with low > DO and prior close above DO ✅ |
+| 4 | Daily Open at midnight ET; Psy = high/low of first 8 hours of week (generic) | Daily Open = open of the 18:00-ET exchange day (TR `time('D')` boundary for MNQ, compat param for literal midnight); Psy = ported `calcPsyLevels` GMT sessions + ported `calcDst`; YDay/LWeek unchanged non-repainting prev-completed aggregates (main-indicator source not supplied — documented) | `KeyLevelEngine` (day roll, `IsInPsySession`, `CalcSydneyDst`), host `ToUtc`/`MaybePrintLevelsDiagnostic` | Daily-Open stability, YDay/LWeek, psy in/out-of-session accumulation, calcDst flags, diagnostic print ✅ |
+| 5 | A new qualifying vector replaced/restarted an active flat VBR parent (default true) | Original trigger + original 4-candle clock preserved; legacy parameter defaults FALSE | `VbrConfig.RetriggerReplacesActiveSetup`, `OnFifteenMinuteBar` | Second qualifying vector ignored; expiry exactly 4 candles after ORIGINAL trigger ✅ |
+| 6 | NT exit-on-session-close defaulted ON | Defaults OFF; parameter relabeled as platform behavior, not a strategy rule; positions entered before 11:30 run under stop/target/trail/runner | `MnqTwoStrategies` SetDefaults/param | Default inspection (no strategy-side flatten path exists other than the platform option) |
+| 7 | A- = literal validity candle #1, so premarket parents could never grade A- | A- = entry in FIRST candle in which a fresh LTF entry is actually eligible (≥ 9:30); later entries B+ | `FbConfig.GradeBasis` default, `FakeBreakoutEngine.TryEnter`/`ProcessLtf` FirstTradable tracking | Premarket parent, entry 9:30–9:45 → A- @ 26% (118 lots on $10k/11pt); later entry → B+ @ 10% (45 lots) ✅ |
+| 8 | Equal-price merge used a ±1-tick tolerance band | Prices tick-normalized first; merge ONLY on exact equality of normalized prices | `KeyLevelEngine.GetSortedTargets` | Coincident levels merge keeping 13 names; adjacent ticks 100.25/100.50 do NOT merge; R2 never selectable; strict ordering ✅ |

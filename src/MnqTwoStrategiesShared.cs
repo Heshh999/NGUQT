@@ -79,11 +79,29 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         ThreeMinuteCloseBeyond    // completed 3m close beyond the target
     }
 
-    // Ambiguity FB-6: meaning of "FIRST eligible 15-minute candle" for the A- grade.
+    // FB grade basis. V5 correction Fix 7 makes FirstTradableCandle the mandated
+    // default: A- = entry in the FIRST 15m candle in which a fresh lower-timeframe
+    // entry is actually eligible (premarket candles cannot host an entry).
     public enum FbGradeBasis
     {
-        ValidityCandleNumber,     // literal: validity candle #1 after the breakout candle
-        FirstTradableCandle       // first validity candle at/after 9:30 ET
+        ValidityCandleNumber,     // LEGACY research: literal validity candle #1
+        FirstTradableCandle       // V5 default: first candle where entries are permitted
+    }
+
+    // V5 correction (unresolved item 2): the exact VBR "target reached" definition
+    // is not fixed by the master spec — kept configurable, default intrabar touch.
+    public enum TargetReachedMode
+    {
+        IntrabarTouch,            // 1m high/low touches the target price
+        OneMinuteCloseBeyond      // completed 1m close beyond the target price
+    }
+
+    // Traders Reality calcPsyLevels psyType ('forex' vs 'crypto' path in the
+    // supplied library source). MNQ uses the forex path by default.
+    public enum PsyLevelType
+    {
+        Forex,                    // Monday 00:00-08:00 GMT session (library source)
+        Crypto                    // Saturday 22:00-06:00 GMT/GMT+1 by Sydney DST
     }
 
     // ------------------------------------------------------------------
@@ -163,16 +181,32 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     // Spec: "SHARED TAKE-PROFIT KEY-LEVEL ENGINE" sections A + B + C, and the
     // trigger-level values for both strategies.
     //
-    // Levels are aggregated from completed 1-minute bars:
-    //   DAILY_OPEN  = open of the first 1m bar of the exchange day
-    //                 (TR getdayOpen: "open at the start of a new exchange day /
-    //                  exchange midnight" — day boundary configurable, SH-1)
-    //   YDAY_HIGH/LOW   = previous completed exchange day's high/low
-    //   LWEEK_HIGH/LOW  = previous completed week's high/low (futures week,
-    //                     boundary configurable, default Sunday 18:00 ET)
-    //   Pivots/M-levels = Traders Reality formulas from previous day H/L/C
-    //   PSY_HIGH/LOW    = high/low of the first PsyWindowHours of the new week
-    //                     (best-effort port; TR source not supplied — SH-1)
+    // V5 correction Fix 4 — faithful port of the SUPPLIED Traders Reality
+    // library (Traders_Reality_Lib, Pine v5):
+    //
+    //   DAILY_OPEN — TR getdayOpen(): dlyOpen := open on ta.change(time('D')),
+    //     i.e. the open of the first bar of the instrument's new exchange day.
+    //     For CME MNQ on TradingView the daily bar boundary is the session open
+    //     at 17:00 CT = 18:00 ET, so the faithful default here is 18:00 ET
+    //     (DayStartMinutesEt = 1080). The library's "basically exchange
+    //     midnight" comment describes forex/crypto symbols; set the
+    //     compatibility parameter to 0 to reproduce that literal behavior.
+    //
+    //   YDAY_HIGH/LOW, LWEEK_HIGH/LOW — previous COMPLETED exchange day / week
+    //     aggregates (non-repainting: values only change at the boundary).
+    //     NOTE: the supplied uploads contain the TR *library* only; the main
+    //     indicator's request.security daily/weekly retrieval was not supplied,
+    //     so this is the documented equivalent, not a line-for-line port.
+    //
+    //   PSY_HIGH/LOW — direct port of the supplied calcPsyLevels():
+    //     forex path: session '0000-0800:2' GMT (Monday 00:00-08:00 GMT);
+    //     crypto path: session '2200-0600:1' in GMT+1 when Sydney DST else GMT
+    //     (Saturday 22:00 -> Sunday 06:00). psyHi/psyLo initialize on the first
+    //     bar of the session, extend with max(high)/min(low) while in session,
+    //     and hold their last value outside the session. Sydney DST comes from
+    //     a port of the supplied calcDst().
+    //
+    //   Pivots/M-levels — spec section B formulas (unchanged, already exact).
     // ------------------------------------------------------------------
     public class KeyLevelEngine
     {
@@ -190,21 +224,50 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         private DateTime curWeekKey = DateTime.MinValue;
         private double dailyOpen = double.NaN;
 
-        // Psy-level tracking (weekly window)
-        private DateTime weekAnchorEt = DateTime.MinValue;
-        private double psyHiAccum = double.NaN;
-        private double psyLoAccum = double.NaN;
-        private bool psyWindowClosed;
+        // Psy-level state (TR calcPsyLevels port)
+        private bool wasInPsySession;
         private double psyHigh = double.NaN;
         private double psyLow = double.NaN;
 
         // Configuration (set once by the host strategy before data starts)
-        public int DayStartMinutesEt = 0;       // 0 = exchange midnight ET (TR getdayOpen semantics)
-        public int WeekStartMinutesEt = 1080;   // Sunday 18:00 ET = futures week open
-        public int PsyWindowHours = 8;          // first 8 hours of the week (TR psy behavior)
+        public int DayStartMinutesEt = 1080;    // 18:00 ET = CME exchange-day open (TR time('D') boundary for MNQ); 0 = literal "exchange midnight"
+        public int WeekStartMinutesEt = 1080;   // Sunday 18:00 ET = futures week open (TradingView weekly bar boundary for MNQ)
+        public PsyLevelType PsyType = PsyLevelType.Forex; // TR calcPsyLevels psyType
+
+        // ---- port of Traders Reality calcDst(): Sydney DST flag ----
+        // Pine: previousSunday = dayofmonth - dayofweek + 1  (dayofweek 1=Sun..7=Sat)
+        public static bool CalcSydneyDst(DateTime date)
+        {
+            int month = date.Month;
+            int previousSunday = date.Day - ((int)date.DayOfWeek + 1) + 1;
+            if (month < 3 || month > 11) return true;
+            if (month > 4 && month < 10) return false;
+            if (month == 3) return true;
+            if (month == 4) return previousSunday <= 0;
+            if (month == 10) return previousSunday >= 0;
+            return true; // month == 11
+        }
+
+        // ---- port of the calcPsyLevels session windows ----
+        private bool IsInPsySession(DateTime utc)
+        {
+            if (PsyType == PsyLevelType.Forex)
+            {
+                // psySession := time('240', '0000-0800:2', "GMT") — Monday 00:00-08:00 GMT
+                return utc.DayOfWeek == DayOfWeek.Monday && utc.TimeOfDay.TotalHours < 8.0;
+            }
+            // crypto: '2200-0600:1' in GMT+1 when Sydney DST, else GMT
+            // (Saturday 22:00 -> Sunday 06:00 in the offset timezone)
+            DateTime t = CalcSydneyDst(utc.Date) ? utc.AddHours(1) : utc;
+            if (t.DayOfWeek == DayOfWeek.Saturday && t.TimeOfDay.TotalHours >= 22.0) return true;
+            if (t.DayOfWeek == DayOfWeek.Sunday && t.TimeOfDay.TotalHours < 6.0) return true;
+            return false;
+        }
 
         // Feed one COMPLETED 1m bar. Returns true when a new exchange day started.
-        public bool OnOneMinuteBar(DateTime etOpen, DateTime etClose, double o, double h, double l, double c)
+        // utcOpen is the bar's open time in UTC (needed by the psy-session port,
+        // whose sessions are defined in GMT in the supplied source).
+        public bool OnOneMinuteBar(DateTime etOpen, DateTime etClose, DateTime utcOpen, double o, double h, double l, double c)
         {
             bool newDay = false;
 
@@ -239,12 +302,6 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 curWeek = new Agg();
                 curWeek.O = o; curWeek.H = h; curWeek.L = l; curWeek.C = c; curWeek.Valid = true;
                 curWeekKey = weekKey;
-
-                // new psy window
-                weekAnchorEt = weekKey.AddMinutes(WeekStartMinutesEt);
-                psyHiAccum = h; psyLoAccum = l;
-                psyWindowClosed = false;
-                psyHigh = double.NaN; psyLow = double.NaN;
             }
             else
             {
@@ -254,21 +311,22 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 curWeek.C = c;
             }
 
-            // ---- psy window (first PsyWindowHours of the week) ----
-            if (!psyWindowClosed && weekAnchorEt != DateTime.MinValue)
+            // ---- Traders Reality calcPsyLevels port (V5 Fix 4D) ----
+            // "When entering a new psy session, initialize hi/lo. After
+            //  initialization, calculate psy hi/lo [max/min]. When not in the
+            //  psy session, use the last value of psyHi and psyLo."
+            bool inPsy = IsInPsySession(utcOpen);
+            if (inPsy)
             {
-                if (etOpen < weekAnchorEt.AddHours(PsyWindowHours))
-                {
-                    if (double.IsNaN(psyHiAccum) || h > psyHiAccum) psyHiAccum = h;
-                    if (double.IsNaN(psyLoAccum) || l < psyLoAccum) psyLoAccum = l;
-                }
+                if (!wasInPsySession) { psyHigh = h; psyLow = l; }
                 else
                 {
-                    psyWindowClosed = true;
-                    psyHigh = psyHiAccum;
-                    psyLow = psyLoAccum;
+                    if (h > psyHigh || double.IsNaN(psyHigh)) psyHigh = h;
+                    if (l < psyLow || double.IsNaN(psyLow)) psyLow = l;
                 }
             }
+            // outside the session psyHigh/psyLow simply hold their last values
+            wasInPsySession = inPsy;
 
             return newDay;
         }
@@ -353,28 +411,36 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // ---- Spec section C: NEXT-KEY-LEVEL SELECTION ALGORITHM ------------------
         // LONG : all valid levels STRICTLY ABOVE referencePrice, sorted low->high.
         // SHORT: all valid levels STRICTLY BELOW referencePrice, sorted high->low.
-        // Equal-price levels are one target event (all names kept).
-        // NaN levels and levels exactly equal to the reference are ignored.
+        //
+        // V5 correction Fix 8: every level price (and the reference) is first
+        // NORMALIZED to MNQ tick size via the supplied delegate; levels are then
+        // merged into one target-price event ONLY when the normalized prices are
+        // exactly equal. Distinct normalized prices are never merged by a broad
+        // tolerance. NaN levels and levels equal to the reference are ignored.
         public List<TpTarget> GetSortedTargets(TradeDirection direction, double referencePrice,
-                                               Func<TpLevelId, bool> levelEnabled, double mergeTolerance)
+                                               Func<TpLevelId, bool> levelEnabled, Func<double, double> normalizeToTick)
         {
             List<TpTarget> result = new List<TpTarget>();
             Array all = Enum.GetValues(typeof(TpLevelId));
             List<KeyValuePair<TpLevelId, double>> candidates = new List<KeyValuePair<TpLevelId, double>>();
+
+            double refNorm = normalizeToTick != null ? normalizeToTick(referencePrice) : referencePrice;
 
             foreach (TpLevelId id in all)
             {
                 if (levelEnabled != null && !levelEnabled(id)) continue;
                 double p = GetTpLevelPrice(id);
                 if (double.IsNaN(p)) continue;
+                if (normalizeToTick != null) p = normalizeToTick(p);
+
                 if (direction == TradeDirection.Long)
                 {
-                    if (p > referencePrice + mergeTolerance * 0.5)
+                    if (p > refNorm)
                         candidates.Add(new KeyValuePair<TpLevelId, double>(id, p));
                 }
                 else
                 {
-                    if (p < referencePrice - mergeTolerance * 0.5)
+                    if (p < refNorm)
                         candidates.Add(new KeyValuePair<TpLevelId, double>(id, p));
                 }
             }
@@ -388,9 +454,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
             foreach (KeyValuePair<TpLevelId, double> kv in candidates)
             {
-                if (result.Count > 0 && Math.Abs(result[result.Count - 1].Price - kv.Value) <= mergeTolerance)
+                if (result.Count > 0 && result[result.Count - 1].Price == kv.Value)
                 {
-                    result[result.Count - 1].Names.Add(kv.Key); // same price = one target event
+                    result[result.Count - 1].Names.Add(kv.Key); // exact same normalized price = one event
                 }
                 else
                 {

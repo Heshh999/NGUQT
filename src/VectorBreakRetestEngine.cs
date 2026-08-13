@@ -35,14 +35,18 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     {
         public double RiskPctAPlus = 50.0;                // spec: A+ = 50% account risk
 
-        // Ambiguity VBR-1: require the trigger vector to actually break through
-        // Daily Open (traded through it or prior close on the other side), not
-        // merely be a vector closing on the far side.
-        public bool RequireCrossThrough = true;
-        // Ambiguity VBR-2: a new qualifying 15m vector while a (flat) parent is
-        // active replaces/restarts the parent. While a position is open new
-        // triggers are always ignored.
-        public bool RetriggerReplacesActiveSetup = true;
+        // V5 correction Fix 3: the master rule is ONLY "GREEN_VECTOR closes above
+        // Daily Open" / "RED_VECTOR closes below Daily Open" — no cross-through or
+        // prior-close condition. LEGACY research parameter, defaults FALSE.
+        public bool RequireCrossThrough = false;
+        // V5 correction Fix 5: once a VBR parent is active its ORIGINAL trigger
+        // and ORIGINAL 4-candle clock are preserved; a later qualifying vector
+        // must NOT restart/replace/extend it. LEGACY research parameter,
+        // defaults FALSE.
+        public bool RetriggerReplacesActiveSetup = false;
+        // V5 unresolved item 2: exact "target reached" definition is not fixed by
+        // the master spec — configurable, default intrabar touch.
+        public TargetReachedMode TargetReached = TargetReachedMode.IntrabarTouch;
         // Ambiguity VBR-3: Pattern B reclaim whose close fails the EMA condition:
         // default = no entry, structure cleared (spec defines no waiting for VBR).
         public bool PatternBWaitForEma = false;
@@ -517,7 +521,12 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             int guard = 0;
             while (!trailActivated && activeTarget != null && guard++ < 25)
             {
-                bool reached = isLong ? bar.High >= activeTarget.Price : bar.Low <= activeTarget.Price;
+                // "reached" definition is configurable (V5 unresolved item 2)
+                bool reached;
+                if (cfg.TargetReached == TargetReachedMode.OneMinuteCloseBeyond)
+                    reached = isLong ? bar.Close > activeTarget.Price : bar.Close < activeTarget.Price;
+                else
+                    reached = isLong ? bar.High >= activeTarget.Price : bar.Low <= activeTarget.Price;
                 if (!reached) break;
 
                 host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
@@ -588,7 +597,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         private void AdvanceTargetChain(bool initial)
         {
             List<TpTarget> targets = host.Levels.GetSortedTargets(
-                isLong ? TradeDirection.Long : TradeDirection.Short, refPrice, host.TpLevelEnabled, host.TickSize);
+                isLong ? TradeDirection.Long : TradeDirection.Short, refPrice, host.TpLevelEnabled, host.RoundToTick);
 
             if (targets.Count == 0)
             {

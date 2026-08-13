@@ -36,10 +36,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public double RiskPctAMinus = 26.0;   // spec: A- = 26% account risk
         public double RiskPctBPlus = 10.0;    // spec: B+ = 10% account risk
 
-        // Ambiguity FB-1: require the previous 15m close to be on the inside of the
-        // level so a candle merely trading beyond an already-broken level does not
-        // re-trigger ("breakout" semantics).
-        public bool RequirePriorCloseInside = true;
+        // V5 correction Fix 2: the master rule is ONLY "trades beyond + closes
+        // beyond + allowed candle type". The prior-close-inside condition is a
+        // LEGACY research parameter and must default FALSE (exact-spec mode).
+        public bool RequirePriorCloseInside = false;
         // Ambiguity FB-3: REGULAR breakout + REGULAR reclaim = "invalid" — default:
         // the reclaim simply does not count and the setup keeps waiting.
         public bool InvalidReclaimCancelsSetup = false;
@@ -49,10 +49,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // Ambiguity FB-5: 15m EMA(9) confluence fails at the LTF entry signal:
         // cancel that LTF setup (default) or keep waiting for a later EMA close.
         public bool ConfluenceFailCancelsLtfSetup = true;
-        // Spec section 12/E: break definition of the first target is configurable.
+        // Spec section 12/E: break definition of the first target is configurable
+        // (V5 unresolved item 1 — still not finalized by the master spec).
         public FbTargetBreakMode TargetBreakMode = FbTargetBreakMode.ThreeMinuteCloseBeyond;
-        // Ambiguity FB-6: basis of the "first eligible 15m candle" A- grade.
-        public FbGradeBasis GradeBasis = FbGradeBasis.ValidityCandleNumber;
+        // V5 correction Fix 7: A- = entry in the FIRST 15m candle in which a
+        // fresh lower-timeframe entry is actually eligible (premarket validity
+        // candles, where entries are forbidden, cannot be the A- opportunity).
+        public FbGradeBasis GradeBasis = FbGradeBasis.FirstTradableCandle;
     }
 
     public class FakeBreakoutEngine
@@ -448,12 +451,17 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             {
                 // Break candle:
                 //  long §9 : RED_VECTOR or REGULAR closes below/through the level
-                //  short §10: GREEN_VECTOR (core) or REGULAR (regular-first) closes above/through
+                //  short §10 (V5): three paths —
+                //    A. GREEN_VECTOR closes above/through   (any reclaim below)
+                //    B. BLUE_VECTOR closes above/through    (V5 Fix 1: reclaim must
+                //       be REGULAR or RED_VECTOR; VIOLET NOT valid on this path)
+                //    C. REGULAR closes above/through        (RED/VIOLET reclaim)
                 bool breakClose = slot.IsLong ? bar.Close < lvl : bar.Close > lvl;
                 if (!breakClose) return;
                 bool breakVecOk = slot.IsLong
                     ? (bar.Vector == VectorType.RED_VECTOR || VectorClassifier.IsRegular(bar.Vector))
-                    : (bar.Vector == VectorType.GREEN_VECTOR || VectorClassifier.IsRegular(bar.Vector));
+                    : (bar.Vector == VectorType.GREEN_VECTOR || bar.Vector == VectorType.BLUE_VECTOR
+                       || VectorClassifier.IsRegular(bar.Vector));
                 if (!breakVecOk) return;
 
                 // GLOBAL ENTRY-TIME RULE: premarket LTF patterns are never banked —
@@ -484,13 +492,19 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
                 // Reclaim candle vector rules:
                 //  long §9 : GREEN_VECTOR or BLUE_VECTOR only (REGULAR reclaim NOT valid)
-                //  short §10: GREEN-first → any close back below counts;
-                //             REGULAR-first → RED_VECTOR or VIOLET_VECTOR required
+                //  short §10 (V5):
+                //    path A GREEN-first  → preserve existing behavior: any close back below counts
+                //    path B BLUE-first   → V5 Fix 1: REGULAR or RED_VECTOR only
+                //                          (VIOLET_VECTOR NOT valid on the BLUE path)
+                //    path C REGULAR-first→ RED_VECTOR or VIOLET_VECTOR required
+                //                          (REGULAR + REGULAR = invalid)
                 bool reclaimVecOk;
                 if (slot.IsLong)
                     reclaimVecOk = bar.Vector == VectorType.GREEN_VECTOR || bar.Vector == VectorType.BLUE_VECTOR;
                 else if (s.BreakVector == VectorType.GREEN_VECTOR)
                     reclaimVecOk = true;
+                else if (s.BreakVector == VectorType.BLUE_VECTOR)
+                    reclaimVecOk = VectorClassifier.IsRegular(bar.Vector) || bar.Vector == VectorType.RED_VECTOR;
                 else
                     reclaimVecOk = bar.Vector == VectorType.RED_VECTOR || bar.Vector == VectorType.VIOLET_VECTOR;
 
@@ -747,7 +761,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 // Shared engine section E: nearest directional level = first target
                 List<TpTarget> targets = host.Levels.GetSortedTargets(
                     slot.IsLong ? TradeDirection.Long : TradeDirection.Short,
-                    slot.EntryAvg, host.TpLevelEnabled, host.TickSize);
+                    slot.EntryAvg, host.TpLevelEnabled, host.RoundToTick);
                 if (targets.Count > 0)
                 {
                     slot.TargetNames = targets[0].NameString();
