@@ -112,9 +112,9 @@ The V6 U1–U9 locks are implemented; none of them is ambiguous any more. What r
    the 15m EMA(9) confluence (§7) fails at the instant of a lower-timeframe entry signal.
    Default = cancel that LTF setup and keep scanning for a fresh one while the parent lives
    (`FbConfluenceFailCancelsLtfSetup`). Tell me if it should instead wait for a later 15m close.
-4. **Psy 4H-grid compatibility flag** remains OFF and unverifiable from source alone
-   (carried over from the V5 audit, caveat 2). Confirm Psy Hi/Lo against TradingView with
-   `PrintLevelsDiagnosticDate`.
+*(Closed by user decision: the Psy 4H-grid compatibility flag stays OFF — the literal
+session window is the accepted behavior and no TradingView cross-check is required. Not an
+open issue.)*
 
 ## How to run the tests
 
