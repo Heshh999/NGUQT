@@ -17,7 +17,7 @@ V4 implementation.
 |---|---|
 | `FbGradeBasis` enum | Re-documented: `FirstTradableCandle` is now the V5-mandated default (Fix 7); `ValidityCandleNumber` demoted to legacy research |
 | `TargetReachedMode` enum | **New** — VBR "target reached" definition kept configurable (unresolved item 2) |
-| `PsyLevelType` enum | **New** — TR `calcPsyLevels` psyType; default **Crypto** for MNQ per TR_MAIN L243 (see follow-up section) |
+| `PsyLevelType` enum | **New** — TR `calcPsyLevels` psyType; default **Forex** (user-confirmed for MNQ; TR `overridePsyType` selector) |
 | `KeyLevelEngine` header + fields | Rewritten for the faithful TR port; removed the generic "first 8 hours of week" psy fields; `DayStartMinutesEt` default now 1080 (18:00 ET = CME exchange-day open = TR `time('D')` boundary for MNQ; 0 reproduces the library's literal "exchange midnight" comment) |
 | `KeyLevelEngine.CalcSydneyDst` | **New** — direct port of TR `calcDst()` Sydney-DST branch |
 | `KeyLevelEngine.IsInPsySession` | **New** — port of `calcPsyLevels` session windows: forex `'0000-0800:2'` GMT (Monday 00:00–08:00 GMT); crypto `'2200-0600:1'` GMT+1/GMT by Sydney DST |
@@ -59,7 +59,7 @@ high; stop at the structure HIGH/WICK).
 
 ### `tests/` (new)
 `MockHost.cs`, `Tests.cs` — deterministic scenario tests compiled against the actual engine
-sources (the engines have no NinjaTrader dependency by design). 39 assertions, all passing;
+sources (the engines have no NinjaTrader dependency by design). 41 assertions, all passing;
 see `docs/COMPLIANCE_AUDIT.md` §Corrections for the mapping.
 
 ## Previous vs corrected behavior (with tests)
@@ -97,9 +97,9 @@ both remaining caveats and exposed one real defect in the psy port.
 
 | Previous behavior | Corrected behavior | Code file/function | Test performed |
 |---|---|---|---|
-| `PsyType` defaulted to **Forex** | TR_MAIN L243: `psyType = overridePsyType ? psyTypeX : (syminfo.type == 'forex' ? 'forex' : 'crypto')`. MNQ is `syminfo.type == 'futures'`, so the indicator uses the **CRYPTO** path — now the default | `KeyLevelEngine.PsyType`, `MnqTwoStrategies.PsyLevelTypeParam` | crypto-path accumulation from the Sunday futures-week open ✅ |
+| Only one psy path implemented as usable | Both TR paths ported and selectable. TR_MAIN's *automatic* derivation (L243) would give `crypto` for a futures symbol, but L241-242 expose `overridePsyType` + a manual selector; **the user runs the FOREX path for MNQ**, which is the default. Forex window = Mon 00:00-08:00 GMT = Sun 20:00 → Mon 04:00 ET, fully inside CME hours year-round, no DST dependency | `KeyLevelEngine.PsyType`, `MnqTwoStrategies.PsyLevelTypeParam` | forex-path accumulation + boundary exclusions ✅; crypto path also covered ✅ |
 | Crypto session read as **Saturday** 22:00 → Sunday 06:00 | Pine session days are 1=Sunday and name the day the session STARTS, so `'2200-0600:1'` = **Sunday 22:00 → Monday 06:00** (GMT+1 while Sydney DST, else GMT). Decisive check: the Saturday window lies entirely inside the CME weekend closure, so it would leave Psy Hi/Lo NaN forever; the Sunday window starts exactly at the Sunday 18:00 ET futures reopen | `KeyLevelEngine.IsInPsySession` | Saturday bar excluded ✅; crypto window non-empty for MNQ ✅; forex path unaffected ✅ |
 | (new) 4H-grid session evaluation | The source tests membership via `time('240', session, gmt)`. The anchor cannot be derived from the source, and anchoring to the exchange-day open makes the source's own forex branch fall permanently out of session — so the literal session window is the default and the grid is a clearly-named compat parameter, default OFF | `KeyLevelEngine.PsyUse4HourGrid`, `PsyUse4HourGridParam` | compat mode agrees with the literal window on the aligned MNQ case ✅ |
 | Doc claims | "documented equivalent, not a line-for-line port" caveats replaced with CONFIRMED rows citing TR_MAIN line numbers | `docs/COMPLIANCE_AUDIT.md` §5 | — |
 
-Test count after this pass: **39 assertions, all passing**.
+Test count after this pass: **41 assertions, all passing**.

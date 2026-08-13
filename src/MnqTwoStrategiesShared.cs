@@ -238,9 +238,17 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // Configuration (set once by the host strategy before data starts)
         public int DayStartMinutesEt = 1080;    // 18:00 ET = CME exchange-day open (TR time('D') boundary for MNQ); 0 = literal "exchange midnight"
         public int WeekStartMinutesEt = 1080;   // Sunday 18:00 ET = futures week open (TradingView weekly bar boundary for MNQ)
-        // TR_MAIN line 243: psyType = syminfo.type == 'forex' ? 'forex' : 'crypto'.
-        // MNQ is syminfo.type == 'futures' -> the indicator uses the CRYPTO path.
-        public PsyLevelType PsyType = PsyLevelType.Crypto;
+        // TR_MAIN psyType. The AUTOMATIC derivation (L243) is
+        //     syminfo.type == 'forex' ? 'forex' : 'crypto'
+        // which would give 'crypto' for MNQ, but TR_MAIN also exposes
+        // overridePsyType + a manual psyType selector (L241-242) for exactly this
+        // case, and the user runs the FOREX path for MNQ psy levels. That is the
+        // configured default here.
+        // Practical note: the forex window (Monday 00:00-08:00 GMT = Sun 20:00 ->
+        // Mon 04:00 ET) sits fully inside CME trading hours year-round and has no
+        // DST dependency; the crypto window opens ~2h before the Sunday 18:00 ET
+        // futures reopen while Sydney is in DST.
+        public PsyLevelType PsyType = PsyLevelType.Forex;
         // COMPATIBILITY ONLY (default OFF): TR tests session membership through
         // time('240', session, gmt). Reproducing that needs TradingView's 4H-bar
         // anchor, which cannot be verified from the source alone — and anchoring

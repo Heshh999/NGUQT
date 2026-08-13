@@ -87,7 +87,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int WeekStartMinutesEt { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Psy level type (TR_MAIN L243: futures => Crypto)", GroupName = "01. Session / Time", Order = 6)]
+        [Display(Name = "Psy level type (TR overridePsyType; Forex confirmed for MNQ)", GroupName = "01. Session / Time", Order = 6)]
         public PsyLevelType PsyLevelTypeParam { get; set; }
 
         [NinjaScriptProperty]
@@ -264,7 +264,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AssumeBarTimesAreEastern = false;
                 DayStartMinutesEt = 1080;       // 18:00 ET = CME exchange-day open = TR time('D') boundary for MNQ (V5 Fix 4A)
                 WeekStartMinutesEt = 1080;      // Sunday 18:00 ET futures week open (TradingView weekly bar for MNQ)
-                PsyLevelTypeParam = PsyLevelType.Crypto; // TR_MAIN L243: MNQ is 'futures' -> crypto path
+                PsyLevelTypeParam = PsyLevelType.Forex;  // user-confirmed for MNQ (TR overridePsyType path)
                 PsyUse4HourGridParam = false;            // compat only — see KeyLevelEngine notes
                 ExitOnSessionCloseEnabled = false;      // V5 Fix 6
 
