@@ -3,7 +3,7 @@
 Audited against `two_automated_strategies_for_claude_v6_MNQ_ONLY_FINAL.md` (controlling).
 Supersedes `docs/COMPLIANCE_AUDIT.md` (V5). Changes in this pass: `docs/CHANGELOG_V6.md`.
 
-**Deterministic assertions: 93 executed, 93 passed, 0 failed** (Mono, run against the actual
+**Deterministic assertions: 102 executed, 102 passed, 0 failed** (Mono, run against the actual
 engine sources — see "How to run" below).
 
 Legend: ✅ implemented and test-proven · ⚙️ implemented, behavior exposed as a parameter
@@ -56,7 +56,8 @@ Code refs: `Shared` = `src/MnqTwoStrategiesShared.cs`, `FB` = `src/FakeBreakoutE
 | **BLUE above → RED_VECTOR below = valid short** | ✅ | same | `TestBlueShortPaths` | |
 | **BLUE above → VIOLET below = INVALID for the BLUE path** | ✅ | same | `TestBlueShortPaths` | |
 | BLUE is NOT a valid 15m FB parent initiator | ✅ | FB `TryTrigger` vector filter | structural (GREEN/REGULAR short, RED/REGULAR long) | |
-| Same-timeframe EMA(9) confirmation (enter if already beyond, else wait for first close beyond; cancel on structure break) | ✅ | FB `ProcessLtf` emaOk / `WaitingEma` branches | `TestBlueShortPaths`, `TestU4U5FbReclaim` | |
+| Same-timeframe EMA(9) confirmation (enter if already beyond, else wait for first close beyond; cancel on structure break) | ✅ | FB `ProcessLtf` emaOk / `WaitingEma` branches | `TestBlueShortPaths`, `TestU4U5FbReclaim`, `TestFinalFbEmaRule` | |
+| **FINAL EMA RULE: the 15m EMA(9) is informational only — it must never gate, cancel, postpone or invalidate a valid 1m/3m entry** | ✅⚙️ | FB `TryEnter` (gate removed; value logged as context); `Require15mEmaConfluence = false` | `TestFinalFbEmaRule` (9 assertions incl. 1m/3m short and long entries with the 15m EMA on the wrong side) | LEGACY flag restores the old gate for research only |
 | A- = first actually executable/eligible entry candle; B+ later | ✅⚙️ | `FbGradeBasis.FirstTradableCandle`; `TryEnter` | `TestPremarketAMinusGrading`, `TestLaterEntryGradesBPlus` | 26% / 10% risk asserted via contract counts |
 | 4 primary 15m candles + 2 extension (max 6) | ✅ | FB `Process15` | structural | |
 | First target broken only by completed 1m close; wick doesn't count | ✅ | see U1 | `TestU1FbTargetBreak` | |
@@ -108,10 +109,12 @@ The V6 U1–U9 locks are implemented; none of them is ambiguous any more. What r
    `OnPositionUpdate(... MarketPosition.Flat ...)`. The sequencing logic itself is
    test-proven via the shared coordinator, but that NinjaTrader callback firing as expected
    can only be confirmed in NT8 (live or Playback). Worth watching on the first handoff.
-3. **One FB behavior is not locked by V6** (flagged rather than invented): what happens when
-   the 15m EMA(9) confluence (§7) fails at the instant of a lower-timeframe entry signal.
-   Default = cancel that LTF setup and keep scanning for a fresh one while the parent lives
-   (`FbConfluenceFailCancelsLtfSetup`). Tell me if it should instead wait for a later 15m close.
+3. **Opposite-direction FB parents can now both be active** (surfaced by the final EMA rule,
+   spec-correct, flagged rather than filtered). The 15m candle that reclaims below a level for
+   a SHORT parent also satisfies the §5 LONG parent trigger at that same level, so both FB
+   slots can produce entries; the old 15m EMA confluence gate used to suppress the
+   counter-direction one. No filter was added. If FB long and FB short should be mutually
+   exclusive, that is a NEW rule and needs your instruction.
 *(Closed by user decision: the Psy 4H-grid compatibility flag stays OFF — the literal
 session window is the accepted behavior and no TradingView cross-check is required. Not an
 open issue.)*
@@ -124,4 +127,4 @@ mcs -out:run_tests.exe ../src/MnqTwoStrategiesShared.cs ../src/FakeBreakoutEngin
     ../src/VectorBreakRetestEngine.cs MockHost.cs Tests.cs
 mono run_tests.exe
 ```
-Expected final line: `RESULT: 93 passed, 0 failed`.
+Expected final line: `RESULT: 102 passed, 0 failed`.

@@ -48,10 +48,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // 1m/3m entry engine may scan or enter. The 1m/3m engines scan as soon as a
         // valid 15m parent exists. Must be FALSE in exact-spec mode.
         public bool Require15mReclaimBeforeLtfEntry = false;
-        // NOT locked by V6: what happens when the 15m EMA(9) confluence (§7) fails at
-        // the moment of a lower-timeframe entry signal. Default cancels that LTF
-        // setup; scanning continues for a fresh one while the parent is alive.
-        public bool ConfluenceFailCancelsLtfSetup = true;
+        // FINAL FAKE BREAKOUT EMA RULE — LOCKED:
+        // The 15-minute EMA(9) is NOT an entry gate. It must never cancel, delay,
+        // block or invalidate an otherwise valid 1m/3m Fake Breakout entry. Only the
+        // LOWER-TIMEFRAME EMA(9) controls the actual entry. The 15m EMA is kept for
+        // context/logging only. LEGACY research flag, must stay FALSE in exact-spec
+        // mode; when TRUE it restores the old confluence gate (cancels the LTF setup).
+        public bool Require15mEmaConfluence = false;
         // V6 U1 — LOCKED: first target is broken ONLY by a completed 1m close beyond
         // it (a wick/touch does not count). Then the 3m EMA(9) runner activates.
         public FbTargetBreakMode TargetBreakMode = FbTargetBreakMode.OneMinuteCloseBeyond;
@@ -568,23 +571,21 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // ==================================================================
         private void TryEnter(FbSlot slot, LtfSetup s, BarSnap bar)
         {
-            // §7 15m EMA(9) confluence before actual lower-timeframe entry
-            bool confluence = slot.IsLong ? last15Close > last15Ema : last15Close < last15Ema;
-            if (double.IsNaN(last15Close) || double.IsNaN(last15Ema)) confluence = false;
-            if (!confluence)
+            // FINAL FAKE BREAKOUT EMA RULE:
+            // The 15m EMA(9) is INFORMATIONAL ONLY. The entry has already been
+            // confirmed by the LOWER-TIMEFRAME EMA(9) in ProcessLtf, so the 15m EMA
+            // state must not gate, cancel, postpone or invalidate it here. It is only
+            // recorded as context on the entry log below.
+            bool confluence15m = slot.IsLong ? last15Close > last15Ema : last15Close < last15Ema;
+            if (double.IsNaN(last15Close) || double.IsNaN(last15Ema)) confluence15m = false;
+
+            if (cfg.Require15mEmaConfluence && !confluence15m)
             {
-                if (cfg.ConfluenceFailCancelsLtfSetup)
-                {
-                    host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
-                        "{0} entry blocked: 15m EMA confluence failed (close {1:0.00} vs ema {2:0.00}) — LTF setup cancelled (FB-5)",
-                        slot.IsLong ? "LONG" : "SHORT", last15Close, last15Ema));
-                    s.Reset();
-                }
-                else
-                {
-                    host.Diag(StrategyId.FAKE_BREAKOUT, "entry blocked: 15m EMA confluence failed — waiting (FB-5 config)");
-                    s.WaitingEma = true;
-                }
+                // LEGACY research path only — never active in exact-spec mode.
+                host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                    "{0} entry blocked: 15m EMA confluence failed (close {1:0.00} vs ema {2:0.00}) — LTF setup cancelled (LEGACY flag, not exact-spec)",
+                    slot.IsLong ? "LONG" : "SHORT", last15Close, last15Ema));
+                s.Reset();
                 return;
             }
 
@@ -665,9 +666,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
             // Spec diagnostics: entry price/stop/distance/balance/risk%/contracts/etc.
             host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
-                "ENTRY {0} {1} tf={2}m pattern=FAKE_BREAK_RECLAIM validityCandle={3} grade={4} entryRef={5:0.00} stop={6:0.00} stopPts={7:0.00} balance={8:0.00} risk%={9} riskDollars={10:0.00} contracts={11} tradeId={12}",
+                "ENTRY {0} {1} tf={2}m pattern=FAKE_BREAK_RECLAIM validityCandle={3} grade={4} entryRef={5:0.00} ltfEma9={6:0.00} stop={7:0.00} stopPts={8:0.00} balance={9:0.00} risk%={10} riskDollars={11:0.00} contracts={12} tradeId={13} | context only: 15mClose={14:0.00} 15mEma9={15:0.00} 15mConfluence={16}",
                 slot.IsLong ? "LONG" : "SHORT", slot.EntrySignal, bar.PeriodMinutes, formingCandle, grade,
-                entryRef, stop, stopPts, balance, riskPct, riskDollars, qty, slot.TradeId));
+                entryRef, bar.Ema9, stop, stopPts, balance, riskPct, riskDollars, qty, slot.TradeId,
+                last15Close, last15Ema, confluence15m));
         }
 
         // ==================================================================

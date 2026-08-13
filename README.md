@@ -24,7 +24,7 @@ the 18-level take-profit engine, MNQ ($2/pt) risk-based sizing, session/time hel
 | `docs/CHANGELOG_V6.md` | V6 rule-lock pass (U1–U9): previous vs corrected behavior |
 | `docs/COMPLIANCE_AUDIT.md` | Superseded V5 audit (kept for history) |
 | `docs/CHANGELOG_V5.md` | V5 correction pass: every file/function changed, previous vs corrected behavior |
-| `tests/` | Deterministic engine tests (Mono/.NET, no NinjaTrader needed) — 93 assertions |
+| `tests/` | Deterministic engine tests (Mono/.NET, no NinjaTrader needed) — 102 assertions |
 
 ## Installation
 
@@ -64,7 +64,7 @@ the 18-level take-profit engine, MNQ ($2/pt) risk-based sizing, session/time hel
 - **Tests**: `cd tests && mcs -out:run_tests.exe ../src/MnqTwoStrategiesShared.cs
   ../src/FakeBreakoutEngine.cs ../src/VectorBreakRetestEngine.cs MockHost.cs Tests.cs &&
   mono run_tests.exe` — the engines and the handoff coordinator have no NinjaTrader
-  dependency, so the V6 scenario tests run anywhere .NET/Mono runs (93 assertions).
+  dependency, so the V6 scenario tests run anywhere .NET/Mono runs (102 assertions).
 - **Backtest sizing** uses the *Backtest starting balance* parameter (default $5,000),
   optionally compounded with realized PnL. Live sizing uses the account cash value.
 - **Risk warning**: the spec mandates 50% / 26% / 10% account risk per trade. Those are the

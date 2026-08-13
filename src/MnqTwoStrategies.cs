@@ -145,8 +145,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         public bool FbRequire15mReclaimBeforeLtfEntry { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "15m EMA confluence fail cancels LTF setup (not locked by V6)", GroupName = "03. Fake Breakout", Order = 4)]
-        public bool FbConfluenceFailCancelsLtfSetup { get; set; }
+        [Display(Name = "LEGACY: require 15m EMA confluence (FINAL RULE: keep FALSE)", GroupName = "03. Fake Breakout", Order = 4)]
+        public bool FbRequire15mEmaConfluence { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "First-target break definition (V6 U1: 1m close beyond)", GroupName = "03. Fake Breakout", Order = 5)]
@@ -271,7 +271,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 FbRequirePriorCloseInside = false;          // V5 Fix 2 (legacy, keep FALSE)
                 FbInvalidReclaimCancelsSetup = false;
                 FbRequire15mReclaimBeforeLtfEntry = false;   // V6 U5
-                FbConfluenceFailCancelsLtfSetup = true;
+                FbRequire15mEmaConfluence = false;          // FINAL FB EMA RULE: 15m EMA is context only
                 FbTargetBreakModeParam = FbTargetBreakMode.OneMinuteCloseBeyond; // V6 U1
                 FbGradeBasisParam = FbGradeBasis.FirstTradableCandle; // V5 Fix 7
 
@@ -327,7 +327,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 fbCfg.RequirePriorCloseInside = FbRequirePriorCloseInside;
                 fbCfg.InvalidReclaimCancelsSetup = FbInvalidReclaimCancelsSetup;
                 fbCfg.Require15mReclaimBeforeLtfEntry = FbRequire15mReclaimBeforeLtfEntry;
-                fbCfg.ConfluenceFailCancelsLtfSetup = FbConfluenceFailCancelsLtfSetup;
+                fbCfg.Require15mEmaConfluence = FbRequire15mEmaConfluence;
                 fbCfg.TargetBreakMode = FbTargetBreakModeParam;
                 fbCfg.GradeBasis = FbGradeBasisParam;
                 fb = new FakeBreakoutEngine(this, fbCfg);

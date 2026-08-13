@@ -220,8 +220,13 @@ namespace MnqTwoTests
             // pattern during candle #3 -> second eligible candle -> B+ (10%)
             fb.OnOneMinuteBar(Bar(At(9, 46), 1, 20096, 20106, 20094, 20105, VectorType.BLUE_VECTOR, 20100));
             fb.OnOneMinuteBar(Bar(At(9, 48), 1, 20104, 20105, 20092, 20095, VectorType.REGULAR_BEARISH, 20099));
-            Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 45",
-                "later entry sized at B+ 10% risk (45 contracts)");
+            // NOTE: the 9:15-9:30 candle that reclaims below YDAY_HIGH for the short
+            // slot also satisfies the §5 LONG parent trigger at the same level, so an
+            // independent FB long can also fire here. That is spec-correct; the old
+            // 15m EMA confluence gate used to mask it. This assertion targets the
+            // SHORT entry specifically.
+            Check(h.Entries.Contains("FB_SHORT 45"),
+                "later short entry sized at B+ 10% risk (45 contracts)");
             Check(h.AnyDiagContains("grade=B+"), "later entry graded B+");
         }
 
@@ -754,6 +759,97 @@ namespace MnqTwoTests
                 "U9 ordering: VBR exit -> flat confirmed -> FB entry");
         }
 
+        // ======================================================================
+        // FINAL FAKE BREAKOUT EMA RULE
+        // The 15m EMA(9) is informational only: it must never gate, cancel, delay
+        // or invalidate a valid 1m/3m Fake Breakout entry. Only the SAME-TIMEFRAME
+        // EMA(9) controls the entry.
+        // ======================================================================
+
+        // 15m SHORT parent at YDAY_HIGH 20100 whose 15m EMA is DELIBERATELY on the
+        // wrong side: close 20110 > 15m EMA 20090, so the old confluence gate would
+        // have blocked/cancelled every short entry underneath it.
+        private static FakeBreakoutEngine FbShortParentBad15mEma(MockHost host)
+        {
+            host.LevelsEngine = StdLevels();
+            FakeBreakoutEngine fb = new FakeBreakoutEngine(host, new FbConfig());
+            fb.OnFifteenMinuteBar(Bar(At(9, 15), 15, 20080, 20120, 20070, 20110,
+                VectorType.GREEN_VECTOR, 20090), 20090);   // 20110 > 20090 => short confluence FAILS
+            return fb;
+        }
+
+        // 15m LONG parent at YDAY_LOW 19900 whose 15m EMA is on the wrong side:
+        // close 19890 < 15m EMA 19920, so long confluence FAILS.
+        private static FakeBreakoutEngine FbLongParentBad15mEma(MockHost host)
+        {
+            host.LevelsEngine = StdLevels();
+            FakeBreakoutEngine fb = new FakeBreakoutEngine(host, new FbConfig());
+            fb.OnFifteenMinuteBar(Bar(At(9, 15), 15, 19910, 19915, 19880, 19890,
+                VectorType.RED_VECTOR, 19920), 19910);     // 19890 < 19920 => long confluence FAILS
+            return fb;
+        }
+
+        private static void TestFinalFbEmaRule()
+        {
+            Console.WriteLine("FINAL FB EMA RULE — 15m EMA(9) is context only, never an entry gate:");
+
+            // 1m SHORT already below the 1m EMA9, 15m EMA on the wrong side
+            MockHost h1 = new MockHost();
+            FakeBreakoutEngine f1 = FbShortParentBad15mEma(h1);
+            f1.OnOneMinuteBar(Bar(At(9, 31), 1, 20096, 20106, 20094, 20105, VectorType.BLUE_VECTOR, 20100));
+            f1.OnOneMinuteBar(Bar(At(9, 33), 1, 20104, 20105, 20092, 20095, VectorType.REGULAR_BEARISH, 20099));
+            Check(h1.Entries.Count == 1 && h1.Entries[0].StartsWith("FB_SHORT"),
+                "1m short already below 1m EMA9 ENTERS while the 15m candle is not below the 15m EMA9");
+            Check(h1.AnyDiagContains("15mConfluence=False"),
+                "the failing 15m confluence is logged as context only, not as a block");
+
+            // 3m SHORT already below the 3m EMA9, 15m EMA condition absent
+            MockHost h2 = new MockHost();
+            FakeBreakoutEngine f2 = FbShortParentBad15mEma(h2);
+            f2.OnThreeMinuteBar(Bar(At(9, 33), 3, 20096, 20108, 20094, 20105, VectorType.BLUE_VECTOR, 20100));
+            f2.OnThreeMinuteBar(Bar(At(9, 36), 3, 20104, 20106, 20090, 20094, VectorType.RED_VECTOR, 20099));
+            Check(h2.Entries.Count == 1 && h2.Entries[0].StartsWith("FB_SHORT"),
+                "3m short already below 3m EMA9 ENTERS with the 15m EMA condition absent");
+
+            // 1m LONG already above the 1m EMA9, no 15m EMA confirmation
+            MockHost h3 = new MockHost();
+            FakeBreakoutEngine f3 = FbLongParentBad15mEma(h3);
+            f3.OnOneMinuteBar(Bar(At(9, 31), 1, 19905, 19906, 19888, 19894, VectorType.RED_VECTOR, 19900));
+            f3.OnOneMinuteBar(Bar(At(9, 33), 1, 19895, 19912, 19893, 19908, VectorType.GREEN_VECTOR, 19902));
+            Check(h3.Entries.Count == 1 && h3.Entries[0].StartsWith("FB_LONG"),
+                "1m long already above 1m EMA9 ENTERS without any 15m EMA confirmation");
+
+            // 3m LONG already above the 3m EMA9, no 15m EMA confirmation
+            MockHost h4 = new MockHost();
+            FakeBreakoutEngine f4 = FbLongParentBad15mEma(h4);
+            f4.OnThreeMinuteBar(Bar(At(9, 33), 3, 19905, 19907, 19886, 19893, VectorType.RED_VECTOR, 19900));
+            f4.OnThreeMinuteBar(Bar(At(9, 36), 3, 19894, 19914, 19892, 19910, VectorType.GREEN_VECTOR, 19903));
+            Check(h4.Entries.Count == 1 && h4.Entries[0].StartsWith("FB_LONG"),
+                "3m long already above 3m EMA9 ENTERS without any 15m EMA confirmation");
+
+            // Reclaim NOT yet through the same-timeframe EMA -> WAIT, do not cancel
+            MockHost h5 = new MockHost();
+            FakeBreakoutEngine f5 = FbShortParentBad15mEma(h5);
+            f5.OnOneMinuteBar(Bar(At(9, 31), 1, 20096, 20106, 20094, 20105, VectorType.BLUE_VECTOR, 20100));
+            // reclaim closes below the level (20095 < 20100) but ABOVE the 1m EMA9 (20090)
+            f5.OnOneMinuteBar(Bar(At(9, 33), 1, 20104, 20105, 20092, 20095, VectorType.REGULAR_BEARISH, 20090));
+            Check(h5.Entries.Count == 0, "reclaim not yet through the same-timeframe EMA9 does NOT enter");
+            Check(!h5.AnyDiagContains("LTF setup cancelled") && !h5.AnyDiagContains("setup CANCELLED"),
+                "reclaim awaiting the same-timeframe EMA WAITS instead of being cancelled");
+            // later 1m close BELOW the 1m EMA9 (and inside the structure) -> ENTER
+            f5.OnOneMinuteBar(Bar(At(9, 35), 1, 20095, 20098, 20080, 20085, VectorType.REGULAR_BEARISH, 20090));
+            Check(h5.Entries.Count == 1 && h5.Entries[0].StartsWith("FB_SHORT"),
+                "a later same-timeframe EMA close triggers the entry while the setup is still valid");
+
+            // The 15m EMA state alone never cancels a valid LTF setup
+            Check(!h1.AnyDiagContains("15m EMA confluence failed")
+               && !h2.AnyDiagContains("15m EMA confluence failed")
+               && !h3.AnyDiagContains("15m EMA confluence failed")
+               && !h4.AnyDiagContains("15m EMA confluence failed")
+               && !h5.AnyDiagContains("15m EMA confluence failed"),
+                "15m EMA state alone NEVER cancels a valid lower-timeframe Fake Breakout setup");
+        }
+
         // ---- main ------------------------------------------------------------
 
         public static int Main()
@@ -778,6 +874,9 @@ namespace MnqTwoTests
             TestU7WrongSideBreaksRolling();
             TestU9HandoffFbToVbr();
             TestU9HandoffVbrToFb();
+
+            // ---- FINAL FAKE BREAKOUT EMA RULE ----
+            TestFinalFbEmaRule();
 
             Console.WriteLine();
             Console.WriteLine(string.Format("RESULT: {0} passed, {1} failed", passed, failed));

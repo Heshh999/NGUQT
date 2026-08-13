@@ -4,7 +4,8 @@ Controlling spec: `two_automated_strategies_for_claude_v6_MNQ_ONLY_FINAL.md` (su
 Directives: `CLAUDE_FINAL_V6_CORRECTION_PROMPT.md`.
 
 Existing architecture preserved — no rebuild. Code already matching V6 was left alone;
-only V4/V5-era behavior was modified. Deterministic assertions: **93, all passing.**
+only V4/V5-era behavior was modified. Deterministic assertions: **102, all passing**
+(93 for the U1-U9 locks + 9 for the FINAL FAKE BREAKOUT EMA RULE follow-up below).
 
 ## Rule | Previous behavior | Corrected behavior | Code location | Test proving it
 
@@ -79,3 +80,34 @@ Three initial V6 test scenarios failed against correct engine behavior and were 
 - **Clock assertion.** "Clock never restarts" was asserted while a position was open, where
   the clock legitimately governs entries only; rebuilt as a no-entry roll to #4 that must
   expire rather than create a #5.
+
+---
+
+## Follow-up: FINAL FAKE BREAKOUT EMA RULE
+
+The 15-minute EMA(9) is **not** an entry gate for Fake Breakout. It must never cancel, delay,
+block or invalidate an otherwise valid 1m/3m entry. Only the **same-timeframe** EMA(9)
+controls the entry. This supersedes the older "15m EMA confluence before LTF entry" rule.
+
+| Rule | Previous behavior | Corrected behavior | Code location | Test proving it |
+|---|---|---|---|---|
+| 15m EMA(9) role | `ConfluenceFailCancelsLtfSetup = true` — if the most recent completed 15m close was on the wrong side of the 15m EMA(9), the qualifying 1m/3m setup was **cancelled** at the entry moment | 15m EMA is **informational/context only**. `TryEnter` no longer gates on it; the value is logged as `15mClose / 15mEma9 / 15mConfluence` on the entry record. Replaced by LEGACY flag `Require15mEmaConfluence` (default **false**) | `FbConfig.Require15mEmaConfluence`; `FakeBreakoutEngine.TryEnter`; host param `FbRequire15mEmaConfluence` | `TestFinalFbEmaRule` (9 assertions) |
+| SHORT: reclaim already below same-TF EMA9 | entered only if 15m confluence also held | enters on that completed candle regardless of 15m EMA | `ProcessLtf` reclaim branch (unchanged) → `TryEnter` | "1m short already below 1m EMA9 ENTERS…", "3m short… ENTERS…" |
+| LONG: reclaim already above same-TF EMA9 | as above | enters on that completed candle regardless of 15m EMA | same | "1m long… ENTERS without any 15m EMA confirmation", "3m long… ENTERS…" |
+| Reclaim not yet through same-TF EMA9 | waited, but could then be cancelled by the 15m gate | keeps the LTF setup alive and enters on the first completed same-TF candle closing through EMA9, provided parent + LTF structure remain valid | `ProcessLtf` `WaitingEma` branch (unchanged) | "…WAITS instead of being cancelled", "a later same-timeframe EMA close triggers the entry" |
+| 15m EMA alone cancelling a setup | possible | impossible | — | "15m EMA state alone NEVER cancels a valid lower-timeframe Fake Breakout setup" |
+
+Unchanged and still enforced: the §9/§10 structure rule that cancels a waiting LTF setup when
+a completed same-timeframe candle closes beyond the fake-break structure extreme.
+
+**Assertion count after this pass: 102 executed, 102 passed, 0 failed.**
+
+### Behavior surfaced by this change (spec-correct, flagged not filtered)
+
+Removing the 15m gate revealed that a single 15m candle can start **both** FB directions at
+the same level: the candle that closes back below YDAY_HIGH to reclaim for a short parent
+also satisfies the §5 LONG parent trigger at that level (trades below + closes below + RED or
+REGULAR initiator). Both slots are independent and both can now produce entries, where the
+15m EMA confluence used to suppress the counter-direction one. This is the literal V6 reading
+and no filter was added. If opposite-direction FB parents should be mutually exclusive, that
+is a NEW rule — tell me and I will add it.
