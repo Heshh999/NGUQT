@@ -1,0 +1,853 @@
+// ============================================================================
+// FakeBreakoutEngine.cs
+// STRATEGY 1 — FAKE BREAKOUT  (StrategyId = FAKE_BREAKOUT)
+//
+// Implements the spec sections:
+//   "STRATEGY 1 — FAKE BREAKOUT" items 1-12
+//   "FAKE_BREAKOUT trigger levels" (YDAY_HIGH, YDAY_LOW, LWEEK_HIGH, LWEEK_LOW;
+//    DAILY_OPEN must NOT start a Fake Breakout setup)
+//   "SHARED TAKE-PROFIT KEY-LEVEL ENGINE" section E (first target + 3m EMA runner)
+//   "GLOBAL ENTRY-TIME RULE" (9:30-11:30 ET; premarket LTF signals never bank)
+//
+// This engine's state, counters, orders, grades, sizing, trade IDs and logs are
+// fully independent of VectorBreakRetestEngine (spec hard separation rule).
+// Order signal names: FB_LONG / FB_SHORT, exits FB_STOP_* / FB_RUN_*.
+// ============================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+
+namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
+{
+    // Spec "Suggested Fake Breakout states" (WAITING_FOR_LOWER_TF_EMA lives inside
+    // each lower-timeframe sub-setup; INVALIDATED/EXPIRED collapse back to IDLE).
+    public enum FbState
+    {
+        IDLE,
+        BREAKOUT_15M_ACTIVE,        // waiting for the 15m reclaim (structure tracking)
+        STRUCTURE_FROZEN_SEARCHING, // reclaim confirmed; scanning 1m/3m for entry
+        POSITION_OPEN,
+        RUNNER_MODE
+    }
+
+    public class FbConfig
+    {
+        public double RiskPctAMinus = 26.0;   // spec: A- = 26% account risk
+        public double RiskPctBPlus = 10.0;    // spec: B+ = 10% account risk
+
+        // Ambiguity FB-1: require the previous 15m close to be on the inside of the
+        // level so a candle merely trading beyond an already-broken level does not
+        // re-trigger ("breakout" semantics).
+        public bool RequirePriorCloseInside = true;
+        // Ambiguity FB-3: REGULAR breakout + REGULAR reclaim = "invalid" — default:
+        // the reclaim simply does not count and the setup keeps waiting.
+        public bool InvalidReclaimCancelsSetup = false;
+        // Ambiguity FB-2: suggested state flow implies the 15m reclaim/freeze must
+        // occur before 1m/3m entry scanning starts.
+        public bool Require15mReclaimBeforeLtfEntry = true;
+        // Ambiguity FB-5: 15m EMA(9) confluence fails at the LTF entry signal:
+        // cancel that LTF setup (default) or keep waiting for a later EMA close.
+        public bool ConfluenceFailCancelsLtfSetup = true;
+        // Spec section 12/E: break definition of the first target is configurable.
+        public FbTargetBreakMode TargetBreakMode = FbTargetBreakMode.ThreeMinuteCloseBeyond;
+        // Ambiguity FB-6: basis of the "first eligible 15m candle" A- grade.
+        public FbGradeBasis GradeBasis = FbGradeBasis.ValidityCandleNumber;
+    }
+
+    public class FakeBreakoutEngine
+    {
+        // Spec: FakeBreakoutEligibleLevels = { YDAY_HIGH, YDAY_LOW, LWEEK_HIGH, LWEEK_LOW }
+        private static readonly KeyLevelId[] EligibleLevels = new KeyLevelId[]
+        {
+            KeyLevelId.YDAY_HIGH, KeyLevelId.YDAY_LOW, KeyLevelId.LWEEK_HIGH, KeyLevelId.LWEEK_LOW
+        };
+
+        // ---- one lower-timeframe (1m or 3m) fake-break sub-setup (spec §9/§10) ----
+        private class LtfSetup
+        {
+            public int TfMinutes;
+            public bool StructureActive;   // break candle seen, waiting for reclaim
+            public bool WaitingEma;        // valid reclaim seen, waiting for EMA close
+            public double StructExtreme;   // long: lowest low; short: highest high
+            public VectorType BreakVector;
+            public DateTime StructStartEtOpen;
+
+            public void Reset()
+            {
+                StructureActive = false;
+                WaitingEma = false;
+                StructExtreme = double.NaN;
+            }
+        }
+
+        // ---- one directional parent-setup slot (spec §4 short / §5 long) ----
+        private class FbSlot
+        {
+            public bool IsLong;
+            public FbState State = FbState.IDLE;
+
+            // parent setup
+            public KeyLevelId ActiveLevelId;
+            public double ActiveLevelPrice;
+            public VectorType BreakoutVector;
+            public DateTime BreakoutEtClose;       // OriginalBreakoutTime (spec §4)
+            public int ValidityCount;              // completed 15m candles since breakout candle
+            public double StructExtreme15;         // StructuralHigh / StructuralLow (spec §4/§5)
+            public bool Frozen;
+            public double FrozenExtreme;
+            public bool ParentPremarket;
+            public int FirstTradableFormingNum;    // for FbGradeBasis.FirstTradableCandle
+
+            public LtfSetup Ltf1 = new LtfSetup();
+            public LtfSetup Ltf3 = new LtfSetup();
+
+            // trade
+            public string TradeId;
+            public string Grade;
+            public double RiskPct;
+            public double RiskDollars;
+            public double BalanceAtEntry;
+            public int EntryTf;
+            public int ValidityCandleAtEntry;
+            public DateTime EntryEtTime;
+            public double IntendedEntry;
+            public double EntryAvg;
+            public int QtyTotal;
+            public int QtyOpen;
+            public int QtyFilled;
+            public double StopPrice;
+            public double StopPts;
+            public string TargetNames = "";
+            public double TargetPrice = double.NaN;
+            public double TargetDistance = double.NaN;
+            public bool TargetBroken;
+            public double MfeExtreme;              // long: max high since entry; short: min low
+            public double MaeExtreme;              // long: min low since entry;  short: max high
+            public double ExitAvg;
+            public int ExitQtyAccum;
+
+            public bool HasPosition { get { return State == FbState.POSITION_OPEN || State == FbState.RUNNER_MODE; } }
+
+            public string EntrySignal { get { return IsLong ? "FB_LONG" : "FB_SHORT"; } }
+            public string StopSignal { get { return IsLong ? "FB_STOP_L" : "FB_STOP_S"; } }
+            public string RunSignal { get { return IsLong ? "FB_RUN_L" : "FB_RUN_S"; } }
+
+            public void ResetAll()
+            {
+                State = FbState.IDLE;
+                ValidityCount = 0;
+                Frozen = false;
+                FrozenExtreme = double.NaN;
+                StructExtreme15 = double.NaN;
+                FirstTradableFormingNum = 0;
+                Ltf1.Reset();
+                Ltf3.Reset();
+                TradeId = null;
+                Grade = null;
+                QtyTotal = 0; QtyOpen = 0; QtyFilled = 0;
+                EntryAvg = 0; ExitAvg = 0; ExitQtyAccum = 0;
+                TargetBroken = false;
+                TargetNames = "";
+                TargetPrice = double.NaN;
+                TargetDistance = double.NaN;
+            }
+        }
+
+        private readonly IMnqHost host;
+        private readonly FbConfig cfg;
+        private readonly FbSlot longSlot;
+        private readonly FbSlot shortSlot;
+        private double last15Close = double.NaN;   // most recent COMPLETED 15m close (spec §7)
+        private double last15Ema = double.NaN;     // most recent COMPLETED 15m EMA(9)
+        private int tradeSeq;
+
+        public StrategyStats Stats = new StrategyStats();
+
+        public FakeBreakoutEngine(IMnqHost host, FbConfig cfg)
+        {
+            this.host = host;
+            this.cfg = cfg;
+            longSlot = new FbSlot(); longSlot.IsLong = true;
+            shortSlot = new FbSlot(); shortSlot.IsLong = false;
+            longSlot.ResetAll();
+            shortSlot.ResetAll();
+        }
+
+        public bool HasOpenOrPendingPosition
+        {
+            get { return longSlot.HasPosition || shortSlot.HasPosition; }
+        }
+
+        // Cancel pre-entry setups when the exchange day rolls (key levels change).
+        public void OnNewDay(DateTime etTime)
+        {
+            CancelPreEntry(longSlot, etTime, "new exchange day — key levels rolled, pre-entry setup cancelled");
+            CancelPreEntry(shortSlot, etTime, "new exchange day — key levels rolled, pre-entry setup cancelled");
+        }
+
+        private void CancelPreEntry(FbSlot slot, DateTime etTime, string reason)
+        {
+            if (slot.State == FbState.BREAKOUT_15M_ACTIVE || slot.State == FbState.STRUCTURE_FROZEN_SEARCHING)
+            {
+                host.Diag(StrategyId.FAKE_BREAKOUT, string.Format("{0} setup CANCELLED: {1}", slot.IsLong ? "LONG" : "SHORT", reason));
+                slot.ResetAll();
+            }
+        }
+
+        // ==================================================================
+        // 15-MINUTE SERIES (parent setup, reclaim, structure, validity clock,
+        // EMA confluence source) — spec §1, §4, §5, §6, §7
+        // ==================================================================
+        public void OnFifteenMinuteBar(BarSnap bar, double prev15Close)
+        {
+            Process15(longSlot, bar, prev15Close);
+            Process15(shortSlot, bar, prev15Close);
+
+            // Spec §7: confluence compares the most recent COMPLETED 15m close to the
+            // 15m EMA(9). Updated after slot processing so entries during the NEXT
+            // forming candle read this candle's values.
+            last15Close = bar.Close;
+            last15Ema = bar.Ema9;
+        }
+
+        private void Process15(FbSlot slot, BarSnap bar, double prev15Close)
+        {
+            switch (slot.State)
+            {
+                case FbState.IDLE:
+                    TryTrigger(slot, bar, prev15Close);
+                    break;
+
+                case FbState.BREAKOUT_15M_ACTIVE:
+                case FbState.STRUCTURE_FROZEN_SEARCHING:
+                    // Spec §6: this completed candle is validity candle #ValidityCount
+                    slot.ValidityCount++;
+
+                    if (!slot.Frozen)
+                    {
+                        // Spec §4/§5: StructuralHigh/Low tracks every subsequent completed 15m extreme
+                        if (slot.IsLong) { if (bar.Low < slot.StructExtreme15) slot.StructExtreme15 = bar.Low; }
+                        else { if (bar.High > slot.StructExtreme15) slot.StructExtreme15 = bar.High; }
+                        TryReclaim(slot, bar);
+                    }
+
+                    // Spec §6: primary 4 candles + 2 extension, max 6; expire after
+                    // candle #6 completes with no entry.
+                    if ((slot.State == FbState.BREAKOUT_15M_ACTIVE || slot.State == FbState.STRUCTURE_FROZEN_SEARCHING)
+                        && slot.ValidityCount >= 6)
+                    {
+                        host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(
+                            "{0} setup EXPIRED after 6 validity candles (level {1} @ {2:0.00}, spec §6)",
+                            slot.IsLong ? "LONG" : "SHORT", slot.ActiveLevelId, slot.ActiveLevelPrice));
+                        slot.ResetAll();
+                    }
+                    // Spec §6: "11:30 AM ET entry cutoff overrides remaining time"
+                    else if ((slot.State == FbState.BREAKOUT_15M_ACTIVE || slot.State == FbState.STRUCTURE_FROZEN_SEARCHING)
+                        && host.IsAfterEntryCutoff(bar.EtClose))
+                    {
+                        host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(
+                            "{0} setup EXPIRED: past 11:30 ET entry cutoff (spec §6)", slot.IsLong ? "LONG" : "SHORT"));
+                        slot.ResetAll();
+                    }
+                    break;
+
+                case FbState.POSITION_OPEN:
+                case FbState.RUNNER_MODE:
+                    break; // position management runs on 1m/3m
+            }
+        }
+
+        // Spec §4 (short) / §5 (long): parent trigger on a COMPLETED 15m candle.
+        private void TryTrigger(FbSlot slot, BarSnap bar, double prev15Close)
+        {
+            if (!host.InstrumentOk) return;
+            // A setup starting after the 11:30 cutoff can never produce an entry today.
+            if (host.IsAfterEntryCutoff(bar.EtClose)) return;
+
+            // Initiating candle vector rules:
+            //  short (§4): GREEN_VECTOR or REGULAR;  long (§5): RED_VECTOR or REGULAR
+            //  (VIOLET explicitly not allowed to initiate a long; BLUE not listed → not allowed)
+            bool vectorOk = slot.IsLong
+                ? (bar.Vector == VectorType.RED_VECTOR || VectorClassifier.IsRegular(bar.Vector))
+                : (bar.Vector == VectorType.GREEN_VECTOR || VectorClassifier.IsRegular(bar.Vector));
+            if (!vectorOk) return;
+
+            KeyLevelId bestId = KeyLevelId.YDAY_HIGH;
+            double bestPrice = double.NaN;
+            bool found = false;
+
+            foreach (KeyLevelId id in EligibleLevels)
+            {
+                double lvl = host.Levels.GetTriggerLevelPrice(id);
+                if (double.IsNaN(lvl)) continue;
+
+                bool trig;
+                if (slot.IsLong)
+                {
+                    // §5: trades below AND closes below the level (wick alone insufficient)
+                    trig = bar.Low < lvl && bar.Close < lvl
+                        && (!cfg.RequirePriorCloseInside || (!double.IsNaN(prev15Close) && prev15Close >= lvl));
+                }
+                else
+                {
+                    // §4: trades above AND closes above the level
+                    trig = bar.High > lvl && bar.Close > lvl
+                        && (!cfg.RequirePriorCloseInside || (!double.IsNaN(prev15Close) && prev15Close <= lvl));
+                }
+                if (!trig) continue;
+
+                // FB-9: multiple levels broken by one candle → take the deepest broken
+                // level (highest for a short breakout above / lowest for a long below).
+                if (!found
+                    || (slot.IsLong && lvl < bestPrice)
+                    || (!slot.IsLong && lvl > bestPrice))
+                {
+                    found = true; bestId = id; bestPrice = lvl;
+                }
+            }
+            if (!found) return;
+
+            slot.State = FbState.BREAKOUT_15M_ACTIVE;
+            slot.ActiveLevelId = bestId;
+            slot.ActiveLevelPrice = bestPrice;
+            slot.BreakoutVector = bar.Vector;
+            slot.BreakoutEtClose = bar.EtClose;                       // OriginalBreakoutTime
+            slot.StructExtreme15 = slot.IsLong ? bar.Low : bar.High;  // initiating candle extreme
+            slot.Frozen = false;
+            slot.ValidityCount = 0;
+            slot.ParentPremarket = !host.IsAtOrAfterSessionStart(bar.EtClose);
+            slot.FirstTradableFormingNum = 0;
+            slot.Ltf1.Reset(); slot.Ltf3.Reset();
+
+            // Spec diagnostic list: when parent setup started / which key level /
+            // strategy / direction / vector type
+            host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                "PARENT SETUP START dir={0} level={1}@{2:0.00} breakoutVector={3} breakoutClose={4:0.00} struct15={5:0.00} premarket={6} time={7:HH:mm}",
+                slot.IsLong ? "LONG" : "SHORT", bestId, bestPrice, bar.Vector, bar.Close,
+                slot.StructExtreme15, slot.ParentPremarket, bar.EtClose));
+        }
+
+        // Spec §4/§5: 15m reclaim close back through the level freezes the structure.
+        private void TryReclaim(FbSlot slot, BarSnap bar)
+        {
+            bool reclaimClose = slot.IsLong
+                ? bar.Close > slot.ActiveLevelPrice     // §5: CLOSES BACK ABOVE
+                : bar.Close < slot.ActiveLevelPrice;    // §4: CLOSES BACK BELOW
+            if (!reclaimClose) return;
+
+            // 15m vector participation (spec §4/§5):
+            bool valid;
+            if (slot.IsLong)
+            {
+                // RED breakout -> reclaim may be REGULAR or GREEN
+                // REGULAR breakout -> reclaim MUST be GREEN; REGULAR+REGULAR invalid
+                if (slot.BreakoutVector == VectorType.RED_VECTOR)
+                    valid = bar.Vector == VectorType.GREEN_VECTOR || VectorClassifier.IsRegular(bar.Vector);
+                else
+                    valid = bar.Vector == VectorType.GREEN_VECTOR;
+            }
+            else
+            {
+                // GREEN breakout -> reclaim may be REGULAR, RED or VIOLET
+                // REGULAR breakout -> reclaim MUST be RED or VIOLET; REGULAR+REGULAR invalid
+                if (slot.BreakoutVector == VectorType.GREEN_VECTOR)
+                    valid = VectorClassifier.IsRegular(bar.Vector)
+                         || bar.Vector == VectorType.RED_VECTOR || bar.Vector == VectorType.VIOLET_VECTOR;
+                else
+                    valid = bar.Vector == VectorType.RED_VECTOR || bar.Vector == VectorType.VIOLET_VECTOR;
+            }
+
+            if (valid)
+            {
+                slot.Frozen = true;
+                slot.FrozenExtreme = slot.StructExtreme15;   // freeze incl. this candle's extreme
+                slot.State = FbState.STRUCTURE_FROZEN_SEARCHING;
+                host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                    "15m RECLAIM confirmed dir={0} reclaimVector={1} close={2:0.00} frozen{3}={4:0.00} validityCandle={5} — searching 1m/3m entry",
+                    slot.IsLong ? "LONG" : "SHORT", bar.Vector, bar.Close,
+                    slot.IsLong ? "StructLow" : "StructHigh", slot.FrozenExtreme, slot.ValidityCount));
+            }
+            else
+            {
+                if (cfg.InvalidReclaimCancelsSetup)
+                {
+                    host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(
+                        "{0} setup CANCELLED: invalid 15m reclaim vector {1} after {2} breakout (REGULAR+REGULAR rule, config)",
+                        slot.IsLong ? "LONG" : "SHORT", bar.Vector, slot.BreakoutVector));
+                    slot.ResetAll();
+                }
+                else
+                {
+                    host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(
+                        "{0} 15m reclaim IGNORED: vector {1} not valid after {2} breakout (spec §4/§5) — still waiting",
+                        slot.IsLong ? "LONG" : "SHORT", bar.Vector, slot.BreakoutVector));
+                }
+            }
+        }
+
+        // ==================================================================
+        // 3-MINUTE SERIES — entry scanning (§8-§10), structural invalidation
+        // (§11), first-target break (3m mode) and 3m EMA(9) runner (§12/E)
+        // ==================================================================
+        public void OnThreeMinuteBar(BarSnap bar)
+        {
+            ProcessLtf(longSlot, longSlot.Ltf3, bar);
+            ProcessLtf(shortSlot, shortSlot.Ltf3, bar);
+        }
+
+        // ==================================================================
+        // 1-MINUTE SERIES — entry scanning (§8-§10), structural invalidation
+        // (§11), MFE/MAE, Touch/1m-close target-break modes
+        // ==================================================================
+        public void OnOneMinuteBar(BarSnap bar)
+        {
+            ProcessLtf(longSlot, longSlot.Ltf1, bar);
+            ProcessLtf(shortSlot, shortSlot.Ltf1, bar);
+        }
+
+        private void ProcessLtf(FbSlot slot, LtfSetup s, BarSnap bar)
+        {
+            // ---------- open position management ----------
+            if (slot.HasPosition)
+            {
+                ManagePosition(slot, bar);
+                return;
+            }
+
+            // ---------- FB-6 alt-grade bookkeeping (1m only) ----------
+            if (bar.PeriodMinutes == 1 && slot.State != FbState.IDLE && slot.FirstTradableFormingNum == 0
+                && host.IsAtOrAfterSessionStart(bar.EtOpen))
+                slot.FirstTradableFormingNum = slot.ValidityCount + 1;
+
+            bool mayScan = slot.State == FbState.STRUCTURE_FROZEN_SEARCHING
+                        || (slot.State == FbState.BREAKOUT_15M_ACTIVE && !cfg.Require15mReclaimBeforeLtfEntry);
+            if (!mayScan) return;
+
+            // ---------- §11 overall 15m structural invalidation ----------
+            // (completed 1m OR 3m close beyond the FROZEN structural extreme
+            //  cancels the ENTIRE parent setup; wicks do not invalidate)
+            if (slot.Frozen)
+            {
+                bool breach = slot.IsLong ? bar.Close < slot.FrozenExtreme : bar.Close > slot.FrozenExtreme;
+                if (breach)
+                {
+                    host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                        "{0} setup INVALIDATED: completed {1}m close {2:0.00} beyond frozen structural {3} {4:0.00} (spec §11)",
+                        slot.IsLong ? "LONG" : "SHORT", bar.PeriodMinutes, bar.Close,
+                        slot.IsLong ? "low" : "high", slot.FrozenExtreme));
+                    slot.ResetAll();
+                    return;
+                }
+            }
+
+            // ---------- §9 (long) / §10 (short) lower-timeframe fake break ----------
+            double lvl = slot.ActiveLevelPrice;
+
+            if (!s.StructureActive && !s.WaitingEma)
+            {
+                // Break candle:
+                //  long §9 : RED_VECTOR or REGULAR closes below/through the level
+                //  short §10: GREEN_VECTOR (core) or REGULAR (regular-first) closes above/through
+                bool breakClose = slot.IsLong ? bar.Close < lvl : bar.Close > lvl;
+                if (!breakClose) return;
+                bool breakVecOk = slot.IsLong
+                    ? (bar.Vector == VectorType.RED_VECTOR || VectorClassifier.IsRegular(bar.Vector))
+                    : (bar.Vector == VectorType.GREEN_VECTOR || VectorClassifier.IsRegular(bar.Vector));
+                if (!breakVecOk) return;
+
+                // GLOBAL ENTRY-TIME RULE: premarket LTF patterns are never banked —
+                // only patterns whose candles FORM at/after 9:30 ET are tracked.
+                if (!host.IsAtOrAfterSessionStart(bar.EtOpen)) return;
+
+                s.StructureActive = true;
+                s.WaitingEma = false;
+                s.BreakVector = bar.Vector;
+                s.StructExtreme = slot.IsLong ? bar.Low : bar.High;
+                s.StructStartEtOpen = bar.EtOpen;
+                host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                    "{0} {1}m fake-break structure started: {2} close {3:0.00} through level {4:0.00}, structExtreme={5:0.00}",
+                    slot.IsLong ? "LONG" : "SHORT", bar.PeriodMinutes, bar.Vector, bar.Close, lvl, s.StructExtreme));
+                return;
+            }
+
+            if (s.StructureActive && !s.WaitingEma)
+            {
+                bool reclaimClose = slot.IsLong ? bar.Close > lvl : bar.Close < lvl;
+                if (!reclaimClose)
+                {
+                    // still on the far side of the level → extend the fake-break structure
+                    if (slot.IsLong) { if (bar.Low < s.StructExtreme) s.StructExtreme = bar.Low; }
+                    else { if (bar.High > s.StructExtreme) s.StructExtreme = bar.High; }
+                    return;
+                }
+
+                // Reclaim candle vector rules:
+                //  long §9 : GREEN_VECTOR or BLUE_VECTOR only (REGULAR reclaim NOT valid)
+                //  short §10: GREEN-first → any close back below counts;
+                //             REGULAR-first → RED_VECTOR or VIOLET_VECTOR required
+                bool reclaimVecOk;
+                if (slot.IsLong)
+                    reclaimVecOk = bar.Vector == VectorType.GREEN_VECTOR || bar.Vector == VectorType.BLUE_VECTOR;
+                else if (s.BreakVector == VectorType.GREEN_VECTOR)
+                    reclaimVecOk = true;
+                else
+                    reclaimVecOk = bar.Vector == VectorType.RED_VECTOR || bar.Vector == VectorType.VIOLET_VECTOR;
+
+                if (!reclaimVecOk)
+                {
+                    host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(
+                        "{0} {1}m reclaim vector {2} invalid (breakVector={3}) — LTF setup cancelled, keep scanning (spec §8)",
+                        slot.IsLong ? "LONG" : "SHORT", bar.PeriodMinutes, bar.Vector, s.BreakVector));
+                    s.Reset();
+                    return;
+                }
+
+                // include the reclaim candle's wick in the structure extreme
+                if (slot.IsLong) { if (bar.Low < s.StructExtreme) s.StructExtreme = bar.Low; }
+                else { if (bar.High > s.StructExtreme) s.StructExtreme = bar.High; }
+
+                // §9/§10 EMA step: enter now if already through that timeframe's EMA9,
+                // else wait for the first completed close through it.
+                bool emaOk = slot.IsLong ? bar.Close > bar.Ema9 : bar.Close < bar.Ema9;
+                host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                    "{0} {1}m fake-break RECLAIM: {2} close {3:0.00} back through {4:0.00}, ema9={5:0.00}, emaConfirmed={6}",
+                    slot.IsLong ? "LONG" : "SHORT", bar.PeriodMinutes, bar.Vector, bar.Close, lvl, bar.Ema9, emaOk));
+                if (emaOk)
+                    TryEnter(slot, s, bar);
+                else
+                    s.WaitingEma = true;
+                return;
+            }
+
+            if (s.WaitingEma)
+            {
+                // §9/§10: while waiting, a completed close beyond the fake-break
+                // structure extreme cancels this LTF setup only.
+                bool structBreach = slot.IsLong ? bar.Close < s.StructExtreme : bar.Close > s.StructExtreme;
+                if (structBreach)
+                {
+                    host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                        "{0} {1}m LTF setup cancelled: close {2:0.00} beyond fake-break structure {3:0.00} before EMA confirmation (spec §9/§10)",
+                        slot.IsLong ? "LONG" : "SHORT", bar.PeriodMinutes, bar.Close, s.StructExtreme));
+                    s.Reset();
+                    return;
+                }
+                // extend structure extreme with wicks while waiting (stop = structure wick)
+                if (slot.IsLong) { if (bar.Low < s.StructExtreme) s.StructExtreme = bar.Low; }
+                else { if (bar.High > s.StructExtreme) s.StructExtreme = bar.High; }
+
+                bool emaOk = slot.IsLong ? bar.Close > bar.Ema9 : bar.Close < bar.Ema9;
+                if (emaOk)
+                    TryEnter(slot, s, bar); // "enter on FIRST completed candle" through EMA9
+            }
+        }
+
+        // ==================================================================
+        // Entry submission — grade (spec GRADE), sizing (GLOBAL POSITION
+        // SIZING), 15m EMA confluence (§7), entry-time gate (GLOBAL RULE)
+        // ==================================================================
+        private void TryEnter(FbSlot slot, LtfSetup s, BarSnap bar)
+        {
+            // §7 15m EMA(9) confluence before actual lower-timeframe entry
+            bool confluence = slot.IsLong ? last15Close > last15Ema : last15Close < last15Ema;
+            if (double.IsNaN(last15Close) || double.IsNaN(last15Ema)) confluence = false;
+            if (!confluence)
+            {
+                if (cfg.ConfluenceFailCancelsLtfSetup)
+                {
+                    host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                        "{0} entry blocked: 15m EMA confluence failed (close {1:0.00} vs ema {2:0.00}) — LTF setup cancelled (FB-5)",
+                        slot.IsLong ? "LONG" : "SHORT", last15Close, last15Ema));
+                    s.Reset();
+                }
+                else
+                {
+                    host.Diag(StrategyId.FAKE_BREAKOUT, "entry blocked: 15m EMA confluence failed — waiting (FB-5 config)");
+                    s.WaitingEma = true;
+                }
+                return;
+            }
+
+            // GLOBAL ENTRY-TIME RULE: 9:30-11:30 ET at the signal-candle close
+            if (!host.IsEntryTimeAllowed(bar.EtClose))
+            {
+                host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(
+                    "entry blocked: signal close {0:HH:mm} ET outside 9:30-11:30 window", bar.EtClose));
+                s.Reset();
+                if (host.IsAfterEntryCutoff(bar.EtClose)) { slot.ResetAll(); }
+                return;
+            }
+
+            // simultaneous-position policy (spec: configurable, SH-2)
+            if (!host.CanOpenPosition(StrategyId.FAKE_BREAKOUT))
+            {
+                host.Diag(StrategyId.FAKE_BREAKOUT, "entry blocked: another strategy position is open (concurrency policy) — LTF setup cancelled");
+                s.Reset();
+                return;
+            }
+
+            double stop = s.StructExtreme;               // §9/§10 INITIAL STOP = structure wick
+            double entryRef = bar.Close;
+            double stopPts = slot.IsLong ? entryRef - stop : stop - entryRef;
+            if (stopPts <= 0)
+            {
+                host.Diag(StrategyId.FAKE_BREAKOUT, "entry blocked: non-positive stop distance — LTF setup cancelled");
+                s.Reset();
+                return;
+            }
+
+            // GRADE (spec): A- = entry within FIRST eligible 15m candle (26%);
+            // B+ = candles 2-4 or +2 extension (10%).
+            int formingCandle = slot.ValidityCount + 1;
+            int gradeCandle = formingCandle;
+            if (cfg.GradeBasis == FbGradeBasis.FirstTradableCandle && slot.FirstTradableFormingNum > 0)
+                gradeCandle = formingCandle - slot.FirstTradableFormingNum + 1;
+            string grade = gradeCandle <= 1 ? "A-" : "B+";
+            double riskPct = grade == "A-" ? cfg.RiskPctAMinus : cfg.RiskPctBPlus;
+
+            double balance = host.AccountBalance;
+            double riskDollars, riskPerContract;
+            int qty = PositionSizer.Contracts(balance, riskPct, stopPts, out riskDollars, out riskPerContract);
+            if (qty < 1)
+            {
+                host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                    "entry blocked: sizing yields 0 contracts (balance={0:0.00} risk%={1} stopPts={2:0.00}) — LTF setup cancelled",
+                    balance, riskPct, stopPts));
+                s.Reset();
+                return;
+            }
+
+            tradeSeq++;
+            slot.TradeId = string.Format(CultureInfo.InvariantCulture, "FB-{0:yyyyMMdd}-{1}", bar.EtClose, tradeSeq);
+            slot.Grade = grade;
+            slot.RiskPct = riskPct;
+            slot.RiskDollars = riskDollars;
+            slot.BalanceAtEntry = balance;
+            slot.EntryTf = bar.PeriodMinutes;
+            slot.ValidityCandleAtEntry = formingCandle;
+            slot.EntryEtTime = bar.EtClose;
+            slot.IntendedEntry = entryRef;
+            slot.StopPrice = stop;
+            slot.StopPts = stopPts;
+            slot.QtyTotal = qty;
+            slot.QtyOpen = 0;      // set on fill
+            slot.QtyFilled = 0;
+            slot.EntryAvg = 0;
+            slot.State = FbState.POSITION_OPEN;
+            // §8: once a trade is entered, stop looking for another entry for this parent
+            slot.Ltf1.Reset();
+            slot.Ltf3.Reset();
+
+            host.EnterPosition(StrategyId.FAKE_BREAKOUT, slot.IsLong ? TradeDirection.Long : TradeDirection.Short,
+                qty, slot.EntrySignal);
+
+            // Spec diagnostics: entry price/stop/distance/balance/risk%/contracts/etc.
+            host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                "ENTRY {0} {1} tf={2}m pattern=FAKE_BREAK_RECLAIM validityCandle={3} grade={4} entryRef={5:0.00} stop={6:0.00} stopPts={7:0.00} balance={8:0.00} risk%={9} riskDollars={10:0.00} contracts={11} tradeId={12}",
+                slot.IsLong ? "LONG" : "SHORT", slot.EntrySignal, bar.PeriodMinutes, formingCandle, grade,
+                entryRef, stop, stopPts, balance, riskPct, riskDollars, qty, slot.TradeId));
+        }
+
+        // ==================================================================
+        // Position management — spec §12 + shared engine section E:
+        // first target from the 18-level engine; once "broken" (configurable
+        // definition) activate the 3m EMA(9) runner. Stop stays at structure.
+        // ==================================================================
+        private void ManagePosition(FbSlot slot, BarSnap bar)
+        {
+            if (slot.QtyOpen <= 0) return; // waiting for entry fill
+
+            if (bar.PeriodMinutes == 1)
+            {
+                // MFE / MAE tracking (spec logging requirements)
+                if (slot.IsLong)
+                {
+                    if (bar.High > slot.MfeExtreme) slot.MfeExtreme = bar.High;
+                    if (bar.Low < slot.MaeExtreme) slot.MaeExtreme = bar.Low;
+                }
+                else
+                {
+                    if (bar.Low < slot.MfeExtreme) slot.MfeExtreme = bar.Low;
+                    if (bar.High > slot.MaeExtreme) slot.MaeExtreme = bar.High;
+                }
+
+                // first-target break: Touch / 1m-close modes
+                if (slot.State == FbState.POSITION_OPEN && !slot.TargetBroken && !double.IsNaN(slot.TargetPrice))
+                {
+                    bool broken = false;
+                    if (cfg.TargetBreakMode == FbTargetBreakMode.Touch)
+                        broken = slot.IsLong ? bar.High >= slot.TargetPrice : bar.Low <= slot.TargetPrice;
+                    else if (cfg.TargetBreakMode == FbTargetBreakMode.OneMinuteCloseBeyond)
+                        broken = slot.IsLong ? bar.Close > slot.TargetPrice : bar.Close < slot.TargetPrice;
+                    if (broken) ActivateRunner(slot, bar);
+                }
+            }
+            else if (bar.PeriodMinutes == 3)
+            {
+                // first-target break: 3m-close mode (default)
+                if (slot.State == FbState.POSITION_OPEN && !slot.TargetBroken && !double.IsNaN(slot.TargetPrice)
+                    && cfg.TargetBreakMode == FbTargetBreakMode.ThreeMinuteCloseBeyond)
+                {
+                    bool broken = slot.IsLong ? bar.Close > slot.TargetPrice : bar.Close < slot.TargetPrice;
+                    if (broken) ActivateRunner(slot, bar);
+                }
+
+                // §12/E runner: LONG exits on completed 3m close below 3m EMA9;
+                // SHORT exits on completed 3m close above 3m EMA9.
+                if (slot.State == FbState.RUNNER_MODE)
+                {
+                    bool exit = slot.IsLong ? bar.Close < bar.Ema9 : bar.Close > bar.Ema9;
+                    if (exit)
+                    {
+                        host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                            "RUNNER EXIT signal: 3m close {0:0.00} through 3m EMA9 {1:0.00} — exiting {2} contracts",
+                            bar.Close, bar.Ema9, slot.QtyOpen));
+                        host.ExitMarket(StrategyId.FAKE_BREAKOUT,
+                            slot.IsLong ? TradeDirection.Long : TradeDirection.Short,
+                            slot.QtyOpen, slot.RunSignal, slot.EntrySignal);
+                    }
+                }
+            }
+        }
+
+        private void ActivateRunner(FbSlot slot, BarSnap bar)
+        {
+            slot.TargetBroken = true;
+            slot.State = FbState.RUNNER_MODE;
+            host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                "FIRST TARGET BROKEN ({0} @ {1:0.00}, mode={2}) — 3m EMA(9) runner ACTIVE (spec §12/E)",
+                slot.TargetNames, slot.TargetPrice, cfg.TargetBreakMode));
+        }
+
+        // ==================================================================
+        // Execution routing (called by the host strategy)
+        // ==================================================================
+        public void OnEntryExecution(string orderName, double price, int qty, DateTime etTime)
+        {
+            FbSlot slot = orderName == "FB_LONG" ? longSlot : orderName == "FB_SHORT" ? shortSlot : null;
+            if (slot == null || slot.State == FbState.IDLE) return;
+
+            slot.EntryAvg = (slot.EntryAvg * slot.QtyFilled + price * qty) / Math.Max(1, slot.QtyFilled + qty);
+            slot.QtyFilled += qty;
+            slot.QtyOpen += qty;
+
+            if (slot.QtyFilled == qty) // first fill
+            {
+                slot.MfeExtreme = price;
+                slot.MaeExtreme = price;
+                // structure stop, live until cancelled (spec §9/§10 INITIAL STOP)
+                host.SubmitOrUpdateStop(StrategyId.FAKE_BREAKOUT,
+                    slot.IsLong ? TradeDirection.Long : TradeDirection.Short,
+                    slot.QtyTotal, slot.StopPrice, slot.StopSignal, slot.EntrySignal);
+
+                // recompute stop distance off the actual fill
+                slot.StopPts = slot.IsLong ? slot.EntryAvg - slot.StopPrice : slot.StopPrice - slot.EntryAvg;
+
+                // Shared engine section E: nearest directional level = first target
+                List<TpTarget> targets = host.Levels.GetSortedTargets(
+                    slot.IsLong ? TradeDirection.Long : TradeDirection.Short,
+                    slot.EntryAvg, host.TpLevelEnabled, host.TickSize);
+                if (targets.Count > 0)
+                {
+                    slot.TargetNames = targets[0].NameString();
+                    slot.TargetPrice = targets[0].Price;
+                    slot.TargetDistance = Math.Abs(targets[0].Price - slot.EntryAvg);
+                    host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                        "FILLED {0} qty={1} avg={2:0.00} | first target {3} @ {4:0.00} dist={5:0.00}pts (18-level engine)",
+                        orderName, qty, slot.EntryAvg, slot.TargetNames, slot.TargetPrice, slot.TargetDistance));
+                }
+                else
+                {
+                    host.Diag(StrategyId.FAKE_BREAKOUT,
+                        "FILLED " + orderName + " — WARNING: no directional take-profit level available; only the structure stop manages this trade");
+                }
+            }
+        }
+
+        public void OnExitExecution(string orderName, double price, int qty, DateTime etTime)
+        {
+            FbSlot slot = orderName.EndsWith("_L") ? longSlot : orderName.EndsWith("_S") ? shortSlot : null;
+            if (slot == null || !slot.HasPosition) return;
+
+            string reason = orderName.Contains("STOP") ? "STOP_LOSS" : "RUNNER_EMA3M";
+            ApplyExit(slot, price, qty, etTime, reason, orderName.Contains("STOP") ? "STOP" : "RUNNER_EMA3M");
+        }
+
+        public void OnSessionCloseExecution(double price, int qty, DateTime etTime)
+        {
+            // NT flattens the whole strategy; attribute this engine's open quantity.
+            FbSlot[] slots = new FbSlot[] { longSlot, shortSlot };
+            int remaining = qty;
+            foreach (FbSlot slot in slots)
+            {
+                if (remaining <= 0) break;
+                if (!slot.HasPosition || slot.QtyOpen <= 0) continue;
+                int leg = Math.Min(remaining, slot.QtyOpen);
+                remaining -= leg;
+                ApplyExit(slot, price, leg, etTime, "SESSION_CLOSE", "SESSION_CLOSE");
+            }
+        }
+
+        private void ApplyExit(FbSlot slot, double price, int qty, DateTime etTime, string reason, string legName)
+        {
+            slot.ExitAvg = (slot.ExitAvg * slot.ExitQtyAccum + price * qty) / Math.Max(1, slot.ExitQtyAccum + qty);
+            slot.ExitQtyAccum += qty;
+            slot.QtyOpen -= qty;
+            if (slot.QtyOpen > 0) return; // partial fill of the exit order — wait for the rest
+
+            double pnlPts = slot.IsLong ? slot.ExitAvg - slot.EntryAvg : slot.EntryAvg - slot.ExitAvg;
+            double pnlDollars = pnlPts * PositionSizer.MnqDollarsPerPoint * slot.QtyFilled;
+            double r = slot.StopPts > 0 ? pnlPts / slot.StopPts : 0;
+            double mfePts = slot.IsLong ? slot.MfeExtreme - slot.EntryAvg : slot.EntryAvg - slot.MfeExtreme;
+            double maePts = slot.IsLong ? slot.EntryAvg - slot.MaeExtreme : slot.MaeExtreme - slot.EntryAvg;
+
+            TradeRecord rec = new TradeRecord();
+            rec.Strategy = StrategyId.FAKE_BREAKOUT;
+            rec.TradeId = slot.TradeId;
+            rec.Grade = slot.Grade;
+            rec.Direction = slot.IsLong ? TradeDirection.Long : TradeDirection.Short;
+            rec.ParentTriggerTimeEt = slot.BreakoutEtClose;
+            rec.ParentLevelName = slot.ActiveLevelId.ToString();
+            rec.ParentLevelPrice = slot.ActiveLevelPrice;
+            rec.ParentVector = slot.BreakoutVector.ToString();
+            rec.ValidityCandleNumber = slot.ValidityCandleAtEntry;
+            rec.EntryTimeframeMinutes = slot.EntryTf;
+            rec.EntryPatternType = "FAKE_BREAK_RECLAIM";
+            rec.EntryTimeEt = slot.EntryEtTime;
+            rec.EntryPrice = slot.EntryAvg;
+            rec.StopPrice = slot.StopPrice;
+            rec.StopDistancePoints = slot.StopPts;
+            rec.AccountBalance = slot.BalanceAtEntry;
+            rec.RiskPercent = slot.RiskPct;
+            rec.RiskDollars = slot.RiskDollars;
+            rec.Contracts = slot.QtyFilled;
+            rec.TargetLevelNames = slot.TargetNames;
+            rec.TargetPrice = slot.TargetPrice;
+            rec.TargetDistancePoints = slot.TargetDistance;
+            rec.ExitLeg = legName;
+            rec.ExitQty = slot.ExitQtyAccum;
+            rec.ExitTimeEt = etTime;
+            rec.ExitPrice = slot.ExitAvg;
+            rec.ExitReason = reason;
+            rec.PnlPoints = pnlPts;
+            rec.PnlDollars = pnlDollars;
+            rec.RMultiple = r;
+            rec.MfePoints = mfePts;
+            rec.MaePoints = maePts;
+            rec.ReentryNumber = 0;                    // FB has no re-entry (spec §8)
+            rec.ParentFormedPremarket = slot.ParentPremarket;
+            rec.EntryFormedAfter930 = true;           // enforced structurally
+            host.LogTrade(rec);
+            Stats.AddClosedTrade(pnlDollars, r, mfePts, maePts);
+
+            host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                "TRADE CLOSED {0} reason={1} exit={2:0.00} pnl={3:0.00}pts ${4:0.00} R={5:0.00} MFE={6:0.00} MAE={7:0.00}",
+                slot.TradeId, reason, slot.ExitAvg, pnlPts, pnlDollars, r, mfePts, maePts));
+
+            // §8: parent setup is finished after its one trade — back to IDLE so a
+            // NEW parent breakout may start fresh later.
+            slot.ResetAll();
+        }
+    }
+}
