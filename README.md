@@ -47,8 +47,13 @@ the 18-level take-profit engine, MNQ ($2/pt) risk-based sizing, session/time hel
 - **Exchange day = 18:00 ET (V5 Fix 4)**: Daily Open / YDay / pivot day boundary follows the
   CME exchange day (TR `getdayOpen` daily-bar boundary for MNQ). Set the day-start parameter
   to 0 to reproduce the TR library's literal "exchange midnight" (forex/crypto) behavior.
-  Psy levels are a direct `calcPsyLevels` port (Monday 00:00–08:00 GMT forex session by
-  default, crypto Saturday session with Sydney-DST logic available).
+  YDay/LWeek high/low and all pivot & M-level formulas are confirmed against the TR **main
+  indicator** (`f_security(...,'D'/'W',...,false)` = previous completed daily/weekly values).
+- **Psy levels use the CRYPTO path** — TR_MAIN derives psyType as
+  `syminfo.type == 'forex' ? 'forex' : 'crypto'`, and MNQ is `futures`. The window is
+  Sunday 22:00 → Monday 06:00 GMT (GMT+1 while Sydney is in DST), i.e. the first ~8 hours of
+  the futures trading week. Verify with the level-diagnostic parameter before relying on it —
+  see caveat 2 in `docs/COMPLIANCE_AUDIT.md`.
 - **Timezone**: bar times are converted from your machine's timezone to US-Eastern. If your
   NinjaTrader time zone is already US-Eastern, set *"Bar times already US-Eastern"* = true.
 - **Level verification**: set *"Print 18 levels on ET date"* (yyyy-MM-dd) to print all 18

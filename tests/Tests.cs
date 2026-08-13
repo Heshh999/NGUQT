@@ -53,8 +53,15 @@ namespace MnqTwoTests
 
         private static void Feed(KeyLevelEngine lv, DateTime etOpen, double o, double h, double l, double c)
         {
-            // utcOpen = et + 4h keeps seed bars out of the Monday 00:00-08:00 GMT psy window
+            // ET -> UTC during US DST (+4h); the seed dates are mid-week so they
+            // never fall inside a psy session window
             lv.OnOneMinuteBar(etOpen, etOpen.AddMinutes(1), etOpen.AddHours(4), o, h, l, c);
+        }
+
+        // Feed a bar by its ET open, converting to UTC with a fixed +4h (EDT).
+        private static void FeedEt(KeyLevelEngine lv, DateTime etOpen, double h, double l)
+        {
+            lv.OnOneMinuteBar(etOpen, etOpen.AddMinutes(1), etOpen.AddHours(4), (h + l) / 2, h, l, (h + l) / 2);
         }
 
         // Standard level book:
@@ -281,23 +288,51 @@ namespace MnqTwoTests
             Check(lv.PP == 20000.0 && lv.R1 == 20100.0 && lv.S1 == 19900.0 && lv.R3 == 20300.0,
                 "pivot formulas from previous day H/L/C");
 
-            // calcPsyLevels forex path: Monday 00:00-08:00 GMT session
-            KeyLevelEngine psy = new KeyLevelEngine();
+            // ---- calcPsyLevels CRYPTO path (TR_MAIN L243: MNQ is 'futures' -> crypto) ----
+            // Session = Sunday 22:00 -> Monday 06:00 GMT (Sydney DST off in August).
+            // Realistic MNQ week: CME reopens Sunday 18:00 ET = Sunday 22:00 UTC.
+            KeyLevelEngine psy = new KeyLevelEngine(); // defaults: Crypto + 4H grid
+            FeedEt(psy, new DateTime(2026, 8, 1, 12, 0, 0), 99999, 1);      // Saturday: market shut in reality; must NOT count
+            Check(double.IsNaN(psy.PsyHigh), "Saturday bar is NOT in the psy session (Pine day 1 = Sunday)");
+
+            FeedEt(psy, new DateTime(2026, 8, 2, 18, 0, 0), 20010, 19990);  // Sun 18:00 ET = 22:00 UTC — session opens
+            FeedEt(psy, new DateTime(2026, 8, 2, 23, 0, 0), 20050, 19980);  // Sun 23:00 ET = Mon 03:00 UTC — in session
+            Check(psy.PsyHigh == 20050.0 && psy.PsyLow == 19980.0,
+                "crypto path: hi/lo accumulate from the Sunday 22:00 GMT futures-week open");
+
+            FeedEt(psy, new DateTime(2026, 8, 3, 9, 30, 0), 21000, 19000);  // Mon 09:30 ET = 13:30 UTC — out of session
+            Check(psy.PsyHigh == 20050.0 && psy.PsyLow == 19980.0,
+                "psy levels hold their last values outside the psy session");
+            Check(!double.IsNaN(psy.PsyHigh),
+                "crypto window is non-empty for MNQ (the Saturday reading would leave it NaN forever)");
+
+            // ---- calcPsyLevels FOREX path: Monday 00:00-08:00 GMT ----
+            KeyLevelEngine psyFx = new KeyLevelEngine();
+            psyFx.PsyType = PsyLevelType.Forex;
             DateTime monUtc = new DateTime(2026, 8, 3, 0, 30, 0); // Monday 00:30 GMT
-            psy.OnOneMinuteBar(monUtc.AddHours(-4), monUtc.AddHours(-4).AddMinutes(1), monUtc, 20000, 20010, 19990, 20005);
-            psy.OnOneMinuteBar(monUtc.AddHours(-4).AddMinutes(30), monUtc.AddHours(-4).AddMinutes(31), monUtc.AddMinutes(30), 20005, 20050, 19980, 20040);
-            Check(psy.PsyHigh == 20050.0 && psy.PsyLow == 19980.0,
-                "calcPsyLevels port: hi/lo accumulate inside Monday 00:00-08:00 GMT session");
-            // a bar OUTSIDE the session (Monday 09:00 GMT) must not move psy levels
-            DateTime outUtc = new DateTime(2026, 8, 3, 9, 0, 0);
-            psy.OnOneMinuteBar(outUtc.AddHours(-4), outUtc.AddHours(-4).AddMinutes(1), outUtc, 20500, 21000, 19000, 20000);
-            Check(psy.PsyHigh == 20050.0 && psy.PsyLow == 19980.0,
-                "psy levels hold last session values outside the psy session");
+            psyFx.OnOneMinuteBar(monUtc.AddHours(-4), monUtc.AddHours(-4).AddMinutes(1), monUtc, 20000, 20010, 19990, 20005);
+            psyFx.OnOneMinuteBar(monUtc.AddHours(-4).AddMinutes(30), monUtc.AddHours(-4).AddMinutes(31), monUtc.AddMinutes(30), 20005, 20050, 19980, 20040);
+            Check(psyFx.PsyHigh == 20050.0 && psyFx.PsyLow == 19980.0,
+                "forex path ('0000-0800:2' = Monday) still accumulates correctly");
+
+            // The 4H-grid compatibility mode must agree with the literal window on
+            // the aligned MNQ crypto case (grid start == session start == Sun 22:00 UTC)
+            KeyLevelEngine psyGrid = new KeyLevelEngine();
+            psyGrid.PsyUse4HourGrid = true;
+            FeedEt(psyGrid, new DateTime(2026, 8, 2, 18, 0, 0), 20010, 19990);
+            FeedEt(psyGrid, new DateTime(2026, 8, 2, 23, 0, 0), 20050, 19980);
+            FeedEt(psyGrid, new DateTime(2026, 8, 3, 9, 30, 0), 21000, 19000);
+            Check(psyGrid.PsyHigh == psy.PsyHigh && psyGrid.PsyLow == psy.PsyLow,
+                "4H-grid compat mode agrees with the literal window on the aligned MNQ case");
 
             // calcDst port: Sydney DST flag (southern hemisphere)
             Check(KeyLevelEngine.CalcSydneyDst(new DateTime(2026, 1, 15)) == true, "calcDst: January -> Sydney DST on");
             Check(KeyLevelEngine.CalcSydneyDst(new DateTime(2026, 7, 1)) == false, "calcDst: July -> Sydney DST off");
             Check(KeyLevelEngine.CalcSydneyDst(new DateTime(2026, 12, 1)) == true, "calcDst: December -> Sydney DST on");
+
+            // M-levels exactly as TR_MAIN lines 569-574
+            Check(lv.M3 == (lv.PP + lv.R1) / 2 && lv.M0 == (lv.S2 + lv.S3) / 2 && lv.M5 == (lv.R2 + lv.R3) / 2,
+                "M-level formulas match TR_MAIN m0C..m5C");
 
             // diagnostic comparison print (the values to check against TradingView)
             Console.WriteLine(string.Format(

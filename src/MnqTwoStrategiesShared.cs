@@ -192,21 +192,27 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     //     midnight" comment describes forex/crypto symbols; set the
     //     compatibility parameter to 0 to reproduce that literal behavior.
     //
-    //   YDAY_HIGH/LOW, LWEEK_HIGH/LOW — previous COMPLETED exchange day / week
-    //     aggregates (non-repainting: values only change at the boundary).
-    //     NOTE: the supplied uploads contain the TR *library* only; the main
-    //     indicator's request.security daily/weekly retrieval was not supplied,
-    //     so this is the documented equivalent, not a line-for-line port.
+    //   YDAY_HIGH/LOW, LWEEK_HIGH/LOW — CONFIRMED against TR_MAIN (main indicator):
+    //     dayHigh/dayLow = f_security(tickerid,'D',high/low,false) plotted as
+    //     "YDay Hi"/"YDay Lo" (lines 309-310, 348-351); weekHigh/weekLow =
+    //     f_security(tickerid,'W',...) plotted as "LWeek Hi"/"LWeek Lo"
+    //     (lines 337-338, 353-356). The non-repainting wrapper
+    //         request.security(sym,res,src[isrealtime?1:0])[isrealtime?0:1]
+    //     returns the PREVIOUS COMPLETED daily/weekly value on both the
+    //     historical and realtime branches — i.e. exactly these prev-day /
+    //     prev-week aggregates, changing only at the boundary.
     //
-    //   PSY_HIGH/LOW — direct port of the supplied calcPsyLevels():
-    //     forex path: session '0000-0800:2' GMT (Monday 00:00-08:00 GMT);
-    //     crypto path: session '2200-0600:1' in GMT+1 when Sydney DST else GMT
-    //     (Saturday 22:00 -> Sunday 06:00). psyHi/psyLo initialize on the first
-    //     bar of the session, extend with max(high)/min(low) while in session,
-    //     and hold their last value outside the session. Sydney DST comes from
-    //     a port of the supplied calcDst().
+    //   PSY_HIGH/LOW — direct port of calcPsyLevels(), with psyType taken from
+    //     TR_MAIN line 243: syminfo.type == 'forex' ? 'forex' : 'crypto'. MNQ is
+    //     'futures', so the CRYPTO path is the faithful default. See
+    //     IsInPsySession for the session windows and the 4H-grid note.
+    //     psyHi/psyLo initialize on the first bar of the session, extend with
+    //     max(high)/min(low) while in session, and hold their last value outside
+    //     it. Sydney DST comes from a port of calcDst().
     //
-    //   Pivots/M-levels — spec section B formulas (unchanged, already exact).
+    //   Pivots/M-levels — CONFIRMED against TR_MAIN: pivotPoint/R/S computed from
+    //     the same previous-completed-day f_security values (lines 316-324) and
+    //     m0C..m5C (lines 569-574) match the implemented formulas exactly.
     // ------------------------------------------------------------------
     public class KeyLevelEngine
     {
@@ -232,7 +238,18 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // Configuration (set once by the host strategy before data starts)
         public int DayStartMinutesEt = 1080;    // 18:00 ET = CME exchange-day open (TR time('D') boundary for MNQ); 0 = literal "exchange midnight"
         public int WeekStartMinutesEt = 1080;   // Sunday 18:00 ET = futures week open (TradingView weekly bar boundary for MNQ)
-        public PsyLevelType PsyType = PsyLevelType.Forex; // TR calcPsyLevels psyType
+        // TR_MAIN line 243: psyType = syminfo.type == 'forex' ? 'forex' : 'crypto'.
+        // MNQ is syminfo.type == 'futures' -> the indicator uses the CRYPTO path.
+        public PsyLevelType PsyType = PsyLevelType.Crypto;
+        // COMPATIBILITY ONLY (default OFF): TR tests session membership through
+        // time('240', session, gmt). Reproducing that needs TradingView's 4H-bar
+        // anchor, which cannot be verified from the source alone — and anchoring
+        // the grid to the exchange-day open makes the source's own forex branch
+        // ('0000-0800:2' GMT) fall permanently out of session, which cannot be the
+        // intended behavior. The literal session window is therefore the default;
+        // it is identical to the 4H reading whenever the grid aligns with the
+        // session start (the MNQ crypto-path case). See docs/COMPLIANCE_AUDIT.md.
+        public bool PsyUse4HourGrid = false;
 
         // ---- port of Traders Reality calcDst(): Sydney DST flag ----
         // Pine: previousSunday = dayofmonth - dayofweek + 1  (dayofweek 1=Sun..7=Sat)
@@ -249,18 +266,29 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         }
 
         // ---- port of the calcPsyLevels session windows ----
-        private bool IsInPsySession(DateTime utc)
+        // Pine session-string day numbers are 1=Sunday .. 7=Saturday, and for a
+        // session spanning midnight the day list names the day the session STARTS.
+        //   forex : psySession := time('240', '0000-0800:2', "GMT")
+        //           -> day 2 = MONDAY 00:00 -> 08:00 GMT
+        //           (tooltip: "Forex calculations start with the Tokyo session on
+        //            Monday morning")
+        //   crypto: psySession := time('240', '2200-0600:1', "GMT+1"/"GMT")
+        //           -> day 1 = SUNDAY 22:00 -> Monday 06:00 in that GMT offset
+        //           (GMT+1 while Sydney is in DST, else GMT)
+        // NOTE: the library's timestampPreviousDayOfWeek('Saturday', 22, ...) call
+        // feeds psySessionStartTime only, which TR_MAIN uses purely to decide where
+        // to START DRAWING the psy line (main indicator lines 654-657). It does not
+        // participate in the psyHi/psyLo values.
+        private bool IsInPsySession(DateTime utc, DateTime etForDst)
         {
             if (PsyType == PsyLevelType.Forex)
-            {
-                // psySession := time('240', '0000-0800:2', "GMT") — Monday 00:00-08:00 GMT
                 return utc.DayOfWeek == DayOfWeek.Monday && utc.TimeOfDay.TotalHours < 8.0;
-            }
-            // crypto: '2200-0600:1' in GMT+1 when Sydney DST, else GMT
-            // (Saturday 22:00 -> Sunday 06:00 in the offset timezone)
-            DateTime t = CalcSydneyDst(utc.Date) ? utc.AddHours(1) : utc;
-            if (t.DayOfWeek == DayOfWeek.Saturday && t.TimeOfDay.TotalHours >= 22.0) return true;
-            if (t.DayOfWeek == DayOfWeek.Sunday && t.TimeOfDay.TotalHours < 6.0) return true;
+
+            // crypto path: shift into the session's offset timezone, then test
+            // Sunday 22:00 -> Monday 06:00
+            DateTime t = CalcSydneyDst(etForDst) ? utc.AddHours(1) : utc;
+            if (t.DayOfWeek == DayOfWeek.Sunday && t.TimeOfDay.TotalHours >= 22.0) return true;
+            if (t.DayOfWeek == DayOfWeek.Monday && t.TimeOfDay.TotalHours < 6.0) return true;
             return false;
         }
 
@@ -315,7 +343,26 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             // "When entering a new psy session, initialize hi/lo. After
             //  initialization, calculate psy hi/lo [max/min]. When not in the
             //  psy session, use the last value of psyHi and psyLo."
-            bool inPsy = IsInPsySession(utcOpen);
+            //
+            // The source tests membership with time('240', session, gmt): the
+            // session is evaluated on the instrument's 4-HOUR bar grid, not on the
+            // chart bar itself ("because the session is 8 hours and we are looking
+            // at a 4 hour resolution we only need ... 2 bars"). TradingView anchors
+            // intraday aggregation to the exchange day start, so the grid is
+            // reproduced here from DayStartMinutesEt. With PsyUse4HourGrid = false
+            // the literal session window is used instead (identical whenever the
+            // grid aligns to the session start, which is the MNQ summer case).
+            DateTime sessionProbeUtc = utcOpen;
+            if (PsyUse4HourGrid)
+            {
+                DateTime dayStartEt = dayKey.AddMinutes(DayStartMinutesEt);
+                double minsSinceDayStart = (etOpen - dayStartEt).TotalMinutes;
+                if (minsSinceDayStart < 0) minsSinceDayStart = 0;
+                int gridIdx = (int)Math.Floor(minsSinceDayStart / 240.0);
+                DateTime gridOpenEt = dayStartEt.AddMinutes(gridIdx * 240.0);
+                sessionProbeUtc = gridOpenEt.Add(utcOpen - etOpen); // same UTC offset as this bar
+            }
+            bool inPsy = IsInPsySession(sessionProbeUtc, etOpen);
             if (inPsy)
             {
                 if (!wasInPsySession) { psyHigh = h; psyLow = l; }

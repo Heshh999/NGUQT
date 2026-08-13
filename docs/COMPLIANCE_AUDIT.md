@@ -73,11 +73,11 @@ Code refs: `Shared` = `src/MnqTwoStrategiesShared.cs`, `FB` = `src/FakeBreakoutE
 | Specification Rule | Implemented? | Function/Code Section | Notes |
 |---|---|---|---|
 | Exactly 18 selectable targets; R2/S3 internal only | ✅ | `TpLevelId` (18); `R2`/`S3` getters not selectable | Test: R2=101.00 never appears as a target event |
-| DAILY_OPEN = TR `getdayOpen()` semantics | ✅⚙️ | `KeyLevelEngine` day roll; `DayStartMinutesEt` | Faithful port: `getdayOpen` sets open on `ta.change(time('D'))` = the instrument's new exchange day. For CME MNQ on TradingView that boundary is 17:00 CT = **18:00 ET**, now the default. The library's "exchange midnight" comment (forex/crypto) is available via the compat value 0. Test: Daily Open stable intraday |
-| YDay Hi/Lo per supplied higher-TF retrieval | ✅⚠️ | `prevDay` aggregate | Non-repainting previous-completed-day values. **Caveat:** both uploads are the TR *library*; the main indicator's `request.security` retrieval was not supplied, so this is the documented equivalent, not a line-for-line port |
-| LWeek Hi/Lo per supplied retrieval | ✅⚠️⚙️ | `prevWeek` aggregate; `WeekStartMinutesEt` | Same caveat; boundary default Sunday 18:00 ET = TradingView weekly bar open for MNQ |
-| Psy levels: port `calcPsyLevels`, not an arbitrary calculation | ✅⚙️ | `IsInPsySession` + accumulation in `OnOneMinuteBar`; `CalcSydneyDst` | Direct port: forex `'0000-0800:2'` GMT session; crypto `'2200-0600:1'` GMT+1/GMT by Sydney DST (ported `calcDst`); init-on-entry, max/min in-session, hold outside. The generic "first 8 hours of week" approximation is REMOVED. `PsyLevelType` param selects the path (Forex default for MNQ — the source has no explicit futures branch; documented compatibility choice). Incompatibility note: the source samples 4H bars; this port samples 1m bars inside the same window, which can only make the hi/lo equal-or-tighter-grained, not different in range |
-| Pivot/M formulas (PP, R1, S1, R2, S2, R3, S3, M0–M5) | ✅ | `KeyLevelEngine` getters | Verbatim; unchanged from V4 (verified correct) |
+| DAILY_OPEN = TR `getdayOpen()` semantics | ✅⚙️ | `KeyLevelEngine` day roll; `DayStartMinutesEt` | Faithful port: `getdayOpen` sets open on `ta.change(time('D'))` = the instrument's new exchange day (TR_MAIN L677 calls it directly). For CME MNQ that boundary is 17:00 CT = **18:00 ET**, the default. The library's "exchange midnight" comment (forex/crypto) is available via the compat value 0. Test: Daily Open stable intraday |
+| YDay Hi/Lo per supplied higher-TF retrieval | ✅ | `prevDay` aggregate | **CONFIRMED against TR_MAIN**: `dayHigh/dayLow = f_security(tickerid,'D',high/low,false)` plotted as "YDay Hi"/"YDay Lo" (L309-310, L348-351). The `_repaint=false` wrapper returns the PREVIOUS COMPLETED daily value on both the historical and realtime branches — exactly the implemented prev-day aggregate, non-repainting |
+| LWeek Hi/Lo per supplied retrieval | ✅⚙️ | `prevWeek` aggregate; `WeekStartMinutesEt` | **CONFIRMED against TR_MAIN**: `weekHigh/weekLow = f_security(tickerid,'W',...)` plotted as "LWeek Hi"/"LWeek Lo" (L337-338, L353-356) = previous completed weekly bar. Boundary default Sunday 18:00 ET = TradingView weekly-bar open for MNQ |
+| Psy levels: port `calcPsyLevels`, not an arbitrary calculation | ✅⚙️ | `IsInPsySession` + accumulation in `OnOneMinuteBar`; `CalcSydneyDst`; `PsyLevelTypeParam` | Direct port. **psyType now CONFIRMED from TR_MAIN L243**: `syminfo.type == 'forex' ? 'forex' : 'crypto'` — MNQ is `futures`, so the **CRYPTO** path is correct (previous default of Forex was wrong and is fixed). Session days follow Pine numbering (1=Sunday): crypto `'2200-0600:1'` = **Sunday 22:00 → Monday 06:00** in GMT+1/GMT by Sydney DST; forex `'0000-0800:2'` = Monday 00:00–08:00 GMT. Init-on-entry, max/min in-session, hold outside. The library's `timestampPreviousDayOfWeek('Saturday',…)` feeds only the line's draw-start (TR_MAIN L654-657), not the values. Tests cover both paths + the Saturday exclusion |
+| Pivot/M formulas (PP, R1, S1, R2, S2, R3, S3, M0–M5) | ✅ | `KeyLevelEngine` getters | **CONFIRMED against TR_MAIN**: pivots L316-324 from the same previous-completed-day `f_security` values; `m0C..m5C` L569-574 match the implemented formulas exactly (test asserts M0/M3/M5 identities) |
 | `GetNextTakeProfitLevel`: strictly above/below, sorted, chainable | ✅ | `GetSortedTargets` | Test: strict ordering, ref-equal exclusion |
 | Equal exact prices = one target event, all names kept; no double-reach | ✅ | tick-normalized exact-equality merge (Fix 8) | Tests in §0 |
 | NaN levels ignored; levels equal to reference ignored | ✅ | NaN skip + strict compare | |
@@ -159,18 +159,25 @@ Code refs: `Shared` = `src/MnqTwoStrategiesShared.cs`, `FB` = `src/FakeBreakoutE
 
 ## Outstanding caveats — read before calling this "fully compliant"
 
-1. **TR main indicator not supplied.** Both uploaded "Pasted text" files are byte-identical
-   copies of the TR *library*. `calcPvsra`, `getdayOpen`, `calcPsyLevels`, `calcDst` are
-   ported from it faithfully. YDay/LWeek retrieval and the psyType actually passed for a
-   futures symbol live in the *main indicator*, which was not supplied — the implemented
-   equivalents (previous-completed-day/week aggregates; Forex psy path) are documented
-   choices behind parameters, not verified line-for-line ports. Supply the main indicator
-   source to close this gap, or verify with `PrintLevelsDiagnosticDate` against TradingView.
-2. **Day-boundary compatibility.** TR `getdayOpen` follows the instrument's daily-bar
-   boundary; for CME MNQ on TradingView that is 18:00 ET (now the default). The library
-   comment "exchange midnight" describes forex/crypto; `DayStartMinutesEt = 0` reproduces it.
-3. **Engine logic is test-verified (34/34) under Mono; the NinjaTrader host file
+1. **TR main indicator NOW SUPPLIED — earlier caveat closed.** `TR_MAIN` resolved the two
+   open items: YDay/LWeek use `f_security(..., 'D'/'W', ..., false)` = previous completed
+   daily/weekly values (matching the implementation), and psyType for a futures symbol is
+   `crypto` (previous Forex default corrected). Pivots and M-levels are confirmed verbatim.
+2. **One genuinely unverifiable item remains: the psy 4H-grid.** The source tests session
+   membership via `time('240', session, gmt)`, so membership is decided on TradingView's
+   4-hour bar grid rather than on the chart bar. Reproducing that requires TradingView's
+   4H anchor, which cannot be derived from the source — and anchoring it to the exchange-day
+   open makes the source's own forex branch fall permanently out of session, so that anchor
+   is demonstrably not the intended one. The implementation therefore uses the **literal
+   session window** (identical to the 4H reading whenever the grid aligns with the session
+   start, which is the MNQ crypto case — asserted by test), with
+   `PsyUse4HourGrid` retained as a clearly-named compatibility parameter, default OFF.
+   Verify against TradingView with `PrintLevelsDiagnosticDate` before relying on Psy levels.
+3. **Day-boundary compatibility.** TR `getdayOpen` follows the instrument's daily-bar
+   boundary; for CME MNQ that is 18:00 ET (default). The library's "exchange midnight"
+   comment describes forex/crypto; `DayStartMinutesEt = 0` reproduces it.
+4. **Engine logic is test-verified (39/39) under Mono; the NinjaTrader host file
    (`MnqTwoStrategies.cs`) still requires an F5 compile inside NT8** — no NT8 runtime exists
    in this environment. Compiling ≠ compliant, which is why the engine-level tests exist.
-4. Unresolved items U1–U9 above remain configurable by design; exact-spec compliance for
+5. Unresolved items U1–U9 above remain configurable by design; exact-spec compliance for
    those specific definitions cannot be claimed until the spec pins them down.

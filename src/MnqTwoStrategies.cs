@@ -87,8 +87,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int WeekStartMinutesEt { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Psy level type (TR calcPsyLevels psyType)", GroupName = "01. Session / Time", Order = 6)]
+        [Display(Name = "Psy level type (TR_MAIN L243: futures => Crypto)", GroupName = "01. Session / Time", Order = 6)]
         public PsyLevelType PsyLevelTypeParam { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "COMPAT: evaluate psy session on 4H grid (unverified; keep FALSE)", GroupName = "01. Session / Time", Order = 8)]
+        public bool PsyUse4HourGridParam { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "PLATFORM flatten on session close (NOT a strategy rule; V5 Fix 6 default OFF)", GroupName = "01. Session / Time", Order = 7)]
@@ -260,7 +264,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AssumeBarTimesAreEastern = false;
                 DayStartMinutesEt = 1080;       // 18:00 ET = CME exchange-day open = TR time('D') boundary for MNQ (V5 Fix 4A)
                 WeekStartMinutesEt = 1080;      // Sunday 18:00 ET futures week open (TradingView weekly bar for MNQ)
-                PsyLevelTypeParam = PsyLevelType.Forex; // TR calcPsyLevels forex path (V5 Fix 4D)
+                PsyLevelTypeParam = PsyLevelType.Crypto; // TR_MAIN L243: MNQ is 'futures' -> crypto path
+                PsyUse4HourGridParam = false;            // compat only — see KeyLevelEngine notes
                 ExitOnSessionCloseEnabled = false;      // V5 Fix 6
 
                 UseAccountCashValueLive = true;
@@ -323,6 +328,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 levels.DayStartMinutesEt = DayStartMinutesEt;
                 levels.WeekStartMinutesEt = WeekStartMinutesEt;
                 levels.PsyType = PsyLevelTypeParam;
+                levels.PsyUse4HourGrid = PsyUse4HourGridParam;
 
                 FbConfig fbCfg = new FbConfig();
                 fbCfg.RiskPctAMinus = RiskPctAMinus;

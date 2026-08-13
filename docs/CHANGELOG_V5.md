@@ -2,11 +2,10 @@
 
 Controlling spec: `two_automated_strategies_for_claude_v5_MNQ_ONLY.md` (supersedes V4).
 Correction directives: `FABLE_5_CORRECTION_PROMPT_MNQ.md`.
-Supplied Traders Reality source: `Pasted text(1).txt` / `Pasted text(2).txt` — **note:
-both uploads are byte-identical copies of the TR *library* (`Traders_Reality_Lib`, Pine v5)**;
-the TR *main indicator* (with the `request.security` daily/weekly retrieval calls) was not
-among the uploads. Everything the library defines was ported; what only the main indicator
-defines is documented as an equivalent, not claimed as a line-for-line port.
+Supplied Traders Reality source: the TR **library** (`Traders_Reality_Lib`, Pine v5) and the
+TR **main indicator** (`TR_MAIN`) — both ported. The first two uploads were byte-identical
+copies of the library; `TR_MAIN` was supplied afterwards and closed the two items that had
+been documented as unverified equivalents. See the "TR_MAIN follow-up pass" section below.
 
 Existing architecture preserved — no rebuild. Every change below is a modification of the
 V4 implementation.
@@ -18,7 +17,7 @@ V4 implementation.
 |---|---|
 | `FbGradeBasis` enum | Re-documented: `FirstTradableCandle` is now the V5-mandated default (Fix 7); `ValidityCandleNumber` demoted to legacy research |
 | `TargetReachedMode` enum | **New** — VBR "target reached" definition kept configurable (unresolved item 2) |
-| `PsyLevelType` enum | **New** — TR `calcPsyLevels` psyType (`forex` default for MNQ / `crypto`) |
+| `PsyLevelType` enum | **New** — TR `calcPsyLevels` psyType; default **Crypto** for MNQ per TR_MAIN L243 (see follow-up section) |
 | `KeyLevelEngine` header + fields | Rewritten for the faithful TR port; removed the generic "first 8 hours of week" psy fields; `DayStartMinutesEt` default now 1080 (18:00 ET = CME exchange-day open = TR `time('D')` boundary for MNQ; 0 reproduces the library's literal "exchange midnight" comment) |
 | `KeyLevelEngine.CalcSydneyDst` | **New** — direct port of TR `calcDst()` Sydney-DST branch |
 | `KeyLevelEngine.IsInPsySession` | **New** — port of `calcPsyLevels` session windows: forex `'0000-0800:2'` GMT (Monday 00:00–08:00 GMT); crypto `'2200-0600:1'` GMT+1/GMT by Sydney DST |
@@ -60,18 +59,47 @@ high; stop at the structure HIGH/WICK).
 
 ### `tests/` (new)
 `MockHost.cs`, `Tests.cs` — deterministic scenario tests compiled against the actual engine
-sources (the engines have no NinjaTrader dependency by design). 34 assertions, all passing;
+sources (the engines have no NinjaTrader dependency by design). 39 assertions, all passing;
 see `docs/COMPLIANCE_AUDIT.md` §Corrections for the mapping.
 
 ## Previous vs corrected behavior (with tests)
 
 | # | Previous behavior (V4 build) | Corrected behavior (V5) | Code file/function | Test performed |
 |---|---|---|---|---|
-| 1 | FB LTF short break candle: GREEN or REGULAR only; a BLUE break candle was silently ignored | BLUE_VECTOR is a valid short break candle; reclaim valid iff REGULAR or RED_VECTOR (VIOLET rejected on this path); same EMA wait/cancel and structure-wick stop; applies identically to 1m and 3m; 15m parent initiators unchanged (no BLUE) | `FakeBreakoutEngine.ProcessLtf` (break + reclaim filters) | `BLUE->REGULAR = VALID` ✅, `BLUE->RED = VALID` ✅, `BLUE->VIOLET = NO entry` ✅ (34/34 pass, `tests/Tests.cs`) |
+| 1 | FB LTF short break candle: GREEN or REGULAR only; a BLUE break candle was silently ignored | BLUE_VECTOR is a valid short break candle; reclaim valid iff REGULAR or RED_VECTOR (VIOLET rejected on this path); same EMA wait/cancel and structure-wick stop; applies identically to 1m and 3m; 15m parent initiators unchanged (no BLUE) | `FakeBreakoutEngine.ProcessLtf` (break + reclaim filters) | `BLUE->REGULAR = VALID` ✅, `BLUE->RED = VALID` ✅, `BLUE->VIOLET = NO entry` ✅ (`tests/Tests.cs`) |
 | 2 | FB parent trigger required previous 15m close inside the level (default true) | Trigger = trades beyond + closes beyond + allowed candle type, nothing else; legacy parameter defaults FALSE | `FbConfig.RequirePriorCloseInside`, `FakeBreakoutEngine.TryTrigger` | Trigger fires with prior close already beyond the level ✅ |
 | 3 | VBR trigger required a cross-through of Daily Open (default true) | GREEN/RED vector close beyond Daily Open is sufficient; legacy parameter defaults FALSE | `VbrConfig.RequireCrossThrough`, `VectorBreakRetestEngine.OnFifteenMinuteBar` | Trigger fires with low > DO and prior close above DO ✅ |
-| 4 | Daily Open at midnight ET; Psy = high/low of first 8 hours of week (generic) | Daily Open = open of the 18:00-ET exchange day (TR `time('D')` boundary for MNQ, compat param for literal midnight); Psy = ported `calcPsyLevels` GMT sessions + ported `calcDst`; YDay/LWeek unchanged non-repainting prev-completed aggregates (main-indicator source not supplied — documented) | `KeyLevelEngine` (day roll, `IsInPsySession`, `CalcSydneyDst`), host `ToUtc`/`MaybePrintLevelsDiagnostic` | Daily-Open stability, YDay/LWeek, psy in/out-of-session accumulation, calcDst flags, diagnostic print ✅ |
+| 4 | Daily Open at midnight ET; Psy = high/low of first 8 hours of week (generic) | Daily Open = open of the 18:00-ET exchange day (TR `time('D')` boundary for MNQ, compat param for literal midnight); Psy = ported `calcPsyLevels` GMT sessions + ported `calcDst`; YDay/LWeek non-repainting prev-completed aggregates (later CONFIRMED against TR_MAIN) | `KeyLevelEngine` (day roll, `IsInPsySession`, `CalcSydneyDst`), host `ToUtc`/`MaybePrintLevelsDiagnostic` | Daily-Open stability, YDay/LWeek, psy in/out-of-session accumulation, calcDst flags, diagnostic print ✅ |
 | 5 | A new qualifying vector replaced/restarted an active flat VBR parent (default true) | Original trigger + original 4-candle clock preserved; legacy parameter defaults FALSE | `VbrConfig.RetriggerReplacesActiveSetup`, `OnFifteenMinuteBar` | Second qualifying vector ignored; expiry exactly 4 candles after ORIGINAL trigger ✅ |
 | 6 | NT exit-on-session-close defaulted ON | Defaults OFF; parameter relabeled as platform behavior, not a strategy rule; positions entered before 11:30 run under stop/target/trail/runner | `MnqTwoStrategies` SetDefaults/param | Default inspection (no strategy-side flatten path exists other than the platform option) |
 | 7 | A- = literal validity candle #1, so premarket parents could never grade A- | A- = entry in FIRST candle in which a fresh LTF entry is actually eligible (≥ 9:30); later entries B+ | `FbConfig.GradeBasis` default, `FakeBreakoutEngine.TryEnter`/`ProcessLtf` FirstTradable tracking | Premarket parent, entry 9:30–9:45 → A- @ 26% (118 lots on $10k/11pt); later entry → B+ @ 10% (45 lots) ✅ |
 | 8 | Equal-price merge used a ±1-tick tolerance band | Prices tick-normalized first; merge ONLY on exact equality of normalized prices | `KeyLevelEngine.GetSortedTargets` | Coincident levels merge keeping 13 names; adjacent ticks 100.25/100.50 do NOT merge; R2 never selectable; strict ordering ✅ |
+
+---
+
+## TR_MAIN follow-up pass (main indicator supplied)
+
+The Traders Reality **main indicator** was supplied after the corrections above. It resolved
+both remaining caveats and exposed one real defect in the psy port.
+
+### Confirmed correct — no code change required
+
+| Item | TR_MAIN evidence | Implementation |
+|---|---|---|
+| YDay Hi / YDay Lo | L309-310 `dayHigh/dayLow = f_security(tickerid,'D',high/low,false)`, plotted with titles `"YDay Hi"/"YDay Lo"` (L348-351). The `_repaint=false` wrapper (L252-253) returns the PREVIOUS COMPLETED daily value on both the historical and realtime branch | `KeyLevelEngine.prevDay.H/L` — previous completed exchange day, non-repainting ✅ |
+| LWeek Hi / LWeek Lo | L337-338 `weekHigh/weekLow = f_security(tickerid,'W',...)`, titles `"LWeek Hi"/"LWeek Lo"` (L353-356) | `KeyLevelEngine.prevWeek.H/L` ✅ |
+| Pivots | L316-324 computed from the same previous-completed-day values | `PP/R1/S1/R2/S2/R3/S3` getters ✅ |
+| M-levels | L569-574 `m0C=(pivS2+pivS3)/2 … m5C=(pivR2+pivR3)/2` | `M0..M5` getters ✅ (test asserts the identities) |
+| Daily Open | L677 `dailyOpen = trLib.getdayOpen()` | 18:00-ET exchange-day open ✅ |
+| R2/S3 not selectable targets | R2/S3 exist as pivot plots in TR but the V5 spec excludes them from the target list | internal-only ✅ |
+
+### Defect found and fixed
+
+| Previous behavior | Corrected behavior | Code file/function | Test performed |
+|---|---|---|---|
+| `PsyType` defaulted to **Forex** | TR_MAIN L243: `psyType = overridePsyType ? psyTypeX : (syminfo.type == 'forex' ? 'forex' : 'crypto')`. MNQ is `syminfo.type == 'futures'`, so the indicator uses the **CRYPTO** path — now the default | `KeyLevelEngine.PsyType`, `MnqTwoStrategies.PsyLevelTypeParam` | crypto-path accumulation from the Sunday futures-week open ✅ |
+| Crypto session read as **Saturday** 22:00 → Sunday 06:00 | Pine session days are 1=Sunday and name the day the session STARTS, so `'2200-0600:1'` = **Sunday 22:00 → Monday 06:00** (GMT+1 while Sydney DST, else GMT). Decisive check: the Saturday window lies entirely inside the CME weekend closure, so it would leave Psy Hi/Lo NaN forever; the Sunday window starts exactly at the Sunday 18:00 ET futures reopen | `KeyLevelEngine.IsInPsySession` | Saturday bar excluded ✅; crypto window non-empty for MNQ ✅; forex path unaffected ✅ |
+| (new) 4H-grid session evaluation | The source tests membership via `time('240', session, gmt)`. The anchor cannot be derived from the source, and anchoring to the exchange-day open makes the source's own forex branch fall permanently out of session — so the literal session window is the default and the grid is a clearly-named compat parameter, default OFF | `KeyLevelEngine.PsyUse4HourGrid`, `PsyUse4HourGridParam` | compat mode agrees with the literal window on the aligned MNQ case ✅ |
+| Doc claims | "documented equivalent, not a line-for-line port" caveats replaced with CONFIRMED rows citing TR_MAIN line numbers | `docs/COMPLIANCE_AUDIT.md` §5 | — |
+
+Test count after this pass: **39 assertions, all passing**.
