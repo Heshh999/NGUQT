@@ -943,30 +943,32 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     }
 
     // ----------------------------------------------------------------------
-    // The complete FB grade table. Every ES/QQQ combination is enumerated
-    // here and nowhere else, so no combination can fall through to an
-    // invented default and two grading systems cannot both be live.
+    // The complete FB grade table (user specification, 2026-08-14).
     //
-    //   ES  QQQ  -> grade  risk
-    //   Y   Y       A+     30%
-    //   Y   N       A-     10%
-    //   N   Y       B+      5%
-    //   N   N       B       5%   (user-specified 2026-08-14)
+    // The grade is decided by HOW MANY confirmation markets agree with MNQ,
+    // not by WHICH one. ES and market 2 are interchangeable votes.
+    //
+    //   markets agreeing -> grade  risk
+    //   both (ES + M2)      A+     30%
+    //   exactly one         A-     10%
+    //   neither             B+      5%
+    //
+    // Every case is enumerated here and nowhere else, so nothing can fall
+    // through to an invented default. There is no fourth grade: the old
+    // "B / neither" tier is now B+ by the user's definition.
     // ----------------------------------------------------------------------
     public class FbCrossMarketGradeTable
     {
-        public double RiskPctAPlus = 30.0;   // ES + QQQ both confirm
-        public double RiskPctAMinus = 10.0;  // ES only
-        public double RiskPctBPlus = 5.0;    // QQQ only
-        public double RiskPctNone = 5.0;     // neither confirms
-        public string GradeNone = "B";       // label only; distinguishes the log from B+
+        public double RiskPctAPlus = 30.0;   // ES + market 2 both confirm
+        public double RiskPctAMinus = 10.0;  // exactly one confirms (either one)
+        public double RiskPctBPlus = 5.0;    // MNQ alone, neither confirms
 
-        public void Resolve(bool esConfirm, bool qqqConfirm, out string grade, out double riskPct)
+        public void Resolve(bool esConfirm, bool market2Confirm, out string grade, out double riskPct)
         {
-            if (esConfirm && qqqConfirm) { grade = "A+"; riskPct = RiskPctAPlus; }
-            else if (esConfirm)          { grade = "A-"; riskPct = RiskPctAMinus; }
-            else if (qqqConfirm)         { grade = "B+"; riskPct = RiskPctBPlus; }
-            else                         { grade = GradeNone; riskPct = RiskPctNone; }
+            int agreeing = (esConfirm ? 1 : 0) + (market2Confirm ? 1 : 0);
+            if (agreeing == 2)      { grade = "A+"; riskPct = RiskPctAPlus; }
+            else if (agreeing == 1) { grade = "A-"; riskPct = RiskPctAMinus; }
+            else                    { grade = "B+"; riskPct = RiskPctBPlus; }
         }
     }
 
@@ -1019,6 +1021,11 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
         // Bound on break -> reclaim. User-specified 2026-08-14: 4 bars.
         public int MaxBarsBreakToReclaim = 4;
+        // User specification 2026-08-14: "for es and ym the emas dont matter".
+        // Confirmation is break + reclaim only. The MNQ engine's own EMA(9) rule is
+        // untouched — this flag applies solely to the confirmation markets. Left
+        // configurable so the stricter behavior can be restored without a code change.
+        public bool RequireEmaConfirmation = false;
         // Mirrors the MNQ rule "premarket LTF patterns are never banked".
         public int SessionStartMinutesEt = 570;   // 09:30 ET
 
@@ -1208,7 +1215,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
                 s.ReclaimVector = bar.Vector;
                 bool emaOk = isLong ? bar.Close > bar.Ema9 : bar.Close < bar.Ema9;
-                if (emaOk) Record(li, di, isLong, lvl, s, bar);
+                if (!RequireEmaConfirmation || emaOk) Record(li, di, isLong, lvl, s, bar);
                 else
                 {
                     s.WaitingEma = true; DayAwaitingEma++;
@@ -1241,10 +1248,15 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             c.ReclaimVector = s.ReclaimVector;
             c.Close = bar.Close;
             c.Ema9 = bar.Ema9;
-            c.Reason = string.Format(CultureInfo.InvariantCulture,
-                "{0} {1}m {2} fake-break {3} -> reclaim {4} through {5:0.00}, close {6:0.00} {7} ema9 {8:0.00}",
-                Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", s.BreakVector, s.ReclaimVector,
-                lvl, bar.Close, isLong ? ">" : "<", bar.Ema9);
+            c.Reason = RequireEmaConfirmation
+                ? string.Format(CultureInfo.InvariantCulture,
+                    "{0} {1}m {2} fake-break {3} -> reclaim {4} through {5:0.00}, close {6:0.00} {7} ema9 {8:0.00}",
+                    Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", s.BreakVector, s.ReclaimVector,
+                    lvl, bar.Close, isLong ? ">" : "<", bar.Ema9)
+                : string.Format(CultureInfo.InvariantCulture,
+                    "{0} {1}m {2} fake-break {3} -> reclaim {4} through {5:0.00}, close {6:0.00} (EMA not required)",
+                    Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", s.BreakVector, s.ReclaimVector,
+                    lvl, bar.Close);
             last[li, di] = c;
             DayConfirms++; TotalConfirms++;
             Ev(string.Format(CultureInfo.InvariantCulture,

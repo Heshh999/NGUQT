@@ -904,9 +904,9 @@ namespace MnqTwoTests
         //
         // MNQ short setup throughout: parent at YDAY_HIGH = 20100, entry 20095,
         // structure stop 20106 -> 11 pts -> $22/contract on MNQ ($2/pt).
-        //   30% of 10,000 = 3000 -> 136 contracts   (A+)
-        //   10%           = 1000 ->  45 contracts   (A-)
-        //    5%           =  500 ->  22 contracts   (B+ and B)
+        //   30% of 10,000 = 3000 -> 136 contracts   (A+  = BOTH agree)
+        //   10%           = 1000 ->  45 contracts   (A-  = exactly ONE agrees)
+        //    5%           =  500 ->  22 contracts   (B+  = NEITHER agrees)
         // ES and QQQ trade at COMPLETELY different prices (5600 / 480) on
         // purpose: if any code path ever compared MNQ prices to theirs, every
         // one of these tests would fail.
@@ -1028,8 +1028,9 @@ namespace MnqTwoTests
                 MockHost h = CmHost(out fb);
                 QqqConfirmShort(h, 1);
                 FbBluePath(fb, VectorType.REGULAR_BEARISH);
-                Check(h.AnyDiagContains("grade=B+ riskPct=5"), "TEST 3: MNQ 1m + QQQ 1m only -> B+ @ 5%");
-                Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 22", "TEST 3: B+ sized at 5% (22 contracts)");
+                Check(h.AnyDiagContains("grade=A- riskPct=10"),
+                    "TEST 3: MNQ 1m + market-2 1m only -> A- @ 10% (either single confirmation is A-)");
+                Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 45", "TEST 3: A- sized at 10% (45 contracts)");
             }
 
             // ---- TEST 4: MNQ 3m + ES 3m + QQQ 3m -> A+ / 30% ----
@@ -1063,7 +1064,7 @@ namespace MnqTwoTests
                 QqqConfirmShort(h, 3);
                 FbBluePath3m(fb);
                 Check(h.AnyDiagContains("ES_confirm=False"), "TEST 6: an ES 1m confirmation does NOT count for a 3m MNQ signal");
-                Check(h.AnyDiagContains("grade=B+ riskPct=5"), "TEST 6: grade is B+ (QQQ only), not A+");
+                Check(h.AnyDiagContains("grade=A- riskPct=10"), "TEST 6: grade is A- (market 2 only), not A+");
             }
 
             // ---- TEST 7: ES/QQQ 15m is irrelevant ----
@@ -1103,8 +1104,9 @@ namespace MnqTwoTests
                 FbBluePath(fb, VectorType.REGULAR_BEARISH);
                 Check(h.AnyDiagContains("ES_confirm=False") && h.AnyDiagContains("QQQ_confirm=False"),
                     "TEST 12: the no-confirmation case is logged explicitly");
-                Check(h.AnyDiagContains("grade=B riskPct=5"),
-                    "TEST 12: no-confirmation resolves to the user-specified B @ 5% — not A-, B+ or an invented value");
+                Check(!h.AnyDiagContains("grade=A- "), "TEST 12: zero agreement is never promoted to A-");
+                Check(h.AnyDiagContains("grade=B+ riskPct=5"),
+                    "TEST 12: MNQ alone with NEITHER market agreeing resolves to B+ @ 5%");
                 Check(!h.AnyDiagContains("grade=A- riskPct=26"),
                     "TEST 12: the legacy 26% A- grade can never leak into cross-market mode");
                 Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 22", "TEST 12: sized at 5% (22 contracts)");
@@ -1210,7 +1212,7 @@ namespace MnqTwoTests
 
                 Check(h.AnyDiagContains("CROSS-MARKET GRADE REFUSED"),
                     "FB refuses to assign a cross-market grade when a market could not be evaluated");
-                Check(!h.AnyDiagContains("grade=B riskPct=5"),
+                Check(!h.AnyDiagContains("grade=B+ riskPct=5"),
                     "the 'neither confirms' grade is NEVER produced from unevaluated data");
                 Check(h.Entries.Count == 1, "the trade itself is unaffected — entry logic stays frozen");
                 Check(h.AnyDiagContains("legacy grade="), "it falls back to the legacy grade and says so");
@@ -1298,6 +1300,51 @@ namespace MnqTwoTests
                 "logs report the ACTUAL configured symbol, never a stale 'QQQ' label: " + c.Reason);
         }
 
+        // ---- confirmation markets ignore their own EMA(9) ---------------------
+        private static void TestConfirmMarketsIgnoreEma()
+        {
+            Console.WriteLine("V7.3 — ES / market 2 confirm on break+reclaim ALONE (their EMA9 does not matter):");
+
+            // reclaim closes back below the level but is still ABOVE its own EMA9,
+            // which under the old rule would have blocked/delayed the confirmation.
+            MockHost h = new MockHost();
+            h.WireCrossMarket(4);
+            SetupEsLevels(h);
+            h.EsDet1.OnBar(Bar(At(9, 31), 1, 5598, 5606, 5597, 5605, VectorType.BLUE_VECTOR, 5600));
+            h.EsDet1.OnBar(Bar(At(9, 33), 1, 5604, 5605, 5593, 5595, VectorType.REGULAR_BEARISH, 5570));
+            CrossMarketConfirm c = h.QueryCrossMarket(ConfirmMarket.ES, false, KeyLevelId.YDAY_HIGH, 1, At(9, 34));
+            Check(c.Confirmed, "confirms on the reclaim bar even though close 5595 is ABOVE its ema9 5570");
+            Check(c.Reason.Contains("EMA not required"), "the log states the EMA was not part of the test");
+            Check(h.EsDet1.DayAwaitingEma == 0, "no EMA wait state is ever entered");
+
+            // and the stricter behavior is still available if it is ever wanted back
+            MockHost h2 = new MockHost();
+            h2.WireCrossMarket(4);
+            SetupEsLevels(h2);
+            h2.EsDet1.RequireEmaConfirmation = true;
+            h2.EsDet1.OnBar(Bar(At(9, 31), 1, 5598, 5606, 5597, 5605, VectorType.BLUE_VECTOR, 5600));
+            h2.EsDet1.OnBar(Bar(At(9, 33), 1, 5604, 5605, 5593, 5595, VectorType.REGULAR_BEARISH, 5570));
+            CrossMarketConfirm c2 = h2.QueryCrossMarket(ConfirmMarket.ES, false, KeyLevelId.YDAY_HIGH, 1, At(9, 34));
+            Check(!c2.Confirmed, "with the EMA toggle ON the same sequence does NOT confirm");
+            Check(h2.EsDet1.DayAwaitingEma >= 1, "it waits for the EMA instead");
+        }
+
+        // ---- the grade table counts AGREEING MARKETS, not which one ------------
+        private static void TestGradeTableCountsAgreement()
+        {
+            Console.WriteLine("V7.3 — grade is set by HOW MANY markets agree, not WHICH:");
+            FbCrossMarketGradeTable t = new FbCrossMarketGradeTable();
+            string g; double r;
+            t.Resolve(true, true, out g, out r);
+            Check(g == "A+" && Math.Abs(r - 30) < 1e-9, "both agree -> A+ @ 30%");
+            t.Resolve(true, false, out g, out r);
+            Check(g == "A-" && Math.Abs(r - 10) < 1e-9, "ES alone -> A- @ 10%");
+            t.Resolve(false, true, out g, out r);
+            Check(g == "A-" && Math.Abs(r - 10) < 1e-9, "market 2 alone -> A- @ 10% (interchangeable with ES)");
+            t.Resolve(false, false, out g, out r);
+            Check(g == "B+" && Math.Abs(r - 5) < 1e-9, "neither agrees -> B+ @ 5%");
+        }
+
         // ---- TEST 8 / TEST 9: VECTOR_BREAK_RETEST enable switch --------------
 
         private static void TestVbrEnableSwitch()
@@ -1370,6 +1417,8 @@ namespace MnqTwoTests
             TestCrossMarketGrading();
             TestUnknownIsNotNo();
             TestFuturesConfirmMarket2();
+            TestConfirmMarketsIgnoreEma();
+            TestGradeTableCountsAgreement();
             TestVbrEnableSwitch();
 
             Console.WriteLine();

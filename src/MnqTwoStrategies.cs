@@ -156,23 +156,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Range(0, 100)]
-        [Display(Name = "Risk % — A+ (ES + market 2 confirm)", GroupName = "00b. Cross-Market Confirmation", Order = 7)]
+        [Display(Name = "Risk % — A+ (BOTH markets confirm)", GroupName = "00b. Cross-Market Confirmation", Order = 7)]
         public double CmRiskPctAPlus { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 100)]
-        [Display(Name = "Risk % — A- (ES only)", GroupName = "00b. Cross-Market Confirmation", Order = 8)]
+        [Display(Name = "Risk % — A- (exactly ONE market confirms)", GroupName = "00b. Cross-Market Confirmation", Order = 8)]
         public double CmRiskPctAMinus { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 100)]
-        [Display(Name = "Risk % — B+ (market 2 only)", GroupName = "00b. Cross-Market Confirmation", Order = 9)]
+        [Display(Name = "Risk % — B+ (MNQ alone, NEITHER confirms)", GroupName = "00b. Cross-Market Confirmation", Order = 9)]
         public double CmRiskPctBPlus { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(0, 100)]
-        [Display(Name = "Risk % — B (neither confirms)", GroupName = "00b. Cross-Market Confirmation", Order = 10)]
-        public double CmRiskPctNone { get; set; }
 
         // QQQ is an ETF: it has no 18:00 ET exchange day. Its key levels are built
         // from the RTH cash session only, per user specification.
@@ -189,6 +184,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V7.1: makes a silent ES/QQQ data failure impossible to miss.
         //   Summary = one line per market per day (bar counts, levels, near-miss tally)
         //   Verbose = every break / rejected reclaim / expiry / confirmation (LOUD)
+        // Confirmation on ES / market 2 is break + reclaim only. Their EMA(9) plays no
+        // part (user specification). MNQ's own EMA(9) entry rule is unaffected.
+        [NinjaScriptProperty]
+        [Display(Name = "Require EMA(9) on confirmation markets too", GroupName = "00b. Cross-Market Confirmation", Order = 10)]
+        public bool ConfirmMarketsRequireEma { get; set; }
+
         [NinjaScriptProperty]
         [Display(Name = "Cross-market diagnostics (0=Off 1=Summary 2=Verbose)", GroupName = "00b. Cross-Market Confirmation", Order = 13)]
         [Range(0, 2)]
@@ -409,10 +410,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 CrossMarketToleranceBars = 0;           // exact same completed bar
                 CmRiskPctAPlus = 30.0;                  // ES + QQQ
                 CmRiskPctAMinus = 10.0;                 // ES only
-                CmRiskPctBPlus = 5.0;                   // QQQ only
-                CmRiskPctNone = 5.0;                    // neither (user-specified)
+                CmRiskPctBPlus = 5.0;                   // MNQ alone, neither confirms
                 QqqSessionStartMinutesEt = 570;         // 09:30 ET
                 QqqSessionEndMinutesEt = 960;           // 16:00 ET
+                ConfirmMarketsRequireEma = false;        // spec: ES/market-2 EMAs do not matter
                 CrossMarketDiagnostics = 1;             // Summary
 
                 EntryStartMinutesEt = 570;      // 9:30 ET
@@ -564,6 +565,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         d.MaxBarsBreakToReclaim = CrossMarketMaxBarsBreakToReclaim;
                         d.SessionStartMinutesEt = EntryStartMinutesEt;
+                        d.RequireEmaConfirmation = ConfirmMarketsRequireEma;
                     }
                     esDet1.Label = EsSymbol; esDet3.Label = EsSymbol;
                     qqqDet1.Label = QqqSymbol; qqqDet3.Label = QqqSymbol;
@@ -607,7 +609,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 fbCfg.CrossMarketGrades.RiskPctAPlus = CmRiskPctAPlus;
                 fbCfg.CrossMarketGrades.RiskPctAMinus = CmRiskPctAMinus;
                 fbCfg.CrossMarketGrades.RiskPctBPlus = CmRiskPctBPlus;
-                fbCfg.CrossMarketGrades.RiskPctNone = CmRiskPctNone;
                 fb = new FakeBreakoutEngine(this, fbCfg);
 
                 VbrConfig vbrCfg = new VbrConfig();
@@ -672,12 +673,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                     PrintLine(string.Format(CultureInfo.InvariantCulture,
-                        "CROSS-MARKET CONFIRMATION ENABLED — ES='{0}' QQQ='{1}' | grades: A+={2}% (ES+QQQ), A-={3}% (ES only), B+={4}% (QQQ only), B={5}% (neither) "
-                        + "| reclaim window={6} bars, lag tolerance={7} bar(s) | ORDERS ARE MNQ-ONLY"
-                        + "\n  bars loaded: ES 1m={8} 3m={9} | QQQ 1m={10} 3m={11}"
-                        + "\n  NOTE: levels need >=2 sessions of each market's own history before they can be computed.",
-                        EsSymbol, QqqSymbol, CmRiskPctAPlus, CmRiskPctAMinus, CmRiskPctBPlus, CmRiskPctNone,
+                        "CROSS-MARKET CONFIRMATION ENABLED — market1='{0}' market2='{1}'"
+                        + "\n  grades: A+={2}% (BOTH agree) | A-={3}% (exactly ONE agrees) | B+={4}% (NEITHER agrees)"
+                        + "\n  reclaim window={5} bars, lag tolerance={6} bar(s), confirmation EMA(9): {7}"
+                        + "\n  bars loaded: {0} 1m={8} 3m={9} | {1} 1m={10} 3m={11}"
+                        + "\n  ORDERS ARE MNQ-ONLY. Levels need >=2 sessions of each market's own history.",
+                        EsSymbol, QqqSymbol, CmRiskPctAPlus, CmRiskPctAMinus, CmRiskPctBPlus,
                         CrossMarketMaxBarsBreakToReclaim, CrossMarketToleranceBars,
+                        ConfirmMarketsRequireEma ? "REQUIRED" : "NOT required",
                         esBars1, esBars3, qqqBars1, qqqBars3));
 
                 if (!instrumentOk)
