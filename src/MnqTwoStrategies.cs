@@ -241,7 +241,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EntryHandling = EntryHandling.UniqueEntries; // FB_* and VBR_* independent
                 // V5 Fix 6: 11:30 ET is a NEW-ENTRY cutoff only; no strategy-level
                 // forced flatten. Platform session-close exit defaults OFF.
-                IsExitOnSessionClose = false;
+                IsExitOnSessionCloseStrategy = false;
                 ExitOnSessionCloseSeconds = 30;
                 BarsRequiredToTrade = 30;
                 StartBehavior = StartBehavior.WaitUntilFlat;
@@ -299,7 +299,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AddDataSeries(BarsPeriodType.Minute, 1);   // BarsInProgress 1
                 AddDataSeries(BarsPeriodType.Minute, 3);   // BarsInProgress 2
                 AddDataSeries(BarsPeriodType.Minute, 15);  // BarsInProgress 3
-                IsExitOnSessionClose = ExitOnSessionCloseEnabled;
+                IsExitOnSessionCloseStrategy = ExitOnSessionCloseEnabled;
             }
             else if (State == State.DataLoaded)
             {
