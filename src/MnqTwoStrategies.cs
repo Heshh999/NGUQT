@@ -18,6 +18,7 @@
 //   1 = 1-minute   (entries/patterns/MFE-MAE/key-level aggregation)
 //   2 = 3-minute   (Fake Breakout entry TF + runner)
 //   3 = 15-minute  (parent setups for both strategies)
+//   4 = 1-tick     (OPTIONAL, execution granularity only — carries NO logic)
 // Each engine only ever receives snapshots built inside the matching
 // BarsInProgress branch, so cross-series contamination is impossible.
 //
@@ -45,6 +46,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         private const int BipOneMin = 1;
         private const int BipThreeMin = 2;
         private const int BipFifteenMin = 3;
+        private const int BipTick = 4;        // execution-granularity series only (no logic)
+
+        // Series index that ORDERS are submitted against. Signals are unaffected —
+        // this only controls how finely NinjaTrader simulates fills in a backtest.
+        // NT8 refuses "High" order-fill resolution for multi-series strategies and
+        // instructs you to "program directly into your strategy the more granular
+        // resolution you would like to simulate order fills with" — that is exactly
+        // what the optional 1-tick series below does.
+        private int bipExec = BipOneMin;
 
         private KeyLevelEngine levels;
         private FakeBreakoutEngine fb;
@@ -215,6 +225,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         public bool WriteCsvTradeLog { get; set; }
 
         [NinjaScriptProperty]
+        [Display(Name = "Use 1-tick execution series (accurate backtest stop fills)", GroupName = "07. Execution", Order = 1)]
+        public bool UseTickExecutionSeries { get; set; }
+
+        [NinjaScriptProperty]
         [Display(Name = "Verbose diagnostics", GroupName = "06. Logging", Order = 2)]
         public bool VerboseDiagnostics { get; set; }
 
@@ -291,6 +305,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 WriteCsvTradeLog = true;
                 VerboseDiagnostics = true;
+                UseTickExecutionSeries = true;   // NT8 multi-series fill granularity
                 PrintLevelsDiagnosticDate = "";
             }
             else if (State == State.Configure)
@@ -299,6 +314,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AddDataSeries(BarsPeriodType.Minute, 1);   // BarsInProgress 1
                 AddDataSeries(BarsPeriodType.Minute, 3);   // BarsInProgress 2
                 AddDataSeries(BarsPeriodType.Minute, 15);  // BarsInProgress 3
+
+                // Optional execution series (added LAST so the indices above never move).
+                // It carries NO strategy logic — OnBarUpdate ignores BarsInProgress 4
+                // entirely. Its only job is to give the backtester tick-by-tick
+                // granularity for entry fills and, critically, for the structure stops.
+                if (UseTickExecutionSeries)
+                {
+                    AddDataSeries(BarsPeriodType.Tick, 1); // BarsInProgress 4
+                    bipExec = BipTick;
+                }
+                else
+                {
+                    bipExec = BipOneMin;
+                }
+
                 IsExitOnSessionCloseStrategy = ExitOnSessionCloseEnabled;
             }
             else if (State == State.DataLoaded)
@@ -594,9 +624,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void SubmitEntryOrder(StrategyId id, TradeDirection dir, int qty, string signalName)
         {
             if (dir == TradeDirection.Long)
-                EnterLong(BipOneMin, qty, signalName);
+                EnterLong(bipExec, qty, signalName);
             else
-                EnterShort(BipOneMin, qty, signalName);
+                EnterShort(bipExec, qty, signalName);
         }
 
         private bool StrategyHasPosition(StrategyId id)
@@ -618,18 +648,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (qty < 1) return;
             double p = RoundToTick(stopPrice);
             if (dir == TradeDirection.Long)
-                ExitLongStopMarket(BipOneMin, true, qty, p, stopName, fromEntrySignal);
+                ExitLongStopMarket(bipExec, true, qty, p, stopName, fromEntrySignal);
             else
-                ExitShortStopMarket(BipOneMin, true, qty, p, stopName, fromEntrySignal);
+                ExitShortStopMarket(bipExec, true, qty, p, stopName, fromEntrySignal);
         }
 
         public void ExitMarket(StrategyId id, TradeDirection dir, int qty, string exitName, string fromEntrySignal)
         {
             if (qty < 1) return;
             if (dir == TradeDirection.Long)
-                ExitLong(BipOneMin, qty, exitName, fromEntrySignal);
+                ExitLong(bipExec, qty, exitName, fromEntrySignal);
             else
-                ExitShort(BipOneMin, qty, exitName, fromEntrySignal);
+                ExitShort(bipExec, qty, exitName, fromEntrySignal);
         }
 
         public void Diag(StrategyId id, string msg)
