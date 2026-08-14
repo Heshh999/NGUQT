@@ -72,6 +72,20 @@ namespace NinjaTrader.NinjaScript.Strategies
         // ambiguous, expose it as a configurable parameter").
         // ==================================================================
 
+        #region 00. Strategy Selection
+        // Each engine can be switched off independently. Disabling one simply stops
+        // feeding it bars — its state machine never starts, so it can never signal,
+        // size, order or hand off. The other engine is completely unaffected
+        // (spec: the two engines share no setup state).
+        [NinjaScriptProperty]
+        [Display(Name = "Enable FAKE_BREAKOUT", GroupName = "00. Strategy Selection", Order = 1)]
+        public bool EnableFakeBreakout { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Enable VECTOR_BREAK_RETEST", GroupName = "00. Strategy Selection", Order = 2)]
+        public bool EnableVectorBreakRetest { get; set; }
+        #endregion
+
         #region 01. Session / Time
         [NinjaScriptProperty]
         [Range(0, 1439)]
@@ -274,6 +288,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IsInstantiatedOnEachOptimizationIteration = true;
 
                 // ---- defaults ----
+                EnableFakeBreakout = true;
+                EnableVectorBreakRetest = false;  // user request: VBR switched off
+
                 EntryStartMinutesEt = 570;      // 9:30 ET
                 EntryEndMinutesEt = 690;        // 11:30 ET
                 AssumeBarTimesAreEastern = false;
@@ -395,6 +412,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ema3m = EMA(BarsArray[BipThreeMin], 9);
                 ema15m = EMA(BarsArray[BipFifteenMin], 9);
 
+                PrintLine(string.Format("MnqTwoStrategies: FAKE_BREAKOUT={0}, VECTOR_BREAK_RETEST={1}",
+                    EnableFakeBreakout ? "ENABLED" : "DISABLED",
+                    EnableVectorBreakRetest ? "ENABLED" : "DISABLED"));
+
                 if (!instrumentOk)
                     PrintLine("MnqTwoStrategies ERROR: instrument '" + master
                         + "' is not MNQ. Spec is MNQ-ONLY — all trading disabled. Apply this strategy to an MNQ chart.");
@@ -404,8 +425,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (fb != null && logger != null)
                 {
                     PrintLine("================ FINAL STATISTICS ================");
-                    PrintLine(fb.Stats.Summary("FAKE_BREAKOUT"));
-                    PrintLine(vbr.Stats.Summary("VECTOR_BREAK_RETEST"));
+                    PrintLine(EnableFakeBreakout
+                        ? fb.Stats.Summary("FAKE_BREAKOUT")
+                        : "[FAKE_BREAKOUT] DISABLED — did not trade");
+                    PrintLine(EnableVectorBreakRetest
+                        ? vbr.Stats.Summary("VECTOR_BREAK_RETEST")
+                        : "[VECTOR_BREAK_RETEST] DISABLED — did not trade");
                 }
                 if (logger != null) { logger.Close(); logger = null; }
             }
@@ -442,18 +467,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                         logger.DiagGlobal(etClose, string.Format(CultureInfo.InvariantCulture,
                             "NEW EXCHANGE DAY — DailyOpen={0:0.00} YH={1:0.00} YL={2:0.00} LWH={3:0.00} LWL={4:0.00} PP={5:0.00}",
                             levels.DailyOpen, levels.YdayHigh, levels.YdayLow, levels.LweekHigh, levels.LweekLow, levels.PP));
-                    fb.OnNewDay(etClose);
-                    vbr.OnNewDay(etClose);
+                    if (EnableFakeBreakout) fb.OnNewDay(etClose);
+                    if (EnableVectorBreakRetest) vbr.OnNewDay(etClose);
                 }
 
                 if (CurrentBars[BipOneMin] < 11) return; // vector needs previous 10 completed candles
                 BarSnap snap = BuildSnap(BipOneMin, 1, ema1m[0]);
-                fb.OnOneMinuteBar(snap);
-                vbr.OnOneMinuteBar(snap);
+                if (EnableFakeBreakout) fb.OnOneMinuteBar(snap);
+                if (EnableVectorBreakRetest) vbr.OnOneMinuteBar(snap);
             }
             else if (BarsInProgress == BipThreeMin)
             {
                 if (CurrentBars[BipThreeMin] < 11) return;
+                if (!EnableFakeBreakout) return;   // 3m series serves FAKE_BREAKOUT only
                 BarSnap snap = BuildSnap(BipThreeMin, 3, ema3m[0]);
                 fb.OnThreeMinuteBar(snap);
                 // VECTOR_BREAK_RETEST uses 15m + 1m ONLY (spec §1) — never fed 3m data.
@@ -463,8 +489,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (CurrentBars[BipFifteenMin] < 11) return;
                 BarSnap snap = BuildSnap(BipFifteenMin, 15, ema15m[0]);
                 double prev15Close = CurrentBars[BipFifteenMin] >= 1 ? Closes[BipFifteenMin][1] : double.NaN;
-                fb.OnFifteenMinuteBar(snap, prev15Close);
-                vbr.OnFifteenMinuteBar(snap, prev15Close);
+                if (EnableFakeBreakout) fb.OnFifteenMinuteBar(snap, prev15Close);
+                if (EnableVectorBreakRetest) vbr.OnFifteenMinuteBar(snap, prev15Close);
             }
         }
 
