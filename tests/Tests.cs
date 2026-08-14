@@ -899,6 +899,292 @@ namespace MnqTwoTests
                 "target universe is now 21 selectable levels (18 + VWAP + 2 bands)");
         }
 
+        // ==================================================================
+        // V7 — CROSS-MARKET CONFIRMATION GRADING (FAKE BREAKOUT ONLY)
+        //
+        // MNQ short setup throughout: parent at YDAY_HIGH = 20100, entry 20095,
+        // structure stop 20106 -> 11 pts -> $22/contract on MNQ ($2/pt).
+        //   30% of 10,000 = 3000 -> 136 contracts   (A+)
+        //   10%           = 1000 ->  45 contracts   (A-)
+        //    5%           =  500 ->  22 contracts   (B+ and B)
+        // ES and QQQ trade at COMPLETELY different prices (5600 / 480) on
+        // purpose: if any code path ever compared MNQ prices to theirs, every
+        // one of these tests would fail.
+        // ==================================================================
+
+        private static void SetupEsLevels(MockHost h)
+        {
+            // ES is CME — same 18:00 ET exchange day as MNQ (engine defaults).
+            Feed(h.EsLevels, new DateTime(2026, 7, 29, 12, 0, 0), 5500, 5700, 5400, 5500); // prev week
+            Feed(h.EsLevels, new DateTime(2026, 8, 3, 19, 0, 0), 5590, 5600, 5580, 5590);  // "yesterday"
+            Feed(h.EsLevels, new DateTime(2026, 8, 4, 19, 0, 0), 5590, 5592, 5588, 5590);  // today
+        }
+
+        private static void SetupQqqLevels(MockHost h)
+        {
+            // QQQ is an ETF: RTH cash session only (09:30-16:00 ET), calendar day roll.
+            h.QqqLevels.DayStartMinutesEt = 0;
+            h.QqqLevels.WeekStartMinutesEt = 0;
+            h.QqqLevels.SessionFilterEnabled = true;
+            h.QqqLevels.SessionFilterStartMinutesEt = 570;
+            h.QqqLevels.SessionFilterEndMinutesEt = 960;
+            Feed(h.QqqLevels, new DateTime(2026, 8, 4, 10, 0, 0), 479, 480, 478, 479);     // Tue RTH
+            Feed(h.QqqLevels, new DateTime(2026, 8, 5, 8, 0, 0), 500, 505, 495, 500);      // Wed PREMARKET (must be ignored)
+            Feed(h.QqqLevels, new DateTime(2026, 8, 5, 9, 30, 0), 479, 479.5, 478.5, 479); // Wed RTH -> rolls the day
+        }
+
+        // ES bearish fake-break + reclaim at ES's OWN YDAY_HIGH (5600).
+        private static void EsConfirmShort(MockHost h, int tf)
+        {
+            CrossMarketConfirmDetector d = tf == 1 ? h.EsDet1 : h.EsDet3;
+            DateTime b0 = tf == 1 ? At(9, 31) : At(9, 30);
+            DateTime b1 = tf == 1 ? At(9, 33) : At(9, 33);
+            d.OnBar(Bar(b0, tf, 5598, 5606, 5597, 5605, VectorType.BLUE_VECTOR, 5600));
+            d.OnBar(Bar(b1, tf, 5604, 5605, 5593, 5595, VectorType.REGULAR_BEARISH, 5599));
+        }
+
+        // QQQ bearish fake-break + reclaim at QQQ's OWN YDAY_HIGH (480).
+        private static void QqqConfirmShort(MockHost h, int tf)
+        {
+            CrossMarketConfirmDetector d = tf == 1 ? h.QqqDet1 : h.QqqDet3;
+            DateTime b0 = tf == 1 ? At(9, 31) : At(9, 30);
+            DateTime b1 = tf == 1 ? At(9, 33) : At(9, 33);
+            d.OnBar(Bar(b0, tf, 479.5, 481.5, 479.4, 481, VectorType.BLUE_VECTOR, 480));
+            d.OnBar(Bar(b1, tf, 480.8, 481, 478.5, 479, VectorType.REGULAR_BEARISH, 479.8));
+        }
+
+        // MNQ 3m fake-break + reclaim (entry decision bar closes 09:36).
+        private static void FbBluePath3m(FakeBreakoutEngine fb)
+        {
+            fb.OnThreeMinuteBar(Bar(At(9, 30), 3, 20096, 20106, 20094, 20105, VectorType.BLUE_VECTOR, 20100));
+            fb.OnThreeMinuteBar(Bar(At(9, 33), 3, 20104, 20105, 20092, 20095, VectorType.REGULAR_BEARISH, 20099));
+        }
+
+        private static MockHost CmHost(out FakeBreakoutEngine fb)
+        {
+            MockHost h = new MockHost();
+            h.WireCrossMarket(4);          // user-specified 4-bar reclaim window
+            SetupEsLevels(h);
+            SetupQqqLevels(h);
+            fb = FbFrozenShort(h, At(9, 15), At(9, 30), 20090);
+            return h;
+        }
+
+        private static void TestCrossMarketGrading()
+        {
+            Console.WriteLine("V7 — cross-market confirmation grading (FAKE BREAKOUT only):");
+
+            // ---- sanity: each market uses its OWN level, at its own price ----
+            {
+                MockHost h = new MockHost();
+                h.WireCrossMarket(4);
+                SetupEsLevels(h); SetupQqqLevels(h);
+                Check(Math.Abs(h.EsLevels.YdayHigh - 5600) < 1e-9,
+                    "ES uses its OWN YDAY_HIGH (5600), not MNQ's");
+                Check(Math.Abs(h.QqqLevels.YdayHigh - 480) < 1e-9,
+                    "QQQ uses its OWN YDAY_HIGH (480) from the RTH session — the 505 premarket high is excluded");
+            }
+
+            // ---- TEST 1: MNQ 1m + ES 1m + QQQ 1m -> A+ / 30% ----
+            {
+                FakeBreakoutEngine fb;
+                MockHost h = CmHost(out fb);
+                EsConfirmShort(h, 1);
+                QqqConfirmShort(h, 1);
+                FbBluePath(fb, VectorType.REGULAR_BEARISH);
+                Check(h.AnyDiagContains("grade=A+ riskPct=30"), "TEST 1: MNQ 1m + ES 1m + QQQ 1m -> A+ @ 30%");
+                Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 136", "TEST 1: A+ sized at 30% (136 contracts)");
+                Check(h.AnyDiagContains("ES_confirm=True") && h.AnyDiagContains("QQQ_confirm=True"),
+                    "TEST 1: both confirmations logged true");
+            }
+
+            // ---- TEST 2: MNQ 1m + ES 1m only -> A- / 10% ----
+            {
+                FakeBreakoutEngine fb;
+                MockHost h = CmHost(out fb);
+                EsConfirmShort(h, 1);
+                FbBluePath(fb, VectorType.REGULAR_BEARISH);
+                Check(h.AnyDiagContains("grade=A- riskPct=10"), "TEST 2: MNQ 1m + ES 1m only -> A- @ 10%");
+                Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 45", "TEST 2: A- sized at 10% (45 contracts)");
+            }
+
+            // ---- TEST 3: MNQ 1m + QQQ 1m only -> B+ / 5% ----
+            {
+                FakeBreakoutEngine fb;
+                MockHost h = CmHost(out fb);
+                QqqConfirmShort(h, 1);
+                FbBluePath(fb, VectorType.REGULAR_BEARISH);
+                Check(h.AnyDiagContains("grade=B+ riskPct=5"), "TEST 3: MNQ 1m + QQQ 1m only -> B+ @ 5%");
+                Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 22", "TEST 3: B+ sized at 5% (22 contracts)");
+            }
+
+            // ---- TEST 4: MNQ 3m + ES 3m + QQQ 3m -> A+ / 30% ----
+            {
+                FakeBreakoutEngine fb;
+                MockHost h = CmHost(out fb);
+                EsConfirmShort(h, 3);
+                QqqConfirmShort(h, 3);
+                FbBluePath3m(fb);
+                Check(h.AnyDiagContains("grade=A+ riskPct=30"), "TEST 4: MNQ 3m + ES 3m + QQQ 3m -> A+ @ 30%");
+                Check(h.AnyDiagContains("entryTf=3m"), "TEST 4: graded on the 3m entry timeframe");
+                Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 136", "TEST 4: A+ sized at 30% (136 contracts)");
+            }
+
+            // ---- TEST 5: MNQ 1m + ES 1m + QQQ 3m -> QQQ must NOT count ----
+            {
+                FakeBreakoutEngine fb;
+                MockHost h = CmHost(out fb);
+                EsConfirmShort(h, 1);
+                QqqConfirmShort(h, 3);     // 3m confirmation only
+                FbBluePath(fb, VectorType.REGULAR_BEARISH);
+                Check(h.AnyDiagContains("QQQ_confirm=False"), "TEST 5: a QQQ 3m confirmation does NOT count for a 1m MNQ signal");
+                Check(h.AnyDiagContains("grade=A- riskPct=10"), "TEST 5: grade is A- (ES only), not A+");
+            }
+
+            // ---- TEST 6: MNQ 3m + ES 1m + QQQ 3m -> ES must NOT count ----
+            {
+                FakeBreakoutEngine fb;
+                MockHost h = CmHost(out fb);
+                EsConfirmShort(h, 1);      // 1m confirmation only
+                QqqConfirmShort(h, 3);
+                FbBluePath3m(fb);
+                Check(h.AnyDiagContains("ES_confirm=False"), "TEST 6: an ES 1m confirmation does NOT count for a 3m MNQ signal");
+                Check(h.AnyDiagContains("grade=B+ riskPct=5"), "TEST 6: grade is B+ (QQQ only), not A+");
+            }
+
+            // ---- TEST 7: ES/QQQ 15m is irrelevant ----
+            {
+                FakeBreakoutEngine fb;
+                MockHost h = CmHost(out fb);
+                EsConfirmShort(h, 1);
+                QqqConfirmShort(h, 1);
+                CrossMarketConfirm es15 = h.QueryCrossMarket(ConfirmMarket.ES, false, KeyLevelId.YDAY_HIGH, 15, At(9, 34));
+                CrossMarketConfirm qq15 = h.QueryCrossMarket(ConfirmMarket.QQQ, false, KeyLevelId.YDAY_HIGH, 15, At(9, 34));
+                Check(!es15.Confirmed && !qq15.Confirmed, "TEST 7: no 15m ES/QQQ confirmation channel exists at all");
+                FbBluePath(fb, VectorType.REGULAR_BEARISH);
+                Check(h.AnyDiagContains("grade=A+ riskPct=30"),
+                    "TEST 7: the grade is decided purely by the 1m confirmations — 15m cannot affect it");
+            }
+
+            // ---- TEST 11: no lookahead ----
+            {
+                MockHost h = new MockHost();
+                h.WireCrossMarket(4);
+                SetupEsLevels(h);
+                // ES confirms on the 09:36 bar, AFTER a 09:34 MNQ decision
+                h.EsDet1.OnBar(Bar(At(9, 33), 1, 5598, 5606, 5597, 5605, VectorType.BLUE_VECTOR, 5600));
+                h.EsDet1.OnBar(Bar(At(9, 35), 1, 5604, 5605, 5593, 5595, VectorType.REGULAR_BEARISH, 5599));
+                CrossMarketConfirm early = h.QueryCrossMarket(ConfirmMarket.ES, false, KeyLevelId.YDAY_HIGH, 1, At(9, 34));
+                Check(!early.Confirmed, "TEST 11: a confirmation from a LATER bar is never visible to an earlier MNQ decision");
+                Check(early.Reason.Contains("no lookahead"), "TEST 11: the rejection is logged explicitly as a lookahead guard");
+                CrossMarketConfirm onTime = h.QueryCrossMarket(ConfirmMarket.ES, false, KeyLevelId.YDAY_HIGH, 1, At(9, 36));
+                Check(onTime.Confirmed, "TEST 11: the same confirmation IS visible on its own bar");
+            }
+
+            // ---- TEST 12: undefined case is explicit, never invented ----
+            {
+                FakeBreakoutEngine fb;
+                MockHost h = CmHost(out fb);
+                // neither market confirms
+                FbBluePath(fb, VectorType.REGULAR_BEARISH);
+                Check(h.AnyDiagContains("ES_confirm=False") && h.AnyDiagContains("QQQ_confirm=False"),
+                    "TEST 12: the no-confirmation case is logged explicitly");
+                Check(h.AnyDiagContains("grade=B riskPct=5"),
+                    "TEST 12: no-confirmation resolves to the user-specified B @ 5% — not A-, B+ or an invented value");
+                Check(!h.AnyDiagContains("grade=A- riskPct=26"),
+                    "TEST 12: the legacy 26% A- grade can never leak into cross-market mode");
+                Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 22", "TEST 12: sized at 5% (22 contracts)");
+            }
+
+            // ---- the reclaim window is bounded (user-specified 4 bars) ----
+            {
+                MockHost h = new MockHost();
+                h.WireCrossMarket(4);
+                SetupEsLevels(h);
+                h.EsDet1.OnBar(Bar(At(9, 31), 1, 5598, 5606, 5597, 5605, VectorType.BLUE_VECTOR, 5600));
+                for (int i = 32; i <= 36; i++)   // 5 bars beyond the level = window expires
+                    h.EsDet1.OnBar(Bar(At(9, i), 1, 5604, 5607, 5602, 5605, VectorType.REGULAR_BULLISH, 5600));
+                h.EsDet1.OnBar(Bar(At(9, 37), 1, 5604, 5605, 5593, 5595, VectorType.REGULAR_BEARISH, 5599));
+                CrossMarketConfirm late = h.QueryCrossMarket(ConfirmMarket.ES, false, KeyLevelId.YDAY_HIGH, 1, At(9, 38));
+                Check(!late.Confirmed, "a reclaim later than 4 bars after the break does NOT confirm");
+            }
+
+            // ---- TEST 10: ES/QQQ never place an order ----
+            {
+                FakeBreakoutEngine fb;
+                MockHost h = CmHost(out fb);
+                EsConfirmShort(h, 1); EsConfirmShort(h, 3);
+                QqqConfirmShort(h, 1); QqqConfirmShort(h, 3);
+                Check(h.Entries.Count == 0 && h.Exits.Count == 0 && h.Stops.Count == 0,
+                    "TEST 10: feeding ES/QQQ bars alone submits no order of any kind");
+                FbBluePath(fb, VectorType.REGULAR_BEARISH);
+                bool allMnq = h.OrderInstruments.Count > 0;
+                foreach (string s in h.OrderInstruments) if (!s.StartsWith("MNQ:")) allMnq = false;
+                Check(allMnq, "TEST 10: every order that IS placed is routed to MNQ");
+                foreach (string sig in h.Entries)
+                    Check(sig.StartsWith("FB_"), "TEST 10: entry signal carries the FB_ tag (" + sig + ")");
+            }
+
+            // ---- entry qualification is UNCHANGED by cross-market grading ----
+            {
+                FakeBreakoutEngine fbA, fbB;
+                MockHost a = CmHost(out fbA);                 // no confirmations
+                FbBluePath(fbA, VectorType.REGULAR_BEARISH);
+                MockHost b = CmHost(out fbB);
+                EsConfirmShort(b, 1); QqqConfirmShort(b, 1);  // full confirmation
+                FbBluePath(fbB, VectorType.REGULAR_BEARISH);
+                Check(a.Entries.Count == 1 && b.Entries.Count == 1,
+                    "cross-market state changes the SIZE but never whether the trade is taken");
+
+                // and an invalid MNQ reclaim is still rejected even with full confirmation
+                FakeBreakoutEngine fbC;
+                MockHost c = CmHost(out fbC);
+                EsConfirmShort(c, 1); QqqConfirmShort(c, 1);
+                FbBluePath(fbC, VectorType.VIOLET_VECTOR);   // invalid on the BLUE path
+                Check(c.Entries.Count == 0,
+                    "a full ES+QQQ confirmation can NEVER rescue an invalid MNQ setup");
+            }
+        }
+
+        // ---- TEST 8 / TEST 9: VECTOR_BREAK_RETEST enable switch --------------
+
+        private static void TestVbrEnableSwitch()
+        {
+            Console.WriteLine("V7 — EnableVBR switch:");
+
+            // TEST 8: VBR disabled == never fed a bar (exactly what the host does).
+            // FB must be completely unaffected and no VBR artifact may appear.
+            {
+                MockHost h = new MockHost();
+                h.Fb = null; h.Vbr = null;
+                FakeBreakoutEngine fb = FbFrozenShort(h, At(9, 15), At(9, 30), 20090);
+                VectorBreakRetestEngine vbr = new VectorBreakRetestEngine(h, new VbrConfig());
+                // the 15m/1m bars that WOULD have built a VBR parent are simply not delivered
+                FbBluePath(fb, VectorType.REGULAR_BEARISH);
+
+                Check(h.Entries.Count == 1 && h.Entries[0].StartsWith("FB_SHORT"),
+                    "TEST 8: FAKE_BREAKOUT still enters normally with VBR disabled");
+                Check(!vbr.HasOpenOrPendingPosition, "TEST 8: disabled VBR holds no position");
+                int vbrEntries = 0;
+                foreach (string e in h.Entries) if (e.StartsWith("VBR_")) vbrEntries++;
+                Check(vbrEntries == 0, "TEST 8: zero VBR entries");
+                foreach (string s in h.Sequence)
+                    Check(!s.Contains("VBR_"), "TEST 8: no VBR order appears in the execution sequence");
+                Check(!h.AnyDiagContains("HANDOFF"), "TEST 8: zero handoffs — FB is never flattened for VBR");
+            }
+
+            // TEST 9: VBR enabled behaves exactly as before (V6 U9 handoff intact).
+            {
+                MockHost h = new MockHost();
+                h.LevelsEngine = StdLevels();
+                VectorBreakRetestEngine vbr = new VectorBreakRetestEngine(h, new VbrConfig());
+                vbr.OnFifteenMinuteBar(Bar(At(8, 45), 15, 20040, 20060, 20010, 20050,
+                    VectorType.GREEN_VECTOR, 20030), 20040);
+                Check(h.CountDiagContains("PARENT TRIGGER") == 1,
+                    "TEST 9: re-enabled VBR builds its parent setup exactly as before");
+            }
+        }
+
         // ---- main ------------------------------------------------------------
 
         public static int Main()
@@ -927,6 +1213,10 @@ namespace MnqTwoTests
             // ---- FINAL FAKE BREAKOUT EMA RULE ----
             TestFinalFbEmaRule();
             TestSessionVwap();
+
+            // ---- V7 CROSS-MARKET CONFIRMATION + VBR SWITCH ----
+            TestCrossMarketGrading();
+            TestVbrEnableSwitch();
 
             Console.WriteLine();
             Console.WriteLine(string.Format("RESULT: {0} passed, {1} failed", passed, failed));

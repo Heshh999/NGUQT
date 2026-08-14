@@ -62,6 +62,18 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // fresh lower-timeframe entry is actually eligible (premarket validity
         // candles, where entries are forbidden, cannot be the A- opportunity).
         public FbGradeBasis GradeBasis = FbGradeBasis.FirstTradableCandle;
+
+        // ---- V7 CROSS-MARKET GRADING ----------------------------------------
+        // When TRUE (and the host actually has ES/QQQ data), grade and risk come
+        // from the ES/QQQ confirmation table and the validity-candle A-/B+ system
+        // above is BYPASSED ENTIRELY. The two never run together: RiskPctAMinus /
+        // RiskPctBPlus / GradeBasis are dead code on this path.
+        // When FALSE, the legacy validity-candle grading is restored unchanged.
+        public bool UseCrossMarketGrading = true;
+        // 0 = the ES/QQQ confirmation must sit on EXACTLY the MNQ entry bar's
+        // completed timestamp. Higher values allow that many bars of lag.
+        public int CrossMarketToleranceBars = 0;
+        public FbCrossMarketGradeTable CrossMarketGrades = new FbCrossMarketGradeTable();
     }
 
     public class FakeBreakoutEngine
@@ -619,14 +631,58 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 return;
             }
 
-            // GRADE (spec): A- = entry within FIRST eligible 15m candle (26%);
-            // B+ = candles 2-4 or +2 extension (10%).
+            // ==============================================================
+            // GRADE. Exactly ONE of the two systems below runs — never both.
+            //
+            // V7 (default): ES/QQQ cross-market confirmation at the SAME level
+            //   name, on the SAME timeframe, on the SAME completed bar. This
+            //   only sets grade/risk — the entry above already qualified on the
+            //   MNQ rules alone and is not affected by what ES/QQQ do.
+            // LEGACY: validity-candle A-/B+ (26%/10%), used only when the V7
+            //   system is switched off or its data is unavailable.
+            // ==============================================================
             int formingCandle = slot.ValidityCount + 1;
-            int gradeCandle = formingCandle;
-            if (cfg.GradeBasis == FbGradeBasis.FirstTradableCandle && slot.FirstTradableFormingNum > 0)
-                gradeCandle = formingCandle - slot.FirstTradableFormingNum + 1;
-            string grade = gradeCandle <= 1 ? "A-" : "B+";
-            double riskPct = grade == "A-" ? cfg.RiskPctAMinus : cfg.RiskPctBPlus;
+            string grade;
+            double riskPct;
+
+            if (cfg.UseCrossMarketGrading && host.CrossMarketEnabled)
+            {
+                CrossMarketConfirm es = host.QueryCrossMarket(ConfirmMarket.ES, slot.IsLong,
+                    slot.ActiveLevelId, bar.PeriodMinutes, bar.EtClose);
+                CrossMarketConfirm qqq = host.QueryCrossMarket(ConfirmMarket.QQQ, slot.IsLong,
+                    slot.ActiveLevelId, bar.PeriodMinutes, bar.EtClose);
+
+                cfg.CrossMarketGrades.Resolve(es.Confirmed, qqq.Confirmed, out grade, out riskPct);
+
+                host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                    "FAKE BREAKOUT CONFIRMATION | direction={0} entryTf={1}m level={2} confirmBar={3:yyyy-MM-dd HH:mm} ET"
+                    + " | MNQ_confirm=true ES_confirm={4} QQQ_confirm={5} | grade={6} riskPct={7}"
+                    + "\n    MNQ_level_name={2} MNQ_level_price={8:0.00} MNQ_close={9:0.00} MNQ_ema9={10:0.00} MNQ_vector={11}"
+                    + "\n    ES_level_name={12} ES_level_price={13:0.00} ES_reason={14}"
+                    + "\n    QQQ_level_name={15} QQQ_level_price={16:0.00} QQQ_reason={17}",
+                    slot.IsLong ? "LONG" : "SHORT", bar.PeriodMinutes, slot.ActiveLevelId, bar.EtClose,
+                    es.Confirmed, qqq.Confirmed, grade, riskPct,
+                    slot.ActiveLevelPrice, bar.Close, bar.Ema9, bar.Vector,
+                    es.LevelId, es.LevelPrice, es.Reason,
+                    qqq.LevelId, qqq.LevelPrice, qqq.Reason));
+            }
+            else
+            {
+                // LEGACY grading (spec): A- = entry within FIRST eligible 15m
+                // candle (26%); B+ = candles 2-4 or +2 extension (10%).
+                int gradeCandle = formingCandle;
+                if (cfg.GradeBasis == FbGradeBasis.FirstTradableCandle && slot.FirstTradableFormingNum > 0)
+                    gradeCandle = formingCandle - slot.FirstTradableFormingNum + 1;
+                grade = gradeCandle <= 1 ? "A-" : "B+";
+                riskPct = grade == "A-" ? cfg.RiskPctAMinus : cfg.RiskPctBPlus;
+
+                host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                    "FAKE BREAKOUT CONFIRMATION | cross-market grading INACTIVE ({0}) — using LEGACY validity-candle grade"
+                    + " | direction={1} entryTf={2}m level={3} gradeCandle={4} grade={5} riskPct={6}",
+                    cfg.UseCrossMarketGrading ? "ES/QQQ data unavailable" : "switched off in settings",
+                    slot.IsLong ? "LONG" : "SHORT", bar.PeriodMinutes, slot.ActiveLevelId,
+                    gradeCandle, grade, riskPct));
+            }
 
             double balance = host.AccountBalance;
             double riskDollars, riskPerContract;

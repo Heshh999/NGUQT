@@ -74,6 +74,51 @@ namespace MnqTwoTests
         public bool CanOpenPosition(StrategyId id) { return AllowOpen; }
         public bool TpLevelEnabled(TpLevelId id) { return true; }
 
+        // ---- V7 cross-market confirmation ----
+        // Mirrors the NT host: one detector per (market, timeframe), each with its
+        // OWN KeyLevelEngine, queried read-only at the MNQ entry decision.
+        public bool CrossMarketOn = false;
+        public KeyLevelEngine EsLevels = new KeyLevelEngine();
+        public KeyLevelEngine QqqLevels = new KeyLevelEngine();
+        public CrossMarketConfirmDetector EsDet1, EsDet3, QqqDet1, QqqDet3;
+        public int CmToleranceBars = 0;
+        /// Every order the host was ever asked to place, with the series it went to.
+        public List<string> OrderInstruments = new List<string>();
+
+        public void WireCrossMarket(int maxBarsBreakToReclaim)
+        {
+            EsDet1 = new CrossMarketConfirmDetector(ConfirmMarket.ES, 1, EsLevels);
+            EsDet3 = new CrossMarketConfirmDetector(ConfirmMarket.ES, 3, EsLevels);
+            QqqDet1 = new CrossMarketConfirmDetector(ConfirmMarket.QQQ, 1, QqqLevels);
+            QqqDet3 = new CrossMarketConfirmDetector(ConfirmMarket.QQQ, 3, QqqLevels);
+            foreach (CrossMarketConfirmDetector d in new CrossMarketConfirmDetector[] { EsDet1, EsDet3, QqqDet1, QqqDet3 })
+                d.MaxBarsBreakToReclaim = maxBarsBreakToReclaim;
+            CrossMarketOn = true;
+        }
+
+        public bool CrossMarketEnabled { get { return CrossMarketOn; } }
+
+        public CrossMarketConfirm QueryCrossMarket(ConfirmMarket market, bool isLong, KeyLevelId levelId,
+                                                   int tfMinutes, DateTime barEtClose)
+        {
+            CrossMarketConfirm miss = new CrossMarketConfirm();
+            miss.LevelId = levelId;
+            miss.Reason = "cross-market confirmation not available";
+            if (!CrossMarketOn) return miss;
+
+            CrossMarketConfirmDetector det;
+            if (market == ConfirmMarket.ES)
+                det = tfMinutes == 1 ? EsDet1 : tfMinutes == 3 ? EsDet3 : null;
+            else
+                det = tfMinutes == 1 ? QqqDet1 : tfMinutes == 3 ? QqqDet3 : null;
+            if (det == null)
+            {
+                miss.Reason = market + ": no " + tfMinutes + "m confirmation series exists";
+                return miss;
+            }
+            return det.Query(isLong, levelId, barEtClose, CmToleranceBars);
+        }
+
         public int EnterPosition(StrategyId id, TradeDirection dir, int qty, string signalName)
         {
             if (Handoff != null)
@@ -83,6 +128,7 @@ namespace MnqTwoTests
             }
             Entries.Add(signalName + " " + qty);
             Sequence.Add("ENTRY " + signalName + " x" + qty);
+            OrderInstruments.Add("MNQ:" + signalName);
             return qty;
         }
         public void SubmitOrUpdateStop(StrategyId id, TradeDirection dir, int qty, double stopPrice,

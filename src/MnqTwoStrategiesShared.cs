@@ -280,6 +280,17 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // indicator defaults to 1.0 standard deviation.
         public double VwapBandMultiplier = 1.0;
 
+        // ---- V7: optional intraday session filter -------------------------------
+        // OFF by default, so MNQ and ES (both CME, 18:00 ET exchange day) aggregate
+        // exactly as before — this is a strict no-op for every pre-V7 caller.
+        // It exists for QQQ, which is an ETF and has no 18:00 ET exchange day: the
+        // user specified its key levels come from the RTH cash session only
+        // (09:30-16:00 ET). Bars whose OPEN falls outside the window are ignored
+        // entirely for day/week aggregation.
+        public bool SessionFilterEnabled = false;
+        public int SessionFilterStartMinutesEt = 570;   // 09:30 ET
+        public int SessionFilterEndMinutesEt = 960;     // 16:00 ET (exclusive)
+
         // ---- port of Traders Reality calcDst(): Sydney DST flag ----
         // Pine: previousSunday = dayofmonth - dayofweek + 1  (dayofweek 1=Sun..7=Sat)
         public static bool CalcSydneyDst(DateTime date)
@@ -327,6 +338,14 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public bool OnOneMinuteBar(DateTime etOpen, DateTime etClose, DateTime utcOpen, double o, double h, double l, double c, double volume)
         {
             bool newDay = false;
+
+            // ---- V7 session filter (no-op unless explicitly enabled) ----
+            if (SessionFilterEnabled)
+            {
+                int minOfDay = etOpen.Hour * 60 + etOpen.Minute;
+                if (minOfDay < SessionFilterStartMinutesEt || minOfDay >= SessionFilterEndMinutesEt)
+                    return false;
+            }
 
             // ---- day roll ----
             DateTime dayShift = etOpen.AddMinutes(-DayStartMinutesEt);
@@ -884,6 +903,299 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     // Engines only call OUT through this interface; they never touch each
     // other or the other engine's orders (spec hard separation rule).
     // ------------------------------------------------------------------
+    // ======================================================================
+    // V7 — CROSS-MARKET CONFIRMATION (FAKE BREAKOUT ONLY)
+    //
+    // ES and QQQ are CONFIRMATION markets. They never produce a setup, never
+    // size a trade and never receive an order — the traded instrument is MNQ
+    // and nothing here can submit anything. Their only job is to answer one
+    // question at the moment an already-valid MNQ Fake Breakout entry fires:
+    //
+    //   "on the SAME completed bar timestamp, on the SAME timeframe, at YOUR
+    //    OWN equivalent named key level, are you showing the same directional
+    //    fake-break + reclaim + EMA(9) confirmation?"
+    //
+    // The answer sets the grade and risk. It never creates or blocks a trade.
+    //
+    // Timeframe isolation is STRUCTURAL, not conditional: one detector instance
+    // exists per (market, timeframe), so a 3m confirmation physically cannot be
+    // read when grading a 1m signal. There is no code path that mixes them.
+    //
+    // VECTOR_BREAK_RETEST never touches any of this.
+    // ======================================================================
+    public enum ConfirmMarket { ES, QQQ }
+
+    public struct CrossMarketConfirm
+    {
+        public bool Confirmed;
+        public DateTime BarEtClose;      // bar on which reclaim+EMA completed
+        public KeyLevelId LevelId;       // that market's OWN equivalent level
+        public double LevelPrice;        // that market's OWN price for it
+        public VectorType BreakVector;
+        public VectorType ReclaimVector;
+        public double Close;
+        public double Ema9;
+        public string Reason;            // why it confirmed, or why it did not
+    }
+
+    // ----------------------------------------------------------------------
+    // The complete FB grade table. Every ES/QQQ combination is enumerated
+    // here and nowhere else, so no combination can fall through to an
+    // invented default and two grading systems cannot both be live.
+    //
+    //   ES  QQQ  -> grade  risk
+    //   Y   Y       A+     30%
+    //   Y   N       A-     10%
+    //   N   Y       B+      5%
+    //   N   N       B       5%   (user-specified 2026-08-14)
+    // ----------------------------------------------------------------------
+    public class FbCrossMarketGradeTable
+    {
+        public double RiskPctAPlus = 30.0;   // ES + QQQ both confirm
+        public double RiskPctAMinus = 10.0;  // ES only
+        public double RiskPctBPlus = 5.0;    // QQQ only
+        public double RiskPctNone = 5.0;     // neither confirms
+        public string GradeNone = "B";       // label only; distinguishes the log from B+
+
+        public void Resolve(bool esConfirm, bool qqqConfirm, out string grade, out double riskPct)
+        {
+            if (esConfirm && qqqConfirm) { grade = "A+"; riskPct = RiskPctAPlus; }
+            else if (esConfirm)          { grade = "A-"; riskPct = RiskPctAMinus; }
+            else if (qqqConfirm)         { grade = "B+"; riskPct = RiskPctBPlus; }
+            else                         { grade = GradeNone; riskPct = RiskPctNone; }
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // One (market, timeframe) fake-break detector.
+    //
+    // The break/reclaim/vector/EMA rules are a deliberate mirror of the MNQ
+    // Fake Breakout lower-timeframe logic in FakeBreakoutEngine.ProcessLtf.
+    // What is NOT mirrored, per the specification:
+    //   - no 15m parent setup is required (or consulted) for ES/QQQ
+    //   - no validity-candle counting
+    //   - no entry-time window (this produces no entries)
+    // What IS mirrored:
+    //   - break candle vector rules       (long: RED/REGULAR, short: GREEN/BLUE/REGULAR)
+    //   - reclaim candle vector rules     (incl. the break-vector-dependent short paths)
+    //   - structure extreme + wick extension
+    //   - same-timeframe EMA(9) confirmation, with the post-reclaim EMA wait
+    //   - the >= 09:30 ET session-start gate on the BREAK candle
+    // Plus one bound the MNQ engine gets from its parent and this does not:
+    //   - the reclaim must arrive within MaxBarsBreakToReclaim bars of the break.
+    // ----------------------------------------------------------------------
+    public class CrossMarketConfirmDetector
+    {
+        private static readonly KeyLevelId[] Eligible = new KeyLevelId[]
+        {
+            KeyLevelId.YDAY_HIGH, KeyLevelId.YDAY_LOW, KeyLevelId.LWEEK_HIGH, KeyLevelId.LWEEK_LOW
+        };
+
+        private class Str
+        {
+            public bool Active;
+            public bool WaitingEma;
+            public VectorType BreakVector;
+            public VectorType ReclaimVector;
+            public double StructExtreme = double.NaN;
+            public int BarsSinceBreak;
+            public void Reset()
+            {
+                Active = false; WaitingEma = false; BarsSinceBreak = 0;
+                StructExtreme = double.NaN;
+            }
+        }
+
+        public readonly ConfirmMarket Market;
+        public readonly int TfMinutes;
+
+        // Bound on break -> reclaim. User-specified 2026-08-14: 4 bars.
+        public int MaxBarsBreakToReclaim = 4;
+        // Mirrors the MNQ rule "premarket LTF patterns are never banked".
+        public int SessionStartMinutesEt = 570;   // 09:30 ET
+
+        private readonly KeyLevelEngine levels;   // this market's OWN levels
+        private readonly Str[,] st = new Str[4, 2];              // [level, 0=long 1=short]
+        private readonly CrossMarketConfirm[,] last = new CrossMarketConfirm[4, 2];
+
+        public CrossMarketConfirmDetector(ConfirmMarket market, int tfMinutes, KeyLevelEngine ownLevels)
+        {
+            Market = market;
+            TfMinutes = tfMinutes;
+            levels = ownLevels;
+            for (int i = 0; i < 4; i++)
+                for (int d = 0; d < 2; d++)
+                    st[i, d] = new Str();
+        }
+
+        public void OnNewDay()
+        {
+            for (int i = 0; i < 4; i++)
+                for (int d = 0; d < 2; d++)
+                {
+                    st[i, d].Reset();
+                    last[i, d] = default(CrossMarketConfirm);
+                }
+        }
+
+        private static int IndexOf(KeyLevelId id)
+        {
+            for (int i = 0; i < Eligible.Length; i++)
+                if (Eligible[i] == id) return i;
+            return -1;
+        }
+
+        // Feed one COMPLETED bar of this market on this timeframe.
+        public void OnBar(BarSnap bar)
+        {
+            if (bar.PeriodMinutes != TfMinutes) return;   // hard timeframe isolation
+            for (int i = 0; i < Eligible.Length; i++)
+            {
+                double lvl = levels.GetTriggerLevelPrice(Eligible[i]);
+                if (double.IsNaN(lvl)) continue;
+                Process(i, true, lvl, bar);    // bullish confirmation candidate
+                Process(i, false, lvl, bar);   // bearish confirmation candidate
+            }
+        }
+
+        private void Process(int li, bool isLong, double lvl, BarSnap bar)
+        {
+            int di = isLong ? 0 : 1;
+            Str s = st[li, di];
+
+            if (!s.Active)
+            {
+                // ---- break candle (mirror of FB §9/§10 break rules) ----
+                bool breakClose = isLong ? bar.Close < lvl : bar.Close > lvl;
+                if (!breakClose) return;
+                bool breakVecOk = isLong
+                    ? (bar.Vector == VectorType.RED_VECTOR || VectorClassifier.IsRegular(bar.Vector))
+                    : (bar.Vector == VectorType.GREEN_VECTOR || bar.Vector == VectorType.BLUE_VECTOR
+                       || VectorClassifier.IsRegular(bar.Vector));
+                if (!breakVecOk) return;
+
+                int minOfDay = bar.EtOpen.Hour * 60 + bar.EtOpen.Minute;
+                if (minOfDay < SessionStartMinutesEt) return;   // premarket never banked
+
+                s.Active = true;
+                s.WaitingEma = false;
+                s.BreakVector = bar.Vector;
+                s.StructExtreme = isLong ? bar.Low : bar.High;
+                s.BarsSinceBreak = 0;
+                return;
+            }
+
+            if (!s.WaitingEma)
+            {
+                bool reclaimClose = isLong ? bar.Close > lvl : bar.Close < lvl;
+                if (!reclaimClose)
+                {
+                    // still beyond the level — extend the structure, but the reclaim
+                    // window is finite (this is what the 15m parent bounds on MNQ).
+                    if (isLong) { if (bar.Low < s.StructExtreme) s.StructExtreme = bar.Low; }
+                    else { if (bar.High > s.StructExtreme) s.StructExtreme = bar.High; }
+                    if (++s.BarsSinceBreak > MaxBarsBreakToReclaim) s.Reset();
+                    return;
+                }
+                if (++s.BarsSinceBreak > MaxBarsBreakToReclaim) { s.Reset(); return; }
+
+                // ---- reclaim candle vector rules (mirror of FB §9/§10) ----
+                bool reclaimVecOk;
+                if (isLong)
+                    reclaimVecOk = bar.Vector == VectorType.GREEN_VECTOR || bar.Vector == VectorType.BLUE_VECTOR;
+                else if (s.BreakVector == VectorType.GREEN_VECTOR)
+                    reclaimVecOk = true;
+                else if (s.BreakVector == VectorType.BLUE_VECTOR)
+                    reclaimVecOk = VectorClassifier.IsRegular(bar.Vector) || bar.Vector == VectorType.RED_VECTOR;
+                else
+                    reclaimVecOk = bar.Vector == VectorType.RED_VECTOR || bar.Vector == VectorType.VIOLET_VECTOR;
+
+                if (!reclaimVecOk) { s.Reset(); return; }
+
+                if (isLong) { if (bar.Low < s.StructExtreme) s.StructExtreme = bar.Low; }
+                else { if (bar.High > s.StructExtreme) s.StructExtreme = bar.High; }
+
+                s.ReclaimVector = bar.Vector;
+                bool emaOk = isLong ? bar.Close > bar.Ema9 : bar.Close < bar.Ema9;
+                if (emaOk) Record(li, di, isLong, lvl, s, bar);
+                else s.WaitingEma = true;
+                return;
+            }
+
+            // ---- waiting for the same-timeframe EMA(9) after a valid reclaim ----
+            bool structBreach = isLong ? bar.Close < s.StructExtreme : bar.Close > s.StructExtreme;
+            if (structBreach) { s.Reset(); return; }
+            if (isLong) { if (bar.Low < s.StructExtreme) s.StructExtreme = bar.Low; }
+            else { if (bar.High > s.StructExtreme) s.StructExtreme = bar.High; }
+
+            bool ema2 = isLong ? bar.Close > bar.Ema9 : bar.Close < bar.Ema9;
+            if (ema2) Record(li, di, isLong, lvl, s, bar);
+        }
+
+        private void Record(int li, int di, bool isLong, double lvl, Str s, BarSnap bar)
+        {
+            CrossMarketConfirm c = new CrossMarketConfirm();
+            c.Confirmed = true;
+            c.BarEtClose = bar.EtClose;
+            c.LevelId = Eligible[li];
+            c.LevelPrice = lvl;
+            c.BreakVector = s.BreakVector;
+            c.ReclaimVector = s.ReclaimVector;
+            c.Close = bar.Close;
+            c.Ema9 = bar.Ema9;
+            c.Reason = string.Format(CultureInfo.InvariantCulture,
+                "{0} {1}m {2} fake-break {3} -> reclaim {4} through {5:0.00}, close {6:0.00} {7} ema9 {8:0.00}",
+                Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", s.BreakVector, s.ReclaimVector,
+                lvl, bar.Close, isLong ? ">" : "<", bar.Ema9);
+            last[li, di] = c;
+            s.Reset();
+        }
+
+        // Read-only query made at the MNQ entry decision. toleranceBars = 0 means
+        // the confirmation must sit on EXACTLY the same completed bar timestamp.
+        public CrossMarketConfirm Query(bool isLong, KeyLevelId id, DateTime barEtClose, int toleranceBars)
+        {
+            CrossMarketConfirm miss = new CrossMarketConfirm();
+            miss.LevelId = id;
+            miss.LevelPrice = levels.GetTriggerLevelPrice(id);
+
+            int li = IndexOf(id);
+            if (li < 0)
+            {
+                miss.Reason = string.Format("{0} {1}m: {2} is not a Fake Breakout eligible level", Market, TfMinutes, id);
+                return miss;
+            }
+            int di = isLong ? 0 : 1;
+            CrossMarketConfirm c = last[li, di];
+            if (!c.Confirmed)
+            {
+                miss.Reason = string.Format(CultureInfo.InvariantCulture,
+                    "{0} {1}m: no {2} fake-break confirmation recorded at {3} ({4:0.00})",
+                    Market, TfMinutes, isLong ? "bullish" : "bearish", id, miss.LevelPrice);
+                return miss;
+            }
+
+            double diffMin = (barEtClose - c.BarEtClose).TotalMinutes;
+            if (diffMin < 0)
+            {
+                // The stored confirmation is LATER than the MNQ decision bar. Using it
+                // would be lookahead. Never allowed, at any tolerance.
+                miss.Reason = string.Format(CultureInfo.InvariantCulture,
+                    "{0} {1}m: confirmation at {2:HH:mm} is AFTER the MNQ decision bar {3:HH:mm} — rejected (no lookahead)",
+                    Market, TfMinutes, c.BarEtClose, barEtClose);
+                return miss;
+            }
+            if (diffMin > (double)toleranceBars * TfMinutes)
+            {
+                miss.Reason = string.Format(CultureInfo.InvariantCulture,
+                    "{0} {1}m: confirmation at {2:HH:mm} is stale for MNQ decision bar {3:HH:mm} (tolerance {4} bar(s))",
+                    Market, TfMinutes, c.BarEtClose, barEtClose, toleranceBars);
+                return miss;
+            }
+            return c;
+        }
+    }
+
     public interface IMnqHost
     {
         KeyLevelEngine Levels { get; }
@@ -902,6 +1214,12 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         bool CanOpenPosition(StrategyId id);
 
         bool TpLevelEnabled(TpLevelId id);
+
+        // V7 cross-market confirmation (FAKE_BREAKOUT grading only, read-only).
+        // False when the feature is switched off or the ES/QQQ data is unavailable.
+        bool CrossMarketEnabled { get; }
+        CrossMarketConfirm QueryCrossMarket(ConfirmMarket market, bool isLong, KeyLevelId levelId,
+                                            int tfMinutes, DateTime barEtClose);
 
         int  EnterPosition(StrategyId id, TradeDirection dir, int qty, string signalName);
         void SubmitOrUpdateStop(StrategyId id, TradeDirection dir, int qty, double stopPrice,
