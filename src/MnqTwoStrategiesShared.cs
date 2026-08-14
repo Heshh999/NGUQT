@@ -55,6 +55,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     }
 
     // Spec: "The shared take-profit engine contains exactly 18 SELECTABLE target levels"
+    // V6.1 — the take-profit universe grows from 18 to 21 selectable levels with the
+    // addition of TradingView's built-in Session VWAP and its band pair. This is a
+    // deliberate SPEC CHANGE requested by the user, not a fix.
     public enum TpLevelId
     {
         M0, M1, M2, M3, M4, M5,
@@ -64,7 +67,8 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         LWEEK_HIGH, LWEEK_LOW,
         R1, R3,
         S1, S2,
-        PSY_HIGH, PSY_LOW
+        PSY_HIGH, PSY_LOW,
+        VWAP, VWAP_BAND_HIGH, VWAP_BAND_LOW
     }
 
     public enum TradeDirection { Long, Short }
@@ -232,6 +236,17 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         private DateTime curWeekKey = DateTime.MinValue;
         private double dailyOpen = double.NaN;
 
+        // ---- Session VWAP + bands (TradingView built-in "VWAP", Anchor = Session) ----
+        // TradingView computes, cumulatively from the session anchor:
+        //     vwap     = SUM(src*vol) / SUM(vol)                      (src = hlc3 by default)
+        //     variance = SUM(vol*src*src)/SUM(vol) - vwap^2   (floored at 0)
+        //     band     = vwap +/- multiplier * sqrt(variance)
+        // For an ETH futures symbol the Session anchor resets at the exchange-day
+        // open (18:00 ET), which is the same boundary DayStartMinutesEt already uses.
+        private double vwapSumSrcVol;
+        private double vwapSumVol;
+        private double vwapSumSrcSrcVol;
+
         // Psy-level state (TR calcPsyLevels port)
         private bool wasInPsySession;
         private double psyHigh = double.NaN;
@@ -260,6 +275,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // it is identical to the 4H reading whenever the grid aligns with the
         // session start (the MNQ crypto-path case). See docs/COMPLIANCE_AUDIT.md.
         public bool PsyUse4HourGrid = false;
+
+        // TradingView VWAP band multiplier. Enabling Band 1 in the built-in
+        // indicator defaults to 1.0 standard deviation.
+        public double VwapBandMultiplier = 1.0;
 
         // ---- port of Traders Reality calcDst(): Sydney DST flag ----
         // Pine: previousSunday = dayofmonth - dayofweek + 1  (dayofweek 1=Sun..7=Sat)
@@ -305,7 +324,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // Feed one COMPLETED 1m bar. Returns true when a new exchange day started.
         // utcOpen is the bar's open time in UTC (needed by the psy-session port,
         // whose sessions are defined in GMT in the supplied source).
-        public bool OnOneMinuteBar(DateTime etOpen, DateTime etClose, DateTime utcOpen, double o, double h, double l, double c)
+        public bool OnOneMinuteBar(DateTime etOpen, DateTime etClose, DateTime utcOpen, double o, double h, double l, double c, double volume)
         {
             bool newDay = false;
 
@@ -321,6 +340,8 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 dailyOpen = o;                       // TR getdayOpen
                 curDayKey = dayKey;
                 newDay = true;
+                // Session VWAP re-anchors with the new exchange day
+                vwapSumSrcVol = 0; vwapSumVol = 0; vwapSumSrcSrcVol = 0;
             }
             else
             {
@@ -347,6 +368,15 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 if (h > curWeek.H) curWeek.H = h;
                 if (l < curWeek.L) curWeek.L = l;
                 curWeek.C = c;
+            }
+
+            // ---- Session VWAP accumulation (TradingView built-in VWAP) ----
+            if (volume > 0)
+            {
+                double vwapSrc = (h + l + c) / 3.0;   // hlc3 = TradingView's default source
+                vwapSumSrcVol += vwapSrc * volume;
+                vwapSumVol += volume;
+                vwapSumSrcSrcVol += volume * vwapSrc * vwapSrc;
             }
 
             // ---- Traders Reality calcPsyLevels port (V5 Fix 4D) ----
@@ -439,6 +469,30 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public double PsyHigh { get { return psyHigh; } }
         public double PsyLow { get { return psyLow; } }
 
+        public double Vwap
+        {
+            get { return vwapSumVol > 0 ? vwapSumSrcVol / vwapSumVol : double.NaN; }
+        }
+        private double VwapStdev
+        {
+            get
+            {
+                if (vwapSumVol <= 0) return double.NaN;
+                double v = vwapSumSrcVol / vwapSumVol;
+                double variance = vwapSumSrcSrcVol / vwapSumVol - v * v;
+                if (variance < 0) variance = 0;      // TradingView floors negatives
+                return Math.Sqrt(variance);
+            }
+        }
+        public double VwapBandHigh
+        {
+            get { double v = Vwap, sd = VwapStdev; return (double.IsNaN(v) || double.IsNaN(sd)) ? double.NaN : v + VwapBandMultiplier * sd; }
+        }
+        public double VwapBandLow
+        {
+            get { double v = Vwap, sd = VwapStdev; return (double.IsNaN(v) || double.IsNaN(sd)) ? double.NaN : v - VwapBandMultiplier * sd; }
+        }
+
         public double GetTpLevelPrice(TpLevelId id)
         {
             switch (id)
@@ -461,6 +515,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 case TpLevelId.S2: return S2;
                 case TpLevelId.PSY_HIGH: return PsyHigh;
                 case TpLevelId.PSY_LOW: return PsyLow;
+                case TpLevelId.VWAP: return Vwap;
+                case TpLevelId.VWAP_BAND_HIGH: return VwapBandHigh;
+                case TpLevelId.VWAP_BAND_LOW: return VwapBandLow;
             }
             return double.NaN;
         }

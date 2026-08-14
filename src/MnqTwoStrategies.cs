@@ -217,6 +217,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty] [Display(Name = "S2", GroupName = "05. Take-Profit Levels", Order = 16)] public bool TpEnableS2 { get; set; }
         [NinjaScriptProperty] [Display(Name = "Psy High", GroupName = "05. Take-Profit Levels", Order = 17)] public bool TpEnablePsyHigh { get; set; }
         [NinjaScriptProperty] [Display(Name = "Psy Low", GroupName = "05. Take-Profit Levels", Order = 18)] public bool TpEnablePsyLow { get; set; }
+        [NinjaScriptProperty] [Display(Name = "VWAP (session)", GroupName = "05. Take-Profit Levels", Order = 19)] public bool TpEnableVwap { get; set; }
+        [NinjaScriptProperty] [Display(Name = "VWAP band high", GroupName = "05. Take-Profit Levels", Order = 20)] public bool TpEnableVwapBandHigh { get; set; }
+        [NinjaScriptProperty] [Display(Name = "VWAP band low", GroupName = "05. Take-Profit Levels", Order = 21)] public bool TpEnableVwapBandLow { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0.1, 10)]
+        [Display(Name = "VWAP band multiplier (TradingView Band 1 default = 1.0)", GroupName = "05. Take-Profit Levels", Order = 22)]
+        public double VwapBandMultiplierParam { get; set; }
         #endregion
 
         #region 06. Logging
@@ -350,6 +358,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 levels.WeekStartMinutesEt = WeekStartMinutesEt;
                 levels.PsyType = PsyLevelTypeParam;
                 levels.PsyUse4HourGrid = PsyUse4HourGridParam;
+                levels.VwapBandMultiplier = VwapBandMultiplierParam;
 
                 FbConfig fbCfg = new FbConfig();
                 fbCfg.RiskPctAMinus = RiskPctAMinus;
@@ -424,7 +433,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 DateTime etOpen = etClose.AddMinutes(-1);
                 DateTime utcOpen = ToUtc(Times[BipOneMin][0]).AddMinutes(-1); // psy sessions are GMT-defined (TR source)
                 bool newDay = levels.OnOneMinuteBar(etOpen, etClose, utcOpen,
-                    Opens[BipOneMin][0], Highs[BipOneMin][0], Lows[BipOneMin][0], Closes[BipOneMin][0]);
+                    Opens[BipOneMin][0], Highs[BipOneMin][0], Lows[BipOneMin][0], Closes[BipOneMin][0],
+                    Volumes[BipOneMin][0]);
                 MaybePrintLevelsDiagnostic(etClose);
                 if (newDay)
                 {
@@ -605,6 +615,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 case TpLevelId.S2: return TpEnableS2;
                 case TpLevelId.PSY_HIGH: return TpEnablePsyHigh;
                 case TpLevelId.PSY_LOW: return TpEnablePsyLow;
+                case TpLevelId.VWAP: return TpEnableVwap;
+                case TpLevelId.VWAP_BAND_HIGH: return TpEnableVwapBandHigh;
+                case TpLevelId.VWAP_BAND_LOW: return TpEnableVwapBandLow;
             }
             return false;
         }

@@ -52,16 +52,19 @@ namespace MnqTwoTests
         }
 
         private static void Feed(KeyLevelEngine lv, DateTime etOpen, double o, double h, double l, double c)
+        { Feed(lv, etOpen, o, h, l, c, 1000); }
+
+        private static void Feed(KeyLevelEngine lv, DateTime etOpen, double o, double h, double l, double c, double vol)
         {
             // ET -> UTC during US DST (+4h); the seed dates are mid-week so they
             // never fall inside a psy session window
-            lv.OnOneMinuteBar(etOpen, etOpen.AddMinutes(1), etOpen.AddHours(4), o, h, l, c);
+            lv.OnOneMinuteBar(etOpen, etOpen.AddMinutes(1), etOpen.AddHours(4), o, h, l, c, vol);
         }
 
         // Feed a bar by its ET open, converting to UTC with a fixed +4h (EDT).
         private static void FeedEt(KeyLevelEngine lv, DateTime etOpen, double h, double l)
         {
-            lv.OnOneMinuteBar(etOpen, etOpen.AddMinutes(1), etOpen.AddHours(4), (h + l) / 2, h, l, (h + l) / 2);
+            lv.OnOneMinuteBar(etOpen, etOpen.AddMinutes(1), etOpen.AddHours(4), (h + l) / 2, h, l, (h + l) / 2, 1000);
         }
 
         // Standard level book:
@@ -850,6 +853,52 @@ namespace MnqTwoTests
                 "15m EMA state alone NEVER cancels a valid lower-timeframe Fake Breakout setup");
         }
 
+        // ======================================================================
+        // Session VWAP + bands (TradingView built-in "VWAP", Anchor = Session)
+        // ======================================================================
+
+        private static void TestSessionVwap()
+        {
+            Console.WriteLine("Session VWAP + bands (TradingView built-in math):");
+
+            KeyLevelEngine lv = new KeyLevelEngine();   // day starts 18:00 ET
+            // two equal-volume bars at hlc3 = 100 and 200 inside one exchange day
+            Feed(lv, new DateTime(2026, 8, 4, 19, 0, 0), 100, 100, 100, 100, 100);
+            Check(lv.Vwap == 100.0, "VWAP of a single bar equals that bar's hlc3");
+
+            Feed(lv, new DateTime(2026, 8, 4, 19, 1, 0), 200, 200, 200, 200, 100);
+            // vwap = (100*100 + 200*100)/200 = 150
+            // variance = (100*100^2 + 100*200^2)/200 - 150^2 = 25000 - 22500 = 2500 -> sd = 50
+            Check(lv.Vwap == 150.0, "VWAP is volume-weighted across the session");
+            Check(lv.VwapBandHigh == 200.0 && lv.VwapBandLow == 100.0,
+                "bands = VWAP +/- 1.0 * volume-weighted stdev (TradingView Band 1 default)");
+
+            // volume weighting must actually weight
+            KeyLevelEngine lw = new KeyLevelEngine();
+            Feed(lw, new DateTime(2026, 8, 4, 19, 0, 0), 100, 100, 100, 100, 300);
+            Feed(lw, new DateTime(2026, 8, 4, 19, 1, 0), 200, 200, 200, 200, 100);
+            Check(lw.Vwap == 125.0, "heavier volume pulls VWAP toward that bar (300/100 split -> 125)");
+
+            // multiplier is honoured
+            lw.VwapBandMultiplier = 2.0;
+            double sd = lw.VwapBandHigh - lw.Vwap;
+            lw.VwapBandMultiplier = 1.0;
+            Check(Math.Abs(sd - 2.0 * (lw.VwapBandHigh - lw.Vwap)) < 1e-9,
+                "band multiplier scales the band distance linearly");
+
+            // re-anchors on the new exchange day
+            Feed(lv, new DateTime(2026, 8, 5, 19, 0, 0), 500, 500, 500, 500, 50);
+            Check(lv.Vwap == 500.0, "Session VWAP re-anchors at the 18:00 ET exchange-day open");
+
+            // and it participates in the target engine
+            List<TpTarget> ups = lv.GetSortedTargets(TradeDirection.Long, 499.0, AllOn, Tick);
+            bool sawVwap = false;
+            foreach (TpTarget t in ups) if (t.Names.Contains(TpLevelId.VWAP)) sawVwap = true;
+            Check(sawVwap, "VWAP is selectable by the take-profit engine");
+            Check(Enum.GetValues(typeof(TpLevelId)).Length == 21,
+                "target universe is now 21 selectable levels (18 + VWAP + 2 bands)");
+        }
+
         // ---- main ------------------------------------------------------------
 
         public static int Main()
@@ -877,6 +926,7 @@ namespace MnqTwoTests
 
             // ---- FINAL FAKE BREAKOUT EMA RULE ----
             TestFinalFbEmaRule();
+            TestSessionVwap();
 
             Console.WriteLine();
             Console.WriteLine(string.Format("RESULT: {0} passed, {1} failed", passed, failed));
