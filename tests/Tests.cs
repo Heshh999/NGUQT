@@ -1265,6 +1265,39 @@ namespace MnqTwoTests
             }
         }
 
+        // ---- confirmation market 2 as a CME FUTURES contract (YM) -------------
+        private static void TestFuturesConfirmMarket2()
+        {
+            Console.WriteLine("V7.2 — confirmation market 2 as CME futures (YM) instead of an ETF:");
+
+            // YM is CME: same 18:00 ET exchange day as MNQ/ES, no RTH filter.
+            MockHost h = new MockHost();
+            h.WireCrossMarket(4);
+            h.QqqLevels.DayStartMinutesEt = 1080;    // 18:00 ET, as the host now configures it
+            h.QqqLevels.WeekStartMinutesEt = 1080;
+            h.QqqLevels.SessionFilterEnabled = false;
+            h.QqqDet1.Label = "YM ##-##"; h.QqqDet3.Label = "YM ##-##";
+
+            // "yesterday" is the CME exchange day that OPENED Mon 18:00 ET
+            Feed(h.QqqLevels, new DateTime(2026, 8, 3, 19, 0, 0), 45000, 45120, 44900, 45000);
+            // an overnight bar must COUNT for a futures market (it would be discarded under RTH)
+            Feed(h.QqqLevels, new DateTime(2026, 8, 4, 2, 0, 0), 45050, 45200, 45040, 45060);
+            Feed(h.QqqLevels, new DateTime(2026, 8, 4, 19, 0, 0), 45100, 45110, 45090, 45100);
+
+            Check(Math.Abs(h.QqqLevels.YdayHigh - 45200) < 1e-9,
+                "futures market 2 includes the overnight session in YDAY_HIGH (45200, not the 45120 day-session high)");
+            Check(!double.IsNaN(h.QqqLevels.YdayLow), "futures market 2 computes YDAY_LOW");
+
+            // it confirms on its OWN level at its own price scale
+            h.QqqDet1.OnBar(Bar(At(9, 31), 1, 45190, 45260, 45185, 45250, VectorType.BLUE_VECTOR, 45200));
+            h.QqqDet1.OnBar(Bar(At(9, 33), 1, 45240, 45245, 45150, 45170, VectorType.REGULAR_BEARISH, 45195));
+            CrossMarketConfirm c = h.QueryCrossMarket(ConfirmMarket.QQQ, false, KeyLevelId.YDAY_HIGH, 1, At(9, 34));
+            Check(c.Confirmed, "YM confirms a bearish fake-break at its OWN YDAY_HIGH (45200)");
+            Check(Math.Abs(c.LevelPrice - 45200) < 1e-9, "the confirmation is anchored to YM's own level price");
+            Check(c.Reason.Contains("YM ##-##"),
+                "logs report the ACTUAL configured symbol, never a stale 'QQQ' label: " + c.Reason);
+        }
+
         // ---- TEST 8 / TEST 9: VECTOR_BREAK_RETEST enable switch --------------
 
         private static void TestVbrEnableSwitch()
@@ -1336,6 +1369,7 @@ namespace MnqTwoTests
             // ---- V7 CROSS-MARKET CONFIRMATION + VBR SWITCH ----
             TestCrossMarketGrading();
             TestUnknownIsNotNo();
+            TestFuturesConfirmMarket2();
             TestVbrEnableSwitch();
 
             Console.WriteLine();

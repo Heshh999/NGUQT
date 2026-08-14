@@ -1012,6 +1012,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
         public readonly ConfirmMarket Market;
         public readonly int TfMinutes;
+        /// Display name used in EVERY log line and reason string. Defaults to the
+        /// slot name but the host overwrites it with the actually-configured symbol,
+        /// so a slot pointed at YM never reports itself as QQQ.
+        public string Label;
 
         // Bound on break -> reclaim. User-specified 2026-08-14: 4 bars.
         public int MaxBarsBreakToReclaim = 4;
@@ -1056,7 +1060,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         {
             string s = string.Format(CultureInfo.InvariantCulture,
                 "{0} {1}m: bars={2} noLevelBars={3} breaks={4} reclaimRejected={5} windowExpired={6} awaitingEma={7} CONFIRMS={8}",
-                Market, TfMinutes, BarsSeen, DayBarsNoLevels, DayBreaks,
+                Label, TfMinutes, BarsSeen, DayBarsNoLevels, DayBreaks,
                 DayReclaimRejectedVector, DayWindowExpired, DayAwaitingEma, DayConfirms);
             DayBarsNoLevels = 0; DayBreaks = 0; DayReclaimRejectedVector = 0;
             DayWindowExpired = 0; DayAwaitingEma = 0; DayConfirms = 0;
@@ -1076,6 +1080,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         {
             Market = market;
             TfMinutes = tfMinutes;
+            Label = market.ToString();
             levels = ownLevels;
             for (int i = 0; i < 4; i++)
                 for (int d = 0; d < 2; d++)
@@ -1144,7 +1149,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 DayBreaks++;
                 Ev(string.Format(CultureInfo.InvariantCulture,
                     "{0} {1}m {2}: fake-break started at {3} ({4:0.00}) — {5} close {6:0.00}, awaiting reclaim within {7} bars [{8:HH:mm}]",
-                    Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
+                    Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
                     bar.Vector, bar.Close, MaxBarsBreakToReclaim, bar.EtClose));
                 return;
             }
@@ -1163,7 +1168,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                         s.Reset(); DayWindowExpired++;
                         Ev(string.Format(CultureInfo.InvariantCulture,
                             "{0} {1}m {2}: NO CONFIRM — never reclaimed {3} ({4:0.00}) within {5} bars [{6:HH:mm}]",
-                            Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
+                            Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
                             MaxBarsBreakToReclaim, bar.EtClose));
                     }
                     return;
@@ -1173,7 +1178,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                     s.Reset(); DayWindowExpired++;
                     Ev(string.Format(CultureInfo.InvariantCulture,
                         "{0} {1}m {2}: NO CONFIRM — reclaimed {3} ({4:0.00}) but {5} bars after the break (limit {6}) [{7:HH:mm}]",
-                        Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
+                        Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
                         s.BarsSinceBreak, MaxBarsBreakToReclaim, bar.EtClose));
                     return;
                 }
@@ -1193,7 +1198,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 {
                     Ev(string.Format(CultureInfo.InvariantCulture,
                         "{0} {1}m {2}: NO CONFIRM — reclaimed {3} ({4:0.00}) but reclaim vector {5} invalid after break vector {6} [{7:HH:mm}]",
-                        Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
+                        Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
                         bar.Vector, s.BreakVector, bar.EtClose));
                     s.Reset(); DayReclaimRejectedVector++; return;
                 }
@@ -1209,7 +1214,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                     s.WaitingEma = true; DayAwaitingEma++;
                     Ev(string.Format(CultureInfo.InvariantCulture,
                         "{0} {1}m {2}: valid reclaim of {3} ({4:0.00}) but close {5:0.00} not yet through EMA9 {6:0.00} — waiting [{7:HH:mm}]",
-                        Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
+                        Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
                         bar.Close, bar.Ema9, bar.EtClose));
                 }
                 return;
@@ -1238,13 +1243,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             c.Ema9 = bar.Ema9;
             c.Reason = string.Format(CultureInfo.InvariantCulture,
                 "{0} {1}m {2} fake-break {3} -> reclaim {4} through {5:0.00}, close {6:0.00} {7} ema9 {8:0.00}",
-                Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", s.BreakVector, s.ReclaimVector,
+                Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", s.BreakVector, s.ReclaimVector,
                 lvl, bar.Close, isLong ? ">" : "<", bar.Ema9);
             last[li, di] = c;
             DayConfirms++; TotalConfirms++;
             Ev(string.Format(CultureInfo.InvariantCulture,
                 "{0} {1}m: *** CONFIRMED *** {2} [{3:HH:mm}]",
-                Market, TfMinutes, c.Reason, bar.EtClose));
+                Label, TfMinutes, c.Reason, bar.EtClose));
             s.Reset();
         }
 
@@ -1259,7 +1264,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             int li = IndexOf(id);
             if (li < 0)
             {
-                miss.Reason = string.Format("{0} {1}m: {2} is not a Fake Breakout eligible level", Market, TfMinutes, id);
+                miss.Reason = string.Format("{0} {1}m: {2} is not a Fake Breakout eligible level", Label, TfMinutes, id);
                 return miss;
             }
             // UNKNOWN vs NO. If this market has no bars, or cannot compute its own
@@ -1268,7 +1273,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             if (BarsSeen == 0)
             {
                 miss.Unavailable = true;
-                miss.Reason = string.Format("{0} {1}m: UNKNOWN — this series delivered ZERO bars (no data loaded)", Market, TfMinutes);
+                miss.Reason = string.Format("{0} {1}m: UNKNOWN — this series delivered ZERO bars (no data loaded)", Label, TfMinutes);
                 return miss;
             }
             if (double.IsNaN(miss.LevelPrice))
@@ -1276,7 +1281,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 miss.Unavailable = true;
                 miss.Reason = string.Format(
                     "{0} {1}m: UNKNOWN — {2} could not be computed for {0} (level is NaN; needs >=2 sessions of {0} history)",
-                    Market, TfMinutes, id);
+                    Label, TfMinutes, id);
                 return miss;
             }
 
@@ -1286,7 +1291,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             {
                 miss.Reason = string.Format(CultureInfo.InvariantCulture,
                     "{0} {1}m: no {2} fake-break confirmation recorded at {3} ({4:0.00}) — evaluated, did not occur",
-                    Market, TfMinutes, isLong ? "bullish" : "bearish", id, miss.LevelPrice);
+                    Label, TfMinutes, isLong ? "bullish" : "bearish", id, miss.LevelPrice);
                 return miss;
             }
 
@@ -1297,14 +1302,14 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 // would be lookahead. Never allowed, at any tolerance.
                 miss.Reason = string.Format(CultureInfo.InvariantCulture,
                     "{0} {1}m: confirmation at {2:HH:mm} is AFTER the MNQ decision bar {3:HH:mm} — rejected (no lookahead)",
-                    Market, TfMinutes, c.BarEtClose, barEtClose);
+                    Label, TfMinutes, c.BarEtClose, barEtClose);
                 return miss;
             }
             if (diffMin > (double)toleranceBars * TfMinutes)
             {
                 miss.Reason = string.Format(CultureInfo.InvariantCulture,
                     "{0} {1}m: confirmation at {2:HH:mm} is stale for MNQ decision bar {3:HH:mm} (tolerance {4} bar(s))",
-                    Market, TfMinutes, c.BarEtClose, barEtClose, toleranceBars);
+                    Label, TfMinutes, c.BarEtClose, barEtClose, toleranceBars);
                 return miss;
             }
             return c;

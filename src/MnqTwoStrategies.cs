@@ -132,57 +132,65 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "ES confirmation symbol", GroupName = "00b. Cross-Market Confirmation", Order = 2)]
         public string EsSymbol { get; set; }
 
+        // Confirmation market 2. Originally QQQ; the property name is kept so saved
+        // NinjaTrader templates are not invalidated, but the slot accepts ANY symbol.
+        // A futures contract (YM ##-##, RTY ##-##) needs the CME exchange day; an ETF
+        // (QQQ) needs the RTH cash session. Confirm2UsesRthSession selects which.
         [NinjaScriptProperty]
-        [Display(Name = "QQQ confirmation symbol", GroupName = "00b. Cross-Market Confirmation", Order = 3)]
+        [Display(Name = "Confirmation market 2 symbol", GroupName = "00b. Cross-Market Confirmation", Order = 3)]
         public string QqqSymbol { get; set; }
 
         [NinjaScriptProperty]
+        [Display(Name = "Market 2 is an ETF (use RTH session for its levels)", GroupName = "00b. Cross-Market Confirmation", Order = 4)]
+        public bool Confirm2UsesRthSession { get; set; }
+
+        [NinjaScriptProperty]
         [Range(1, 50)]
-        [Display(Name = "Max bars from break to reclaim (ES/QQQ)", GroupName = "00b. Cross-Market Confirmation", Order = 4)]
+        [Display(Name = "Max bars from break to reclaim (confirmation markets)", GroupName = "00b. Cross-Market Confirmation", Order = 5)]
         public int CrossMarketMaxBarsBreakToReclaim { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 10)]
-        [Display(Name = "Confirmation lag tolerance (bars, 0 = exact same bar)", GroupName = "00b. Cross-Market Confirmation", Order = 5)]
+        [Display(Name = "Confirmation lag tolerance (bars, 0 = exact same bar)", GroupName = "00b. Cross-Market Confirmation", Order = 6)]
         public int CrossMarketToleranceBars { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 100)]
-        [Display(Name = "Risk % — A+ (ES + QQQ confirm)", GroupName = "00b. Cross-Market Confirmation", Order = 6)]
+        [Display(Name = "Risk % — A+ (ES + market 2 confirm)", GroupName = "00b. Cross-Market Confirmation", Order = 7)]
         public double CmRiskPctAPlus { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 100)]
-        [Display(Name = "Risk % — A- (ES only)", GroupName = "00b. Cross-Market Confirmation", Order = 7)]
+        [Display(Name = "Risk % — A- (ES only)", GroupName = "00b. Cross-Market Confirmation", Order = 8)]
         public double CmRiskPctAMinus { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 100)]
-        [Display(Name = "Risk % — B+ (QQQ only)", GroupName = "00b. Cross-Market Confirmation", Order = 8)]
+        [Display(Name = "Risk % — B+ (market 2 only)", GroupName = "00b. Cross-Market Confirmation", Order = 9)]
         public double CmRiskPctBPlus { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 100)]
-        [Display(Name = "Risk % — B (neither confirms)", GroupName = "00b. Cross-Market Confirmation", Order = 9)]
+        [Display(Name = "Risk % — B (neither confirms)", GroupName = "00b. Cross-Market Confirmation", Order = 10)]
         public double CmRiskPctNone { get; set; }
 
         // QQQ is an ETF: it has no 18:00 ET exchange day. Its key levels are built
         // from the RTH cash session only, per user specification.
         [NinjaScriptProperty]
         [Range(0, 1439)]
-        [Display(Name = "QQQ session start (ET minutes, 570 = 09:30)", GroupName = "00b. Cross-Market Confirmation", Order = 10)]
+        [Display(Name = "Market 2 ETF session start (ET minutes, 570 = 09:30)", GroupName = "00b. Cross-Market Confirmation", Order = 11)]
         public int QqqSessionStartMinutesEt { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 1440)]
-        [Display(Name = "QQQ session end (ET minutes, 960 = 16:00)", GroupName = "00b. Cross-Market Confirmation", Order = 11)]
+        [Display(Name = "Market 2 ETF session end (ET minutes, 960 = 16:00)", GroupName = "00b. Cross-Market Confirmation", Order = 12)]
         public int QqqSessionEndMinutesEt { get; set; }
 
         // V7.1: makes a silent ES/QQQ data failure impossible to miss.
         //   Summary = one line per market per day (bar counts, levels, near-miss tally)
         //   Verbose = every break / rejected reclaim / expiry / confirmation (LOUD)
         [NinjaScriptProperty]
-        [Display(Name = "Cross-market diagnostics (0=Off 1=Summary 2=Verbose)", GroupName = "00b. Cross-Market Confirmation", Order = 12)]
+        [Display(Name = "Cross-market diagnostics (0=Off 1=Summary 2=Verbose)", GroupName = "00b. Cross-Market Confirmation", Order = 13)]
         [Range(0, 2)]
         public int CrossMarketDiagnostics { get; set; }
         #endregion
@@ -395,7 +403,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // ---- V7 cross-market confirmation ----
                 EnableCrossMarketConfirmation = true;
                 EsSymbol = "ES ##-##";            // NT8 front-month syntax
-                QqqSymbol = "QQQ";
+                QqqSymbol = "YM ##-##";       // confirmation market 2 (Dow). Data only — never traded.
+                Confirm2UsesRthSession = false;  // YM is CME futures: same 18:00 ET exchange day as MNQ/ES
                 CrossMarketMaxBarsBreakToReclaim = 4;   // user-specified
                 CrossMarketToleranceBars = 0;           // exact same completed bar
                 CmRiskPctAPlus = 30.0;                  // ES + QQQ
@@ -529,11 +538,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // so the day/week roll is calendar-based and the session filter
                     // discards everything outside 09:30-16:00 ET.
                     qqqLevels = new KeyLevelEngine();
-                    qqqLevels.DayStartMinutesEt = 0;
-                    qqqLevels.WeekStartMinutesEt = 0;
-                    qqqLevels.SessionFilterEnabled = true;
-                    qqqLevels.SessionFilterStartMinutesEt = QqqSessionStartMinutesEt;
-                    qqqLevels.SessionFilterEndMinutesEt = QqqSessionEndMinutesEt;
+                    if (Confirm2UsesRthSession)
+                    {
+                        // ETF (QQQ): no exchange day, so calendar roll + RTH-only aggregation.
+                        qqqLevels.DayStartMinutesEt = 0;
+                        qqqLevels.WeekStartMinutesEt = 0;
+                        qqqLevels.SessionFilterEnabled = true;
+                        qqqLevels.SessionFilterStartMinutesEt = QqqSessionStartMinutesEt;
+                        qqqLevels.SessionFilterEndMinutesEt = QqqSessionEndMinutesEt;
+                    }
+                    else
+                    {
+                        // CME futures (YM/RTY): identical exchange day to MNQ and ES,
+                        // so its YDAY/LWEEK levels roll on the same 18:00 ET boundary.
+                        qqqLevels.DayStartMinutesEt = DayStartMinutesEt;
+                        qqqLevels.WeekStartMinutesEt = WeekStartMinutesEt;
+                        qqqLevels.SessionFilterEnabled = false;
+                    }
 
                     esDet1 = new CrossMarketConfirmDetector(ConfirmMarket.ES, 1, esLevels);
                     esDet3 = new CrossMarketConfirmDetector(ConfirmMarket.ES, 3, esLevels);
@@ -544,6 +565,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         d.MaxBarsBreakToReclaim = CrossMarketMaxBarsBreakToReclaim;
                         d.SessionStartMinutesEt = EntryStartMinutesEt;
                     }
+                    esDet1.Label = EsSymbol; esDet3.Label = EsSymbol;
+                    qqqDet1.Label = QqqSymbol; qqqDet3.Label = QqqSymbol;
                     // V7.1 FIX. The previous check only proved the series were ATTACHED.
                     // A series with ZERO loaded bars passed it, which is how an entire
                     // backtest was graded off ES/QQQ levels that were permanently NaN.
@@ -640,8 +663,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         PrintLine("  -> ES delivered ZERO bars. Open a 1-minute chart of '" + EsSymbol
                             + "' over this date range; if it is blank, your data feed has no history for it.");
                     if (qqqBars1 == 0 || qqqBars3 == 0)
-                        PrintLine("  -> QQQ delivered ZERO bars. QQQ is an ETF — futures-only feeds (Rithmic, CQG, "
-                            + "Continuum) carry no equities and will always report 0 here.");
+                        PrintLine("  -> Confirmation market 2 ('" + QqqSymbol + "') delivered ZERO bars. If this is an ETF "
+                            + "(QQQ), futures-only feeds carry no equities and will always report 0 — switch it to a "
+                            + "CME futures symbol such as YM ##-## and untick the ETF session box.");
                     PrintLine("  A+/A-/B+/B grades CANNOT be produced. Every FAKE_BREAKOUT trade will use the");
                     PrintLine("  LEGACY validity-candle grade instead, and will say so on its entry line.");
                     PrintLine("**********************************************************************");
@@ -749,9 +773,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                             levels.DailyOpen, levels.YdayHigh, levels.YdayLow, levels.LweekHigh, levels.LweekLow, levels.PP,
                             crossMarketReady
                                 ? string.Format(CultureInfo.InvariantCulture,
-                                    "\n    ES  YH={0} YL={1} LWH={2} LWL={3}\n    QQQ YH={4} YL={5} LWH={6} LWL={7}",
+                                    "\n    {8,-10} YH={0} YL={1} LWH={2} LWL={3}\n    {9,-10} YH={4} YL={5} LWH={6} LWL={7}",
                                     Fmt(esLevels.YdayHigh), Fmt(esLevels.YdayLow), Fmt(esLevels.LweekHigh), Fmt(esLevels.LweekLow),
-                                    Fmt(qqqLevels.YdayHigh), Fmt(qqqLevels.YdayLow), Fmt(qqqLevels.LweekHigh), Fmt(qqqLevels.LweekLow))
+                                    Fmt(qqqLevels.YdayHigh), Fmt(qqqLevels.YdayLow), Fmt(qqqLevels.LweekHigh), Fmt(qqqLevels.LweekLow),
+                                    EsSymbol, QqqSymbol)
                                 : ""));
                     if (EnableFakeBreakout) fb.OnNewDay(etClose);
                     if (EnableVectorBreakRetest) vbr.OnNewDay(etClose);
@@ -977,7 +1002,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             KeyLevelEngine kl = isEs ? esLevels : qqqLevels;
             CrossMarketConfirmDetector d1 = isEs ? esDet1 : qqqDet1;
             CrossMarketConfirmDetector d3 = isEs ? esDet3 : qqqDet3;
-            string mk = isEs ? "ES" : "QQQ";
+            string mk = isEs ? EsSymbol : QqqSymbol;
             bool levelsOk = !double.IsNaN(kl.YdayHigh) || !double.IsNaN(kl.YdayLow)
                          || !double.IsNaN(kl.LweekHigh) || !double.IsNaN(kl.LweekLow);
             CmDiag(string.Format(CultureInfo.InvariantCulture,
