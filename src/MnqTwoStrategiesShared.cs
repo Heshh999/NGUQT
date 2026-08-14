@@ -928,6 +928,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     public struct CrossMarketConfirm
     {
         public bool Confirmed;
+        /// TRUE when this market could not be evaluated at all (no bars, or its own
+        /// equivalent level was not computable). Confirmed==false with Unavailable==true
+        /// means UNKNOWN — it must never be graded as "this market did not confirm".
+        public bool Unavailable;
         public DateTime BarEtClose;      // bar on which reclaim+EMA completed
         public KeyLevelId LevelId;       // that market's OWN equivalent level
         public double LevelPrice;        // that market's OWN price for it
@@ -1014,6 +1018,56 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // Mirrors the MNQ rule "premarket LTF patterns are never banked".
         public int SessionStartMinutesEt = 570;   // 09:30 ET
 
+        // ---- DIAGNOSTICS (V7.1) -------------------------------------------
+        // A "no confirmation" answer has two completely different meanings:
+        //   (a) evaluated, and the market genuinely did not do it, or
+        //   (b) never evaluated, because this market had no bars / no levels.
+        // Reporting (b) as (a) is exactly how the first cross-market backtest
+        // silently graded 59 trades off inputs that were never populated.
+        // These counters keep the two apart.
+        public Action<string> Diag;         // optional sink; null = no logging
+        public bool VerboseEvents;          // per-event logging (loud)
+        public long BarsSeen;               // total bars this detector processed
+        public long TotalConfirms;
+        public int DayBarsNoLevels;         // bars where NO eligible level existed
+        public int DayBreaks;               // fake-break structures started
+        public int DayReclaimRejectedVector;// reclaim arrived but wrong vector
+        public int DayWindowExpired;        // no reclaim inside MaxBarsBreakToReclaim
+        public int DayAwaitingEma;          // valid reclaim, waiting on same-TF EMA9
+        public int DayConfirms;
+
+        /// True once this detector's market has produced at least one usable
+        /// eligible level. False means every answer it has ever given is "unknown",
+        /// not "no".
+        public bool HasEverHadLevels;
+
+        public bool AnyLevelAvailableNow
+        {
+            get
+            {
+                for (int i = 0; i < Eligible.Length; i++)
+                    if (!double.IsNaN(levels.GetTriggerLevelPrice(Eligible[i]))) return true;
+                return false;
+            }
+        }
+
+        /// One-line daily summary. Call on the market's day roll, then counters reset.
+        public string DailyTally()
+        {
+            string s = string.Format(CultureInfo.InvariantCulture,
+                "{0} {1}m: bars={2} noLevelBars={3} breaks={4} reclaimRejected={5} windowExpired={6} awaitingEma={7} CONFIRMS={8}",
+                Market, TfMinutes, BarsSeen, DayBarsNoLevels, DayBreaks,
+                DayReclaimRejectedVector, DayWindowExpired, DayAwaitingEma, DayConfirms);
+            DayBarsNoLevels = 0; DayBreaks = 0; DayReclaimRejectedVector = 0;
+            DayWindowExpired = 0; DayAwaitingEma = 0; DayConfirms = 0;
+            return s;
+        }
+
+        private void Ev(string msg)
+        {
+            if (VerboseEvents && Diag != null) Diag(msg);
+        }
+
         private readonly KeyLevelEngine levels;   // this market's OWN levels
         private readonly Str[,] st = new Str[4, 2];              // [level, 0=long 1=short]
         private readonly CrossMarketConfirm[,] last = new CrossMarketConfirm[4, 2];
@@ -1049,13 +1103,18 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public void OnBar(BarSnap bar)
         {
             if (bar.PeriodMinutes != TfMinutes) return;   // hard timeframe isolation
+            BarsSeen++;
+            int usable = 0;
             for (int i = 0; i < Eligible.Length; i++)
             {
                 double lvl = levels.GetTriggerLevelPrice(Eligible[i]);
-                if (double.IsNaN(lvl)) continue;
+                if (double.IsNaN(lvl)) continue;   // level not computable -> UNKNOWN, not "no"
+                usable++;
                 Process(i, true, lvl, bar);    // bullish confirmation candidate
                 Process(i, false, lvl, bar);   // bearish confirmation candidate
             }
+            if (usable == 0) DayBarsNoLevels++;
+            else HasEverHadLevels = true;
         }
 
         private void Process(int li, bool isLong, double lvl, BarSnap bar)
@@ -1082,6 +1141,11 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 s.BreakVector = bar.Vector;
                 s.StructExtreme = isLong ? bar.Low : bar.High;
                 s.BarsSinceBreak = 0;
+                DayBreaks++;
+                Ev(string.Format(CultureInfo.InvariantCulture,
+                    "{0} {1}m {2}: fake-break started at {3} ({4:0.00}) — {5} close {6:0.00}, awaiting reclaim within {7} bars [{8:HH:mm}]",
+                    Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
+                    bar.Vector, bar.Close, MaxBarsBreakToReclaim, bar.EtClose));
                 return;
             }
 
@@ -1094,10 +1158,25 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                     // window is finite (this is what the 15m parent bounds on MNQ).
                     if (isLong) { if (bar.Low < s.StructExtreme) s.StructExtreme = bar.Low; }
                     else { if (bar.High > s.StructExtreme) s.StructExtreme = bar.High; }
-                    if (++s.BarsSinceBreak > MaxBarsBreakToReclaim) s.Reset();
+                    if (++s.BarsSinceBreak > MaxBarsBreakToReclaim)
+                    {
+                        s.Reset(); DayWindowExpired++;
+                        Ev(string.Format(CultureInfo.InvariantCulture,
+                            "{0} {1}m {2}: NO CONFIRM — never reclaimed {3} ({4:0.00}) within {5} bars [{6:HH:mm}]",
+                            Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
+                            MaxBarsBreakToReclaim, bar.EtClose));
+                    }
                     return;
                 }
-                if (++s.BarsSinceBreak > MaxBarsBreakToReclaim) { s.Reset(); return; }
+                if (++s.BarsSinceBreak > MaxBarsBreakToReclaim)
+                {
+                    s.Reset(); DayWindowExpired++;
+                    Ev(string.Format(CultureInfo.InvariantCulture,
+                        "{0} {1}m {2}: NO CONFIRM — reclaimed {3} ({4:0.00}) but {5} bars after the break (limit {6}) [{7:HH:mm}]",
+                        Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
+                        s.BarsSinceBreak, MaxBarsBreakToReclaim, bar.EtClose));
+                    return;
+                }
 
                 // ---- reclaim candle vector rules (mirror of FB §9/§10) ----
                 bool reclaimVecOk;
@@ -1110,7 +1189,14 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 else
                     reclaimVecOk = bar.Vector == VectorType.RED_VECTOR || bar.Vector == VectorType.VIOLET_VECTOR;
 
-                if (!reclaimVecOk) { s.Reset(); return; }
+                if (!reclaimVecOk)
+                {
+                    Ev(string.Format(CultureInfo.InvariantCulture,
+                        "{0} {1}m {2}: NO CONFIRM — reclaimed {3} ({4:0.00}) but reclaim vector {5} invalid after break vector {6} [{7:HH:mm}]",
+                        Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
+                        bar.Vector, s.BreakVector, bar.EtClose));
+                    s.Reset(); DayReclaimRejectedVector++; return;
+                }
 
                 if (isLong) { if (bar.Low < s.StructExtreme) s.StructExtreme = bar.Low; }
                 else { if (bar.High > s.StructExtreme) s.StructExtreme = bar.High; }
@@ -1118,7 +1204,14 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 s.ReclaimVector = bar.Vector;
                 bool emaOk = isLong ? bar.Close > bar.Ema9 : bar.Close < bar.Ema9;
                 if (emaOk) Record(li, di, isLong, lvl, s, bar);
-                else s.WaitingEma = true;
+                else
+                {
+                    s.WaitingEma = true; DayAwaitingEma++;
+                    Ev(string.Format(CultureInfo.InvariantCulture,
+                        "{0} {1}m {2}: valid reclaim of {3} ({4:0.00}) but close {5:0.00} not yet through EMA9 {6:0.00} — waiting [{7:HH:mm}]",
+                        Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
+                        bar.Close, bar.Ema9, bar.EtClose));
+                }
                 return;
             }
 
@@ -1148,6 +1241,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 Market, TfMinutes, isLong ? "BULLISH" : "BEARISH", s.BreakVector, s.ReclaimVector,
                 lvl, bar.Close, isLong ? ">" : "<", bar.Ema9);
             last[li, di] = c;
+            DayConfirms++; TotalConfirms++;
+            Ev(string.Format(CultureInfo.InvariantCulture,
+                "{0} {1}m: *** CONFIRMED *** {2} [{3:HH:mm}]",
+                Market, TfMinutes, c.Reason, bar.EtClose));
             s.Reset();
         }
 
@@ -1165,12 +1262,30 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 miss.Reason = string.Format("{0} {1}m: {2} is not a Fake Breakout eligible level", Market, TfMinutes, id);
                 return miss;
             }
+            // UNKNOWN vs NO. If this market has no bars, or cannot compute its own
+            // equivalent level, then nothing was ever evaluated and the honest answer
+            // is "unknown". It must never be reported as "this market did not confirm".
+            if (BarsSeen == 0)
+            {
+                miss.Unavailable = true;
+                miss.Reason = string.Format("{0} {1}m: UNKNOWN — this series delivered ZERO bars (no data loaded)", Market, TfMinutes);
+                return miss;
+            }
+            if (double.IsNaN(miss.LevelPrice))
+            {
+                miss.Unavailable = true;
+                miss.Reason = string.Format(
+                    "{0} {1}m: UNKNOWN — {2} could not be computed for {0} (level is NaN; needs >=2 sessions of {0} history)",
+                    Market, TfMinutes, id);
+                return miss;
+            }
+
             int di = isLong ? 0 : 1;
             CrossMarketConfirm c = last[li, di];
             if (!c.Confirmed)
             {
                 miss.Reason = string.Format(CultureInfo.InvariantCulture,
-                    "{0} {1}m: no {2} fake-break confirmation recorded at {3} ({4:0.00})",
+                    "{0} {1}m: no {2} fake-break confirmation recorded at {3} ({4:0.00}) — evaluated, did not occur",
                     Market, TfMinutes, isLong ? "bullish" : "bearish", id, miss.LevelPrice);
                 return miss;
             }

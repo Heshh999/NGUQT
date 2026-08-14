@@ -960,12 +960,26 @@ namespace MnqTwoTests
             fb.OnThreeMinuteBar(Bar(At(9, 33), 3, 20104, 20105, 20092, 20095, VectorType.REGULAR_BEARISH, 20099));
         }
 
+        // Feed one PREMARKET bar to every detector. Bars before 09:30 can never start
+        // a fake-break structure (the session gate), so this changes no signal — it
+        // only establishes that the market was actually being watched. Without it a
+        // silent market reads as UNKNOWN rather than "evaluated, did not confirm",
+        // which is precisely the V7.1 distinction.
+        private static void CmWarmup(MockHost h)
+        {
+            h.EsDet1.OnBar(Bar(At(9, 20), 1, 5590, 5592, 5588, 5590, VectorType.REGULAR_BULLISH, 5590));
+            h.EsDet3.OnBar(Bar(At(9, 18), 3, 5590, 5592, 5588, 5590, VectorType.REGULAR_BULLISH, 5590));
+            h.QqqDet1.OnBar(Bar(At(9, 20), 1, 479, 479.2, 478.8, 479, VectorType.REGULAR_BULLISH, 479));
+            h.QqqDet3.OnBar(Bar(At(9, 18), 3, 479, 479.2, 478.8, 479, VectorType.REGULAR_BULLISH, 479));
+        }
+
         private static MockHost CmHost(out FakeBreakoutEngine fb)
         {
             MockHost h = new MockHost();
             h.WireCrossMarket(4);          // user-specified 4-bar reclaim window
             SetupEsLevels(h);
             SetupQqqLevels(h);
+            CmWarmup(h);
             fb = FbFrozenShort(h, At(9, 15), At(9, 30), 20090);
             return h;
         }
@@ -978,7 +992,7 @@ namespace MnqTwoTests
             {
                 MockHost h = new MockHost();
                 h.WireCrossMarket(4);
-                SetupEsLevels(h); SetupQqqLevels(h);
+                SetupEsLevels(h); SetupQqqLevels(h); CmWarmup(h);
                 Check(Math.Abs(h.EsLevels.YdayHigh - 5600) < 1e-9,
                     "ES uses its OWN YDAY_HIGH (5600), not MNQ's");
                 Check(Math.Abs(h.QqqLevels.YdayHigh - 480) < 1e-9,
@@ -1146,6 +1160,111 @@ namespace MnqTwoTests
             }
         }
 
+        // ==================================================================
+        // V7.1 — "UNKNOWN is not NO"
+        // Regression tests for the defect that silently graded 59 live backtest
+        // trades off ES/QQQ levels that were permanently NaN.
+        // ==================================================================
+        private static void TestUnknownIsNotNo()
+        {
+            Console.WriteLine("V7.1 — a market that cannot be evaluated is never graded as \"did not confirm\":");
+
+            // ---- A. detector fed ZERO bars ----
+            {
+                MockHost h = new MockHost();
+                h.WireCrossMarket(4);
+                SetupEsLevels(h); SetupQqqLevels(h);      // levels fine, but no bars fed
+                CrossMarketConfirm c = h.QueryCrossMarket(ConfirmMarket.ES, false, KeyLevelId.YDAY_HIGH, 1, At(9, 34));
+                Check(!c.Confirmed && c.Unavailable, "zero bars -> Unavailable (UNKNOWN), not a negative answer");
+                Check(c.Reason.Contains("ZERO bars"), "the reason names the zero-bar cause");
+            }
+
+            // ---- B. bars flowing but the market's own levels are NaN ----
+            // This is the EXACT production failure: series attached, bars arriving,
+            // but no history to build YDAY_HIGH from, so every level reads NaN.
+            {
+                MockHost h = new MockHost();
+                h.WireCrossMarket(4);
+                // deliberately do NOT seed EsLevels -> all eligible levels are NaN
+                h.EsDet1.OnBar(Bar(At(9, 31), 1, 5598, 5606, 5597, 5605, VectorType.BLUE_VECTOR, 5600));
+                h.EsDet1.OnBar(Bar(At(9, 33), 1, 5604, 5605, 5593, 5595, VectorType.REGULAR_BEARISH, 5599));
+                Check(h.EsDet1.BarsSeen == 2, "detector counted the bars it received");
+                Check(h.EsDet1.DayBarsNoLevels == 2, "both bars are recorded as having NO usable level");
+                Check(!h.EsDet1.HasEverHadLevels, "detector reports it has never had a usable level");
+                CrossMarketConfirm c = h.QueryCrossMarket(ConfirmMarket.ES, false, KeyLevelId.YDAY_HIGH, 1, At(9, 34));
+                Check(!c.Confirmed && c.Unavailable, "NaN level -> Unavailable (UNKNOWN), not 'did not confirm'");
+                Check(c.Reason.Contains("UNKNOWN"), "the reason says UNKNOWN explicitly");
+            }
+
+            // ---- C. FB refuses the cross-market grade when either side is unknown ----
+            {
+                FakeBreakoutEngine fb;
+                MockHost h = new MockHost();
+                h.WireCrossMarket(4);
+                SetupEsLevels(h);           // ES fine
+                                            // QQQ deliberately unseeded -> NaN levels
+                h.QqqDet1.OnBar(Bar(At(9, 31), 1, 479.5, 481.5, 479.4, 481, VectorType.BLUE_VECTOR, 480));
+                EsConfirmShort(h, 1);
+                fb = FbFrozenShort(h, At(9, 15), At(9, 30), 20090);
+                FbBluePath(fb, VectorType.REGULAR_BEARISH);
+
+                Check(h.AnyDiagContains("CROSS-MARKET GRADE REFUSED"),
+                    "FB refuses to assign a cross-market grade when a market could not be evaluated");
+                Check(!h.AnyDiagContains("grade=B riskPct=5"),
+                    "the 'neither confirms' grade is NEVER produced from unevaluated data");
+                Check(h.Entries.Count == 1, "the trade itself is unaffected — entry logic stays frozen");
+                Check(h.AnyDiagContains("legacy grade="), "it falls back to the legacy grade and says so");
+            }
+
+            // ---- D. a REAL negative is still a real negative ----
+            {
+                MockHost h = new MockHost();
+                h.WireCrossMarket(4);
+                SetupEsLevels(h);
+                // ES has levels and bars, but simply never breaks/reclaims
+                for (int i = 31; i <= 36; i++)
+                    h.EsDet1.OnBar(Bar(At(9, i), 1, 5590, 5592, 5588, 5590, VectorType.REGULAR_BULLISH, 5591));
+                CrossMarketConfirm c = h.QueryCrossMarket(ConfirmMarket.ES, false, KeyLevelId.YDAY_HIGH, 1, At(9, 37));
+                Check(!c.Confirmed && !c.Unavailable, "evaluated-and-declined stays a genuine NO, not UNKNOWN");
+                Check(c.Reason.Contains("evaluated, did not occur"), "the reason distinguishes it from UNKNOWN");
+                Check(h.EsDet1.HasEverHadLevels && h.EsDet1.DayBarsNoLevels == 0, "levels were usable throughout");
+            }
+
+            // ---- E. near-miss counters separate the failure modes ----
+            {
+                MockHost h = new MockHost();
+                h.WireCrossMarket(4);
+                SetupEsLevels(h);
+                // break, then reclaim with an INVALID vector for the BLUE path
+                h.EsDet1.OnBar(Bar(At(9, 31), 1, 5598, 5606, 5597, 5605, VectorType.BLUE_VECTOR, 5600));
+                h.EsDet1.OnBar(Bar(At(9, 33), 1, 5604, 5605, 5593, 5595, VectorType.VIOLET_VECTOR, 5599));
+                // NOTE: one bar can break several of the 4 eligible levels at once
+                // (a close at 5605 is beyond YDAY_HIGH 5600, YDAY_LOW 5580 and
+                // LWEEK_LOW 5400), so these are counts of EVENTS, not of trades.
+                Check(h.EsDet1.DayBreaks >= 1, "a started fake-break is counted");
+                Check(h.EsDet1.DayReclaimRejectedVector >= 1, "a reclaim rejected on vector rules is counted separately");
+                Check(h.EsDet1.DayWindowExpired == 0, "a vector rejection is NOT miscounted as a window expiry");
+                Check(h.EsDet1.DayConfirms == 0, "no confirmation recorded");
+                string tally = h.EsDet1.DailyTally();
+                Check(tally.Contains("reclaimRejected=1") && tally.Contains("CONFIRMS=0"),
+                    "the daily tally separates the near-miss reasons: " + tally);
+                Check(h.EsDet1.DayBreaks == 0, "tally resets the daily counters");
+            }
+
+            // ---- F. window expiry is counted and distinguishable ----
+            {
+                MockHost h = new MockHost();
+                h.WireCrossMarket(4);
+                SetupEsLevels(h);
+                h.EsDet1.OnBar(Bar(At(9, 31), 1, 5598, 5606, 5597, 5605, VectorType.BLUE_VECTOR, 5600));
+                for (int i = 32; i <= 37; i++)
+                    h.EsDet1.OnBar(Bar(At(9, i), 1, 5604, 5607, 5602, 5605, VectorType.REGULAR_BULLISH, 5600));
+                Check(h.EsDet1.DayWindowExpired >= 1, "an expired reclaim window is counted");
+                Check(h.EsDet1.DayReclaimRejectedVector == 0, "an expiry is NOT miscounted as a vector rejection");
+                Check(h.EsDet1.DayConfirms == 0, "an expired window produces no confirmation");
+            }
+        }
+
         // ---- TEST 8 / TEST 9: VECTOR_BREAK_RETEST enable switch --------------
 
         private static void TestVbrEnableSwitch()
@@ -1216,6 +1335,7 @@ namespace MnqTwoTests
 
             // ---- V7 CROSS-MARKET CONFIRMATION + VBR SWITCH ----
             TestCrossMarketGrading();
+            TestUnknownIsNotNo();
             TestVbrEnableSwitch();
 
             Console.WriteLine();

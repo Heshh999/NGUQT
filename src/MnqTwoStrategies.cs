@@ -96,7 +96,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private KeyLevelEngine esLevels, qqqLevels;
         private EMA emaEs1, emaEs3, emaQqq1, emaQqq3;
         private CrossMarketConfirmDetector esDet1, esDet3, qqqDet1, qqqDet3;
-        private bool crossMarketReady;        // series actually loaded
+        private bool crossMarketReady;        // series attached AND carrying bars
+        private int esBars1, esBars3, qqqBars1, qqqBars3;   // loaded bar counts (V7.1 diagnostic)
 
         // ==================================================================
         // Parameters — every flagged ambiguity is exposed here instead of
@@ -176,6 +177,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(1, 1440)]
         [Display(Name = "QQQ session end (ET minutes, 960 = 16:00)", GroupName = "00b. Cross-Market Confirmation", Order = 11)]
         public int QqqSessionEndMinutesEt { get; set; }
+
+        // V7.1: makes a silent ES/QQQ data failure impossible to miss.
+        //   Summary = one line per market per day (bar counts, levels, near-miss tally)
+        //   Verbose = every break / rejected reclaim / expiry / confirmation (LOUD)
+        [NinjaScriptProperty]
+        [Display(Name = "Cross-market diagnostics (0=Off 1=Summary 2=Verbose)", GroupName = "00b. Cross-Market Confirmation", Order = 12)]
+        [Range(0, 2)]
+        public int CrossMarketDiagnostics { get; set; }
         #endregion
 
         #region 01. Session / Time
@@ -395,6 +404,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 CmRiskPctNone = 5.0;                    // neither (user-specified)
                 QqqSessionStartMinutesEt = 570;         // 09:30 ET
                 QqqSessionEndMinutesEt = 960;           // 16:00 ET
+                CrossMarketDiagnostics = 1;             // Summary
 
                 EntryStartMinutesEt = 570;      // 9:30 ET
                 EntryEndMinutesEt = 690;        // 11:30 ET
@@ -534,10 +544,30 @@ namespace NinjaTrader.NinjaScript.Strategies
                         d.MaxBarsBreakToReclaim = CrossMarketMaxBarsBreakToReclaim;
                         d.SessionStartMinutesEt = EntryStartMinutesEt;
                     }
-                    crossMarketReady = BipEs1 > 0 && BipEs3 > 0 && BipQqq1 > 0 && BipQqq3 > 0
+                    // V7.1 FIX. The previous check only proved the series were ATTACHED.
+                    // A series with ZERO loaded bars passed it, which is how an entire
+                    // backtest was graded off ES/QQQ levels that were permanently NaN.
+                    // Readiness now requires every confirmation series to actually
+                    // carry bars, and the counts are printed either way.
+                    bool attached = BipEs1 > 0 && BipEs3 > 0 && BipQqq1 > 0 && BipQqq3 > 0
                         && BarsArray.Length > BipQqq3
                         && BarsArray[BipEs1] != null && BarsArray[BipEs3] != null
                         && BarsArray[BipQqq1] != null && BarsArray[BipQqq3] != null;
+                    if (attached)
+                    {
+                        esBars1 = BarsArray[BipEs1].Count; esBars3 = BarsArray[BipEs3].Count;
+                        qqqBars1 = BarsArray[BipQqq1].Count; qqqBars3 = BarsArray[BipQqq3].Count;
+                    }
+                    crossMarketReady = attached && esBars1 > 0 && esBars3 > 0 && qqqBars1 > 0 && qqqBars3 > 0;
+
+                    if (CrossMarketDiagnostics > 0)
+                    {
+                        esDet1.Diag = CmDiag; esDet3.Diag = CmDiag;
+                        qqqDet1.Diag = CmDiag; qqqDet3.Diag = CmDiag;
+                        bool verbose = CrossMarketDiagnostics >= 2;
+                        esDet1.VerboseEvents = verbose; esDet3.VerboseEvents = verbose;
+                        qqqDet1.VerboseEvents = verbose; qqqDet3.VerboseEvents = verbose;
+                    }
                 }
 
                 FbConfig fbCfg = new FbConfig();
@@ -599,15 +629,32 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (!EnableCrossMarketConfirmation)
                     PrintLine("CROSS-MARKET CONFIRMATION DISABLED — FAKE_BREAKOUT falls back to LEGACY validity-candle grading (A- 26% / B+ 10%)");
                 else if (!crossMarketReady)
-                    PrintLine("MnqTwoStrategies WARNING: cross-market confirmation is enabled but the ES/QQQ series did not load — "
-                        + "FAKE_BREAKOUT falls back to LEGACY validity-candle grading. Check that your data feed provides '"
-                        + EsSymbol + "' and '" + QqqSymbol + "'.");
+                {
+                    PrintLine("**********************************************************************");
+                    PrintLine("*** CROSS-MARKET CONFIRMATION IS ENABLED BUT UNUSABLE — NO GRADING ***");
+                    PrintLine("**********************************************************************");
+                    PrintLine(string.Format(CultureInfo.InvariantCulture,
+                        "  bars loaded:  ES('{0}') 1m={1} 3m={2}   |   QQQ('{3}') 1m={4} 3m={5}",
+                        EsSymbol, esBars1, esBars3, QqqSymbol, qqqBars1, qqqBars3));
+                    if (esBars1 == 0 || esBars3 == 0)
+                        PrintLine("  -> ES delivered ZERO bars. Open a 1-minute chart of '" + EsSymbol
+                            + "' over this date range; if it is blank, your data feed has no history for it.");
+                    if (qqqBars1 == 0 || qqqBars3 == 0)
+                        PrintLine("  -> QQQ delivered ZERO bars. QQQ is an ETF — futures-only feeds (Rithmic, CQG, "
+                            + "Continuum) carry no equities and will always report 0 here.");
+                    PrintLine("  A+/A-/B+/B grades CANNOT be produced. Every FAKE_BREAKOUT trade will use the");
+                    PrintLine("  LEGACY validity-candle grade instead, and will say so on its entry line.");
+                    PrintLine("**********************************************************************");
+                }
                 else
                     PrintLine(string.Format(CultureInfo.InvariantCulture,
                         "CROSS-MARKET CONFIRMATION ENABLED — ES='{0}' QQQ='{1}' | grades: A+={2}% (ES+QQQ), A-={3}% (ES only), B+={4}% (QQQ only), B={5}% (neither) "
-                        + "| reclaim window={6} bars, lag tolerance={7} bar(s) | ORDERS ARE MNQ-ONLY",
+                        + "| reclaim window={6} bars, lag tolerance={7} bar(s) | ORDERS ARE MNQ-ONLY"
+                        + "\n  bars loaded: ES 1m={8} 3m={9} | QQQ 1m={10} 3m={11}"
+                        + "\n  NOTE: levels need >=2 sessions of each market's own history before they can be computed.",
                         EsSymbol, QqqSymbol, CmRiskPctAPlus, CmRiskPctAMinus, CmRiskPctBPlus, CmRiskPctNone,
-                        CrossMarketMaxBarsBreakToReclaim, CrossMarketToleranceBars));
+                        CrossMarketMaxBarsBreakToReclaim, CrossMarketToleranceBars,
+                        esBars1, esBars3, qqqBars1, qqqBars3));
 
                 if (!instrumentOk)
                     PrintLine("MnqTwoStrategies ERROR: instrument '" + master
@@ -666,10 +713,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         if (isEs) { esDet1.OnNewDay(); esDet3.OnNewDay(); }
                         else { qqqDet1.OnNewDay(); qqqDet3.OnNewDay(); }
+                        if (CrossMarketDiagnostics > 0) EmitCrossMarketDayReport(isEs, cEtClose);
                     }
                 }
 
                 if (CurrentBars[bip] < 11) return;   // vector needs 10 prior completed candles
+                cmDiagTime = ToEt(Times[bip][0]);
                 int periodMin = (bip == BipEs1 || bip == BipQqq1) ? 1 : 3;
                 EMA e = bip == BipEs1 ? emaEs1 : bip == BipEs3 ? emaEs3 : bip == BipQqq1 ? emaQqq1 : emaQqq3;
                 BarSnap cs = BuildSnap(bip, periodMin, e[0]);
@@ -696,8 +745,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (VerboseDiagnostics && logger != null)
                         logger.DiagGlobal(etClose, string.Format(CultureInfo.InvariantCulture,
-                            "NEW EXCHANGE DAY — DailyOpen={0:0.00} YH={1:0.00} YL={2:0.00} LWH={3:0.00} LWL={4:0.00} PP={5:0.00}",
-                            levels.DailyOpen, levels.YdayHigh, levels.YdayLow, levels.LweekHigh, levels.LweekLow, levels.PP));
+                            "NEW EXCHANGE DAY — DailyOpen={0:0.00} YH={1:0.00} YL={2:0.00} LWH={3:0.00} LWL={4:0.00} PP={5:0.00}{6}",
+                            levels.DailyOpen, levels.YdayHigh, levels.YdayLow, levels.LweekHigh, levels.LweekLow, levels.PP,
+                            crossMarketReady
+                                ? string.Format(CultureInfo.InvariantCulture,
+                                    "\n    ES  YH={0} YL={1} LWH={2} LWL={3}\n    QQQ YH={4} YL={5} LWH={6} LWL={7}",
+                                    Fmt(esLevels.YdayHigh), Fmt(esLevels.YdayLow), Fmt(esLevels.LweekHigh), Fmt(esLevels.LweekLow),
+                                    Fmt(qqqLevels.YdayHigh), Fmt(qqqLevels.YdayLow), Fmt(qqqLevels.LweekHigh), Fmt(qqqLevels.LweekLow))
+                                : ""));
                     if (EnableFakeBreakout) fb.OnNewDay(etClose);
                     if (EnableVectorBreakRetest) vbr.OnNewDay(etClose);
                 }
@@ -899,6 +954,43 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnterLong(bipExec, qty, signalName);
             else
                 EnterShort(bipExec, qty, signalName);
+        }
+
+        // V7.1 diagnostics sink for the confirmation detectors.
+        // cmDiagTime carries the ET timestamp of the confirmation bar currently being
+        // processed, so detector events are stamped with real bar times rather than
+        // the wall clock (which would be meaningless in a backtest).
+        private DateTime cmDiagTime = DateTime.MinValue;
+        private void CmDiag(string msg)
+        {
+            if (logger != null) logger.DiagGlobal(cmDiagTime, "[XMKT] " + msg);
+            else PrintLine("[XMKT] " + msg);
+        }
+
+        // V7.1: one line per confirmation market per day. Makes "no confirmation
+        // because nothing happened" visually distinct from "no confirmation because
+        // this market had no data" — the failure mode that silently mis-graded a
+        // whole backtest.
+        private void EmitCrossMarketDayReport(bool isEs, DateTime etClose)
+        {
+            cmDiagTime = etClose;
+            KeyLevelEngine kl = isEs ? esLevels : qqqLevels;
+            CrossMarketConfirmDetector d1 = isEs ? esDet1 : qqqDet1;
+            CrossMarketConfirmDetector d3 = isEs ? esDet3 : qqqDet3;
+            string mk = isEs ? "ES" : "QQQ";
+            bool levelsOk = !double.IsNaN(kl.YdayHigh) || !double.IsNaN(kl.YdayLow)
+                         || !double.IsNaN(kl.LweekHigh) || !double.IsNaN(kl.LweekLow);
+            CmDiag(string.Format(CultureInfo.InvariantCulture,
+                "{0:yyyy-MM-dd} {1} levels: YH={2} YL={3} LWH={4} LWL={5}{6}",
+                etClose, mk, Fmt(kl.YdayHigh), Fmt(kl.YdayLow), Fmt(kl.LweekHigh), Fmt(kl.LweekLow),
+                levelsOk ? "" : "   <<< ALL NaN — this market cannot be evaluated, it is NOT declining to confirm"));
+            CmDiag("    " + d1.DailyTally());
+            CmDiag("    " + d3.DailyTally());
+        }
+
+        private static string Fmt(double v)
+        {
+            return double.IsNaN(v) ? "NaN" : v.ToString("0.00", CultureInfo.InvariantCulture);
         }
 
         // ==================================================================

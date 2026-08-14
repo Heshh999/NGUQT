@@ -652,6 +652,29 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 CrossMarketConfirm qqq = host.QueryCrossMarket(ConfirmMarket.QQQ, slot.IsLong,
                     slot.ActiveLevelId, bar.PeriodMinutes, bar.EtClose);
 
+                // V7.1 SAFETY: a market that could not be EVALUATED is not a market
+                // that DECLINED. Grading "neither confirms" off missing data is what
+                // silently mis-graded an entire backtest. If either side is unknown,
+                // refuse the cross-market grade and fall back to the legacy one, loudly.
+                if (es.Unavailable || qqq.Unavailable)
+                {
+                    int gcU = formingCandle;
+                    if (cfg.GradeBasis == FbGradeBasis.FirstTradableCandle && slot.FirstTradableFormingNum > 0)
+                        gcU = formingCandle - slot.FirstTradableFormingNum + 1;
+                    grade = gcU <= 1 ? "A-" : "B+";
+                    riskPct = grade == "A-" ? cfg.RiskPctAMinus : cfg.RiskPctBPlus;
+
+                    host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
+                        "FAKE BREAKOUT CONFIRMATION | *** CROSS-MARKET GRADE REFUSED — INPUT DATA UNUSABLE ***"
+                        + "\n    This trade was NOT graded A+/A-/B+/B. Cross-market confirmation could not be"
+                        + "\n    evaluated, so the legacy validity-candle grade was used instead."
+                        + "\n    ES : {0}\n    QQQ: {1}"
+                        + "\n    direction={2} entryTf={3}m level={4} -> legacy grade={5} riskPct={6}",
+                        es.Reason, qqq.Reason,
+                        slot.IsLong ? "LONG" : "SHORT", bar.PeriodMinutes, slot.ActiveLevelId, grade, riskPct));
+                }
+                else
+                {
                 cfg.CrossMarketGrades.Resolve(es.Confirmed, qqq.Confirmed, out grade, out riskPct);
 
                 host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
@@ -665,6 +688,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                     slot.ActiveLevelPrice, bar.Close, bar.Ema9, bar.Vector,
                     es.LevelId, es.LevelPrice, es.Reason,
                     qqq.LevelId, qqq.LevelPrice, qqq.Reason));
+                }
             }
             else
             {
