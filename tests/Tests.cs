@@ -165,15 +165,15 @@ namespace MnqTwoTests
 
             // GREEN vector that never traded at/below Daily Open (low 20010 > 20000)
             // and whose prior 15m close was also above it — must still trigger.
-            vbr.OnFifteenMinuteBar(Bar(At(8, 45), 15, 20040, 20060, 20010, 20050,
+            vbr.OnFifteenMinuteBar(Bar(At(8, 45), 15, 20040, 20140, 20010, 20050,
                 VectorType.GREEN_VECTOR, 20030), 20040);
-            Check(h.CountDiagContains("PARENT TRIGGER") == 1,
+            Check(h.CountDiagContains("VBR PARENT CREATED") == 1,
                 "trigger accepted without any cross-through condition");
 
             // validity candle #1 is ANOTHER qualifying green vector — must NOT restart
-            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20050, 20080, 20030, 20070,
+            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20050, 20160, 20030, 20070,
                 VectorType.GREEN_VECTOR, 20040), 20050);
-            Check(h.CountDiagContains("PARENT TRIGGER") == 1,
+            Check(h.CountDiagContains("VBR PARENT CREATED") == 1,
                 "later qualifying vector did not restart/replace the active parent");
 
             // candles #2..#4 (regular) — expiry must come exactly 4 candles after
@@ -183,7 +183,7 @@ namespace MnqTwoTests
             Check(!h.AnyDiagContains("EXPIRED"), "not expired before candle #4 completes");
             vbr.OnFifteenMinuteBar(Bar(At(9, 45), 15, 20060, 20065, 20050, 20055, VectorType.REGULAR_BEARISH, 20058), 20060);
             Check(h.AnyDiagContains("EXPIRED"), "expired exactly after 4 candles from ORIGINAL trigger");
-            Check(h.CountDiagContains("PARENT TRIGGER") == 1, "still only one parent trigger overall");
+            Check(h.CountDiagContains("VBR PARENT CREATED") == 1, "still only one parent trigger overall");
         }
 
         // ---- 7: premarket parent -> first executable candle grades A- -------
@@ -464,7 +464,7 @@ namespace MnqTwoTests
         {
             host.LevelsEngine = StdLevels();
             VectorBreakRetestEngine vbr = new VectorBreakRetestEngine(host, cfg ?? new VbrConfig());
-            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20040, 20060, 20010, 20050, VectorType.GREEN_VECTOR, 20030), 20040);
+            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20040, 20140, 20010, 20050, VectorType.GREEN_VECTOR, 20030), 20040);
             return vbr;
         }
 
@@ -481,7 +481,7 @@ namespace MnqTwoTests
             // 2. close back ABOVE Daily Open but BELOW EMA9 -> must WAIT, not discard
             vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20008, 19988, 20005, VectorType.REGULAR_BULLISH, 20010));
             Check(h.Entries.Count == 0, "reclaim above DO but below EMA9 does not enter");
-            Check(h.AnyDiagContains("WAITING for a later 1m close beyond BOTH"),
+            Check(h.AnyDiagContains("PATTERN_B_DO_RECLAIM") && h.AnyDiagContains("emaConfirmed=false"),
                 "U6: structure is kept and the engine WAITS for the EMA");
             // 3. a candle above EMA9 but BELOW Daily Open is NOT a valid entry
             vbr.OnOneMinuteBar(Bar(At(9, 35), 1, 20005, 20006, 19990, 19995, VectorType.REGULAR_BEARISH, 19990));
@@ -500,12 +500,12 @@ namespace MnqTwoTests
             h.LevelsEngine = StdLevels();
             VectorBreakRetestEngine vbr = new VectorBreakRetestEngine(h, new VbrConfig());
             // short parent: 15m RED_VECTOR closes below DAILY_OPEN 20000
-            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 19960, 19990, 19940, 19950, VectorType.RED_VECTOR, 19970), 19960);
+            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 19960, 20070, 19940, 19950, VectorType.RED_VECTOR, 19970), 19960);
             // 1. completed 1m close ABOVE Daily Open
             vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 19995, 20015, 19994, 20010, VectorType.REGULAR_BULLISH, 19990));
             // 2. close back BELOW Daily Open but ABOVE EMA9 -> WAIT
             vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 20010, 20012, 19992, 19995, VectorType.REGULAR_BEARISH, 19990));
-            Check(h.Entries.Count == 0 && h.AnyDiagContains("WAITING for a later 1m close beyond BOTH"),
+            Check(h.Entries.Count == 0 && h.AnyDiagContains("PATTERN_B_DO_RECLAIM") && h.AnyDiagContains("emaConfirmed=false"),
                 "short: rejection below DO but above EMA9 waits");
             // 3. below EMA9 but ABOVE Daily Open is not valid
             vbr.OnOneMinuteBar(Bar(At(9, 35), 1, 19995, 20012, 19994, 20008, VectorType.REGULAR_BULLISH, 20015));
@@ -567,7 +567,7 @@ namespace MnqTwoTests
             MockHost h = new MockHost();
             h.LevelsEngine = lv;
             VectorBreakRetestEngine vbr = new VectorBreakRetestEngine(h, new VbrConfig());
-            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20005, 20020, 19995, 20015, VectorType.GREEN_VECTOR, 20005), 20005);
+            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20005, 20125, 19995, 20015, VectorType.GREEN_VECTOR, 20005), 20005);
             vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 20002, 20003, 19985, 19990, VectorType.REGULAR_BEARISH, 20008));
             vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20012, 19988, 20010, VectorType.GREEN_VECTOR, 20005));
             vbr.OnEntryExecution("VBR_LONG", 20005, 10, At(9, 33));
@@ -671,8 +671,9 @@ namespace MnqTwoTests
             Check(h.AnyDiagContains("candle #3"), "candle #3 authorized");
             // #3 completes with NO entry and closes BELOW Daily Open (wrong side)
             vbr.OnFifteenMinuteBar(Bar(At(9, 45), 15, 20010, 20015, 19960, 19970, VectorType.REGULAR_BEARISH, 20000), 20010);
-            Check(h.AnyDiagContains("ROLLING RE-ENTRY BROKEN"),
-                "U7: wrong-side close ends the rolling re-entry permission");
+            Check(h.AnyDiagContains("VBR PARENT INVALIDATED reason=15M_CLOSE_WRONG_SIDE_DAILY_OPEN"),
+                "a completed 15m close on the wrong side of Daily Open invalidates the parent outright"
+                + " — this now takes precedence over the rolling re-entry permission");
             // and no further entry can occur
             int before = h.Entries.Count;
             vbr.OnOneMinuteBar(Bar(At(10, 1), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
@@ -700,7 +701,7 @@ namespace MnqTwoTests
             fb.OnEntryExecution("FB_SHORT", 20095, 118, At(9, 34));
 
             // now a valid VBR long forms
-            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20040, 20060, 20010, 20050, VectorType.GREEN_VECTOR, 20030), 20040);
+            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20040, 20140, 20010, 20050, VectorType.GREEN_VECTOR, 20030), 20040);
             vbr.OnOneMinuteBar(Bar(At(9, 36), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
             vbr.OnOneMinuteBar(Bar(At(9, 38), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
 
@@ -734,7 +735,7 @@ namespace MnqTwoTests
             h.Fb = fb; h.Vbr = vbr; h.WireHandoff();
 
             // VBR long entered and filled
-            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20040, 20060, 20010, 20050, VectorType.GREEN_VECTOR, 20030), 20040);
+            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20040, 20140, 20010, 20050, VectorType.GREEN_VECTOR, 20030), 20040);
             vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
             vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
             Check(h.Entries.Count == 1 && h.Entries[0].StartsWith("VBR_LONG"), "VBR entered first");
@@ -1379,11 +1380,223 @@ namespace MnqTwoTests
                 MockHost h = new MockHost();
                 h.LevelsEngine = StdLevels();
                 VectorBreakRetestEngine vbr = new VectorBreakRetestEngine(h, new VbrConfig());
-                vbr.OnFifteenMinuteBar(Bar(At(8, 45), 15, 20040, 20060, 20010, 20050,
+                vbr.OnFifteenMinuteBar(Bar(At(8, 45), 15, 20040, 20140, 20010, 20050,
                     VectorType.GREEN_VECTOR, 20030), 20040);
-                Check(h.CountDiagContains("PARENT TRIGGER") == 1,
+                Check(h.CountDiagContains("VBR PARENT CREATED") == 1,
                     "TEST 9: re-enabled VBR builds its parent setup exactly as before");
             }
+        }
+
+        // ==================================================================
+        // VBR FINAL RULES — parent size filter, hard 15m invalidation,
+        // Pattern B locality.  DAILY_OPEN = 20000 in StdLevels().
+        // ==================================================================
+        private const double DO = 20000;
+
+        /// A 15m parent candle with an explicit range, closing on the requested side.
+        private static BarSnap VbrParent(DateTime etClose, bool isLong, double range, double close)
+        {
+            double high = isLong ? close + range * 0.25 : close + range * 0.75;
+            double low = high - range;
+            return Bar(etClose.AddMinutes(-15), 15, close, high, low, close,
+                       isLong ? VectorType.GREEN_VECTOR : VectorType.RED_VECTOR, close);
+        }
+
+        /// A 15m validity candle: closes where asked, optionally wicking through DO.
+        private static BarSnap VbrValidity(DateTime etClose, double close, double high, double low)
+        {
+            return Bar(etClose.AddMinutes(-15), 15, close, high, low, close,
+                       VectorType.REGULAR_BULLISH, close);
+        }
+
+        private static MockHost VbrHost(out VectorBreakRetestEngine vbr)
+        {
+            MockHost h = new MockHost();
+            h.LevelsEngine = StdLevels();
+            vbr = new VectorBreakRetestEngine(h, new VbrConfig());
+            return h;
+        }
+
+        private static void TestVbrParentSizeFilter()
+        {
+            Console.WriteLine("VBR RULE 1 — 15m parent candle must span >= 125 points:");
+
+            // TEST 1 — range 124.75 -> NO parent
+            VectorBreakRetestEngine v1; MockHost h1 = VbrHost(out v1);
+            v1.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 124.75, 20050), 20040);
+            Check(h1.AnyDiagContains("VBR PARENT REJECTED reason=PARENT_RANGE_BELOW_125"),
+                "TEST 1: range 124.75 is REJECTED");
+            Check(!h1.AnyDiagContains("VBR PARENT CREATED"), "TEST 1: no parent is created");
+            // and the validity clock never starts: a later 1m Pattern B cannot enter
+            v1.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20006, 19980, 19990, VectorType.REGULAR_BEARISH, 20010));
+            v1.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h1.Entries.Count == 0, "TEST 1: an undersized parent can never produce a 1m entry");
+
+            // TEST 2 — range exactly 125.00 -> valid parent
+            VectorBreakRetestEngine v2; MockHost h2 = VbrHost(out v2);
+            v2.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 125.00, 20050), 20040);
+            Check(h2.AnyDiagContains("VBR PARENT CREATED"), "TEST 2: range exactly 125.00 is ACCEPTED");
+            Check(h2.AnyDiagContains("parentRangePoints=125.00"), "TEST 2: the logged range is 125.00");
+            Check(h2.AnyDiagContains("validityWindow=4"), "TEST 2: the 4-candle validity window is logged");
+        }
+
+        private static void TestVbrFifteenMinuteInvalidation()
+        {
+            Console.WriteLine("VBR RULE 4/11 — only a completed 15m CLOSE on the wrong side invalidates:");
+
+            // TEST 3 — LONG, validity #1 WICKS below DO but closes above -> still valid
+            VectorBreakRetestEngine v3; MockHost h3 = VbrHost(out v3);
+            v3.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+            v3.OnFifteenMinuteBar(VbrValidity(At(9, 15), 20030, 20060, 19950), 20050);  // low 19950 < DO
+            Check(h3.AnyDiagContains("wickCrossedDO=true"), "TEST 3: the wick below Daily Open is logged");
+            Check(h3.AnyDiagContains("closeInvalidated=false"), "TEST 3: a wick does NOT invalidate");
+            Check(!h3.AnyDiagContains("VBR PARENT INVALIDATED"), "TEST 3: parent stays alive after a wick");
+
+            // TEST 4 — LONG, validity #2 CLOSES below DO -> immediate invalidation
+            v3.OnFifteenMinuteBar(VbrValidity(At(9, 30), 19980, 20010, 19960), 20030);
+            Check(h3.AnyDiagContains("VBR PARENT INVALIDATED reason=15M_CLOSE_WRONG_SIDE_DAILY_OPEN"),
+                "TEST 4: a completed 15m close below Daily Open invalidates the LONG parent");
+            Check(h3.AnyDiagContains("candleNum=2"), "TEST 4: the invalidating candle number is logged");
+            int before4 = h3.Entries.Count;
+            v3.OnOneMinuteBar(Bar(At(9, 46), 1, 20005, 20006, 19980, 19990, VectorType.REGULAR_BEARISH, 20010));
+            v3.OnOneMinuteBar(Bar(At(9, 48), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h3.Entries.Count == before4, "TEST 4: no 1m entry is possible after invalidation");
+
+            // TEST 5 — SHORT, wick ABOVE DO but closes below -> still valid
+            VectorBreakRetestEngine v5; MockHost h5 = VbrHost(out v5);
+            v5.OnFifteenMinuteBar(VbrParent(At(9, 0), false, 130, 19950), 19960);
+            v5.OnFifteenMinuteBar(VbrValidity(At(9, 15), 19970, 20080, 19940), 19950);  // high 20080 > DO
+            Check(h5.AnyDiagContains("wickCrossedDO=true") && h5.AnyDiagContains("closeInvalidated=false"),
+                "TEST 5: SHORT wick above Daily Open does NOT invalidate");
+            Check(!h5.AnyDiagContains("VBR PARENT INVALIDATED"), "TEST 5: SHORT parent stays alive");
+
+            // TEST 6 — SHORT, close ABOVE DO -> invalidation
+            v5.OnFifteenMinuteBar(VbrValidity(At(9, 30), 20030, 20050, 20010), 19970);
+            Check(h5.AnyDiagContains("VBR PARENT INVALIDATED reason=15M_CLOSE_WRONG_SIDE_DAILY_OPEN"),
+                "TEST 6: a completed 15m close above Daily Open invalidates the SHORT parent");
+
+            // TEST 7 — validity candle never touches Daily Open at all -> alive, clock ticks
+            VectorBreakRetestEngine v7; MockHost h7 = VbrHost(out v7);
+            v7.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+            v7.OnFifteenMinuteBar(VbrValidity(At(9, 15), 20120, 20140, 20100), 20050);  // never near DO
+            Check(h7.AnyDiagContains("wickCrossedDO=false") && h7.AnyDiagContains("closeInvalidated=false"),
+                "TEST 7: a candle that never touches Daily Open keeps the parent alive");
+            Check(h7.AnyDiagContains("candleNum=1"), "TEST 7: the validity clock still advances");
+
+            // TEST 8 — four candles, no entry, no invalidation -> expiry, NO fifth candle
+            v7.OnFifteenMinuteBar(VbrValidity(At(9, 30), 20125, 20145, 20105), 20120);
+            v7.OnFifteenMinuteBar(VbrValidity(At(9, 45), 20130, 20150, 20110), 20125);
+            Check(!h7.AnyDiagContains("EXPIRED"), "TEST 8: not expired before candle #4 completes");
+            v7.OnFifteenMinuteBar(VbrValidity(At(10, 0), 20135, 20155, 20115), 20130);
+            Check(h7.AnyDiagContains("EXPIRED"), "TEST 8: parent expires after the 4th validity candle");
+            Check(h7.CountDiagContains("VBR 15M VALIDITY") == 4, "TEST 8: exactly 4 validity candles, no fifth");
+
+            // TEST 14 — the parent candle itself is not validity candle #1
+            VectorBreakRetestEngine v14; MockHost h14 = VbrHost(out v14);
+            v14.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+            Check(h14.CountDiagContains("VBR 15M VALIDITY") == 0,
+                "TEST 14: the parent candle is NOT counted as validity candle #1");
+            v14.OnFifteenMinuteBar(VbrValidity(At(9, 15), 20120, 20140, 20100), 20050);
+            Check(h14.AnyDiagContains("candleNum=1"), "TEST 14: the NEXT completed candle is #1");
+
+            // TEST 15 — the 4-candle clock never restarts on a later qualifying vector
+            VectorBreakRetestEngine v15; MockHost h15 = VbrHost(out v15);
+            v15.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+            v15.OnFifteenMinuteBar(VbrParent(At(9, 15), true, 130, 20120), 20050);   // another green vector
+            Check(h15.CountDiagContains("VBR PARENT CREATED") == 1,
+                "TEST 15: a later qualifying vector does NOT create a second parent");
+            v15.OnFifteenMinuteBar(VbrValidity(At(9, 30), 20125, 20145, 20105), 20120);
+            v15.OnFifteenMinuteBar(VbrValidity(At(9, 45), 20130, 20150, 20110), 20125);
+            v15.OnFifteenMinuteBar(VbrValidity(At(10, 0), 20135, 20155, 20115), 20130);
+            Check(h15.AnyDiagContains("EXPIRED"),
+                "TEST 15: expiry is measured from the ORIGINAL trigger — the clock never restarts");
+        }
+
+        private static void TestVbrPatternBLocality()
+        {
+            Console.WriteLine("VBR RULES 7/8/9/10 — Pattern B structure must stay LOCAL:");
+
+            // TEST 9 — immediate EMA confirmation; stop = local structure low
+            VectorBreakRetestEngine v9; MockHost h9 = VbrHost(out v9);
+            v9.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+            v9.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20008, 19985, 19990, VectorType.REGULAR_BEARISH, 20012));
+            Check(h9.AnyDiagContains("PATTERN_B_STRUCTURE_START"), "TEST 9: structure starts on the close below DO");
+            v9.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20030, 19989, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h9.Entries.Count == 1 && h9.Entries[0].StartsWith("VBR_LONG"), "TEST 9: immediate LONG entry");
+            Check(h9.AnyDiagContains("PATTERN_B_ENTRY"), "TEST 9: PATTERN_B_ENTRY is logged");
+            Check(h9.AnyDiagContains("stop=19985.00"), "TEST 9: stop = LOCAL structure low 19985, not an older extreme");
+            Check(h9.AnyDiagContains("elapsedMinutes=2"), "TEST 9: elapsedMinutes reports the structure age");
+
+            // TEST 10 — EMA wait, then confirmation while the parent is still valid
+            VectorBreakRetestEngine v10; MockHost h10 = VbrHost(out v10);
+            v10.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+            v10.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20008, 19985, 19990, VectorType.REGULAR_BEARISH, 20012));
+            v10.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20008, 19989, 20005, VectorType.REGULAR_BULLISH, 20010));
+            Check(h10.Entries.Count == 0, "TEST 10: reclaim above DO but below EMA9 does NOT enter");
+            Check(h10.AnyDiagContains("emaConfirmed=false"), "TEST 10: the failed EMA leg is logged");
+            v10.OnOneMinuteBar(Bar(At(9, 35), 1, 20005, 20030, 20004, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h10.Entries.Count == 1, "TEST 10: a later close beyond BOTH DO and EMA9 enters");
+            Check(h10.AnyDiagContains("stop=19985.00"), "TEST 10: stop is still the LOCAL structure low");
+
+            // TEST 11 — 15m invalidation during the EMA wait MUST kill the setup
+            VectorBreakRetestEngine v11; MockHost h11 = VbrHost(out v11);
+            v11.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+            v11.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20008, 19985, 19990, VectorType.REGULAR_BEARISH, 20012));
+            v11.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20008, 19989, 20005, VectorType.REGULAR_BULLISH, 20010));
+            Check(h11.Entries.Count == 0, "TEST 11: waiting for EMA");
+            v11.OnFifteenMinuteBar(VbrValidity(At(9, 45), 19970, 20010, 19960), 20050);   // closes BELOW DO
+            Check(h11.AnyDiagContains("VBR PARENT INVALIDATED"), "TEST 11: the 15m close invalidates the parent");
+            v11.OnOneMinuteBar(Bar(At(9, 50), 1, 20005, 20030, 20004, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h11.Entries.Count == 0,
+                "TEST 11: a later EMA confirmation MUST NOT enter — Pattern B state was cleared");
+
+            // TEST 12 — mirror: SHORT Pattern B
+            VectorBreakRetestEngine v12; MockHost h12 = VbrHost(out v12);
+            v12.OnFifteenMinuteBar(VbrParent(At(9, 0), false, 130, 19950), 19960);
+            v12.OnOneMinuteBar(Bar(At(9, 31), 1, 19995, 20015, 19994, 20010, VectorType.REGULAR_BULLISH, 19988));
+            Check(h12.AnyDiagContains("PATTERN_B_STRUCTURE_START"), "TEST 12: SHORT structure starts above DO");
+            v12.OnOneMinuteBar(Bar(At(9, 33), 1, 20010, 20011, 19970, 19975, VectorType.RED_VECTOR, 19990));
+            Check(h12.Entries.Count == 1 && h12.Entries[0].StartsWith("VBR_SHORT"), "TEST 12: SHORT entry");
+            Check(h12.AnyDiagContains("stop=20015.00"), "TEST 12: stop = LOCAL structure high 20015");
+
+            // TEST 13 — wick alone never invalidates (explicit, both directions covered above)
+            VectorBreakRetestEngine v13; MockHost h13 = VbrHost(out v13);
+            v13.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+            v13.OnFifteenMinuteBar(VbrValidity(At(9, 15), 20040, 20060, 19900), 20050);  // deep wick below DO
+            v13.OnFifteenMinuteBar(VbrValidity(At(9, 30), 20045, 20065, 19905), 20040);  // again
+            Check(!h13.AnyDiagContains("VBR PARENT INVALIDATED"),
+                "TEST 13: repeated deep wicks below Daily Open never invalidate a LONG parent");
+            v13.OnOneMinuteBar(Bar(At(9, 46), 1, 20005, 20008, 19985, 19990, VectorType.REGULAR_BEARISH, 20012));
+            v13.OnOneMinuteBar(Bar(At(9, 48), 1, 19990, 20030, 19989, 20025, VectorType.GREEN_VECTOR, 20010));
+            Check(h13.Entries.Count == 1, "TEST 13: the parent still trades normally after wicks");
+        }
+
+        private static void TestVbrOversizedStopRootCause()
+        {
+            Console.WriteLine("VBR ROOT CAUSE — a new Daily Open excursion must NOT inherit an old extreme:");
+
+            // Reproduces the oversized-stop mechanism exactly.
+            // Excursion 1 runs deep (low 19850). Price reclaims but misses the EMA, so
+            // the engine waits. Price then dips back through DO on a SHALLOW excursion
+            // (low 19985) and confirms. The stop must come from the SHALLOW structure.
+            VectorBreakRetestEngine v; MockHost h = VbrHost(out v);
+            v.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+
+            v.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20008, 19850, 19900, VectorType.REGULAR_BEARISH, 20012));
+            v.OnOneMinuteBar(Bar(At(9, 33), 1, 19900, 20008, 19899, 20005, VectorType.REGULAR_BULLISH, 20010));
+            Check(h.Entries.Count == 0, "deep excursion reclaimed but is below EMA9 — waiting");
+
+            v.OnOneMinuteBar(Bar(At(9, 35), 1, 20005, 20006, 19985, 19995, VectorType.REGULAR_BEARISH, 20010));
+            Check(h.CountDiagContains("PATTERN_B_STRUCTURE_START") == 2,
+                "the new excursion starts a SECOND, independent structure");
+            v.OnOneMinuteBar(Bar(At(9, 37), 1, 19995, 20030, 19994, 20025, VectorType.GREEN_VECTOR, 20010));
+
+            Check(h.Entries.Count == 1, "entry taken on the fresh excursion");
+            Check(h.AnyDiagContains("stop=19985.00"),
+                "stop = 19985 from the LOCAL structure (40 pts), NOT 19850 from the stale one (175 pts)");
+            Check(!h.AnyDiagContains("stop=19850.00"), "the stale deep extreme is never used as the stop");
+            Check(h.AnyDiagContains("elapsedMinutes=2"),
+                "elapsedMinutes reflects the LOCAL structure age, not the whole parent window");
         }
 
         // ---- main ------------------------------------------------------------
@@ -1422,6 +1635,12 @@ namespace MnqTwoTests
             TestConfirmMarketsIgnoreEma();
             TestGradeTableCountsAgreement();
             TestVbrEnableSwitch();
+
+            // ---- VBR FINAL RULES ----
+            TestVbrParentSizeFilter();
+            TestVbrFifteenMinuteInvalidation();
+            TestVbrPatternBLocality();
+            TestVbrOversizedStopRootCause();
 
             Console.WriteLine();
             Console.WriteLine(string.Format("RESULT: {0} passed, {1} failed", passed, failed));

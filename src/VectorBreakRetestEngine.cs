@@ -60,6 +60,11 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public bool SingleContractBecomesRunner = false;
 
         public double ChainMaxDistancePoints = 50.0;      // spec §9 / section D: 50-point rule
+
+        // FINAL RULE 1 — HARD parent candle size filter. A 15m vector candle whose
+        // total High-Low range is below this many index points can NEVER create a
+        // VBR parent: no validity clock, no 1m scanning. 125.00 is valid, 124.75 is not.
+        public double ParentMinRangePoints = 125.0;
     }
 
     // V6 U3 — 1-MINUTE SUPPORTING-STRUCTURE TRACKER (final 10% runner exit).
@@ -126,6 +131,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         private bool structActive;
         private double structExtreme = double.NaN;        // long: lowest low below DO; short: highest high above DO
         private bool waitingEmaB;                         // only used when PatternBWaitForEma = true
+        private DateTime structStartEt = DateTime.MinValue;   // when THIS local Pattern B structure began
 
         // ---- re-entry state (spec §8) ----
         private int reentryCount;                         // number of re-entries taken (0 = original)
@@ -194,6 +200,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             structActive = false;
             waitingEmaB = false;
             structExtreme = double.NaN;
+            structStartEt = DateTime.MinValue;
             reentryCount = 0;
             stopOutFormingCandleNum = 0;
             reentryScanCandleNum = 0;
@@ -204,6 +211,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             structActive = false;
             waitingEmaB = false;
             structExtreme = double.NaN;
+            structStartEt = DateTime.MinValue;
         }
 
         // ==================================================================
@@ -217,6 +225,42 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             {
                 validityCount++;
 
+                // ==========================================================
+                // FINAL RULE 4 — HARD 15m INVALIDATION.
+                // A completed 15m validity candle that CLOSES on the wrong side of
+                // Daily Open kills the ENTIRE parent immediately: Pattern A scanning,
+                // the Pattern B structure, the Pattern B EMA wait and any pending
+                // entry state all die with it (FINAL RULE 10).
+                // A WICK through Daily Open does NOT invalidate (FINAL RULE 11).
+                // Completed bars only — never intrabar.
+                // ==========================================================
+                bool invalidatedThisBar = false;
+                if (state != VbrState.POSITION_OPEN && !double.IsNaN(dailyOpenAtTrigger) && validityCount <= 4)
+                {
+                    bool wickCrossedDo = isLong
+                        ? bar.Low < dailyOpenAtTrigger
+                        : bar.High > dailyOpenAtTrigger;
+                    bool closeInvalidated = isLong
+                        ? bar.Close < dailyOpenAtTrigger
+                        : bar.Close > dailyOpenAtTrigger;
+
+                    host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                        "VBR 15M VALIDITY direction={0} candleNum={1} close={2:0.00} dailyOpen={3:0.00} wickCrossedDO={4} closeInvalidated={5}",
+                        isLong ? "LONG" : "SHORT", validityCount, bar.Close, dailyOpenAtTrigger,
+                        wickCrossedDo ? "true" : "false", closeInvalidated ? "true" : "false"));
+
+                    if (closeInvalidated)
+                    {
+                        host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                            "VBR PARENT INVALIDATED reason=15M_CLOSE_WRONG_SIDE_DAILY_OPEN direction={0} candleNum={1} close={2:0.00} dailyOpen={3:0.00}",
+                            isLong ? "LONG" : "SHORT", validityCount, bar.Close, dailyOpenAtTrigger));
+                        ResetSetup();          // clears pattern A/B state, EMA wait, parent validity
+                        invalidatedThisBar = true;
+                    }
+                }
+
+                if (!invalidatedThisBar)
+                {
                 if (state == VbrState.STOPPED_OUT_REENTRY_ELIGIBILITY_PENDING
                     && validityCount == stopOutFormingCandleNum)
                 {
@@ -300,6 +344,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                     host.Diag(StrategyId.VECTOR_BREAK_RETEST, "setup EXPIRED: past 11:30 ET entry cutoff");
                     ResetSetup();
                 }
+                }
             }
 
             // ---- parent trigger (§2 long / §3 short) ----
@@ -323,6 +368,18 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             }
             if (!longTrig && !shortTrig) return;
 
+            // FINAL RULE 1 — HARD parent candle size filter. Checked AFTER the vector
+            // and close-side conditions so the rejection log only fires for candles
+            // that would otherwise have become parents.
+            double parentRange = bar.High - bar.Low;
+            if (parentRange + 1e-9 < cfg.ParentMinRangePoints)
+            {
+                host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                    "VBR PARENT REJECTED reason=PARENT_RANGE_BELOW_125 range={0:0.00} required={1:0.00} direction={2} vector={3} time={4:HH:mm}",
+                    parentRange, cfg.ParentMinRangePoints, longTrig ? "LONG" : "SHORT", bar.Vector, bar.EtClose));
+                return;   // no parent, no validity clock, no 1m scanning
+            }
+
             bool replacing = state == VbrState.PARENT_15M_ACTIVE_SEARCHING_1M;
             state = VbrState.PARENT_15M_ACTIVE_SEARCHING_1M;
             isLong = longTrig;
@@ -337,9 +394,12 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             ResetPattern();
 
             host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                "PARENT TRIGGER{0} dir={1} vector={2} close={3:0.00} DAILY_OPEN={4:0.00} premarket={5} time={6:HH:mm} — next 4 completed 15m candles valid for 1m entry (spec §2/§3)",
+                "VBR PARENT CREATED{0} direction={1} time={2:yyyy-MM-dd HH:mm} dailyOpen={3:0.00}"
+                + " parentOpen={4:0.00} parentHigh={5:0.00} parentLow={6:0.00} parentClose={7:0.00}"
+                + " parentRangePoints={8:0.00} vectorType={9} validityWindow=4",
                 replacing ? " (replaces active setup, VBR-2)" : "",
-                isLong ? "LONG" : "SHORT", parentVector, bar.Close, dailyOpen, parentPremarket, bar.EtClose));
+                isLong ? "LONG" : "SHORT", bar.EtClose, dailyOpen,
+                bar.Open, bar.High, bar.Low, bar.Close, parentRange, parentVector));
         }
 
         // ==================================================================
@@ -390,18 +450,20 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 // and the 1m EMA(9). The reclaim close is already beyond Daily Open
                 // here, so only the EMA leg is outstanding.
                 bool emaOk = isLong ? bar.Close > bar.Ema9 : bar.Close < bar.Ema9;
+                host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                    "PATTERN_B_DO_RECLAIM close={0:0.00} ema9={1:0.00} emaConfirmed={2}",
+                    bar.Close, bar.Ema9, emaOk ? "true" : "false"));
                 if (emaOk)
                 {
                     TryEnter(bar, "CLOSE_RECLAIM_B", structExtreme);
                 }
                 else if (cfg.PatternBWaitForEma)
                 {
-                    // V6 U6 steps 5-6: KEEP WAITING — do not discard the structure.
+                    // FINAL RULE 8: keep waiting — but ONLY while the original 15m
+                    // parent stays valid. The 15m invalidation in OnFifteenMinuteBar
+                    // clears this state outright (FINAL RULE 10).
                     waitingEmaB = true;
                     structActive = false;
-                    host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                        "Pattern B reclaim close {0:0.00} is beyond DAILY_OPEN {1:0.00} but not through 1m EMA9 {2:0.00} — WAITING for a later 1m close beyond BOTH (V6 U6)",
-                        bar.Close, dOpen, bar.Ema9));
                 }
                 else
                 {
@@ -422,20 +484,34 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 bool backThroughDo = isLong ? bar.Close < dOpen : bar.Close > dOpen;
                 if (backThroughDo)
                 {
-                    // a new 1m move beyond Daily Open begins — resume structure tracking
+                    // FINAL RULE 9 — ROOT-CAUSE FIX.
+                    // A completed 1m close back through Daily Open is a NEW step-1 and
+                    // therefore a NEW LOCAL structure. The previous implementation
+                    // RESUMED the old extreme here (min/max against the stale value),
+                    // so every additional Daily Open excursion ratcheted the stop
+                    // further out and one "structure" could span the whole 60-minute
+                    // parent window. The extreme is now seeded from THIS candle only.
                     waitingEmaB = false;
                     structActive = true;
-                    if (isLong) { if (double.IsNaN(structExtreme) || bar.Low < structExtreme) structExtreme = bar.Low; }
-                    else { if (double.IsNaN(structExtreme) || bar.High > structExtreme) structExtreme = bar.High; }
+                    structExtreme = isLong ? bar.Low : bar.High;   // FRESH — never inherited
+                    structStartEt = bar.EtClose;
                     host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                        "Pattern B: 1m close {0:0.00} back through DAILY_OPEN while waiting for EMA — structure leg resumed (structExtreme={1:0.00})",
-                        bar.Close, structExtreme));
+                        "PATTERN_B_STRUCTURE_START direction={0} time={1:yyyy-MM-dd HH:mm} dailyOpen={2:0.00} structureExtreme={3:0.00} (fresh excursion — previous structure discarded)",
+                        isLong ? "LONG" : "SHORT", bar.EtClose, dOpen, structExtreme));
                     return;
                 }
 
                 bool emaOk = isLong ? bar.Close > bar.Ema9 : bar.Close < bar.Ema9;
                 if (emaOk)
+                {
                     TryEnter(bar, "CLOSE_RECLAIM_B", structExtreme);   // beyond DO and beyond EMA9
+                }
+                else
+                {
+                    host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                        "PATTERN_B_EMA_WAIT currentClose={0:0.00} dailyOpen={1:0.00} ema9={2:0.00} structureExtreme={3:0.00} parentValidityCandle={4}",
+                        bar.Close, dOpen, bar.Ema9, structExtreme, validityCount + 1));
+                }
                 return;
             }
 
@@ -448,9 +524,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 if (!host.IsAtOrAfterSessionStart(bar.EtOpen)) return;
                 structActive = true;
                 structExtreme = isLong ? bar.Low : bar.High;
+                structStartEt = bar.EtClose;
                 host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                    "Pattern B structure started: 1m close {0:0.00} through DAILY_OPEN {1:0.00} (structExtreme={2:0.00})",
-                    bar.Close, dOpen, structExtreme));
+                    "PATTERN_B_STRUCTURE_START direction={0} time={1:yyyy-MM-dd HH:mm} dailyOpen={2:0.00} structureExtreme={3:0.00}",
+                    isLong ? "LONG" : "SHORT", bar.EtClose, dOpen, structExtreme));
                 return;
             }
 
@@ -519,6 +596,18 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                     balance, cfg.RiskPctAPlus, pts));
                 ResetPattern();
                 return;
+            }
+
+            // FINAL RULE 12: elapsedMinutes exposes Pattern B structures that stayed
+            // alive far longer than the local move actually being traded.
+            if (pattern == "CLOSE_RECLAIM_B")
+            {
+                double elapsed = structStartEt == DateTime.MinValue
+                    ? -1 : (bar.EtClose - structStartEt).TotalMinutes;
+                host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                    "PATTERN_B_ENTRY entry={0:0.00} stop={1:0.00} stopPts={2:0.00} structureStartTime={3:yyyy-MM-dd HH:mm}"
+                    + " structureExtreme={4:0.00} entryTime={5:yyyy-MM-dd HH:mm} elapsedMinutes={6:0}",
+                    entryRef, stop, pts, structStartEt, stop, bar.EtClose, elapsed));
             }
 
             tradeSeq++;
