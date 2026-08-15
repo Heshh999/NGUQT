@@ -1,9 +1,9 @@
 // ============================================================================
 // VectorBreakRetestEngine.cs
-// STRATEGY 2 — VECTOR BREAK RETEST  (StrategyId = VECTOR_BREAK_RETEST)
+// STRATEGY 2 - VECTOR BREAK RETEST  (StrategyId = VECTOR_BREAK_RETEST)
 //
 // Implements the spec sections:
-//   "STRATEGY 2 — VECTOR BREAK RETEST" items 1-9
+//   "STRATEGY 2 - VECTOR BREAK RETEST" items 1-9
 //   "VECTOR_BREAK_RETEST trigger level" (DAILY_OPEN only; YDay/LWeek levels
 //    must NOT start a Vector Break Retest setup)
 //   "SHARED TAKE-PROFIT KEY-LEVEL ENGINE" section D (50-point chaining rule)
@@ -36,7 +36,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public double RiskPctAPlus = 50.0;                // spec: A+ = 50% account risk
 
         // V5 correction Fix 3: the master rule is ONLY "GREEN_VECTOR closes above
-        // Daily Open" / "RED_VECTOR closes below Daily Open" — no cross-through or
+        // Daily Open" / "RED_VECTOR closes below Daily Open" - no cross-through or
         // prior-close condition. LEGACY research parameter, defaults FALSE.
         public bool RequireCrossThrough = false;
         // V5 correction Fix 5: once a VBR parent is active its ORIGINAL trigger
@@ -44,17 +44,17 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // must NOT restart/replace/extend it. LEGACY research parameter,
         // defaults FALSE.
         public bool RetriggerReplacesActiveSetup = false;
-        // V6 U2 — LOCKED: a target is REACHED on wick/touch (no close required).
+        // V6 U2 - LOCKED: a target is REACHED on wick/touch (no close required).
         public TargetReachedMode TargetReached = TargetReachedMode.IntrabarTouch;
-        // V6 U6 — LOCKED: Pattern B WAITS for the EMA instead of discarding the
+        // V6 U6 - LOCKED: Pattern B WAITS for the EMA instead of discarding the
         // structure. Entry requires a completed 1m close beyond BOTH Daily Open and
         // the 1m EMA(9). Must stay TRUE in exact-spec mode.
         public bool PatternBWaitForEma = true;
-        // V6 U7 — LOCKED: re-entry permission rolls forward one 15m validity candle
+        // V6 U7 - LOCKED: re-entry permission rolls forward one 15m validity candle
         // at a time inside the ORIGINAL 4-candle clock (not "following candle only").
         // LEGACY research flag, must stay FALSE.
         public bool ReentryScanOnlyFollowingCandle = false;
-        // V6 U8 — LOCKED: with a 1-contract position the 1m EMA(9) profit signal
+        // V6 U8 - LOCKED: with a 1-contract position the 1m EMA(9) profit signal
         // exits the ENTIRE contract; the contract does NOT become a runner.
         // LEGACY research flag, must stay FALSE.
         public bool SingleContractBecomesRunner = false;
@@ -79,13 +79,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // confirmation onto a strictly later candle.
         public bool PatternAAllowSameCandleEmaEntry = true;
 
-        // FINAL RULE 1 — HARD parent candle size filter. A 15m vector candle whose
+        // FINAL RULE 1 - HARD parent candle size filter. A 15m vector candle whose
         // total High-Low range is below this many index points can NEVER create a
         // VBR parent: no validity clock, no 1m scanning. 125.00 is valid, 124.75 is not.
         public double ParentMinRangePoints = 125.0;
     }
 
-    // V6 U3 — 1-MINUTE SUPPORTING-STRUCTURE TRACKER (final 10% runner exit).
+    // V6 U3 - 1-MINUTE SUPPORTING-STRUCTURE TRACKER (final 10% runner exit).
     //
     // "Do NOT require a strength-2 or multi-bar fractal. A single completed
     //  1-minute candle may establish the current supporting swing-low / swing-high
@@ -95,7 +95,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     //        candle before it supplies the supporting reference = that candle's LOW.
     //        The final 10% exits only when a LATER completed 1m candle CLOSES BELOW
     //        that low (a wick below does not count).
-    // SHORT: mirror — most recent LOWER HIGH candle supplies its HIGH.
+    // SHORT: mirror - most recent LOWER HIGH candle supplies its HIGH.
     //
     // Bar indices are tracked so the candle that establishes the reference can
     // never also be the candle that breaks it ("a LATER completed 1m candle").
@@ -136,16 +136,16 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
         public StrategyStats Stats = new StrategyStats();
 
-        // ---- parent setup state (spec §2/§3) ----
+        // ---- parent setup state (spec S2/S3) ----
         private VbrState state = VbrState.IDLE;
         private bool isLong;
         private VectorType parentVector;
         private DateTime parentTriggerEtClose;
-        private double dailyOpenAtTrigger = double.NaN;   // the ONLY trigger level (spec §1)
+        private double dailyOpenAtTrigger = double.NaN;   // the ONLY trigger level (spec S1)
         private int validityCount;                        // completed 15m candles since trigger
         private bool parentPremarket;
 
-        // ---- 1m Pattern B structure (spec §5/§7) ----
+        // ---- 1m Pattern B structure (spec S5/S7) ----
         private bool structActive;
         private double structExtreme = double.NaN;        // long: lowest low below DO; short: highest high above DO
         private bool waitingEmaB;                         // only used when PatternBWaitForEma = true
@@ -164,7 +164,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         private int runnerQty;
         private double breakevenPrice = double.NaN;
 
-        // ---- re-entry state (spec §8) ----
+        // ---- re-entry state (spec S8) ----
         private int reentryCount;                         // number of re-entries taken (0 = original)
         private int stopOutFormingCandleNum;              // 15m validity candle containing the stop-out
         private int reentryScanCandleNum;                 // the FOLLOWING candle in which to scan
@@ -189,7 +189,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         private double sumExitLegR;
         private bool anyProfitLeg;
 
-        // ---- 50-point target chain (spec §9 / shared section D) ----
+        // ---- 50-point target chain (spec S9 / shared section D) ----
         // The 50-point target chain is GONE. These remain only to describe the trade
         // in the CSV record; nothing reads them to make an exit decision.
         private double refPrice = double.NaN;
@@ -212,13 +212,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
         public void OnNewDay(DateTime etTime)
         {
-            // Daily Open rolled — a pre-entry parent from the old exchange day no
+            // Daily Open rolled - a pre-entry parent from the old exchange day no
             // longer references a live level.
             if (state == VbrState.PARENT_15M_ACTIVE_SEARCHING_1M
                 || state == VbrState.STOPPED_OUT_REENTRY_ELIGIBILITY_PENDING
                 || state == VbrState.REENTRY_SCAN)
             {
-                host.Diag(StrategyId.VECTOR_BREAK_RETEST, "setup CANCELLED: new exchange day — Daily Open rolled");
+                host.Diag(StrategyId.VECTOR_BREAK_RETEST, "setup CANCELLED: new exchange day - Daily Open rolled");
                 ResetSetup();
             }
         }
@@ -253,8 +253,8 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         }
 
         // ==================================================================
-        // 15-MINUTE SERIES — parent trigger (§2/§3), 4-candle validity clock
-        // (NO +2 extension), re-entry eligibility (§8)
+        // 15-MINUTE SERIES - parent trigger (S2/S3), 4-candle validity clock
+        // (NO +2 extension), re-entry eligibility (S8)
         // ==================================================================
         public void OnFifteenMinuteBar(BarSnap bar, double prev15Close)
         {
@@ -264,13 +264,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 validityCount++;
 
                 // ==========================================================
-                // FINAL RULE 4 — HARD 15m INVALIDATION.
+                // FINAL RULE 4 - HARD 15m INVALIDATION.
                 // A completed 15m validity candle that CLOSES on the wrong side of
                 // Daily Open kills the ENTIRE parent immediately: Pattern A scanning,
                 // the Pattern B structure, the Pattern B EMA wait and any pending
                 // entry state all die with it (FINAL RULE 10).
                 // A WICK through Daily Open does NOT invalidate (FINAL RULE 11).
-                // Completed bars only — never intrabar.
+                // Completed bars only - never intrabar.
                 // ==========================================================
                 bool invalidatedThisBar = false;
                 if (state != VbrState.POSITION_OPEN && !double.IsNaN(dailyOpenAtTrigger) && validityCount <= 4)
@@ -302,7 +302,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 if (state == VbrState.STOPPED_OUT_REENTRY_ELIGIBILITY_PENDING
                     && validityCount == stopOutFormingCandleNum)
                 {
-                    // §8: the SAME 15m candle that contained the stopped 1m attempt
+                    // S8: the SAME 15m candle that contained the stopped 1m attempt
                     // must wick into/through Daily Open and ultimately close back on
                     // the trade side of it.
                     bool eligible = isLong
@@ -315,14 +315,14 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                         state = VbrState.REENTRY_SCAN;
                         ResetPattern();
                         host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                            "RE-ENTRY ELIGIBLE: stop-out candle #{0} wicked DO {1:0.00} and closed {2:0.00} on trade side — scanning fresh 1m setup during candle #{3} (spec §8)",
+                            "RE-ENTRY ELIGIBLE: stop-out candle #{0} wicked DO {1:0.00} and closed {2:0.00} on trade side - scanning fresh 1m setup during candle #{3} (spec S8)",
                             validityCount, dailyOpenAtTrigger, bar.Close, reentryScanCandleNum));
                     }
                     else
                     {
                         host.Diag(StrategyId.VECTOR_BREAK_RETEST, eligible
-                            ? "re-entry not possible: original 4-candle window exhausted (spec §8)"
-                            : "re-entry NOT eligible: stop-out 15m candle failed the wick/close rule (spec §8) — setup finished");
+                            ? "re-entry not possible: original 4-candle window exhausted (spec S8)"
+                            : "re-entry NOT eligible: stop-out 15m candle failed the wick/close rule (spec S8) - setup finished");
                         ResetSetup();
                     }
                 }
@@ -332,7 +332,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                     if (cfg.ReentryScanOnlyFollowingCandle)
                     {
                         host.Diag(StrategyId.VECTOR_BREAK_RETEST,
-                            "re-entry scan candle completed with no entry — setup finished (LEGACY flag, not V6)");
+                            "re-entry scan candle completed with no entry - setup finished (LEGACY flag, not V6)");
                         ResetSetup();
                     }
                     else
@@ -340,7 +340,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                         // V6 U7 ROLLING RE-QUALIFICATION: permission propagates one
                         // 15m candle at a time inside the ORIGINAL 4-candle clock.
                         // "#4 may scan only if #3 itself closes on the correct side"
-                        // — the rolling candle needs only the correct-side close; the
+                        // - the rolling candle needs only the correct-side close; the
                         // wick-into-Daily-Open test applies to the stop-out candle.
                         bool correctSideClose = isLong
                             ? bar.Close > dailyOpenAtTrigger
@@ -349,7 +349,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                         if (!correctSideClose)
                         {
                             host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                                "ROLLING RE-ENTRY BROKEN: candle #{0} closed {1:0.00} on the WRONG side of DAILY_OPEN {2:0.00} — no further re-entry (V6 U7)",
+                                "ROLLING RE-ENTRY BROKEN: candle #{0} closed {1:0.00} on the WRONG side of DAILY_OPEN {2:0.00} - no further re-entry (V6 U7)",
                                 validityCount, bar.Close, dailyOpenAtTrigger));
                             ResetSetup();
                         }
@@ -357,7 +357,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                         {
                             // clock never restarts or extends
                             host.Diag(StrategyId.VECTOR_BREAK_RETEST,
-                                "ORIGINAL 4-candle clock ended — setup EXPIRED (V6 U7: clock never restarts or extends)");
+                                "ORIGINAL 4-candle clock ended - setup EXPIRED (V6 U7: clock never restarts or extends)");
                             ResetSetup();
                         }
                         else
@@ -365,16 +365,16 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                             reentryScanCandleNum = validityCount + 1;
                             ResetPattern();
                             host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                                "ROLLING RE-ENTRY: candle #{0} closed {1:0.00} on the correct side of DAILY_OPEN — candle #{2} may scan for a FRESH 1m setup (V6 U7)",
+                                "ROLLING RE-ENTRY: candle #{0} closed {1:0.00} on the correct side of DAILY_OPEN - candle #{2} may scan for a FRESH 1m setup (V6 U7)",
                                 validityCount, bar.Close, reentryScanCandleNum));
                         }
                     }
                 }
                 else if (state == VbrState.PARENT_15M_ACTIVE_SEARCHING_1M && validityCount >= 4)
                 {
-                    // §2/§3: exactly the NEXT 4 completed 15m candles; NO +2 extension.
+                    // S2/S3: exactly the NEXT 4 completed 15m candles; NO +2 extension.
                     host.Diag(StrategyId.VECTOR_BREAK_RETEST,
-                        "parent setup EXPIRED: 4 validity candles completed with no entry (no extension, spec §2/§3)");
+                        "parent setup EXPIRED: 4 validity candles completed with no entry (no extension, spec S2/S3)");
                     ResetSetup();
                 }
                 else if (state != VbrState.POSITION_OPEN && host.IsAfterEntryCutoff(bar.EtClose))
@@ -385,7 +385,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 }
             }
 
-            // ---- parent trigger (§2 long / §3 short) ----
+            // ---- parent trigger (S2 long / S3 short) ----
             bool mayTrigger = state == VbrState.IDLE
                 || (state == VbrState.PARENT_15M_ACTIVE_SEARCHING_1M && cfg.RetriggerReplacesActiveSetup);
             if (!mayTrigger || !host.InstrumentOk) return;
@@ -406,7 +406,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             }
             if (!longTrig && !shortTrig) return;
 
-            // FINAL RULE 1 — HARD parent candle size filter. Checked AFTER the vector
+            // FINAL RULE 1 - HARD parent candle size filter. Checked AFTER the vector
             // and close-side conditions so the rejection log only fires for candles
             // that would otherwise have become parents.
             double parentRange = bar.High - bar.Low;
@@ -441,8 +441,8 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         }
 
         // ==================================================================
-        // 1-MINUTE SERIES — entry patterns A/B (§4-§7), position management
-        // (§9 + shared section D)
+        // 1-MINUTE SERIES - entry patterns A/B (S4-S7), position management
+        // (S9 + shared section D)
         // ==================================================================
         public void OnOneMinuteBar(BarSnap bar)
         {
@@ -457,10 +457,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             if (state != VbrState.PARENT_15M_ACTIVE_SEARCHING_1M && state != VbrState.REENTRY_SCAN)
                 return;
 
-            // entries only during valid 15m candles #1..#4 (§2/§3)
+            // entries only during valid 15m candles #1..#4 (S2/S3)
             int formingCandle = validityCount + 1;
             if (formingCandle > 4) return;
-            // re-entry scan restricted to its designated following candle (§8/VBR-4)
+            // re-entry scan restricted to its designated following candle (S8/VBR-4)
             // Re-entry scanning is confined to the currently authorized validity
             // candle (V6 U7: permission rolls forward one candle at a time).
             if (state == VbrState.REENTRY_SCAN && formingCandle != reentryScanCandleNum)
@@ -474,7 +474,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 bool reclaim = isLong ? bar.Close > dOpen : bar.Close < dOpen;
                 if (!reclaim)
                 {
-                    // still through Daily Open — extend the structure extreme (§5/§7 stop basis)
+                    // still through Daily Open - extend the structure extreme (S5/S7 stop basis)
                     if (isLong) { if (bar.Low < structExtreme) structExtreme = bar.Low; }
                     else { if (bar.High > structExtreme) structExtreme = bar.High; }
                     return;
@@ -497,7 +497,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 }
                 else if (cfg.PatternBWaitForEma)
                 {
-                    // FINAL RULE 8: keep waiting — but ONLY while the original 15m
+                    // FINAL RULE 8: keep waiting - but ONLY while the original 15m
                     // parent stays valid. The 15m invalidation in OnFifteenMinuteBar
                     // clears this state outright (FINAL RULE 10).
                     waitingEmaB = true;
@@ -506,7 +506,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 else
                 {
                     host.Diag(StrategyId.VECTOR_BREAK_RETEST,
-                        "Pattern B reclaim failed the EMA condition — structure cleared (LEGACY flag, not V6)");
+                        "Pattern B reclaim failed the EMA condition - structure cleared (LEGACY flag, not V6)");
                     ResetPattern();
                 }
                 return;
@@ -522,7 +522,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 bool backThroughDo = isLong ? bar.Close < dOpen : bar.Close > dOpen;
                 if (backThroughDo)
                 {
-                    // FINAL RULE 9 — ROOT-CAUSE FIX.
+                    // FINAL RULE 9 - ROOT-CAUSE FIX.
                     // A completed 1m close back through Daily Open is a NEW step-1 and
                     // therefore a NEW LOCAL structure. The previous implementation
                     // RESUMED the old extreme here (min/max against the stale value),
@@ -531,10 +531,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                     // parent window. The extreme is now seeded from THIS candle only.
                     waitingEmaB = false;
                     structActive = true;
-                    structExtreme = isLong ? bar.Low : bar.High;   // FRESH — never inherited
+                    structExtreme = isLong ? bar.Low : bar.High;   // FRESH - never inherited
                     structStartEt = bar.EtClose;
                     host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                        "PATTERN_B_STRUCTURE_START direction={0} time={1:yyyy-MM-dd HH:mm} dailyOpen={2:0.00} structureExtreme={3:0.00} (fresh excursion — previous structure discarded)",
+                        "PATTERN_B_STRUCTURE_START direction={0} time={1:yyyy-MM-dd HH:mm} dailyOpen={2:0.00} structureExtreme={3:0.00} (fresh excursion - previous structure discarded)",
                         isLong ? "LONG" : "SHORT", bar.EtClose, dOpen, structExtreme));
                     return;
                 }
@@ -563,7 +563,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 if (patAActive)
                 {
                     host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                        "PATTERN_A_CANCELLED reason=COMPLETED_1M_CLOSE_THROUGH_DAILY_OPEN close={0:0.00} dailyOpen={1:0.00} — routing to Pattern B",
+                        "PATTERN_A_CANCELLED reason=COMPLETED_1M_CLOSE_THROUGH_DAILY_OPEN close={0:0.00} dailyOpen={1:0.00} - routing to Pattern B",
                         bar.Close, dOpen));
                     patAActive = false; patAHigh = double.NaN; patALow = double.NaN;
                     patAStartEt = DateTime.MinValue;
@@ -577,7 +577,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 return;
             }
 
-            // ---------- PATTERN A — Daily Open retest FIRST, EMA(9) confirmation SECOND.
+            // ---------- PATTERN A - Daily Open retest FIRST, EMA(9) confirmation SECOND.
             // The retest candle wicks/touches Daily Open and closes back on the trade
             // side WITHOUT closing through it. That builds the LOCAL retest structure.
             // Entry then waits for a completed 1m close through the 1m EMA(9) while the
@@ -607,7 +607,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 bool laterCandle = bar.EtClose > patAStartEt;
                 if (emaOk && (cfg.PatternAAllowSameCandleEmaEntry || laterCandle))
                 {
-                    // STOP: the LOW/HIGH of the LOCAL Daily Open retest structure —
+                    // STOP: the LOW/HIGH of the LOCAL Daily Open retest structure -
                     // never the 15m parent wick.
                     double stop = isLong ? patALow : patAHigh;
                     double elapsed = (bar.EtClose - patAStartEt).TotalMinutes;
@@ -627,7 +627,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         }
 
         // ==================================================================
-        // Entry — grade A+ / 50% risk (spec GRADE), MNQ sizing, time gates
+        // Entry - grade A+ / 50% risk (spec GRADE), MNQ sizing, time gates
         // ==================================================================
         private void TryEnter(BarSnap bar, string pattern, double stop)
         {
@@ -641,7 +641,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 return;
             }
 
-            // V6 U9: an open FB position does NOT block this entry — the host
+            // V6 U9: an open FB position does NOT block this entry - the host
             // flattens FB first and submits this order only once flat is confirmed.
             if (!host.CanOpenPosition(StrategyId.VECTOR_BREAK_RETEST))
             {
@@ -721,7 +721,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         }
 
         // ==================================================================
-        // Position management — spec §9 + shared engine section D:
+        // Position management - spec S9 + shared engine section D:
         // 50-point chaining through the 18-level engine, then 1m EMA(9) trail
         // (90%) and final-10% structure-break runner. Wicks never count.
         // ==================================================================
@@ -742,7 +742,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             }
 
             // ==============================================================
-            // RISK-BASED EXIT (2026-08-14) — replaces the 50-point target chain.
+            // RISK-BASED EXIT (2026-08-14) - replaces the 50-point target chain.
             // There is no target-distance test anywhere in this path: no <=50pt HOLD,
             // no >50pt trail activation, and no key-level touch can close the trade.
             //
@@ -785,7 +785,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                         isLong ? TradeDirection.Long : TradeDirection.Short, exitQty, Tp90Signal, EntrySignal);
 
                     // Protect the runner at breakeven. The stop is only ever moved in
-                    // the favourable direction — it can never be widened.
+                    // the favourable direction - it can never be widened.
                     if (runnerQty > 0)
                     {
                         bool tighter = isLong ? breakevenPrice > stopPrice : breakevenPrice < stopPrice;
@@ -838,7 +838,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             {
                 mfeExtreme = price;
                 maeExtreme = price;
-                // structure stop, live until cancelled (§4-§7 STOP definitions)
+                // structure stop, live until cancelled (S4-S7 STOP definitions)
                 host.SubmitOrUpdateStop(StrategyId.VECTOR_BREAK_RETEST,
                     isLong ? TradeDirection.Long : TradeDirection.Short,
                     qtyTotal, stopPrice, StopSignal, EntrySignal);
@@ -855,7 +855,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 runnerQty = 0;
 
                 // Describe the plan against the ACTUALLY FILLED quantity, which is what
-                // the TP1 split will really operate on — not the intended size.
+                // the TP1 split will really operate on - not the intended size.
                 int planBase = qtyOpen;
                 int planExit = planBase <= 1 ? planBase : (int)Math.Floor(planBase * cfg.Tp1ExitFraction);
                 if (planBase > 1) { if (planExit < 1) planExit = 1; if (planExit >= planBase) planExit = planBase - 1; }
@@ -983,14 +983,14 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             bool fullStopOut = reason == "STOP_LOSS" && !anyProfitLeg && !tp1Reached;
             if (fullStopOut)
             {
-                // §8: a stop-out does NOT kill the parent and does NOT restart the
-                // clock — check the wick/close rule when the current 15m candle completes.
+                // S8: a stop-out does NOT kill the parent and does NOT restart the
+                // clock - check the wick/close rule when the current 15m candle completes.
                 reentryCount++;
                 stopOutFormingCandleNum = validityCount + 1;
                 state = VbrState.STOPPED_OUT_REENTRY_ELIGIBILITY_PENDING;
                 ResetPattern();
                 host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(
-                    "STOPPED OUT during validity candle #{0} — re-entry eligibility pending on that candle's close (spec §8)",
+                    "STOPPED OUT during validity candle #{0} - re-entry eligibility pending on that candle's close (spec S8)",
                     stopOutFormingCandleNum));
             }
             else

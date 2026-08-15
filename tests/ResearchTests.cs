@@ -121,7 +121,7 @@ namespace MnqTwoTests
             };
             Check(int.Parse(g2("barToStopLong")) == 1, "the stop is recorded on the exact bar it was hit (bar 1)");
             int b1r = int.Parse(g2("barToLong_1R"));
-            Check(b1r > 1, "+1R was reached only later (bar " + b1r + ") — the race order is preserved");
+            Check(b1r > 1, "+1R was reached only later (bar " + b1r + ") - the race order is preserved");
 
             // ---- the engine NEVER submits an order: it has no order surface at all ----
             bool hasOrderApi = false;
@@ -129,7 +129,7 @@ namespace MnqTwoTests
                 if (m.Name.IndexOf("Enter", StringComparison.OrdinalIgnoreCase) >= 0
                  || m.Name.IndexOf("Exit", StringComparison.OrdinalIgnoreCase) >= 0
                  || m.Name.IndexOf("Order", StringComparison.OrdinalIgnoreCase) >= 0) hasOrderApi = true;
-            Check(!hasOrderApi, "the research engine exposes NO entry/exit/order method — it cannot trade");
+            Check(!hasOrderApi, "the research engine exposes NO entry/exit/order method - it cannot trade");
 
             // ---- level interaction is classified against the market's OWN levels ----
             Check(get("YDAY_HIGH_interaction") != "<missing>", "per-level interaction columns are present");

@@ -1,7 +1,7 @@
 // ============================================================================
 // VectorCandleResearchEngine.cs
 //
-// RESEARCH MODULE — SUBMITS NO ORDERS, EVER.
+// RESEARCH MODULE - SUBMITS NO ORDERS, EVER.
 //
 // Purpose: build an UNBIASED event dataset of every completed MNQ 1-minute
 // Traders Reality vector candle, with the context that was known AT THAT

@@ -1,5 +1,5 @@
 // ============================================================================
-// MockHost.cs — deterministic test host for the two strategy engines.
+// MockHost.cs - deterministic test host for the two strategy engines.
 // Implements IMnqHost with fixed session times (9:30-11:30 ET), $10,000
 // balance, MNQ tick size 0.25, and records every order/diagnostic so tests
 // can assert on engine behavior without NinjaTrader.

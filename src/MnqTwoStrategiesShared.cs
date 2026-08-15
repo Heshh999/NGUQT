@@ -55,7 +55,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     }
 
     // Spec: "The shared take-profit engine contains exactly 18 SELECTABLE target levels"
-    // V6.1 — the take-profit universe grows from 18 to 21 selectable levels with the
+    // V6.1 - the take-profit universe grows from 18 to 21 selectable levels with the
     // addition of TradingView's built-in Session VWAP and its band pair. This is a
     // deliberate SPEC CHANGE requested by the user, not a fix.
     public enum TpLevelId
@@ -73,7 +73,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
     public enum TradeDirection { Long, Short }
 
-    // V6 U1 — LOCKED: the Fake Breakout first target is "successfully broken" ONLY
+    // V6 U1 - LOCKED: the Fake Breakout first target is "successfully broken" ONLY
     // by a COMPLETED 1-MINUTE CLOSE beyond it in the trade direction; a wick/touch
     // does NOT count. OneMinuteCloseBeyond is therefore the exact-spec default; the
     // other members are retained for research only.
@@ -93,7 +93,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         FirstTradableCandle       // V5 default: first candle where entries are permitted
     }
 
-    // V6 U2 — LOCKED: a VBR key level is REACHED on a wick/touch of the target
+    // V6 U2 - LOCKED: a VBR key level is REACHED on a wick/touch of the target
     // price; a completed close beyond it is NOT required. IntrabarTouch is the
     // exact-spec default.
     public enum TargetReachedMode
@@ -187,10 +187,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     // Spec: "SHARED TAKE-PROFIT KEY-LEVEL ENGINE" sections A + B + C, and the
     // trigger-level values for both strategies.
     //
-    // V5 correction Fix 4 — faithful port of the SUPPLIED Traders Reality
+    // V5 correction Fix 4 - faithful port of the SUPPLIED Traders Reality
     // library (Traders_Reality_Lib, Pine v5):
     //
-    //   DAILY_OPEN — TR getdayOpen(): dlyOpen := open on ta.change(time('D')),
+    //   DAILY_OPEN - TR getdayOpen(): dlyOpen := open on ta.change(time('D')),
     //     i.e. the open of the first bar of the instrument's new exchange day.
     //     For CME MNQ on TradingView the daily bar boundary is the session open
     //     at 17:00 CT = 18:00 ET, so the faithful default here is 18:00 ET
@@ -198,17 +198,17 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     //     midnight" comment describes forex/crypto symbols; set the
     //     compatibility parameter to 0 to reproduce that literal behavior.
     //
-    //   YDAY_HIGH/LOW, LWEEK_HIGH/LOW — CONFIRMED against TR_MAIN (main indicator):
+    //   YDAY_HIGH/LOW, LWEEK_HIGH/LOW - CONFIRMED against TR_MAIN (main indicator):
     //     dayHigh/dayLow = f_security(tickerid,'D',high/low,false) plotted as
     //     "YDay Hi"/"YDay Lo" (lines 309-310, 348-351); weekHigh/weekLow =
     //     f_security(tickerid,'W',...) plotted as "LWeek Hi"/"LWeek Lo"
     //     (lines 337-338, 353-356). The non-repainting wrapper
     //         request.security(sym,res,src[isrealtime?1:0])[isrealtime?0:1]
     //     returns the PREVIOUS COMPLETED daily/weekly value on both the
-    //     historical and realtime branches — i.e. exactly these prev-day /
+    //     historical and realtime branches - i.e. exactly these prev-day /
     //     prev-week aggregates, changing only at the boundary.
     //
-    //   PSY_HIGH/LOW — direct port of calcPsyLevels(), with psyType taken from
+    //   PSY_HIGH/LOW - direct port of calcPsyLevels(), with psyType taken from
     //     TR_MAIN line 243: syminfo.type == 'forex' ? 'forex' : 'crypto'. MNQ is
     //     'futures', so the CRYPTO path is the faithful default. See
     //     IsInPsySession for the session windows and the 4H-grid note.
@@ -216,7 +216,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     //     max(high)/min(low) while in session, and hold their last value outside
     //     it. Sydney DST comes from a port of calcDst().
     //
-    //   Pivots/M-levels — CONFIRMED against TR_MAIN: pivotPoint/R/S computed from
+    //   Pivots/M-levels - CONFIRMED against TR_MAIN: pivotPoint/R/S computed from
     //     the same previous-completed-day f_security values (lines 316-324) and
     //     m0C..m5C (lines 569-574) match the implemented formulas exactly.
     // ------------------------------------------------------------------
@@ -268,7 +268,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public PsyLevelType PsyType = PsyLevelType.Forex;
         // COMPATIBILITY ONLY (default OFF): TR tests session membership through
         // time('240', session, gmt). Reproducing that needs TradingView's 4H-bar
-        // anchor, which cannot be verified from the source alone — and anchoring
+        // anchor, which cannot be verified from the source alone - and anchoring
         // the grid to the exchange-day open makes the source's own forex branch
         // ('0000-0800:2' GMT) fall permanently out of session, which cannot be the
         // intended behavior. The literal session window is therefore the default;
@@ -282,7 +282,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
         // ---- V7: optional intraday session filter -------------------------------
         // OFF by default, so MNQ and ES (both CME, 18:00 ET exchange day) aggregate
-        // exactly as before — this is a strict no-op for every pre-V7 caller.
+        // exactly as before - this is a strict no-op for every pre-V7 caller.
         // It exists for a cash/ETF confirmation market with no 18:00 ET exchange day: the
         // user specified its key levels come from the RTH cash session only
         // (09:30-16:00 ET). Bars whose OPEN falls outside the window are ignored
@@ -604,7 +604,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     }
 
     // ------------------------------------------------------------------
-    // Spec: "GLOBAL: POSITION SIZING" — MNQ ONLY, $2 per index point.
+    // Spec: "GLOBAL: POSITION SIZING" - MNQ ONLY, $2 per index point.
     // ------------------------------------------------------------------
     public static class PositionSizer
     {
@@ -804,7 +804,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     }
 
     // ------------------------------------------------------------------
-    // V6 U9 — STRATEGY HANDOFF
+    // V6 U9 - STRATEGY HANDOFF
     //
     // FAKE_BREAKOUT and VECTOR_BREAK_RETEST must never hold MNQ positions at the
     // same time. When one strategy is open and the OTHER produces a fully valid
@@ -819,7 +819,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     // NinjaTrader host and the deterministic test host execute the SAME logic.
     //
     // Note this is pure execution sequencing: no setup state, grade, stop, size or
-    // target is shared between the engines — the replacement strategy uses only
+    // target is shared between the engines - the replacement strategy uses only
     // its own values (V6 U9).
     // ------------------------------------------------------------------
     public class HandoffCoordinator
@@ -877,14 +877,14 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             awaitingFlatOf = other;
             if (diag != null)
                 diag(id, string.Format(CultureInfo.InvariantCulture,
-                    "HANDOFF: {0} holds an open position — flattening it first; {1} entry ({2} x{3}) is PARKED until flat is confirmed (V6 U9)",
+                    "HANDOFF: {0} holds an open position - flattening it first; {1} entry ({2} x{3}) is PARKED until flat is confirmed (V6 U9)",
                     other, signal, dir, qty));
             if (otherOpen)
                 flattenStrategy(other);
         }
 
         /// Called by the host once the ACCOUNT is confirmed flat (position update /
-        /// exit fill). Releases the parked replacement entry — and only then.
+        /// exit fill). Releases the parked replacement entry - and only then.
         public void NotifyFlat()
         {
             if (pending == null) return;
@@ -892,7 +892,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             pending = null;
             if (diag != null)
                 diag(p.Id, string.Format(CultureInfo.InvariantCulture,
-                    "HANDOFF: {0} flat confirmed — submitting parked {1} entry ({2} x{3}) (V6 U9)",
+                    "HANDOFF: {0} flat confirmed - submitting parked {1} entry ({2} x{3}) (V6 U9)",
                     awaitingFlatOf, p.Signal, p.Dir, p.Qty));
             submit(p.Id, p.Dir, p.Qty, p.Signal);
         }
@@ -904,10 +904,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     // other or the other engine's orders (spec hard separation rule).
     // ------------------------------------------------------------------
     // ======================================================================
-    // V7 — CROSS-MARKET CONFIRMATION (FAKE BREAKOUT ONLY)
+    // V7 - CROSS-MARKET CONFIRMATION (FAKE BREAKOUT ONLY)
     //
     // ES and YM are CONFIRMATION markets. They never produce a setup, never
-    // size a trade and never receive an order — the traded instrument is MNQ
+    // size a trade and never receive an order - the traded instrument is MNQ
     // and nothing here can submit anything. Their only job is to answer one
     // question at the moment an already-valid MNQ Fake Breakout entry fires:
     //
@@ -930,7 +930,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public bool Confirmed;
         /// TRUE when this market could not be evaluated at all (no bars, or its own
         /// equivalent level was not computable). Confirmed==false with Unavailable==true
-        /// means UNKNOWN — it must never be graded as "this market did not confirm".
+        /// means UNKNOWN - it must never be graded as "this market did not confirm".
         public bool Unavailable;
         public DateTime BarEtClose;      // bar on which reclaim+EMA completed
         public KeyLevelId LevelId;       // that market's OWN equivalent level
@@ -1023,7 +1023,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public int MaxBarsBreakToReclaim = 4;
         // User specification 2026-08-14: "for es and ym the emas dont matter".
         // Confirmation is break + reclaim only. The MNQ engine's own EMA(9) rule is
-        // untouched — this flag applies solely to the confirmation markets. Left
+        // untouched - this flag applies solely to the confirmation markets. Left
         // configurable so the stricter behavior can be restored without a code change.
         public bool RequireEmaConfirmation = false;
         // Mirrors the MNQ rule "premarket LTF patterns are never banked".
@@ -1136,7 +1136,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
             if (!s.Active)
             {
-                // ---- break candle (mirror of FB §9/§10 break rules) ----
+                // ---- break candle (mirror of FB S9/S10 break rules) ----
                 bool breakClose = isLong ? bar.Close < lvl : bar.Close > lvl;
                 if (!breakClose) return;
                 bool breakVecOk = isLong
@@ -1155,7 +1155,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 s.BarsSinceBreak = 0;
                 DayBreaks++;
                 Ev(string.Format(CultureInfo.InvariantCulture,
-                    "{0} {1}m {2}: fake-break started at {3} ({4:0.00}) — {5} close {6:0.00}, awaiting reclaim within {7} bars [{8:HH:mm}]",
+                    "{0} {1}m {2}: fake-break started at {3} ({4:0.00}) - {5} close {6:0.00}, awaiting reclaim within {7} bars [{8:HH:mm}]",
                     Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
                     bar.Vector, bar.Close, MaxBarsBreakToReclaim, bar.EtClose));
                 return;
@@ -1166,7 +1166,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 bool reclaimClose = isLong ? bar.Close > lvl : bar.Close < lvl;
                 if (!reclaimClose)
                 {
-                    // still beyond the level — extend the structure, but the reclaim
+                    // still beyond the level - extend the structure, but the reclaim
                     // window is finite (this is what the 15m parent bounds on MNQ).
                     if (isLong) { if (bar.Low < s.StructExtreme) s.StructExtreme = bar.Low; }
                     else { if (bar.High > s.StructExtreme) s.StructExtreme = bar.High; }
@@ -1174,7 +1174,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                     {
                         s.Reset(); DayWindowExpired++;
                         Ev(string.Format(CultureInfo.InvariantCulture,
-                            "{0} {1}m {2}: NO CONFIRM — never reclaimed {3} ({4:0.00}) within {5} bars [{6:HH:mm}]",
+                            "{0} {1}m {2}: NO CONFIRM - never reclaimed {3} ({4:0.00}) within {5} bars [{6:HH:mm}]",
                             Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
                             MaxBarsBreakToReclaim, bar.EtClose));
                     }
@@ -1184,13 +1184,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 {
                     s.Reset(); DayWindowExpired++;
                     Ev(string.Format(CultureInfo.InvariantCulture,
-                        "{0} {1}m {2}: NO CONFIRM — reclaimed {3} ({4:0.00}) but {5} bars after the break (limit {6}) [{7:HH:mm}]",
+                        "{0} {1}m {2}: NO CONFIRM - reclaimed {3} ({4:0.00}) but {5} bars after the break (limit {6}) [{7:HH:mm}]",
                         Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
                         s.BarsSinceBreak, MaxBarsBreakToReclaim, bar.EtClose));
                     return;
                 }
 
-                // ---- reclaim candle vector rules (mirror of FB §9/§10) ----
+                // ---- reclaim candle vector rules (mirror of FB S9/S10) ----
                 bool reclaimVecOk;
                 if (isLong)
                     reclaimVecOk = bar.Vector == VectorType.GREEN_VECTOR || bar.Vector == VectorType.BLUE_VECTOR;
@@ -1204,7 +1204,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 if (!reclaimVecOk)
                 {
                     Ev(string.Format(CultureInfo.InvariantCulture,
-                        "{0} {1}m {2}: NO CONFIRM — reclaimed {3} ({4:0.00}) but reclaim vector {5} invalid after break vector {6} [{7:HH:mm}]",
+                        "{0} {1}m {2}: NO CONFIRM - reclaimed {3} ({4:0.00}) but reclaim vector {5} invalid after break vector {6} [{7:HH:mm}]",
                         Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
                         bar.Vector, s.BreakVector, bar.EtClose));
                     s.Reset(); DayReclaimRejectedVector++; return;
@@ -1220,7 +1220,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 {
                     s.WaitingEma = true; DayAwaitingEma++;
                     Ev(string.Format(CultureInfo.InvariantCulture,
-                        "{0} {1}m {2}: valid reclaim of {3} ({4:0.00}) but close {5:0.00} not yet through EMA9 {6:0.00} — waiting [{7:HH:mm}]",
+                        "{0} {1}m {2}: valid reclaim of {3} ({4:0.00}) but close {5:0.00} not yet through EMA9 {6:0.00} - waiting [{7:HH:mm}]",
                         Label, TfMinutes, isLong ? "BULLISH" : "BEARISH", Eligible[li], lvl,
                         bar.Close, bar.Ema9, bar.EtClose));
                 }
@@ -1285,14 +1285,14 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             if (BarsSeen == 0)
             {
                 miss.Unavailable = true;
-                miss.Reason = string.Format("{0} {1}m: UNKNOWN — this series delivered ZERO bars (no data loaded)", Label, TfMinutes);
+                miss.Reason = string.Format("{0} {1}m: UNKNOWN - this series delivered ZERO bars (no data loaded)", Label, TfMinutes);
                 return miss;
             }
             if (double.IsNaN(miss.LevelPrice))
             {
                 miss.Unavailable = true;
                 miss.Reason = string.Format(
-                    "{0} {1}m: UNKNOWN — {2} could not be computed for {0} (level is NaN; needs >=2 sessions of {0} history)",
+                    "{0} {1}m: UNKNOWN - {2} could not be computed for {0} (level is NaN; needs >=2 sessions of {0} history)",
                     Label, TfMinutes, id);
                 return miss;
             }
@@ -1302,7 +1302,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             if (!c.Confirmed)
             {
                 miss.Reason = string.Format(CultureInfo.InvariantCulture,
-                    "{0} {1}m: no {2} fake-break confirmation recorded at {3} ({4:0.00}) — evaluated, did not occur",
+                    "{0} {1}m: no {2} fake-break confirmation recorded at {3} ({4:0.00}) - evaluated, did not occur",
                     Label, TfMinutes, isLong ? "bullish" : "bearish", id, miss.LevelPrice);
                 return miss;
             }
@@ -1313,7 +1313,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 // The stored confirmation is LATER than the MNQ decision bar. Using it
                 // would be lookahead. Never allowed, at any tolerance.
                 miss.Reason = string.Format(CultureInfo.InvariantCulture,
-                    "{0} {1}m: confirmation at {2:HH:mm} is AFTER the MNQ decision bar {3:HH:mm} — rejected (no lookahead)",
+                    "{0} {1}m: confirmation at {2:HH:mm} is AFTER the MNQ decision bar {3:HH:mm} - rejected (no lookahead)",
                     Label, TfMinutes, c.BarEtClose, barEtClose);
                 return miss;
             }

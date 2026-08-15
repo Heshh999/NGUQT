@@ -1,4 +1,4 @@
-// Minimal NinjaTrader 8 API stubs — SYNTAX/BINDING CHECK ONLY.
+// Minimal NinjaTrader 8 API stubs - SYNTAX/BINDING CHECK ONLY.
 // Not a behavioral model of NT8; it exists so the host file's member usage,
 // overloads and enum names can be verified by a compiler instead of by eye.
 using System;
