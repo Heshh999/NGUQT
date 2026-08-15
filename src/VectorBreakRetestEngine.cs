@@ -59,7 +59,25 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // LEGACY research flag, must stay FALSE.
         public bool SingleContractBecomesRunner = false;
 
-        public double ChainMaxDistancePoints = 50.0;      // spec §9 / section D: 50-point rule
+        // RETIRED (2026-08-14): the 50-point target-chain rule no longer controls any
+        // VBR exit. Kept only so older saved configurations still deserialize; nothing
+        // in the profit path reads it.
+        public double ChainMaxDistancePoints = 50.0;
+
+        // ---- RISK-BASED EXIT SYSTEM (2026-08-14) ----------------------------
+        // TP1 is a fixed fraction of the INITIAL structural risk, measured from the
+        // ACTUAL filled entry. At TP1 most of the position is banked and the remainder
+        // is protected at breakeven and run against the 1m EMA(9).
+        public double Tp1RMultiple = 0.75;      // LOCKED for this pass
+        public double Tp1ExitFraction = 0.80;   // LOCKED for this pass (runner = the rest)
+
+        // Pattern A ambiguity, exposed rather than guessed. The specification says
+        // "DO NOT automatically enter on the retest candle" (short) but "Do NOT
+        // NECESSARILY enter on the retest candle" (long). TRUE keeps the previous
+        // behavior available - a retest candle that already closes through the EMA(9)
+        // may enter immediately - while still allowing the new wait. FALSE forces the
+        // confirmation onto a strictly later candle.
+        public bool PatternAAllowSameCandleEmaEntry = true;
 
         // FINAL RULE 1 — HARD parent candle size filter. A 15m vector candle whose
         // total High-Low range is below this many index points can NEVER create a
@@ -133,6 +151,19 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         private bool waitingEmaB;                         // only used when PatternBWaitForEma = true
         private DateTime structStartEt = DateTime.MinValue;   // when THIS local Pattern B structure began
 
+        // ---- Pattern A: LOCAL Daily Open retest structure, then EMA(9) confirmation ----
+        private bool patAActive;
+        private double patAHigh = double.NaN;
+        private double patALow = double.NaN;
+        private DateTime patAStartEt = DateTime.MinValue;
+
+        // ---- risk-based exit state (replaces the 50-point target chain) ----
+        private double initialRiskPoints;
+        private double tp1Price = double.NaN;
+        private bool tp1Reached;
+        private int runnerQty;
+        private double breakevenPrice = double.NaN;
+
         // ---- re-entry state (spec §8) ----
         private int reentryCount;                         // number of re-entries taken (0 = original)
         private int stopOutFormingCandleNum;              // 15m validity candle containing the stop-out
@@ -159,10 +190,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         private bool anyProfitLeg;
 
         // ---- 50-point target chain (spec §9 / shared section D) ----
+        // The 50-point target chain is GONE. These remain only to describe the trade
+        // in the CSV record; nothing reads them to make an exit decision.
         private double refPrice = double.NaN;
-        private TpTarget activeTarget;
-        private bool trailActivated;
-        private bool tp90Done;
 
         private SupportingStructureTracker structure;   // V6 U3
 
@@ -201,6 +231,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             waitingEmaB = false;
             structExtreme = double.NaN;
             structStartEt = DateTime.MinValue;
+            patAActive = false;
+            patAHigh = double.NaN;
+            patALow = double.NaN;
+            patAStartEt = DateTime.MinValue;
             reentryCount = 0;
             stopOutFormingCandleNum = 0;
             reentryScanCandleNum = 0;
@@ -212,6 +246,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             waitingEmaB = false;
             structExtreme = double.NaN;
             structStartEt = DateTime.MinValue;
+            patAActive = false;
+            patAHigh = double.NaN;
+            patALow = double.NaN;
+            patAStartEt = DateTime.MinValue;
         }
 
         // ==================================================================
@@ -515,13 +553,21 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 return;
             }
 
-            // ---------- fresh pattern detection ----------
+            // ---------- PATTERN B takes precedence: a completed 1m CLOSE through
+            //            Daily Open is Pattern B territory and can never be Pattern A.
             bool closedThrough = isLong ? bar.Close < dOpen : bar.Close > dOpen;
             if (closedThrough)
             {
-                // §5/§7 step 1: completed 1m close through Daily Open starts Pattern B.
                 // GLOBAL ENTRY-TIME RULE: only patterns forming at/after 9:30 ET count.
                 if (!host.IsAtOrAfterSessionStart(bar.EtOpen)) return;
+                if (patAActive)
+                {
+                    host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                        "PATTERN_A_CANCELLED reason=COMPLETED_1M_CLOSE_THROUGH_DAILY_OPEN close={0:0.00} dailyOpen={1:0.00} — routing to Pattern B",
+                        bar.Close, dOpen));
+                    patAActive = false; patAHigh = double.NaN; patALow = double.NaN;
+                    patAStartEt = DateTime.MinValue;
+                }
                 structActive = true;
                 structExtreme = isLong ? bar.Low : bar.High;
                 structStartEt = bar.EtClose;
@@ -531,23 +577,51 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 return;
             }
 
-            // §4/§6 Pattern A — wick retest that holds:
-            //  long: wick into DO (low <= DO), close back above it, close already above EMA9
-            bool wicked = isLong ? (bar.Low <= dOpen && bar.Close > dOpen) : (bar.High >= dOpen && bar.Close < dOpen);
-            if (wicked)
+            // ---------- PATTERN A — Daily Open retest FIRST, EMA(9) confirmation SECOND.
+            // The retest candle wicks/touches Daily Open and closes back on the trade
+            // side WITHOUT closing through it. That builds the LOCAL retest structure.
+            // Entry then waits for a completed 1m close through the 1m EMA(9) while the
+            // parent, the 4-candle clock and the retest structure all remain valid.
+            bool touchedDo = isLong ? bar.Low <= dOpen : bar.High >= dOpen;
+            if (touchedDo && !patAActive)
             {
                 if (!host.IsAtOrAfterSessionStart(bar.EtOpen)) return;
+                patAActive = true;
+                patAHigh = bar.High;
+                patALow = bar.Low;
+                patAStartEt = bar.EtClose;
+                host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                    "PATTERN_A_RETEST direction={0} time={1:yyyy-MM-dd HH:mm} dailyOpen={2:0.00} retestHigh={3:0.00} retestLow={4:0.00} ema9={5:0.00} parentValidityCandle={6}",
+                    isLong ? "LONG" : "SHORT", bar.EtClose, dOpen, patAHigh, patALow, bar.Ema9, formingCandle));
+            }
+            else if (patAActive)
+            {
+                // extend the LOCAL retest structure while awaiting EMA confirmation
+                if (bar.High > patAHigh) patAHigh = bar.High;
+                if (bar.Low < patALow) patALow = bar.Low;
+            }
+
+            if (patAActive)
+            {
                 bool emaOk = isLong ? bar.Close > bar.Ema9 : bar.Close < bar.Ema9;
-                if (emaOk)
+                bool laterCandle = bar.EtClose > patAStartEt;
+                if (emaOk && (cfg.PatternAAllowSameCandleEmaEntry || laterCandle))
                 {
-                    // §4/§6 STOP: LOW/WICK (HIGH/WICK) of the qualifying retest candle
-                    TryEnter(bar, "WICK_RETEST_A", isLong ? bar.Low : bar.High);
+                    // STOP: the LOW/HIGH of the LOCAL Daily Open retest structure —
+                    // never the 15m parent wick.
+                    double stop = isLong ? patALow : patAHigh;
+                    double elapsed = (bar.EtClose - patAStartEt).TotalMinutes;
+                    host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                        "PATTERN_A_EMA_CONFIRM direction={0} time={1:yyyy-MM-dd HH:mm} close={2:0.00} ema9={3:0.00} entry={4:0.00} stop={5:0.00} stopPts={6:0.00} elapsedMinutesFromRetest={7:0}",
+                        isLong ? "LONG" : "SHORT", bar.EtClose, bar.Close, bar.Ema9, bar.Close, stop,
+                        Math.Abs(bar.Close - stop), elapsed));
+                    TryEnter(bar, "WICK_RETEST_A", stop);
                 }
-                else
+                else if (!emaOk)
                 {
                     host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                        "Pattern A wick retest at DO {0:0.00} but close {1:0.00} not through 1m EMA9 {2:0.00} — no entry (§4/§6)",
-                        dOpen, bar.Close, bar.Ema9));
+                        "PATTERN_A_EMA_WAIT direction={0} close={1:0.00} dailyOpen={2:0.00} ema9={3:0.00} retestHigh={4:0.00} retestLow={5:0.00} parentValidityCandle={6}",
+                        isLong ? "LONG" : "SHORT", bar.Close, dOpen, bar.Ema9, patAHigh, patALow, formingCandle));
                 }
             }
         }
@@ -628,9 +702,11 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             netPnlDollars = 0;
             sumExitLegR = 0;
             anyProfitLeg = false;
-            tp90Done = false;
-            trailActivated = false;
-            activeTarget = null;
+            tp1Reached = false;
+            tp1Price = double.NaN;
+            initialRiskPoints = 0;
+            runnerQty = 0;
+            breakevenPrice = double.NaN;
             refPrice = double.NaN;
             state = VbrState.POSITION_OPEN;
             ResetPattern();
@@ -665,114 +741,86 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 if (bar.High > maeExtreme) maeExtreme = bar.High;
             }
 
-            // ---- 50-point chain: hold for targets <= 50 pts away (section D) ----
-            int guard = 0;
-            while (!trailActivated && activeTarget != null && guard++ < 25)
+            // ==============================================================
+            // RISK-BASED EXIT (2026-08-14) — replaces the 50-point target chain.
+            // There is no target-distance test anywhere in this path: no <=50pt HOLD,
+            // no >50pt trail activation, and no key-level touch can close the trade.
+            //
+            // TP1 = entry +/- 0.75 x InitialRiskPoints.
+            // TP1 TRIGGER = INTRABAR HIGH/LOW TOUCH, matching the fill semantics the
+            // engine already used for VBR target touches (TargetReachedMode.IntrabarTouch,
+            // locked by V6 U2). No new fill model is introduced.
+            // ==============================================================
+            if (!tp1Reached && !double.IsNaN(tp1Price))
             {
-                // "reached" definition is configurable (V5 unresolved item 2)
-                bool reached;
-                if (cfg.TargetReached == TargetReachedMode.OneMinuteCloseBeyond)
-                    reached = isLong ? bar.Close > activeTarget.Price : bar.Close < activeTarget.Price;
-                else
-                    reached = isLong ? bar.High >= activeTarget.Price : bar.Low <= activeTarget.Price;
-                if (!reached) break;
-
-                host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                    "TARGET REACHED {0} @ {1:0.00} (ref was {2:0.00}) — chaining to next level (section D)",
-                    activeTarget.NameString(), activeTarget.Price, refPrice));
-
-                // "set that reached target price as the new reference point"
-                refPrice = activeTarget.Price;
-                AdvanceTargetChain(false);
-            }
-
-            // ---- 1m EMA(9) trail mode: take profit on 90% (spec §9 TRAIL MODE) ----
-            if (trailActivated && !tp90Done)
-            {
-                bool emaBreak = isLong ? bar.Close < bar.Ema9 : bar.Close > bar.Ema9; // completed close only
-                if (emaBreak)
+                bool touched = isLong ? bar.High >= tp1Price : bar.Low <= tp1Price;
+                if (touched)
                 {
-                    int q90 = (int)Math.Floor(qtyOpen * 0.9);
-                    if (q90 >= 1)
+                    tp1Reached = true;
+
+                    // Deterministic split: floor(qty * fraction), always leaving a
+                    // runner when 2+ contracts are open. A 1-contract position cannot
+                    // be split, so the whole contract is banked at TP1 (no runner,
+                    // never a fractional contract).
+                    int exitQty;
+                    if (qtyOpen <= 1)
                     {
-                        tp90Done = true;
-                        host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                            "TRAIL EXIT: 1m close {0:0.00} through 1m EMA9 {1:0.00} — taking 90% ({2} of {3} contracts), final {4} runs (spec §9)",
-                            bar.Close, bar.Ema9, q90, qtyOpen, qtyOpen - q90));
-                        host.ExitMarket(StrategyId.VECTOR_BREAK_RETEST,
-                            isLong ? TradeDirection.Long : TradeDirection.Short, q90, Tp90Signal, EntrySignal);
-                    }
-                    else if (cfg.SingleContractBecomesRunner)
-                    {
-                        tp90Done = true; // LEGACY research only — not V6 behavior
-                        host.Diag(StrategyId.VECTOR_BREAK_RETEST,
-                            "TRAIL signal with 1 contract: contract held as runner (LEGACY flag, not V6)");
+                        exitQty = qtyOpen;
                     }
                     else
                     {
-                        // V6 U8: a 1-contract position cannot be split 90/10 — the 1m
-                        // EMA(9) profit signal exits the ENTIRE contract, no runner.
-                        tp90Done = true;
-                        host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                            "TRAIL EXIT: 1m close {0:0.00} through 1m EMA9 {1:0.00} with a 1-contract position — exiting the ENTIRE contract, no runner (V6 U8)",
-                            bar.Close, bar.Ema9));
-                        host.ExitMarket(StrategyId.VECTOR_BREAK_RETEST,
-                            isLong ? TradeDirection.Long : TradeDirection.Short, qtyOpen, Tp90Signal, EntrySignal);
+                        exitQty = (int)Math.Floor(qtyOpen * cfg.Tp1ExitFraction);
+                        if (exitQty < 1) exitQty = 1;
+                        if (exitQty >= qtyOpen) exitQty = qtyOpen - 1;
                     }
-                }
-            }
+                    runnerQty = qtyOpen - exitQty;
+                    breakevenPrice = host.RoundToTick(entryAvg);
 
-            // ---- FINAL 10% RUNNER (V6 U3): exit when a LATER completed 1m candle
-            //      CLOSES through the one-candle supporting structure. Wicks do not
-            //      count; no multi-bar fractal confirmation is required. ----
-            if (tp90Done && qtyOpen > 0)
-            {
-                double support = isLong ? structure.SupportLow : structure.SupportHigh;
-                int supportBar = isLong ? structure.SupportLowBar : structure.SupportHighBar;
-                // the establishing candle can never be the breaking candle
-                if (!double.IsNaN(support) && structure.BarIndex > supportBar)
-                {
-                    bool structBreak = isLong ? bar.Close < support : bar.Close > support;
-                    if (structBreak)
+                    host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                        "VBR TP1 REACHED tradeId={0} price={1:0.00} initialRiskPoints={2:0.00} RReached={3:0.00}"
+                        + " exitQty={4} runnerQty={5} breakevenPrice={6:0.00}",
+                        tradeId, tp1Price, initialRiskPoints, cfg.Tp1RMultiple, exitQty, runnerQty, breakevenPrice));
+
+                    host.ExitMarket(StrategyId.VECTOR_BREAK_RETEST,
+                        isLong ? TradeDirection.Long : TradeDirection.Short, exitQty, Tp90Signal, EntrySignal);
+
+                    // Protect the runner at breakeven. The stop is only ever moved in
+                    // the favourable direction — it can never be widened.
+                    if (runnerQty > 0)
                     {
-                        host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                            "RUNNER EXIT: 1m close {0:0.00} through 1m supporting structure {1:0.00} — exiting final {2} contracts (V6 U3)",
-                            bar.Close, support, qtyOpen));
-                        host.ExitMarket(StrategyId.VECTOR_BREAK_RETEST,
-                            isLong ? TradeDirection.Long : TradeDirection.Short, qtyOpen, RunSignal, EntrySignal);
+                        bool tighter = isLong ? breakevenPrice > stopPrice : breakevenPrice < stopPrice;
+                        if (tighter)
+                        {
+                            stopPrice = breakevenPrice;
+                            host.SubmitOrUpdateStop(StrategyId.VECTOR_BREAK_RETEST,
+                                isLong ? TradeDirection.Long : TradeDirection.Short,
+                                runnerQty, stopPrice, StopSignal, EntrySignal);
+                            host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                                "VBR RUNNER PROTECTED tradeId={0} stop moved to breakeven {1:0.00} for {2} contracts",
+                                tradeId, stopPrice, runnerQty));
+                        }
                     }
+                    return;   // the runner cannot also exit on this same bar
                 }
             }
-        }
 
-        // Compute the next directional target from the CURRENT reference price and
-        // decide hold vs trail per the 50-point rule (section D). initial=true on
-        // the entry fill.
-        private void AdvanceTargetChain(bool initial)
-        {
-            List<TpTarget> targets = host.Levels.GetSortedTargets(
-                isLong ? TradeDirection.Long : TradeDirection.Short, refPrice, host.TpLevelEnabled, host.RoundToTick);
-
-            if (targets.Count == 0)
+            // ---- RUNNER: exit on the first COMPLETED 1m close through the 1m EMA(9).
+            //      Wicks through the EMA do not count. No target level is consulted. ----
+            if (tp1Reached && qtyOpen > 0)
             {
-                activeTarget = null;
-                trailActivated = true; // VBR-8: no level left in direction → trail
-                host.Diag(StrategyId.VECTOR_BREAK_RETEST,
-                    "no further directional take-profit level — 1m EMA(9) TRAIL MODE ACTIVE (VBR-8)");
-                return;
+                bool emaBreak = isLong ? bar.Close < bar.Ema9 : bar.Close > bar.Ema9;
+                if (emaBreak)
+                {
+                    double runnerPts = isLong ? bar.Close - entryAvg : entryAvg - bar.Close;
+                    host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
+                        "VBR RUNNER EMA EXIT tradeId={0} direction={1} close={2:0.00} ema9={3:0.00} exitPrice={4:0.00}"
+                        + " runnerQty={5} runnerR={6:0.00}",
+                        tradeId, isLong ? "LONG" : "SHORT", bar.Close, bar.Ema9, bar.Close, qtyOpen,
+                        initialRiskPoints > 0 ? runnerPts / initialRiskPoints : 0));
+                    host.ExitMarket(StrategyId.VECTOR_BREAK_RETEST,
+                        isLong ? TradeDirection.Long : TradeDirection.Short, qtyOpen, RunSignal, EntrySignal);
+                }
             }
-
-            activeTarget = targets[0];
-            double dist = Math.Abs(activeTarget.Price - refPrice);
-            bool hold = dist <= cfg.ChainMaxDistancePoints;
-
-            host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                "{0} target {1} @ {2:0.00} dist={3:0.00}pts from ref {4:0.00} → {5}",
-                initial ? "FIRST" : "NEXT", activeTarget.NameString(), activeTarget.Price, dist, refPrice,
-                hold ? "HOLD for level (<=50pts: adverse 1m EMA9 closes IGNORED, section D)" : "TRAIL MODE (>50pts, spec §9)"));
-
-            if (!hold)
-                trailActivated = true;
         }
 
         // ==================================================================
@@ -797,13 +845,28 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
                 stopPts = isLong ? entryAvg - stopPrice : stopPrice - entryAvg;
 
-                // section D step 1-2: reference = entry, find next directional level
+                // RISK-BASED PLAN, measured from the ACTUAL filled entry.
                 refPrice = entryAvg;
-                trailActivated = false;
-                AdvanceTargetChain(true);
+                initialRiskPoints = Math.Abs(entryAvg - stopPrice);
+                tp1Price = host.RoundToTick(isLong
+                    ? entryAvg + initialRiskPoints * cfg.Tp1RMultiple
+                    : entryAvg - initialRiskPoints * cfg.Tp1RMultiple);
+                tp1Reached = false;
+                runnerQty = 0;
+
+                // Describe the plan against the ACTUALLY FILLED quantity, which is what
+                // the TP1 split will really operate on — not the intended size.
+                int planBase = qtyOpen;
+                int planExit = planBase <= 1 ? planBase : (int)Math.Floor(planBase * cfg.Tp1ExitFraction);
+                if (planBase > 1) { if (planExit < 1) planExit = 1; if (planExit >= planBase) planExit = planBase - 1; }
 
                 host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                    "FILLED {0} qty={1} avg={2:0.00} stop={3:0.00} stopPts={4:0.00}", orderName, qty, entryAvg, stopPrice, stopPts));
+                    "VBR FILLED tradeId={0} pattern={1} direction={2} filledEntry={3:0.00} initialStop={4:0.00}"
+                    + " initialRiskPoints={5:0.00} TP1Price={6:0.00} TP1R={7:0.00} TP1Percent={8} runnerPercent={9}",
+                    tradeId, entryPattern, isLong ? "LONG" : "SHORT", entryAvg, stopPrice, initialRiskPoints,
+                    tp1Price, cfg.Tp1RMultiple,
+                    planBase > 0 ? (int)Math.Round(100.0 * planExit / planBase) : 0,
+                    planBase > 0 ? (int)Math.Round(100.0 * (planBase - planExit) / planBase) : 0));
             }
         }
 
@@ -814,9 +877,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             string leg;
             string reason;
             if (orderName.Contains("STOP")) { leg = "STOP"; reason = "STOP_LOSS"; }
-            else if (orderName.Contains("TP90")) { leg = "TP90"; reason = "TRAIL_90_EMA1M"; }
+            else if (orderName.Contains("TP90")) { leg = "TP1"; reason = "TP1_0.75R"; }
             else if (orderName.Contains("HANDOFF")) { leg = "HANDOFF_FLATTEN"; reason = "HANDOFF_FLATTEN"; } // V6 U9
-            else { leg = "RUNNER"; reason = "RUNNER_STRUCTURE_BREAK"; }
+            else { leg = "RUNNER"; reason = "RUNNER_EMA1M"; }
 
             ApplyExitLeg(price, qty, etTime, leg, reason);
         }
@@ -873,10 +936,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             rec.RiskPercent = cfg.RiskPctAPlus;
             rec.RiskDollars = riskDollars;
             rec.Contracts = qtyFilled;
-            rec.TargetLevelNames = activeTarget != null ? activeTarget.NameString() : "";
-            rec.TargetPrice = activeTarget != null ? activeTarget.Price : double.NaN;
-            rec.TargetDistancePoints = activeTarget != null && !double.IsNaN(refPrice)
-                ? Math.Abs(activeTarget.Price - refPrice) : double.NaN;
+            rec.TargetLevelNames = "TP1_0.75R";
+            rec.TargetPrice = tp1Price;
+            rec.TargetDistancePoints = initialRiskPoints * cfg.Tp1RMultiple;
             rec.ExitLeg = leg;
             rec.ExitQty = qty;
             rec.ExitTimeEt = etTime;
@@ -908,11 +970,17 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             // ---- position fully closed ----
             double netR = riskDollars > 0 ? netPnlDollars / riskDollars : 0;
             Stats.AddClosedTrade(netPnlDollars, netR, mfePts, maePts);
+            double runnerR = initialRiskPoints > 0 && tp1Reached
+                ? (isLong ? price - entryAvg : entryAvg - price) / initialRiskPoints : 0;
             host.Diag(StrategyId.VECTOR_BREAK_RETEST, string.Format(CultureInfo.InvariantCulture,
-                "TRADE CLOSED {0} net=${1:0.00} netR={2:0.00} MFE={3:0.00}pts MAE={4:0.00}pts",
-                tradeId, netPnlDollars, netR, mfePts, maePts));
+                "TRADE CLOSED {0} realizedR={1:0.00} maxMFEPoints={2:0.00} maxMFER={3:0.00} maxMAEPoints={4:0.00}"
+                + " TP1Reached={5} runnerR={6:0.00} netPoints={7:0.00} netDollars={8:0.00}",
+                tradeId, netR, mfePts, initialRiskPoints > 0 ? mfePts / initialRiskPoints : 0, maePts,
+                tp1Reached ? "true" : "false", runnerR,
+                netPnlDollars / Math.Max(1e-9, PositionSizer.MnqDollarsPerPoint * Math.Max(1, qtyFilled)),
+                netPnlDollars));
 
-            bool fullStopOut = reason == "STOP_LOSS" && !anyProfitLeg && !tp90Done;
+            bool fullStopOut = reason == "STOP_LOSS" && !anyProfitLeg && !tp1Reached;
             if (fullStopOut)
             {
                 // §8: a stop-out does NOT kill the parent and does NOT restart the

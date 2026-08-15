@@ -19,6 +19,7 @@
 // ============================================================================
 
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using NinjaTrader.NinjaScript.Strategies.MnqTwo;
 
@@ -518,95 +519,149 @@ namespace MnqTwoTests
 
         // ---- U2 / U3 / U8: VBR profit management ------------------------------
 
-        private static void TestU2U3U8ProfitManagement()
+        // ==================================================================
+        // VBR RISK-BASED EXIT (2026-08-14): TP1 = +0.75R, 80% out, runner at
+        // breakeven exiting on a completed 1m close through the 1m EMA(9).
+        // The entire 50-point target chain is gone.
+        // ==================================================================
+        private static void TestVbrRiskBasedExit()
         {
-            Console.WriteLine("V6 U2/U3/U8 — target reach by touch, 50-pt chain, 1m structure runner:");
+            Console.WriteLine("VBR EXIT — TP1 +0.75R / 80% out / breakeven runner:");
 
-            // Long VBR filled at 20005 with 20 contracts. Nearest levels above:
-            // YDAY_HIGH 20100 (95 pts away -> >50 -> trail activates immediately).
+            // TEST 22 — LONG reaches exactly +0.75R -> 80% exits
+            // entry 20005, stop 19985 -> risk 20 pts -> TP1 = 20005 + 15 = 20020
             MockHost h = new MockHost();
             VectorBreakRetestEngine vbr = VbrLongParent(h, null);
-            h.LevelsEngine = FarTargetLevels();   // nearest target above = LWEEK_HIGH 20500
+            h.LevelsEngine = FarTargetLevels();
             vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
             vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
             Check(h.Entries.Count == 1, "VBR long entered");
             vbr.OnEntryExecution("VBR_LONG", 20005, 20, At(9, 33));
-            Check(h.AnyDiagContains("TRAIL MODE (>50pts"),
-                "U2: next target > 50 points away activates the 1m EMA(9) trail immediately");
+            Check(h.AnyDiagContains("VBR FILLED") && h.AnyDiagContains("TP1Price=20020.00"),
+                "TEST 22: TP1 = entry + 0.75 x 20pt risk = 20020");
+            Check(h.AnyDiagContains("TP1Percent=80") && h.AnyDiagContains("runnerPercent=20"),
+                "TEST 22: the 80/20 plan is logged at fill");
 
-            // trail: completed 1m close below EMA9 -> take 90% (18 of 20)
-            vbr.OnOneMinuteBar(Bar(At(9, 40), 1, 20050, 20055, 20040, 20042, VectorType.REGULAR_BEARISH, 20048));
-            Check(h.Exits.Count == 1 && h.Exits[0] == "VBR_TP90_L 18",
-                "90% profit exit on a completed 1m close below EMA9 (18 of 20)");
-            vbr.OnExitExecution("VBR_TP90_L", 20042, 18, At(9, 40));
+            // TEST 32 — before TP1 the original structural stop is the only exit
+            vbr.OnOneMinuteBar(Bar(At(9, 34), 1, 20025, 20019, 20012, 20015, VectorType.REGULAR_BEARISH, 20030));
+            Check(h.Exits.Count == 0, "TEST 32: no exit before +0.75R is touched");
+            Check(!h.AnyDiagContains("TP1 REACHED"), "TEST 32: TP1 not reported early");
 
-            // U3: ONE completed 1m candle establishes the supporting higher low.
-            // 9:41 low 20030; 9:42 low 20035 (higher low -> support = 20035).
-            vbr.OnOneMinuteBar(Bar(At(9, 41), 1, 20042, 20045, 20030, 20040, VectorType.REGULAR_BEARISH, 20044));
-            vbr.OnOneMinuteBar(Bar(At(9, 42), 1, 20040, 20048, 20035, 20046, VectorType.REGULAR_BULLISH, 20044));
-            // a wick below 20035 that closes above it must NOT exit
-            vbr.OnOneMinuteBar(Bar(At(9, 43), 1, 20046, 20047, 20020, 20040, VectorType.REGULAR_BEARISH, 20044));
-            Check(h.Exits.Count == 1, "U3: wick below the 1m supporting structure does NOT exit the final 10%");
-            // a later completed close BELOW 20035 exits the final 10%
-            vbr.OnOneMinuteBar(Bar(At(9, 44), 1, 20040, 20041, 20020, 20025, VectorType.REGULAR_BEARISH, 20040));
-            Check(h.Exits.Count == 2 && h.Exits[1] == "VBR_RUN_L 2",
-                "U3: later completed 1m close through the one-candle structure exits the final 10%");
-            Check(h.AnyDiagContains("(V6 U3)"), "runner exit is attributed to the V6 U3 structure rule");
+            // TEST 22/24 — intrabar touch of 20020 banks 80% (16 of 20), runner = 4
+            vbr.OnOneMinuteBar(Bar(At(9, 35), 1, 20015, 20021, 20014, 20018, VectorType.REGULAR_BULLISH, 20016));
+            Check(h.AnyDiagContains("VBR TP1 REACHED"), "TEST 22: an intrabar touch of TP1 triggers it");
+            Check(h.Exits.Count == 1 && h.Exits[0] == "VBR_TP90_L 16", "TEST 22: 80% = 16 of 20 contracts exit");
+            Check(h.AnyDiagContains("runnerQty=4"), "TEST 24: the runner is 20% = 4 contracts");
+
+            // TEST 25 — the remainder is protected at breakeven
+            Check(h.AnyDiagContains("stop moved to breakeven 20005.00"), "TEST 25: runner stop moved to breakeven");
+            bool beStop = false;
+            foreach (string st in h.Stops) if (st == "VBR_STOP_L 4 @ 20005.00") beStop = true;
+            Check(beStop, "TEST 25: a breakeven stop for 4 contracts was actually submitted");
+            vbr.OnExitExecution("VBR_TP90_L", 20020, 16, At(9, 35));
+
+            // TEST 28 — a WICK through the EMA does not exit the runner
+            vbr.OnOneMinuteBar(Bar(At(9, 36), 1, 20018, 20022, 20005, 20019, VectorType.REGULAR_BULLISH, 20014));
+            Check(h.Exits.Count == 1, "TEST 28: a wick through EMA9 does NOT exit the runner");
+
+            // TEST 26 — a COMPLETED close below EMA9 exits the runner
+            vbr.OnOneMinuteBar(Bar(At(9, 37), 1, 20019, 20020, 20008, 20010, VectorType.REGULAR_BEARISH, 20016));
+            Check(h.Exits.Count == 2 && h.Exits[1] == "VBR_RUN_L 4",
+                "TEST 26: completed 1m close below EMA9 exits the 4-contract runner");
+            Check(h.AnyDiagContains("VBR RUNNER EMA EXIT"), "TEST 26: the runner exit is logged");
+
+            // TEST 29/30/31 — none of the old 50-point machinery can appear
+            Check(!h.AnyDiagContains("TRAIL MODE"), "TEST 30: >50pt trail activation is completely inactive");
+            Check(!h.AnyDiagContains("HOLD for level"), "TEST 29: <=50pt HOLD logic is completely inactive");
+            Check(!h.AnyDiagContains("TARGET REACHED"), "TEST 31: no key-level touch closes the position");
+            Check(!h.AnyDiagContains("chaining to next level"), "TEST 29: the target chain is gone");
         }
 
-        private static void TestU2TargetChaining()
+        private static void TestVbrRiskBasedExitShort()
         {
-            Console.WriteLine("V6 U2 — wick/touch reaches a target and advances the chain:");
+            Console.WriteLine("VBR EXIT — SHORT mirror:");
 
-            // Build levels so the first target above entry is ~25 pts away (<=50 -> hold).
-            KeyLevelEngine lv = new KeyLevelEngine();
-            Feed(lv, new DateTime(2026, 7, 29, 12, 0, 0), 20000, 20500, 19500, 20000);
-            Feed(lv, new DateTime(2026, 8, 3, 19, 0, 0), 20000, 20030, 19970, 20000); // YDAY_HIGH 20030
-            Feed(lv, new DateTime(2026, 8, 4, 19, 0, 0), 20000, 20010, 19990, 20000); // DAILY_OPEN 20000
-
+            // TEST 23 — SHORT: entry 19995, stop 20015 -> risk 20 -> TP1 = 19980
             MockHost h = new MockHost();
-            h.LevelsEngine = lv;
+            h.LevelsEngine = FarTargetLevels();
             VectorBreakRetestEngine vbr = new VectorBreakRetestEngine(h, new VbrConfig());
-            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 20005, 20125, 19995, 20015, VectorType.GREEN_VECTOR, 20005), 20005);
-            vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 20002, 20003, 19985, 19990, VectorType.REGULAR_BEARISH, 20008));
-            vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20012, 19988, 20010, VectorType.GREEN_VECTOR, 20005));
-            vbr.OnEntryExecution("VBR_LONG", 20005, 10, At(9, 33));
-            Check(h.AnyDiagContains("HOLD for level (<=50pts"),
-                "first target within 50 points -> HOLD and ignore adverse EMA closes");
+            vbr.OnFifteenMinuteBar(Bar(At(9, 0), 15, 19950, 20070, 19940, 19950, VectorType.RED_VECTOR, 19970), 19960);
+            vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 19995, 20015, 19994, 20010, VectorType.REGULAR_BULLISH, 19988));
+            vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 20010, 20011, 19990, 19995, VectorType.RED_VECTOR, 20000));
+            Check(h.Entries.Count == 1, "VBR short entered");
+            vbr.OnEntryExecution("VBR_SHORT", 19995, 20, At(9, 33));
+            Check(h.AnyDiagContains("TP1Price=19980.00"), "TEST 23: SHORT TP1 = entry - 0.75R");
 
-            // adverse EMA close while the nearby target is active must NOT take profit
-            vbr.OnOneMinuteBar(Bar(At(9, 35), 1, 20010, 20012, 20004, 20006, VectorType.REGULAR_BEARISH, 20009));
-            Check(h.Exits.Count == 0, "U2: adverse 1m EMA close ignored while a <=50pt target is active");
+            vbr.OnOneMinuteBar(Bar(At(9, 35), 1, 19995, 19996, 19979, 19985, VectorType.REGULAR_BEARISH, 19992));
+            Check(h.Exits.Count == 1 && h.Exits[0] == "VBR_TP90_S 16", "TEST 23: 80% = 16 contracts exit");
+            Check(h.AnyDiagContains("stop moved to breakeven 19995.00"), "TEST 25: SHORT runner protected at breakeven");
+            vbr.OnExitExecution("VBR_TP90_S", 19980, 16, At(9, 35));
 
-            // WICK/TOUCH of the target (high 20030, close below it) -> reached, chain advances
-            vbr.OnOneMinuteBar(Bar(At(9, 36), 1, 20006, 20030, 20005, 20020, VectorType.REGULAR_BULLISH, 20010));
-            Check(h.AnyDiagContains("TARGET REACHED"),
-                "U2: a wick/touch REACHES the target (no completed close required)");
+            // TEST 28 mirror — wick above EMA does not exit
+            vbr.OnOneMinuteBar(Bar(At(9, 36), 1, 19985, 19998, 19984, 19986, VectorType.REGULAR_BEARISH, 19990));
+            Check(h.Exits.Count == 1, "TEST 28: SHORT runner survives a wick through EMA9");
+            // TEST 27 — completed close above EMA9 exits
+            vbr.OnOneMinuteBar(Bar(At(9, 37), 1, 19986, 19999, 19985, 19996, VectorType.REGULAR_BULLISH, 19990));
+            Check(h.Exits.Count == 2 && h.Exits[1] == "VBR_RUN_S 4",
+                "TEST 27: completed 1m close above EMA9 exits the SHORT runner");
         }
 
-        private static void TestU8SingleContract()
+        private static void TestVbrExitEdgeCases()
         {
-            Console.WriteLine("V6 U8 — 1-contract VBR position exits fully on the EMA signal:");
+            Console.WriteLine("VBR EXIT — contract rounding, stop widening, no-TP1 path:");
 
-            MockHost h = new MockHost();
-            VectorBreakRetestEngine vbr = VbrLongParent(h, null);
-            h.LevelsEngine = FarTargetLevels();   // ensures the EMA trail can activate
-            // stop 19985 vs entry close 20025 = 40 pts => $80/contract;
-            // 50% of $200 = $100 => floor(100/80) = exactly 1 contract
-            h.Balance = 200;
-            vbr.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
-            vbr.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
-            Check(h.Entries.Count == 1 && h.Entries[0] == "VBR_LONG 1", "sizing produced exactly 1 contract");
-            vbr.OnEntryExecution("VBR_LONG", 20005, 1, At(9, 33));
-            vbr.OnOneMinuteBar(Bar(At(9, 40), 1, 20050, 20055, 20040, 20042, VectorType.REGULAR_BEARISH, 20048));
-            Check(h.Exits.Count == 1 && h.Exits[0] == "VBR_TP90_L 1",
-                "U8: the EMA profit signal exits the ENTIRE 1-contract position");
-            Check(h.AnyDiagContains("no runner (V6 U8)"), "U8: no runner is held for a 1-contract position");
+            // TEST 33 — a 1-contract position cannot be split: the whole contract banks at TP1
+            MockHost h1 = new MockHost();
+            h1.Balance = 200;                      // 50% of 200 = $100; 40pt stop = $80/contract -> exactly 1
+            VectorBreakRetestEngine v1 = VbrLongParent(h1, null);
+            h1.LevelsEngine = FarTargetLevels();
+            v1.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
+            v1.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+            if (h1.Entries.Count == 1)
+            {
+                v1.OnEntryExecution("VBR_LONG", 20005, 1, At(9, 33));
+                v1.OnOneMinuteBar(Bar(At(9, 35), 1, 20015, 20021, 20014, 20018, VectorType.REGULAR_BULLISH, 20016));
+                Check(h1.Exits.Count == 1 && h1.Exits[0] == "VBR_TP90_L 1",
+                    "TEST 33: a 1-contract position exits ENTIRELY at TP1 — never a fractional contract");
+                Check(h1.AnyDiagContains("runnerQty=0"), "TEST 33: no runner is held for 1 contract");
+            }
+            else Check(false, "TEST 33: could not size a 1-contract position");
+
+            // TEST 34 — the stop is never widened. Entry 20005, stop 19985 (risk 20).
+            // Breakeven 20005 is TIGHTER than 19985 for a long, so the move is allowed;
+            // the assertion is that no submitted stop is ever further from entry.
+            MockHost h2 = new MockHost();
+            VectorBreakRetestEngine v2 = VbrLongParent(h2, null);
+            h2.LevelsEngine = FarTargetLevels();
+            v2.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
+            v2.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+            v2.OnEntryExecution("VBR_LONG", 20005, 20, At(9, 33));
+            v2.OnOneMinuteBar(Bar(At(9, 35), 1, 20015, 20021, 20014, 20018, VectorType.REGULAR_BULLISH, 20016));
+            double worst = double.MaxValue;
+            foreach (string st in h2.Stops)
+            {
+                int at = st.LastIndexOf('@');
+                double px = double.Parse(st.Substring(at + 1).Trim(), CultureInfo.InvariantCulture);
+                if (px < worst) worst = px;
+            }
+            Check(worst >= 19985 - 1e-9, "TEST 34: no submitted long stop is ever below the original 19985");
+
+            // TEST 32 — a trade that never reaches +0.75R keeps the original structural stop
+            MockHost h3 = new MockHost();
+            VectorBreakRetestEngine v3 = VbrLongParent(h3, null);
+            h3.LevelsEngine = FarTargetLevels();
+            v3.OnOneMinuteBar(Bar(At(9, 31), 1, 20005, 20006, 19985, 19990, VectorType.REGULAR_BEARISH, 20010));
+            v3.OnOneMinuteBar(Bar(At(9, 33), 1, 19990, 20030, 19988, 20025, VectorType.GREEN_VECTOR, 20010));
+            v3.OnEntryExecution("VBR_LONG", 20005, 20, At(9, 33));
+            for (int m = 34; m <= 40; m++)   // drifts, never touches 20020
+                v3.OnOneMinuteBar(Bar(At(9, m), 1, 20012, 20018, 20008, 20010, VectorType.REGULAR_BEARISH, 20014));
+            Check(h3.Exits.Count == 0, "TEST 32: no partial, no runner exit — the structural stop still governs");
+            Check(!h3.AnyDiagContains("TP1 REACHED"), "TEST 32: TP1 was never reported");
+            bool onlyOriginal = true;
+            foreach (string st in h3.Stops) if (!st.EndsWith("@ 19985.00")) onlyOriginal = false;
+            Check(onlyOriginal, "TEST 32: the only stop ever submitted is the original structural stop");
         }
 
-        // ---- U7: rolling re-entry re-qualification ----------------------------
-
-        // Stop a VBR long out during validity candle #2 and return the engine.
         private static VectorBreakRetestEngine VbrStoppedInCandle2(MockHost host)
         {
             VectorBreakRetestEngine vbr = VbrLongParent(host, null);
@@ -1599,6 +1654,77 @@ namespace MnqTwoTests
                 "elapsedMinutes reflects the LOCAL structure age, not the whole parent window");
         }
 
+        // ==================================================================
+        // PATTERN A — Daily Open retest FIRST, then EMA(9) confirmation entry.
+        // ==================================================================
+        private static void TestVbrPatternA()
+        {
+            Console.WriteLine("VBR PATTERN A — retest first, EMA(9) confirmation second:");
+
+            // TEST 9 — SHORT: wick/touch DO, close back below it, EMA NOT satisfied -> NO ENTRY
+            VectorBreakRetestEngine v9; MockHost h9 = VbrHost(out v9);
+            v9.OnFifteenMinuteBar(VbrParent(At(9, 0), false, 130, 19950), 19960);
+            // high 20010 touches DO 20000, close 19995 back below it, but 19995 > ema 19990
+            v9.OnOneMinuteBar(Bar(At(9, 31), 1, 19990, 20010, 19988, 19995, VectorType.REGULAR_BEARISH, 19990));
+            Check(h9.AnyDiagContains("PATTERN_A_RETEST"), "TEST 9: the Daily Open retest structure is recorded");
+            Check(h9.AnyDiagContains("retestHigh=20010.00"), "TEST 9: retestHigh is the local wick, 20010");
+            Check(h9.Entries.Count == 0, "TEST 9: no entry — the retest candle has not closed below EMA9");
+            Check(h9.AnyDiagContains("PATTERN_A_EMA_WAIT"), "TEST 9: it is explicitly waiting for the EMA");
+
+            // TEST 10/11 — a LATER completed 1m close below EMA9 enters; stop = local retest high
+            v9.OnOneMinuteBar(Bar(At(9, 33), 1, 19995, 19998, 19975, 19980, VectorType.REGULAR_BEARISH, 19992));
+            Check(h9.Entries.Count == 1 && h9.Entries[0].StartsWith("VBR_SHORT"),
+                "TEST 10: a later completed 1m close below EMA9 is the SHORT entry");
+            Check(h9.AnyDiagContains("PATTERN_A_EMA_CONFIRM"), "TEST 10: the confirmation is logged");
+            Check(h9.AnyDiagContains("stop=20010.00"),
+                "TEST 11: stop = LOCAL Pattern A retest high 20010, not the 15m parent wick");
+            Check(h9.AnyDiagContains("elapsedMinutesFromRetest=2"), "TEST 11: elapsed time from the retest is logged");
+
+            // TEST 12 — LONG mirror
+            VectorBreakRetestEngine v12; MockHost h12 = VbrHost(out v12);
+            v12.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+            v12.OnOneMinuteBar(Bar(At(9, 31), 1, 20010, 20012, 19990, 20005, VectorType.REGULAR_BULLISH, 20010));
+            Check(h12.Entries.Count == 0, "TEST 12: LONG retest with close below EMA9 does not enter");
+            Check(h12.AnyDiagContains("retestLow=19990.00"), "TEST 12: retestLow is the local wick, 19990");
+            v12.OnOneMinuteBar(Bar(At(9, 33), 1, 20005, 20030, 20004, 20025, VectorType.REGULAR_BULLISH, 20008));
+            Check(h12.Entries.Count == 1 && h12.Entries[0].StartsWith("VBR_LONG"),
+                "TEST 12: a later completed close above EMA9 is the LONG entry");
+            Check(h12.AnyDiagContains("stop=19990.00"), "TEST 12: stop = LOCAL retest low");
+
+            // TEST 13 — a completed close THROUGH Daily Open routes to Pattern B, not A
+            VectorBreakRetestEngine v13; MockHost h13 = VbrHost(out v13);
+            v13.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+            v13.OnOneMinuteBar(Bar(At(9, 31), 1, 20010, 20012, 19990, 20005, VectorType.REGULAR_BULLISH, 20010));
+            Check(h13.AnyDiagContains("PATTERN_A_RETEST"), "TEST 13: a retest structure exists first");
+            v13.OnOneMinuteBar(Bar(At(9, 32), 1, 20005, 20006, 19980, 19985, VectorType.REGULAR_BEARISH, 20008));
+            Check(h13.AnyDiagContains("PATTERN_A_CANCELLED reason=COMPLETED_1M_CLOSE_THROUGH_DAILY_OPEN"),
+                "TEST 13: a completed close through Daily Open cancels Pattern A");
+            Check(h13.AnyDiagContains("PATTERN_B_STRUCTURE_START"), "TEST 13: and routes to Pattern B instead");
+
+            // TEST 14 — the Pattern A EMA wait cannot survive parent invalidation
+            VectorBreakRetestEngine v14; MockHost h14 = VbrHost(out v14);
+            v14.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+            v14.OnOneMinuteBar(Bar(At(9, 31), 1, 20010, 20012, 19990, 20005, VectorType.REGULAR_BULLISH, 20010));
+            Check(h14.Entries.Count == 0, "TEST 14: waiting for EMA confirmation");
+            v14.OnFifteenMinuteBar(VbrValidity(At(9, 45), 19970, 20010, 19960), 20050);   // closes BELOW DO
+            Check(h14.AnyDiagContains("VBR PARENT INVALIDATED"), "TEST 14: the 15m close invalidates the parent");
+            v14.OnOneMinuteBar(Bar(At(9, 50), 1, 20005, 20030, 20004, 20025, VectorType.REGULAR_BULLISH, 20008));
+            Check(h14.Entries.Count == 0,
+                "TEST 14: a later EMA confirmation MUST NOT enter — the Pattern A state was cleared");
+
+            // TEST 15 — the Pattern A EMA wait cannot survive parent expiration
+            VectorBreakRetestEngine v15; MockHost h15 = VbrHost(out v15);
+            v15.OnFifteenMinuteBar(VbrParent(At(9, 0), true, 130, 20050), 20040);
+            v15.OnOneMinuteBar(Bar(At(9, 31), 1, 20010, 20012, 19990, 20005, VectorType.REGULAR_BULLISH, 20010));
+            v15.OnFifteenMinuteBar(VbrValidity(At(9, 15), 20120, 20140, 20100), 20050);
+            v15.OnFifteenMinuteBar(VbrValidity(At(9, 30), 20125, 20145, 20105), 20120);
+            v15.OnFifteenMinuteBar(VbrValidity(At(9, 45), 20130, 20150, 20110), 20125);
+            v15.OnFifteenMinuteBar(VbrValidity(At(10, 0), 20135, 20155, 20115), 20130);   // #4 -> expiry
+            Check(h15.AnyDiagContains("EXPIRED"), "TEST 15: the parent expires after 4 validity candles");
+            v15.OnOneMinuteBar(Bar(At(10, 5), 1, 20005, 20030, 20004, 20025, VectorType.REGULAR_BULLISH, 20008));
+            Check(h15.Entries.Count == 0, "TEST 15: no entry after expiry, even with EMA confirmation");
+        }
+
         // ---- main ------------------------------------------------------------
 
         public static int Main()
@@ -1616,9 +1742,9 @@ namespace MnqTwoTests
             TestU4U5FbReclaim();
             TestU6PatternBWait();
             TestU6PatternBWaitShort();
-            TestU2U3U8ProfitManagement();
-            TestU2TargetChaining();
-            TestU8SingleContract();
+            TestVbrRiskBasedExit();
+            TestVbrRiskBasedExitShort();
+            TestVbrExitEdgeCases();
             TestU7RollingReentry();
             TestU7WrongSideBreaksRolling();
             TestU9HandoffFbToVbr();
@@ -1641,6 +1767,7 @@ namespace MnqTwoTests
             TestVbrFifteenMinuteInvalidation();
             TestVbrPatternBLocality();
             TestVbrOversizedStopRootCause();
+            TestVbrPatternA();
 
             Console.WriteLine();
             Console.WriteLine(string.Format("RESULT: {0} passed, {1} failed", passed, failed));
