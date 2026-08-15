@@ -123,7 +123,7 @@ namespace MnqTwoTests
             // A- (26% of 10000 = 2600; stop 20106-20095 = 11 pts -> $22/contract -> 118)
             Check(h1.Entries.Count == 1 && h1.Entries[0] == "FB_SHORT 118",
                 "BLUE->REGULAR sized at 26% A- risk (118 contracts)");
-            Check(h1.AnyDiagContains("grade=A-"), "BLUE->REGULAR graded A-");
+            Check(h1.AnyDiagContains("GRADE=A-"), "BLUE->REGULAR graded A-");
 
             MockHost h2 = new MockHost();
             FakeBreakoutEngine f2 = FbFrozenShort(h2, At(9, 15), At(9, 30), 20090);
@@ -208,7 +208,7 @@ namespace MnqTwoTests
             FbBluePath(fb, VectorType.REGULAR_BEARISH);
             Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 118",
                 "entry in 9:30-9:45 sized at A- 26% risk (118 contracts)");
-            Check(h.AnyDiagContains("grade=A-"), "entry in first eligible candle graded A- not B+");
+            Check(h.AnyDiagContains("GRADE=A-"), "entry in first eligible candle graded A- not B+");
         }
 
         private static void TestLaterEntryGradesBPlus()
@@ -230,7 +230,7 @@ namespace MnqTwoTests
             // SHORT entry specifically.
             Check(h.Entries.Contains("FB_SHORT 45"),
                 "later short entry sized at B+ 10% risk (45 contracts)");
-            Check(h.AnyDiagContains("grade=B+"), "later entry graded B+");
+            Check(h.AnyDiagContains("GRADE=B+"), "later entry graded B+");
         }
 
         // ---- 8: 18-level sorting / tick normalization / exact merge ----------
@@ -923,14 +923,14 @@ namespace MnqTwoTests
         private static void SetupQqqLevels(MockHost h)
         {
             // QQQ is an ETF: RTH cash session only (09:30-16:00 ET), calendar day roll.
-            h.QqqLevels.DayStartMinutesEt = 0;
-            h.QqqLevels.WeekStartMinutesEt = 0;
-            h.QqqLevels.SessionFilterEnabled = true;
-            h.QqqLevels.SessionFilterStartMinutesEt = 570;
-            h.QqqLevels.SessionFilterEndMinutesEt = 960;
-            Feed(h.QqqLevels, new DateTime(2026, 8, 4, 10, 0, 0), 479, 480, 478, 479);     // Tue RTH
-            Feed(h.QqqLevels, new DateTime(2026, 8, 5, 8, 0, 0), 500, 505, 495, 500);      // Wed PREMARKET (must be ignored)
-            Feed(h.QqqLevels, new DateTime(2026, 8, 5, 9, 30, 0), 479, 479.5, 478.5, 479); // Wed RTH -> rolls the day
+            h.YmLevels.DayStartMinutesEt = 0;
+            h.YmLevels.WeekStartMinutesEt = 0;
+            h.YmLevels.SessionFilterEnabled = true;
+            h.YmLevels.SessionFilterStartMinutesEt = 570;
+            h.YmLevels.SessionFilterEndMinutesEt = 960;
+            Feed(h.YmLevels, new DateTime(2026, 8, 4, 10, 0, 0), 479, 480, 478, 479);     // Tue RTH
+            Feed(h.YmLevels, new DateTime(2026, 8, 5, 8, 0, 0), 500, 505, 495, 500);      // Wed PREMARKET (must be ignored)
+            Feed(h.YmLevels, new DateTime(2026, 8, 5, 9, 30, 0), 479, 479.5, 478.5, 479); // Wed RTH -> rolls the day
         }
 
         // ES bearish fake-break + reclaim at ES's OWN YDAY_HIGH (5600).
@@ -946,7 +946,7 @@ namespace MnqTwoTests
         // QQQ bearish fake-break + reclaim at QQQ's OWN YDAY_HIGH (480).
         private static void QqqConfirmShort(MockHost h, int tf)
         {
-            CrossMarketConfirmDetector d = tf == 1 ? h.QqqDet1 : h.QqqDet3;
+            CrossMarketConfirmDetector d = tf == 1 ? h.YmDet1 : h.YmDet3;
             DateTime b0 = tf == 1 ? At(9, 31) : At(9, 30);
             DateTime b1 = tf == 1 ? At(9, 33) : At(9, 33);
             d.OnBar(Bar(b0, tf, 479.5, 481.5, 479.4, 481, VectorType.BLUE_VECTOR, 480));
@@ -969,8 +969,8 @@ namespace MnqTwoTests
         {
             h.EsDet1.OnBar(Bar(At(9, 20), 1, 5590, 5592, 5588, 5590, VectorType.REGULAR_BULLISH, 5590));
             h.EsDet3.OnBar(Bar(At(9, 18), 3, 5590, 5592, 5588, 5590, VectorType.REGULAR_BULLISH, 5590));
-            h.QqqDet1.OnBar(Bar(At(9, 20), 1, 479, 479.2, 478.8, 479, VectorType.REGULAR_BULLISH, 479));
-            h.QqqDet3.OnBar(Bar(At(9, 18), 3, 479, 479.2, 478.8, 479, VectorType.REGULAR_BULLISH, 479));
+            h.YmDet1.OnBar(Bar(At(9, 20), 1, 479, 479.2, 478.8, 479, VectorType.REGULAR_BULLISH, 479));
+            h.YmDet3.OnBar(Bar(At(9, 18), 3, 479, 479.2, 478.8, 479, VectorType.REGULAR_BULLISH, 479));
         }
 
         private static MockHost CmHost(out FakeBreakoutEngine fb)
@@ -995,20 +995,20 @@ namespace MnqTwoTests
                 SetupEsLevels(h); SetupQqqLevels(h); CmWarmup(h);
                 Check(Math.Abs(h.EsLevels.YdayHigh - 5600) < 1e-9,
                     "ES uses its OWN YDAY_HIGH (5600), not MNQ's");
-                Check(Math.Abs(h.QqqLevels.YdayHigh - 480) < 1e-9,
+                Check(Math.Abs(h.YmLevels.YdayHigh - 480) < 1e-9,
                     "QQQ uses its OWN YDAY_HIGH (480) from the RTH session — the 505 premarket high is excluded");
             }
 
-            // ---- TEST 1: MNQ 1m + ES 1m + QQQ 1m -> A+ / 30% ----
+            // ---- TEST 1: MNQ 1m + ES 1m + YM 1m -> A+ / 30% ----
             {
                 FakeBreakoutEngine fb;
                 MockHost h = CmHost(out fb);
                 EsConfirmShort(h, 1);
                 QqqConfirmShort(h, 1);
                 FbBluePath(fb, VectorType.REGULAR_BEARISH);
-                Check(h.AnyDiagContains("grade=A+ riskPct=30"), "TEST 1: MNQ 1m + ES 1m + QQQ 1m -> A+ @ 30%");
+                Check(h.AnyDiagContains("GRADE=A+ riskPct=30"), "TEST 1: MNQ 1m + ES 1m + YM 1m -> A+ @ 30%");
                 Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 136", "TEST 1: A+ sized at 30% (136 contracts)");
-                Check(h.AnyDiagContains("ES_confirm=True") && h.AnyDiagContains("QQQ_confirm=True"),
+                Check(h.AnyDiagContains("ES_confirm=True") && h.AnyDiagContains("YM_confirm=True"),
                     "TEST 1: both confirmations logged true");
             }
 
@@ -1018,45 +1018,45 @@ namespace MnqTwoTests
                 MockHost h = CmHost(out fb);
                 EsConfirmShort(h, 1);
                 FbBluePath(fb, VectorType.REGULAR_BEARISH);
-                Check(h.AnyDiagContains("grade=A- riskPct=10"), "TEST 2: MNQ 1m + ES 1m only -> A- @ 10%");
+                Check(h.AnyDiagContains("GRADE=A- riskPct=10"), "TEST 2: MNQ 1m + ES 1m only -> A- @ 10%");
                 Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 45", "TEST 2: A- sized at 10% (45 contracts)");
             }
 
-            // ---- TEST 3: MNQ 1m + QQQ 1m only -> B+ / 5% ----
+            // ---- TEST 3: MNQ 1m + YM 1m only -> B+ / 5% ----
             {
                 FakeBreakoutEngine fb;
                 MockHost h = CmHost(out fb);
                 QqqConfirmShort(h, 1);
                 FbBluePath(fb, VectorType.REGULAR_BEARISH);
-                Check(h.AnyDiagContains("grade=A- riskPct=10"),
+                Check(h.AnyDiagContains("GRADE=A- riskPct=10"),
                     "TEST 3: MNQ 1m + market-2 1m only -> A- @ 10% (either single confirmation is A-)");
                 Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 45", "TEST 3: A- sized at 10% (45 contracts)");
             }
 
-            // ---- TEST 4: MNQ 3m + ES 3m + QQQ 3m -> A+ / 30% ----
+            // ---- TEST 4: MNQ 3m + ES 3m + YM 3m -> A+ / 30% ----
             {
                 FakeBreakoutEngine fb;
                 MockHost h = CmHost(out fb);
                 EsConfirmShort(h, 3);
                 QqqConfirmShort(h, 3);
                 FbBluePath3m(fb);
-                Check(h.AnyDiagContains("grade=A+ riskPct=30"), "TEST 4: MNQ 3m + ES 3m + QQQ 3m -> A+ @ 30%");
+                Check(h.AnyDiagContains("GRADE=A+ riskPct=30"), "TEST 4: MNQ 3m + ES 3m + YM 3m -> A+ @ 30%");
                 Check(h.AnyDiagContains("entryTf=3m"), "TEST 4: graded on the 3m entry timeframe");
                 Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 136", "TEST 4: A+ sized at 30% (136 contracts)");
             }
 
-            // ---- TEST 5: MNQ 1m + ES 1m + QQQ 3m -> QQQ must NOT count ----
+            // ---- TEST 5: MNQ 1m + ES 1m + YM 3m -> QQQ must NOT count ----
             {
                 FakeBreakoutEngine fb;
                 MockHost h = CmHost(out fb);
                 EsConfirmShort(h, 1);
                 QqqConfirmShort(h, 3);     // 3m confirmation only
                 FbBluePath(fb, VectorType.REGULAR_BEARISH);
-                Check(h.AnyDiagContains("QQQ_confirm=False"), "TEST 5: a QQQ 3m confirmation does NOT count for a 1m MNQ signal");
-                Check(h.AnyDiagContains("grade=A- riskPct=10"), "TEST 5: grade is A- (ES only), not A+");
+                Check(h.AnyDiagContains("YM_confirm=False"), "TEST 5: a YM 3m confirmation does NOT count for a 1m MNQ signal");
+                Check(h.AnyDiagContains("GRADE=A- riskPct=10"), "TEST 5: grade is A- (ES only), not A+");
             }
 
-            // ---- TEST 6: MNQ 3m + ES 1m + QQQ 3m -> ES must NOT count ----
+            // ---- TEST 6: MNQ 3m + ES 1m + YM 3m -> ES must NOT count ----
             {
                 FakeBreakoutEngine fb;
                 MockHost h = CmHost(out fb);
@@ -1064,7 +1064,7 @@ namespace MnqTwoTests
                 QqqConfirmShort(h, 3);
                 FbBluePath3m(fb);
                 Check(h.AnyDiagContains("ES_confirm=False"), "TEST 6: an ES 1m confirmation does NOT count for a 3m MNQ signal");
-                Check(h.AnyDiagContains("grade=A- riskPct=10"), "TEST 6: grade is A- (market 2 only), not A+");
+                Check(h.AnyDiagContains("GRADE=A- riskPct=10"), "TEST 6: grade is A- (market 2 only), not A+");
             }
 
             // ---- TEST 7: ES/QQQ 15m is irrelevant ----
@@ -1074,10 +1074,10 @@ namespace MnqTwoTests
                 EsConfirmShort(h, 1);
                 QqqConfirmShort(h, 1);
                 CrossMarketConfirm es15 = h.QueryCrossMarket(ConfirmMarket.ES, false, KeyLevelId.YDAY_HIGH, 15, At(9, 34));
-                CrossMarketConfirm qq15 = h.QueryCrossMarket(ConfirmMarket.QQQ, false, KeyLevelId.YDAY_HIGH, 15, At(9, 34));
+                CrossMarketConfirm qq15 = h.QueryCrossMarket(ConfirmMarket.YM, false, KeyLevelId.YDAY_HIGH, 15, At(9, 34));
                 Check(!es15.Confirmed && !qq15.Confirmed, "TEST 7: no 15m ES/QQQ confirmation channel exists at all");
                 FbBluePath(fb, VectorType.REGULAR_BEARISH);
-                Check(h.AnyDiagContains("grade=A+ riskPct=30"),
+                Check(h.AnyDiagContains("GRADE=A+ riskPct=30"),
                     "TEST 7: the grade is decided purely by the 1m confirmations — 15m cannot affect it");
             }
 
@@ -1102,12 +1102,12 @@ namespace MnqTwoTests
                 MockHost h = CmHost(out fb);
                 // neither market confirms
                 FbBluePath(fb, VectorType.REGULAR_BEARISH);
-                Check(h.AnyDiagContains("ES_confirm=False") && h.AnyDiagContains("QQQ_confirm=False"),
+                Check(h.AnyDiagContains("ES_confirm=False") && h.AnyDiagContains("YM_confirm=False"),
                     "TEST 12: the no-confirmation case is logged explicitly");
-                Check(!h.AnyDiagContains("grade=A- "), "TEST 12: zero agreement is never promoted to A-");
-                Check(h.AnyDiagContains("grade=B+ riskPct=5"),
+                Check(!h.AnyDiagContains("GRADE=A- "), "TEST 12: zero agreement is never promoted to A-");
+                Check(h.AnyDiagContains("GRADE=B+ riskPct=5"),
                     "TEST 12: MNQ alone with NEITHER market agreeing resolves to B+ @ 5%");
-                Check(!h.AnyDiagContains("grade=A- riskPct=26"),
+                Check(!h.AnyDiagContains("GRADE=A- riskPct=26"),
                     "TEST 12: the legacy 26% A- grade can never leak into cross-market mode");
                 Check(h.Entries.Count == 1 && h.Entries[0] == "FB_SHORT 22", "TEST 12: sized at 5% (22 contracts)");
             }
@@ -1205,17 +1205,19 @@ namespace MnqTwoTests
                 h.WireCrossMarket(4);
                 SetupEsLevels(h);           // ES fine
                                             // QQQ deliberately unseeded -> NaN levels
-                h.QqqDet1.OnBar(Bar(At(9, 31), 1, 479.5, 481.5, 479.4, 481, VectorType.BLUE_VECTOR, 480));
+                h.YmDet1.OnBar(Bar(At(9, 31), 1, 479.5, 481.5, 479.4, 481, VectorType.BLUE_VECTOR, 480));
                 EsConfirmShort(h, 1);
                 fb = FbFrozenShort(h, At(9, 15), At(9, 30), 20090);
                 FbBluePath(fb, VectorType.REGULAR_BEARISH);
 
-                Check(h.AnyDiagContains("CROSS-MARKET GRADE REFUSED"),
-                    "FB refuses to assign a cross-market grade when a market could not be evaluated");
-                Check(!h.AnyDiagContains("grade=B+ riskPct=5"),
+                Check(h.AnyDiagContains("CROSS-MARKET GRADING UNAVAILABLE"),
+                    "FB refuses to grade when a confirmation market could not be evaluated");
+                Check(!h.AnyDiagContains("GRADE=B+ riskPct=5"),
                     "the 'neither confirms' grade is NEVER produced from unevaluated data");
-                Check(h.Entries.Count == 1, "the trade itself is unaffected — entry logic stays frozen");
-                Check(h.AnyDiagContains("legacy grade="), "it falls back to the legacy grade and says so");
+                Check(h.Entries.Count == 0,
+                    "the entry is BLOCKED — no legacy fallback, so a legacy grade can never masquerade as a new one");
+                Check(!h.AnyDiagContains("using LEGACY validity-candle grade"),
+                    "the legacy validity-candle grading path is never entered");
             }
 
             // ---- D. a REAL negative is still a real negative ----
@@ -1275,25 +1277,25 @@ namespace MnqTwoTests
             // YM is CME: same 18:00 ET exchange day as MNQ/ES, no RTH filter.
             MockHost h = new MockHost();
             h.WireCrossMarket(4);
-            h.QqqLevels.DayStartMinutesEt = 1080;    // 18:00 ET, as the host now configures it
-            h.QqqLevels.WeekStartMinutesEt = 1080;
-            h.QqqLevels.SessionFilterEnabled = false;
-            h.QqqDet1.Label = "YM ##-##"; h.QqqDet3.Label = "YM ##-##";
+            h.YmLevels.DayStartMinutesEt = 1080;    // 18:00 ET, as the host now configures it
+            h.YmLevels.WeekStartMinutesEt = 1080;
+            h.YmLevels.SessionFilterEnabled = false;
+            h.YmDet1.Label = "YM ##-##"; h.YmDet3.Label = "YM ##-##";
 
             // "yesterday" is the CME exchange day that OPENED Mon 18:00 ET
-            Feed(h.QqqLevels, new DateTime(2026, 8, 3, 19, 0, 0), 45000, 45120, 44900, 45000);
+            Feed(h.YmLevels, new DateTime(2026, 8, 3, 19, 0, 0), 45000, 45120, 44900, 45000);
             // an overnight bar must COUNT for a futures market (it would be discarded under RTH)
-            Feed(h.QqqLevels, new DateTime(2026, 8, 4, 2, 0, 0), 45050, 45200, 45040, 45060);
-            Feed(h.QqqLevels, new DateTime(2026, 8, 4, 19, 0, 0), 45100, 45110, 45090, 45100);
+            Feed(h.YmLevels, new DateTime(2026, 8, 4, 2, 0, 0), 45050, 45200, 45040, 45060);
+            Feed(h.YmLevels, new DateTime(2026, 8, 4, 19, 0, 0), 45100, 45110, 45090, 45100);
 
-            Check(Math.Abs(h.QqqLevels.YdayHigh - 45200) < 1e-9,
+            Check(Math.Abs(h.YmLevels.YdayHigh - 45200) < 1e-9,
                 "futures market 2 includes the overnight session in YDAY_HIGH (45200, not the 45120 day-session high)");
-            Check(!double.IsNaN(h.QqqLevels.YdayLow), "futures market 2 computes YDAY_LOW");
+            Check(!double.IsNaN(h.YmLevels.YdayLow), "futures market 2 computes YDAY_LOW");
 
             // it confirms on its OWN level at its own price scale
-            h.QqqDet1.OnBar(Bar(At(9, 31), 1, 45190, 45260, 45185, 45250, VectorType.BLUE_VECTOR, 45200));
-            h.QqqDet1.OnBar(Bar(At(9, 33), 1, 45240, 45245, 45150, 45170, VectorType.REGULAR_BEARISH, 45195));
-            CrossMarketConfirm c = h.QueryCrossMarket(ConfirmMarket.QQQ, false, KeyLevelId.YDAY_HIGH, 1, At(9, 34));
+            h.YmDet1.OnBar(Bar(At(9, 31), 1, 45190, 45260, 45185, 45250, VectorType.BLUE_VECTOR, 45200));
+            h.YmDet1.OnBar(Bar(At(9, 33), 1, 45240, 45245, 45150, 45170, VectorType.REGULAR_BEARISH, 45195));
+            CrossMarketConfirm c = h.QueryCrossMarket(ConfirmMarket.YM, false, KeyLevelId.YDAY_HIGH, 1, At(9, 34));
             Check(c.Confirmed, "YM confirms a bearish fake-break at its OWN YDAY_HIGH (45200)");
             Check(Math.Abs(c.LevelPrice - 45200) < 1e-9, "the confirmation is anchored to YM's own level price");
             Check(c.Reason.Contains("YM ##-##"),

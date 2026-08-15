@@ -283,7 +283,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // ---- V7: optional intraday session filter -------------------------------
         // OFF by default, so MNQ and ES (both CME, 18:00 ET exchange day) aggregate
         // exactly as before — this is a strict no-op for every pre-V7 caller.
-        // It exists for QQQ, which is an ETF and has no 18:00 ET exchange day: the
+        // It exists for a cash/ETF confirmation market with no 18:00 ET exchange day: the
         // user specified its key levels come from the RTH cash session only
         // (09:30-16:00 ET). Bars whose OPEN falls outside the window are ignored
         // entirely for day/week aggregation.
@@ -906,7 +906,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     // ======================================================================
     // V7 — CROSS-MARKET CONFIRMATION (FAKE BREAKOUT ONLY)
     //
-    // ES and QQQ are CONFIRMATION markets. They never produce a setup, never
+    // ES and YM are CONFIRMATION markets. They never produce a setup, never
     // size a trade and never receive an order — the traded instrument is MNQ
     // and nothing here can submit anything. Their only job is to answer one
     // question at the moment an already-valid MNQ Fake Breakout entry fires:
@@ -923,7 +923,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     //
     // VECTOR_BREAK_RETEST never touches any of this.
     // ======================================================================
-    public enum ConfirmMarket { ES, QQQ }
+    public enum ConfirmMarket { ES, YM }
 
     public struct CrossMarketConfirm
     {
@@ -978,7 +978,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     // The break/reclaim/vector/EMA rules are a deliberate mirror of the MNQ
     // Fake Breakout lower-timeframe logic in FakeBreakoutEngine.ProcessLtf.
     // What is NOT mirrored, per the specification:
-    //   - no 15m parent setup is required (or consulted) for ES/QQQ
+    //   - no 15m parent setup is required (or consulted) for ES/YM
     //   - no validity-candle counting
     //   - no entry-time window (this produces no entries)
     // What IS mirrored:
@@ -1016,7 +1016,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public readonly int TfMinutes;
         /// Display name used in EVERY log line and reason string. Defaults to the
         /// slot name but the host overwrites it with the actually-configured symbol,
-        /// so a slot pointed at YM never reports itself as QQQ.
+        /// so a detector always reports the contract actually configured.
         public string Label;
 
         // Bound on break -> reclaim. User-specified 2026-08-14: 4 bars.
@@ -1348,7 +1348,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         bool TpLevelEnabled(TpLevelId id);
 
         // V7 cross-market confirmation (FAKE_BREAKOUT grading only, read-only).
-        // False when the feature is switched off or the ES/QQQ data is unavailable.
+        // False when the feature is switched off or the ES/YM series are not attached.
         bool CrossMarketEnabled { get; }
         CrossMarketConfirm QueryCrossMarket(ConfirmMarket market, bool isLong, KeyLevelId levelId,
                                             int tfMinutes, DateTime barEtClose);

@@ -79,8 +79,8 @@ namespace MnqTwoTests
         // OWN KeyLevelEngine, queried read-only at the MNQ entry decision.
         public bool CrossMarketOn = false;
         public KeyLevelEngine EsLevels = new KeyLevelEngine();
-        public KeyLevelEngine QqqLevels = new KeyLevelEngine();
-        public CrossMarketConfirmDetector EsDet1, EsDet3, QqqDet1, QqqDet3;
+        public KeyLevelEngine YmLevels = new KeyLevelEngine();
+        public CrossMarketConfirmDetector EsDet1, EsDet3, YmDet1, YmDet3;
         public int CmToleranceBars = 0;
         /// Every order the host was ever asked to place, with the series it went to.
         public List<string> OrderInstruments = new List<string>();
@@ -89,9 +89,9 @@ namespace MnqTwoTests
         {
             EsDet1 = new CrossMarketConfirmDetector(ConfirmMarket.ES, 1, EsLevels);
             EsDet3 = new CrossMarketConfirmDetector(ConfirmMarket.ES, 3, EsLevels);
-            QqqDet1 = new CrossMarketConfirmDetector(ConfirmMarket.QQQ, 1, QqqLevels);
-            QqqDet3 = new CrossMarketConfirmDetector(ConfirmMarket.QQQ, 3, QqqLevels);
-            foreach (CrossMarketConfirmDetector d in new CrossMarketConfirmDetector[] { EsDet1, EsDet3, QqqDet1, QqqDet3 })
+            YmDet1 = new CrossMarketConfirmDetector(ConfirmMarket.YM, 1, YmLevels);
+            YmDet3 = new CrossMarketConfirmDetector(ConfirmMarket.YM, 3, YmLevels);
+            foreach (CrossMarketConfirmDetector d in new CrossMarketConfirmDetector[] { EsDet1, EsDet3, YmDet1, YmDet3 })
                 d.MaxBarsBreakToReclaim = maxBarsBreakToReclaim;
             CrossMarketOn = true;
         }
@@ -110,7 +110,7 @@ namespace MnqTwoTests
             if (market == ConfirmMarket.ES)
                 det = tfMinutes == 1 ? EsDet1 : tfMinutes == 3 ? EsDet3 : null;
             else
-                det = tfMinutes == 1 ? QqqDet1 : tfMinutes == 3 ? QqqDet3 : null;
+                det = tfMinutes == 1 ? YmDet1 : tfMinutes == 3 ? YmDet3 : null;
             if (det == null)
             {
                 miss.Reason = market + ": no " + tfMinutes + "m confirmation series exists";

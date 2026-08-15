@@ -16,7 +16,7 @@ namespace NinjaTrader.Cbi
     public class Account { public string Name { get; set; } public double Get(AccountItem i, Currency c) { return 0; } }
     public enum AccountItem { CashValue, NetLiquidation, BuyingPower }
     public enum Currency { UsDollar }
-    public class Instrument { public MasterInstrument MasterInstrument { get; set; } }
+    public class Instrument { public MasterInstrument MasterInstrument { get; set; } public string FullName { get; set; } }
     public class MasterInstrument { public string Name { get; set; } public double TickSize { get; set; } public double PointValue { get; set; } public double RoundToTickSize(double p) { return p; } }
 }
 
@@ -24,7 +24,7 @@ namespace NinjaTrader.Data
 {
     public enum MarketDataType { Last, Bid, Ask }
     public enum BarsPeriodType { Tick, Volume, Range, Second, Minute, Day, Week, Month, Year }
-    public class Bars { public int Count { get; set; } }
+    public class Bars { public int Count { get; set; } public NinjaTrader.Cbi.Instrument Instrument { get; set; } }
 }
 
 namespace NinjaTrader.Core

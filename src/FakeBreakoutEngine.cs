@@ -64,15 +64,18 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public FbGradeBasis GradeBasis = FbGradeBasis.FirstTradableCandle;
 
         // ---- V7 CROSS-MARKET GRADING ----------------------------------------
-        // When TRUE (and the host actually has ES/QQQ data), grade and risk come
-        // from the ES/QQQ confirmation table and the validity-candle A-/B+ system
-        // above is BYPASSED ENTIRELY. The two never run together: RiskPctAMinus /
-        // RiskPctBPlus / GradeBasis are dead code on this path.
-        // When FALSE, the legacy validity-candle grading is restored unchanged.
+        // When TRUE, grade and risk come from the ES + YM confirmation table and the
+        // validity-candle A-/B+ system above is BYPASSED ENTIRELY. The two never run
+        // together: RiskPctAMinus / RiskPctBPlus / GradeBasis are dead on this path.
         public bool UseCrossMarketGrading = true;
-        // 0 = the ES/QQQ confirmation must sit on EXACTLY the MNQ entry bar's
+        // 0 = the ES/YM confirmation must sit on EXACTLY the MNQ entry bar's
         // completed timestamp. Higher values allow that many bars of lag.
         public int CrossMarketToleranceBars = 0;
+        // USER RULE (2026-08-14): there is NO legacy fallback. If cross-market grading
+        // is switched on but a confirmation market cannot be evaluated, the trade is
+        // BLOCKED and logged. A legacy grade must never be dressed up as a new one,
+        // and a research dataset must never mix the two grading systems.
+        public bool BlockEntryWhenCrossMarketUnavailable = true;
         public FbCrossMarketGradeTable CrossMarketGrades = new FbCrossMarketGradeTable();
     }
 
@@ -634,10 +637,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             // ==============================================================
             // GRADE. Exactly ONE of the two systems below runs — never both.
             //
-            // V7 (default): ES/QQQ cross-market confirmation at the SAME level
+            // V7 (default): ES + YM cross-market confirmation at the SAME level
             //   name, on the SAME timeframe, on the SAME completed bar. This
             //   only sets grade/risk — the entry above already qualified on the
-            //   MNQ rules alone and is not affected by what ES/QQQ do.
+            //   MNQ rules alone and is not affected by what ES/YM do.
             // LEGACY: validity-candle A-/B+ (26%/10%), used only when the V7
             //   system is switched off or its data is unavailable.
             // ==============================================================
@@ -649,45 +652,45 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             {
                 CrossMarketConfirm es = host.QueryCrossMarket(ConfirmMarket.ES, slot.IsLong,
                     slot.ActiveLevelId, bar.PeriodMinutes, bar.EtClose);
-                CrossMarketConfirm qqq = host.QueryCrossMarket(ConfirmMarket.QQQ, slot.IsLong,
+                CrossMarketConfirm ym = host.QueryCrossMarket(ConfirmMarket.YM, slot.IsLong,
                     slot.ActiveLevelId, bar.PeriodMinutes, bar.EtClose);
 
-                // V7.1 SAFETY: a market that could not be EVALUATED is not a market
-                // that DECLINED. Grading "neither confirms" off missing data is what
-                // silently mis-graded an entire backtest. If either side is unknown,
-                // refuse the cross-market grade and fall back to the legacy one, loudly.
-                if (es.Unavailable || qqq.Unavailable)
+                // USER RULE: a market that could not be EVALUATED is not a market that
+                // DECLINED. There is NO legacy fallback — the trade is refused outright
+                // so no legacy grade can ever be mistaken for a correlation grade.
+                if (es.Unavailable || ym.Unavailable)
                 {
-                    int gcU = formingCandle;
-                    if (cfg.GradeBasis == FbGradeBasis.FirstTradableCandle && slot.FirstTradableFormingNum > 0)
-                        gcU = formingCandle - slot.FirstTradableFormingNum + 1;
-                    grade = gcU <= 1 ? "A-" : "B+";
-                    riskPct = grade == "A-" ? cfg.RiskPctAMinus : cfg.RiskPctBPlus;
-
                     host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
-                        "FAKE BREAKOUT CONFIRMATION | *** CROSS-MARKET GRADE REFUSED — INPUT DATA UNUSABLE ***"
-                        + "\n    This trade was NOT graded A+/A-/B+/B. Cross-market confirmation could not be"
-                        + "\n    evaluated, so the legacy validity-candle grade was used instead."
-                        + "\n    ES : {0}\n    QQQ: {1}"
-                        + "\n    direction={2} entryTf={3}m level={4} -> legacy grade={5} riskPct={6}",
-                        es.Reason, qqq.Reason,
-                        slot.IsLong ? "LONG" : "SHORT", bar.PeriodMinutes, slot.ActiveLevelId, grade, riskPct));
+                        "*** CROSS-MARKET GRADING UNAVAILABLE — ENTRY BLOCKED ***"
+                        + "\n    A valid MNQ Fake Breakout qualified but could NOT be graded, and no legacy"
+                        + "\n    grade is permitted. No order was submitted."
+                        + "\n    direction={0} entryTf={1}m level={2} at {3:yyyy-MM-dd HH:mm} ET"
+                        + "\n    ES : {4}\n    YM : {5}",
+                        slot.IsLong ? "LONG" : "SHORT", bar.PeriodMinutes, slot.ActiveLevelId, bar.EtClose,
+                        es.Reason, ym.Reason));
+                    if (cfg.BlockEntryWhenCrossMarketUnavailable) { s.Reset(); return; }
+                    grade = "UNGRADED"; riskPct = 0;
                 }
                 else
                 {
-                cfg.CrossMarketGrades.Resolve(es.Confirmed, qqq.Confirmed, out grade, out riskPct);
+                cfg.CrossMarketGrades.Resolve(es.Confirmed, ym.Confirmed, out grade, out riskPct);
+
+                // RESEARCH-ONLY subtype. The official grade stays "A-"; the subtype
+                // only records WHICH single market agreed, for later subgroup analysis.
+                string subtype = "";
+                if (grade == "A-") subtype = es.Confirmed ? "  A-_subtype=ES" : "  A-_subtype=YM";
 
                 host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
-                    "FAKE BREAKOUT CONFIRMATION | direction={0} entryTf={1}m level={2} confirmBar={3:yyyy-MM-dd HH:mm} ET"
-                    + " | MNQ_confirm=true ES_confirm={4} QQQ_confirm={5} | grade={6} riskPct={7}"
+                    "FAKE BREAKOUT CONFIRMATION | tradeId=(pending) direction={0} entryTf={1}m confirmBar={3:yyyy-MM-dd HH:mm} ET"
+                    + " | MNQ_confirm=TRUE ES_confirm={4} YM_confirm={5} | GRADE={6} riskPct={7}{18}"
                     + "\n    MNQ_level_name={2} MNQ_level_price={8:0.00} MNQ_close={9:0.00} MNQ_ema9={10:0.00} MNQ_vector={11}"
-                    + "\n    ES_level_name={12} ES_level_price={13:0.00} ES_reason={14}"
-                    + "\n    QQQ_level_name={15} QQQ_level_price={16:0.00} QQQ_reason={17}",
+                    + "\n    ES_level_name={12}  ES_level_price={13:0.00}  ES_confirm={4}  ES_reason={14}"
+                    + "\n    YM_level_name={15}  YM_level_price={16:0.00}  YM_confirm={5}  YM_reason={17}",
                     slot.IsLong ? "LONG" : "SHORT", bar.PeriodMinutes, slot.ActiveLevelId, bar.EtClose,
-                    es.Confirmed, qqq.Confirmed, grade, riskPct,
+                    es.Confirmed, ym.Confirmed, grade, riskPct,
                     slot.ActiveLevelPrice, bar.Close, bar.Ema9, bar.Vector,
                     es.LevelId, es.LevelPrice, es.Reason,
-                    qqq.LevelId, qqq.LevelPrice, qqq.Reason));
+                    ym.LevelId, ym.LevelPrice, ym.Reason, subtype));
                 }
             }
             else
@@ -701,9 +704,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                 riskPct = grade == "A-" ? cfg.RiskPctAMinus : cfg.RiskPctBPlus;
 
                 host.Diag(StrategyId.FAKE_BREAKOUT, string.Format(CultureInfo.InvariantCulture,
-                    "FAKE BREAKOUT CONFIRMATION | cross-market grading INACTIVE ({0}) — using LEGACY validity-candle grade"
-                    + " | direction={1} entryTf={2}m level={3} gradeCandle={4} grade={5} riskPct={6}",
-                    cfg.UseCrossMarketGrading ? "ES/QQQ data unavailable" : "switched off in settings",
+                    "FAKE BREAKOUT CONFIRMATION | cross-market grading OFF ({0}) — using LEGACY validity-candle grade"
+                    + " | direction={1} entryTf={2}m level={3} gradeCandle={4} GRADE={5} riskPct={6}",
+                    cfg.UseCrossMarketGrading ? "confirmation series not attached" : "switched off in settings",
                     slot.IsLong ? "LONG" : "SHORT", bar.PeriodMinutes, slot.ActiveLevelId,
                     gradeCandle, grade, riskPct));
             }

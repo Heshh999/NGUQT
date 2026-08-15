@@ -16,7 +16,7 @@
 // SERIES MAP (BarsInProgress) — indices are assigned in State.Configure in
 // AddDataSeries order, so they shift with the optional series:
 //   0 = chart series (NEVER used for logic)
-//   [ES 1m, ES 3m, QQQ 1m, QQQ 3m]  OPTIONAL V7 confirmation markets, added
+//   [ES 1m, ES 3m, YM 1m, YM 3m]  OPTIONAL V7 confirmation markets, added
 //       FIRST so a same-timestamp bar is complete before MNQ decides. DATA
 //       ONLY — no order is ever routed to these series.
 //   1m  (entries/patterns/MFE-MAE/key-level aggregation)
@@ -51,9 +51,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         // SERIES MAP — assigned in State.Configure, in AddDataSeries order.
         //
         // These were compile-time constants before V7. They are now fields
-        // because the optional ES/QQQ confirmation series must be added
+        // because the optional ES/YM confirmation series must be added
         // BEFORE the MNQ series. NinjaTrader processes bars that share a
-        // timestamp in the order the series were added, so ES/QQQ must come
+        // timestamp in the order the series were added, so ES/YM must come
         // first for their 10:03 bar to be complete when MNQ's 10:03 bar makes
         // the entry decision. Adding them last would make every same-bar
         // confirmation arrive one bar too late.
@@ -66,7 +66,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int BipThreeMin = 2;
         private int BipFifteenMin = 3;
         private int BipTick = -1;             // execution-granularity series only (no logic)
-        private int BipEs1 = -1, BipEs3 = -1, BipQqq1 = -1, BipQqq3 = -1;
+        private int BipEs1 = -1, BipEs3 = -1, BipYm1 = -1, BipYm3 = -1;
 
         // Series index that ORDERS are submitted against. Signals are unaffected —
         // this only controls how finely NinjaTrader simulates fills in a backtest.
@@ -91,13 +91,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // ---- V7 cross-market confirmation (FAKE_BREAKOUT grading only) ----
         // Each confirmation market gets its OWN KeyLevelEngine, so YDAY_HIGH means
-        // "ES's own yesterday high" / "QQQ's own yesterday high" — MNQ prices are
-        // never compared against ES or QQQ prices anywhere.
-        private KeyLevelEngine esLevels, qqqLevels;
-        private EMA emaEs1, emaEs3, emaQqq1, emaQqq3;
-        private CrossMarketConfirmDetector esDet1, esDet3, qqqDet1, qqqDet3;
+        // "ES's own yesterday high" / "YM's own yesterday high" — MNQ prices are
+        // never compared against ES or YM prices anywhere.
+        private KeyLevelEngine esLevels, ymLevels;
+        private EMA emaEs1, emaEs3, emaYm1, emaYm3;
+        private CrossMarketConfirmDetector esDet1, esDet3, ymDet1, ymDet3;
         private bool crossMarketReady;        // series attached AND carrying bars
-        private int esBars1, esBars3, qqqBars1, qqqBars3;   // loaded bar counts (V7.1 diagnostic)
 
         // ==================================================================
         // Parameters — every flagged ambiguity is exposed here instead of
@@ -120,29 +119,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         #endregion
 
         #region 00b. Cross-Market Confirmation (FAKE_BREAKOUT grading only)
-        // ES and QQQ are CONFIRMATION MARKETS ONLY. No order is ever submitted on
+        // ES and YM are CONFIRMATION MARKETS ONLY. No order is ever submitted on
         // either one — every order in this strategy is routed to the MNQ series.
         // They change the GRADE and RISK of an MNQ Fake Breakout that has already
         // qualified on the MNQ rules alone. They never create or block a trade.
         [NinjaScriptProperty]
-        [Display(Name = "Enable cross-market grading (ES/QQQ)", GroupName = "00b. Cross-Market Confirmation", Order = 1)]
+        [Display(Name = "Enable cross-market grading (ES + YM)", GroupName = "00b. Cross-Market Confirmation", Order = 1)]
         public bool EnableCrossMarketConfirmation { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "ES confirmation symbol", GroupName = "00b. Cross-Market Confirmation", Order = 2)]
         public string EsSymbol { get; set; }
 
-        // Confirmation market 2. Originally QQQ; the property name is kept so saved
-        // NinjaTrader templates are not invalidated, but the slot accepts ANY symbol.
-        // A futures contract (YM ##-##, RTY ##-##) needs the CME exchange day; an ETF
-        // (QQQ) needs the RTH cash session. Confirm2UsesRthSession selects which.
+        // Confirmation market 2 = YM (CME Dow futures). Data only, never traded.
         [NinjaScriptProperty]
-        [Display(Name = "Confirmation market 2 symbol", GroupName = "00b. Cross-Market Confirmation", Order = 3)]
-        public string QqqSymbol { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Market 2 is an ETF (use RTH session for its levels)", GroupName = "00b. Cross-Market Confirmation", Order = 4)]
-        public bool Confirm2UsesRthSession { get; set; }
+        [Display(Name = "YM confirmation symbol", GroupName = "00b. Cross-Market Confirmation", Order = 3)]
+        public string YmSymbol { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 50)]
@@ -169,19 +161,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Risk % — B+ (MNQ alone, NEITHER confirms)", GroupName = "00b. Cross-Market Confirmation", Order = 9)]
         public double CmRiskPctBPlus { get; set; }
 
-        // QQQ is an ETF: it has no 18:00 ET exchange day. Its key levels are built
+        // Confirmation-market key levels are built from each market's own session.
         // from the RTH cash session only, per user specification.
-        [NinjaScriptProperty]
-        [Range(0, 1439)]
-        [Display(Name = "Market 2 ETF session start (ET minutes, 570 = 09:30)", GroupName = "00b. Cross-Market Confirmation", Order = 11)]
-        public int QqqSessionStartMinutesEt { get; set; }
 
-        [NinjaScriptProperty]
-        [Range(1, 1440)]
-        [Display(Name = "Market 2 ETF session end (ET minutes, 960 = 16:00)", GroupName = "00b. Cross-Market Confirmation", Order = 12)]
-        public int QqqSessionEndMinutesEt { get; set; }
 
-        // V7.1: makes a silent ES/QQQ data failure impossible to miss.
+        // V7.1: makes a silent ES/YM data failure impossible to miss.
         //   Summary = one line per market per day (bar counts, levels, near-miss tally)
         //   Verbose = every break / rejected reclaim / expiry / confirmation (LOUD)
         // Confirmation on ES / market 2 is break + reclaim only. Their EMA(9) plays no
@@ -404,15 +388,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // ---- V7 cross-market confirmation ----
                 EnableCrossMarketConfirmation = true;
                 EsSymbol = "ES ##-##";            // NT8 front-month syntax
-                QqqSymbol = "YM ##-##";       // confirmation market 2 (Dow). Data only — never traded.
-                Confirm2UsesRthSession = false;  // YM is CME futures: same 18:00 ET exchange day as MNQ/ES
+                YmSymbol = "YM ##-##";       // confirmation market 2 (Dow). Data only — never traded.
                 CrossMarketMaxBarsBreakToReclaim = 4;   // user-specified
                 CrossMarketToleranceBars = 0;           // exact same completed bar
-                CmRiskPctAPlus = 30.0;                  // ES + QQQ
+                CmRiskPctAPlus = 30.0;                  // ES + YM both confirm
                 CmRiskPctAMinus = 10.0;                 // ES only
                 CmRiskPctBPlus = 5.0;                   // MNQ alone, neither confirms
-                QqqSessionStartMinutesEt = 570;         // 09:30 ET
-                QqqSessionEndMinutesEt = 960;           // 16:00 ET
                 ConfirmMarketsRequireEma = false;        // spec: ES/market-2 EMAs do not matter
                 CrossMarketDiagnostics = 1;             // Summary
 
@@ -463,7 +444,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 int next = 1;   // BarsInProgress 0 is the chart series
 
                 // ---- V7 confirmation series FIRST -------------------------------
-                // Added ahead of the MNQ series so that when ES/QQQ and MNQ all
+                // Added ahead of the MNQ series so that when ES/YM and MNQ all
                 // close a bar on the same timestamp, the confirmation markets are
                 // processed first and their completed bar is available to the MNQ
                 // entry decision on that same timestamp. No orders are ever routed
@@ -474,10 +455,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     BipEs1 = next++;
                     AddDataSeries(EsSymbol, BarsPeriodType.Minute, 3, MarketDataType.Last);
                     BipEs3 = next++;
-                    AddDataSeries(QqqSymbol, BarsPeriodType.Minute, 1, MarketDataType.Last);
-                    BipQqq1 = next++;
-                    AddDataSeries(QqqSymbol, BarsPeriodType.Minute, 3, MarketDataType.Last);
-                    BipQqq3 = next++;
+                    AddDataSeries(YmSymbol, BarsPeriodType.Minute, 1, MarketDataType.Last);
+                    BipYm1 = next++;
+                    AddDataSeries(YmSymbol, BarsPeriodType.Minute, 3, MarketDataType.Last);
+                    BipYm3 = next++;
                 }
 
                 // Multi-timeframe architecture (spec: 15m parent, 3m/1m entries).
@@ -534,64 +515,45 @@ namespace NinjaTrader.NinjaScript.Strategies
                     esLevels.DayStartMinutesEt = DayStartMinutesEt;
                     esLevels.WeekStartMinutesEt = WeekStartMinutesEt;
 
-                    // QQQ is an ETF with no 18:00 ET exchange day. Per user
                     // specification its levels come from the RTH cash session only,
                     // so the day/week roll is calendar-based and the session filter
                     // discards everything outside 09:30-16:00 ET.
-                    qqqLevels = new KeyLevelEngine();
-                    if (Confirm2UsesRthSession)
-                    {
-                        // ETF (QQQ): no exchange day, so calendar roll + RTH-only aggregation.
-                        qqqLevels.DayStartMinutesEt = 0;
-                        qqqLevels.WeekStartMinutesEt = 0;
-                        qqqLevels.SessionFilterEnabled = true;
-                        qqqLevels.SessionFilterStartMinutesEt = QqqSessionStartMinutesEt;
-                        qqqLevels.SessionFilterEndMinutesEt = QqqSessionEndMinutesEt;
-                    }
-                    else
-                    {
-                        // CME futures (YM/RTY): identical exchange day to MNQ and ES,
-                        // so its YDAY/LWEEK levels roll on the same 18:00 ET boundary.
-                        qqqLevels.DayStartMinutesEt = DayStartMinutesEt;
-                        qqqLevels.WeekStartMinutesEt = WeekStartMinutesEt;
-                        qqqLevels.SessionFilterEnabled = false;
-                    }
+                    // YM is CME, identical exchange day to MNQ and ES.
+                    ymLevels = new KeyLevelEngine();
+                    ymLevels.DayStartMinutesEt = DayStartMinutesEt;
+                    ymLevels.WeekStartMinutesEt = WeekStartMinutesEt;
+                    ymLevels.SessionFilterEnabled = false;
 
                     esDet1 = new CrossMarketConfirmDetector(ConfirmMarket.ES, 1, esLevels);
                     esDet3 = new CrossMarketConfirmDetector(ConfirmMarket.ES, 3, esLevels);
-                    qqqDet1 = new CrossMarketConfirmDetector(ConfirmMarket.QQQ, 1, qqqLevels);
-                    qqqDet3 = new CrossMarketConfirmDetector(ConfirmMarket.QQQ, 3, qqqLevels);
-                    foreach (CrossMarketConfirmDetector d in new CrossMarketConfirmDetector[] { esDet1, esDet3, qqqDet1, qqqDet3 })
+                    ymDet1 = new CrossMarketConfirmDetector(ConfirmMarket.YM, 1, ymLevels);
+                    ymDet3 = new CrossMarketConfirmDetector(ConfirmMarket.YM, 3, ymLevels);
+                    foreach (CrossMarketConfirmDetector d in new CrossMarketConfirmDetector[] { esDet1, esDet3, ymDet1, ymDet3 })
                     {
                         d.MaxBarsBreakToReclaim = CrossMarketMaxBarsBreakToReclaim;
                         d.SessionStartMinutesEt = EntryStartMinutesEt;
                         d.RequireEmaConfirmation = ConfirmMarketsRequireEma;
                     }
                     esDet1.Label = EsSymbol; esDet3.Label = EsSymbol;
-                    qqqDet1.Label = QqqSymbol; qqqDet3.Label = QqqSymbol;
-                    // V7.1 FIX. The previous check only proved the series were ATTACHED.
-                    // A series with ZERO loaded bars passed it, which is how an entire
-                    // backtest was graded off ES/QQQ levels that were permanently NaN.
-                    // Readiness now requires every confirmation series to actually
-                    // carry bars, and the counts are printed either way.
-                    bool attached = BipEs1 > 0 && BipEs3 > 0 && BipQqq1 > 0 && BipQqq3 > 0
-                        && BarsArray.Length > BipQqq3
+                    ymDet1.Label = YmSymbol; ymDet3.Label = YmSymbol;
+                    // V7.2 FIX — do NOT latch readiness on BarsArray[].Count here.
+                    // State.DataLoaded is too early to trust a bar count in the Strategy
+                    // Analyzer: a series that streams in later would be written off
+                    // permanently. Readiness now only asserts the series are ATTACHED;
+                    // whether each market can actually be evaluated is decided per query,
+                    // live, from the detector's own bar count and level validity.
+                    crossMarketReady = BipEs1 > 0 && BipEs3 > 0 && BipYm1 > 0 && BipYm3 > 0
+                        && BarsArray.Length > BipYm3
                         && BarsArray[BipEs1] != null && BarsArray[BipEs3] != null
-                        && BarsArray[BipQqq1] != null && BarsArray[BipQqq3] != null;
-                    if (attached)
-                    {
-                        esBars1 = BarsArray[BipEs1].Count; esBars3 = BarsArray[BipEs3].Count;
-                        qqqBars1 = BarsArray[BipQqq1].Count; qqqBars3 = BarsArray[BipQqq3].Count;
-                    }
-                    crossMarketReady = attached && esBars1 > 0 && esBars3 > 0 && qqqBars1 > 0 && qqqBars3 > 0;
+                        && BarsArray[BipYm1] != null && BarsArray[BipYm3] != null;
 
                     if (CrossMarketDiagnostics > 0)
                     {
                         esDet1.Diag = CmDiag; esDet3.Diag = CmDiag;
-                        qqqDet1.Diag = CmDiag; qqqDet3.Diag = CmDiag;
+                        ymDet1.Diag = CmDiag; ymDet3.Diag = CmDiag;
                         bool verbose = CrossMarketDiagnostics >= 2;
                         esDet1.VerboseEvents = verbose; esDet3.VerboseEvents = verbose;
-                        qqqDet1.VerboseEvents = verbose; qqqDet3.VerboseEvents = verbose;
+                        ymDet1.VerboseEvents = verbose; ymDet3.VerboseEvents = verbose;
                     }
                 }
 
@@ -606,6 +568,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 fbCfg.GradeBasis = FbGradeBasisParam;
                 fbCfg.UseCrossMarketGrading = EnableCrossMarketConfirmation;
                 fbCfg.CrossMarketToleranceBars = CrossMarketToleranceBars;
+                fbCfg.BlockEntryWhenCrossMarketUnavailable = true;   // no legacy fallback, ever
                 fbCfg.CrossMarketGrades.RiskPctAPlus = CmRiskPctAPlus;
                 fbCfg.CrossMarketGrades.RiskPctAMinus = CmRiskPctAMinus;
                 fbCfg.CrossMarketGrades.RiskPctBPlus = CmRiskPctBPlus;
@@ -639,8 +602,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     emaEs1 = EMA(BarsArray[BipEs1], 9);
                     emaEs3 = EMA(BarsArray[BipEs3], 9);
-                    emaQqq1 = EMA(BarsArray[BipQqq1], 9);
-                    emaQqq3 = EMA(BarsArray[BipQqq3], 9);
+                    emaYm1 = EMA(BarsArray[BipYm1], 9);
+                    emaYm3 = EMA(BarsArray[BipYm3], 9);
                 }
 
                 PrintLine(string.Format("MnqTwoStrategies: FAKE_BREAKOUT={0}, VECTOR_BREAK_RETEST={1}",
@@ -655,20 +618,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 else if (!crossMarketReady)
                 {
                     PrintLine("**********************************************************************");
-                    PrintLine("*** CROSS-MARKET CONFIRMATION IS ENABLED BUT UNUSABLE — NO GRADING ***");
+                    PrintLine("***      CROSS-MARKET GRADING UNAVAILABLE — NO TRADES WILL BE TAKEN ***");
                     PrintLine("**********************************************************************");
-                    PrintLine(string.Format(CultureInfo.InvariantCulture,
-                        "  bars loaded:  ES('{0}') 1m={1} 3m={2}   |   QQQ('{3}') 1m={4} 3m={5}",
-                        EsSymbol, esBars1, esBars3, QqqSymbol, qqqBars1, qqqBars3));
-                    if (esBars1 == 0 || esBars3 == 0)
-                        PrintLine("  -> ES delivered ZERO bars. Open a 1-minute chart of '" + EsSymbol
-                            + "' over this date range; if it is blank, your data feed has no history for it.");
-                    if (qqqBars1 == 0 || qqqBars3 == 0)
-                        PrintLine("  -> Confirmation market 2 ('" + QqqSymbol + "') delivered ZERO bars. If this is an ETF "
-                            + "(QQQ), futures-only feeds carry no equities and will always report 0 — switch it to a "
-                            + "CME futures symbol such as YM ##-## and untick the ETF session box.");
-                    PrintLine("  A+/A-/B+/B grades CANNOT be produced. Every FAKE_BREAKOUT trade will use the");
-                    PrintLine("  LEGACY validity-candle grade instead, and will say so on its entry line.");
+                    PrintLine("  The ES/YM confirmation series are not attached. A+/A-/B+ cannot be");
+                    PrintLine("  produced, and NO legacy grade will be substituted — Fake Breakout");
+                    PrintLine("  entries are BLOCKED so the dataset can never mix grading systems.");
+                    PrintLine("  See the CROSS-MARKET DATA STATUS block below for per-series detail.");
+                    PrintLine("**********************************************************************");
+                    PrintLine("  configured: ES='" + EsSymbol + "'   YM='" + YmSymbol + "'");
                     PrintLine("**********************************************************************");
                 }
                 else
@@ -676,12 +633,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                         "CROSS-MARKET CONFIRMATION ENABLED — market1='{0}' market2='{1}'"
                         + "\n  grades: A+={2}% (BOTH agree) | A-={3}% (exactly ONE agrees) | B+={4}% (NEITHER agrees)"
                         + "\n  reclaim window={5} bars, lag tolerance={6} bar(s), confirmation EMA(9): {7}"
-                        + "\n  bars loaded: {0} 1m={8} 3m={9} | {1} 1m={10} 3m={11}"
-                        + "\n  ORDERS ARE MNQ-ONLY. Levels need >=2 sessions of each market's own history.",
-                        EsSymbol, QqqSymbol, CmRiskPctAPlus, CmRiskPctAMinus, CmRiskPctBPlus,
+                        + "\n  ORDERS ARE MNQ-ONLY. Levels need >=2 sessions of each market's own history."
+                        + "\n  Bar counts are reported in the CROSS-MARKET DATA STATUS block on the first MNQ bar.",
+                        EsSymbol, YmSymbol, CmRiskPctAPlus, CmRiskPctAMinus, CmRiskPctBPlus,
                         CrossMarketMaxBarsBreakToReclaim, CrossMarketToleranceBars,
-                        ConfirmMarketsRequireEma ? "REQUIRED" : "NOT required",
-                        esBars1, esBars3, qqqBars1, qqqBars3));
+                        ConfirmMarketsRequireEma ? "REQUIRED" : "NOT required"));
+
+                if (EnableCrossMarketConfirmation)
+                    PrintCrossMarketDataStatus("State.DataLoaded — counts here may be 0 until data streams");
 
                 if (!instrumentOk)
                     PrintLine("MnqTwoStrategies ERROR: instrument '" + master
@@ -717,21 +676,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (fb == null || vbr == null) return;
 
             // ==============================================================
-            // V7 CONFIRMATION SERIES — data only. These branches build ES/QQQ
+            // V7 CONFIRMATION SERIES — data only. These branches build ES/YM
             // key levels and run their fake-break detectors. They never call
             // fb/vbr, never size, and never submit an order of any kind.
             // ==============================================================
             if (crossMarketReady && (BarsInProgress == BipEs1 || BarsInProgress == BipEs3
-                                     || BarsInProgress == BipQqq1 || BarsInProgress == BipQqq3))
+                                     || BarsInProgress == BipYm1 || BarsInProgress == BipYm3))
             {
                 bool isEs = BarsInProgress == BipEs1 || BarsInProgress == BipEs3;
                 int bip = BarsInProgress;
 
                 // 1m series maintains that market's own key levels
-                if (bip == BipEs1 || bip == BipQqq1)
+                if (bip == BipEs1 || bip == BipYm1)
                 {
                     if (CurrentBars[bip] < 1) return;
-                    KeyLevelEngine kl = isEs ? esLevels : qqqLevels;
+                    KeyLevelEngine kl = isEs ? esLevels : ymLevels;
                     DateTime cEtClose = ToEt(Times[bip][0]);
                     bool cNewDay = kl.OnOneMinuteBar(cEtClose.AddMinutes(-1), cEtClose,
                         ToUtc(Times[bip][0]).AddMinutes(-1),
@@ -739,25 +698,30 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (cNewDay)
                     {
                         if (isEs) { esDet1.OnNewDay(); esDet3.OnNewDay(); }
-                        else { qqqDet1.OnNewDay(); qqqDet3.OnNewDay(); }
+                        else { ymDet1.OnNewDay(); ymDet3.OnNewDay(); }
                         if (CrossMarketDiagnostics > 0) EmitCrossMarketDayReport(isEs, cEtClose);
                     }
                 }
 
                 if (CurrentBars[bip] < 11) return;   // vector needs 10 prior completed candles
                 cmDiagTime = ToEt(Times[bip][0]);
-                int periodMin = (bip == BipEs1 || bip == BipQqq1) ? 1 : 3;
-                EMA e = bip == BipEs1 ? emaEs1 : bip == BipEs3 ? emaEs3 : bip == BipQqq1 ? emaQqq1 : emaQqq3;
+                int periodMin = (bip == BipEs1 || bip == BipYm1) ? 1 : 3;
+                EMA e = bip == BipEs1 ? emaEs1 : bip == BipEs3 ? emaEs3 : bip == BipYm1 ? emaYm1 : emaYm3;
                 BarSnap cs = BuildSnap(bip, periodMin, e[0]);
                 if (bip == BipEs1) esDet1.OnBar(cs);
                 else if (bip == BipEs3) esDet3.OnBar(cs);
-                else if (bip == BipQqq1) qqqDet1.OnBar(cs);
-                else qqqDet3.OnBar(cs);
+                else if (bip == BipYm1) ymDet1.OnBar(cs);
+                else ymDet3.OnBar(cs);
                 return;   // never falls through to any MNQ trading path
             }
 
             if (BarsInProgress == BipOneMin)
             {
+                if (!statusPrinted && CurrentBars[BipOneMin] >= 0)
+                {
+                    statusPrinted = true;
+                    PrintCrossMarketDataStatus("first MNQ bar — LIVE counts, this is the authoritative one");
+                }
                 if (CurrentBars[BipOneMin] < 1) return;
 
                 // key-level aggregation always runs (needs full history)
@@ -778,8 +742,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 ? string.Format(CultureInfo.InvariantCulture,
                                     "\n    {8,-10} YH={0} YL={1} LWH={2} LWL={3}\n    {9,-10} YH={4} YL={5} LWH={6} LWL={7}",
                                     Fmt(esLevels.YdayHigh), Fmt(esLevels.YdayLow), Fmt(esLevels.LweekHigh), Fmt(esLevels.LweekLow),
-                                    Fmt(qqqLevels.YdayHigh), Fmt(qqqLevels.YdayLow), Fmt(qqqLevels.LweekHigh), Fmt(qqqLevels.LweekLow),
-                                    EsSymbol, QqqSymbol)
+                                    Fmt(ymLevels.YdayHigh), Fmt(ymLevels.YdayLow), Fmt(ymLevels.LweekHigh), Fmt(ymLevels.LweekLow),
+                                    EsSymbol, YmSymbol)
                                 : ""));
                     if (EnableFakeBreakout) fb.OnNewDay(etClose);
                     if (EnableVectorBreakRetest) vbr.OnNewDay(etClose);
@@ -984,6 +948,52 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnterShort(bipExec, qty, signalName);
         }
 
+        // Prints the exact status of every data series, including what NinjaTrader
+        // actually RESOLVED each symbol to. A zero bar count alone cannot tell you
+        // whether the symbol was wrong or the data was missing; the resolved
+        // instrument name can.
+        private bool statusPrinted;
+        private void PrintCrossMarketDataStatus(string when)
+        {
+            PrintLine("================ CROSS-MARKET DATA STATUS (" + when + ") ================");
+            PrintSeriesStatus("MNQ 1m  (control)", BipOneMin);
+            PrintSeriesStatus("MNQ 3m  (control)", BipThreeMin);
+            PrintSeriesStatus("MNQ 15m (control)", BipFifteenMin);
+            PrintSeriesStatus("ES 1m", BipEs1);
+            PrintSeriesStatus("ES 3m", BipEs3);
+            PrintSeriesStatus("YM 1m", BipYm1);
+            PrintSeriesStatus("YM 3m", BipYm3);
+            PrintLine("  configured symbols: ES='" + EsSymbol + "'  YM='" + YmSymbol + "'");
+            PrintLine("  If a confirmation series shows resolved='<unresolved>' the SYMBOL TEXT is wrong.");
+            PrintLine("  If it resolves but CurrentBars stays -1/0, NinjaTrader loaded no data for that");
+            PrintLine("  instrument over this backtest range (add it in the Strategy Analyzer's data range");
+            PrintLine("  or open a chart of that exact contract once so the history is cached).");
+            PrintLine("========================================================================");
+        }
+
+        private void PrintSeriesStatus(string label, int bip)
+        {
+            if (bip < 0 || BarsArray == null || bip >= BarsArray.Length || BarsArray[bip] == null)
+            {
+                PrintLine(string.Format("  {0,-18} BIP=n/a  NOT ATTACHED", label));
+                return;
+            }
+            string resolved = "<unresolved>";
+            try
+            {
+                if (BarsArray[bip].Instrument != null && BarsArray[bip].Instrument.MasterInstrument != null)
+                    resolved = BarsArray[bip].Instrument.FullName;
+            }
+            catch (Exception) { }
+            int cb = (CurrentBars != null && bip < CurrentBars.Length) ? CurrentBars[bip] : -1;
+            string last = "n/a";
+            try { if (cb >= 0) last = ToEt(Times[bip][0]).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " ET"; }
+            catch (Exception) { }
+            PrintLine(string.Format(CultureInfo.InvariantCulture,
+                "  {0,-18} BIP={1,-3} resolved='{2}'  Count={3}  CurrentBars={4}  lastCompleted={5}",
+                label, bip, resolved, BarsArray[bip].Count, cb, last));
+        }
+
         // V7.1 diagnostics sink for the confirmation detectors.
         // cmDiagTime carries the ET timestamp of the confirmation bar currently being
         // processed, so detector events are stamped with real bar times rather than
@@ -1002,10 +1012,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void EmitCrossMarketDayReport(bool isEs, DateTime etClose)
         {
             cmDiagTime = etClose;
-            KeyLevelEngine kl = isEs ? esLevels : qqqLevels;
-            CrossMarketConfirmDetector d1 = isEs ? esDet1 : qqqDet1;
-            CrossMarketConfirmDetector d3 = isEs ? esDet3 : qqqDet3;
-            string mk = isEs ? EsSymbol : QqqSymbol;
+            KeyLevelEngine kl = isEs ? esLevels : ymLevels;
+            CrossMarketConfirmDetector d1 = isEs ? esDet1 : ymDet1;
+            CrossMarketConfirmDetector d3 = isEs ? esDet3 : ymDet3;
+            string mk = isEs ? EsSymbol : YmSymbol;
             bool levelsOk = !double.IsNaN(kl.YdayHigh) || !double.IsNaN(kl.YdayLow)
                          || !double.IsNaN(kl.LweekHigh) || !double.IsNaN(kl.LweekLow);
             CmDiag(string.Format(CultureInfo.InvariantCulture,
@@ -1049,7 +1059,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (market == ConfirmMarket.ES)
                 det = tfMinutes == 1 ? esDet1 : tfMinutes == 3 ? esDet3 : null;
             else
-                det = tfMinutes == 1 ? qqqDet1 : tfMinutes == 3 ? qqqDet3 : null;
+                det = tfMinutes == 1 ? ymDet1 : tfMinutes == 3 ? ymDet3 : null;
 
             if (det == null)
             {
