@@ -117,6 +117,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public int SameDirectionVectorRun;
 
         public TimeBucket Bucket;
+        public string TimeframeLabel = "1m";
 
         // ---- CANDIDATE STOPS (frozen, chosen without future data) ----
         public double StopVectorWickLongPts, StopVectorWickShortPts;
@@ -183,6 +184,22 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public double LevelStopBufferPoints = 2.0;
         /// Log EVERY candle, not only vectors. Off by default: the dataset is about vectors.
         public bool IncludeRegularCandles = false;
+
+        /// Which series this instance is observing ("15m", "3m", "1m", "30s", "15s", ...).
+        /// Emitted as a column so one CSV can hold every timeframe.
+        public string TimeframeLabel = "1m";
+
+        /// The research brief specifies the ONE-MINUTE EMA200 as context for every
+        /// event, including sub-minute events. When these are supplied the engine
+        /// reports them instead of its own per-series EMA, so a 15s row still carries
+        /// the 1m EMA200. Left null, it falls back to its own internally computed EMA.
+        public Func<double> Ema200Provider;
+        public Func<double> Ema9Provider;
+
+        /// This instance's OWN internally computed EMAs. The 1m instance exposes these
+        /// so every other timeframe can report the ONE-MINUTE EMA200 as context.
+        public double LocalEma200 { get { return ema200.Value; } }
+        public double LocalEma9 { get { return ema9.Value; } }
 
         public int EventsEmitted { get; private set; }
         public int EventsPending { get { return pending.Count; } }
@@ -300,7 +317,8 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             e.YdayHigh = levels.YdayHigh; e.YdayLow = levels.YdayLow;
             e.LweekHigh = levels.LweekHigh; e.LweekLow = levels.LweekLow;
             e.DailyOpen = levels.DailyOpen; e.Vwap = levels.Vwap;
-            e.Ema200 = ema200.Value; e.Ema9 = ema9.Value;
+            e.Ema200 = Ema200Provider != null ? Ema200Provider() : ema200.Value;
+            e.Ema9 = Ema9Provider != null ? Ema9Provider() : ema9.Value;
             e.DistYdayHigh = b.Close - e.YdayHigh;
             e.DistYdayLow = b.Close - e.YdayLow;
             e.DistLweekHigh = b.Close - e.LweekHigh;
@@ -337,6 +355,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             e.PrevCandleKind = prevKind;
             e.SameDirectionVectorRun = sameDirRun;
             e.Bucket = BucketOf(b.EtClose);
+            e.TimeframeLabel = TimeframeLabel;
 
             // ---- candidate stops, all chosen from information available NOW ----
             e.StopVectorWickLongPts = b.Close - b.Low;
@@ -544,7 +563,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public static string CsvHeader()
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append("date,timeEt,barIndex,vectorType,direction,open,high,low,close,volume,");
+            sb.Append("date,timeEt,timeframe,barIndex,vectorType,direction,open,high,low,close,volume,");
             sb.Append("rangePts,bodyPts,bodyPctOfRange,upperWickPts,lowerWickPts,");
             sb.Append("avgVol10,relVolume,volumeSpread,highestVolSpread10,volSpreadRatio,classificationTrigger,");
             sb.Append("ydayHigh,distYdayHigh,ydayLow,distYdayLow,lweekHigh,distLweekHigh,lweekLow,distLweekLow,");
@@ -574,7 +593,8 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             CultureInfo ci = CultureInfo.InvariantCulture;
             StringBuilder sb = new StringBuilder();
             sb.Append(e.EtClose.ToString("yyyy-MM-dd", ci)).Append(',');
-            sb.Append(e.EtClose.ToString("HH:mm", ci)).Append(',');
+            sb.Append(e.EtClose.ToString("HH:mm:ss", ci)).Append(',');
+            sb.Append(e.TimeframeLabel).Append(',');
             sb.Append(e.BarIndex).Append(',').Append(e.Vector).Append(',').Append(e.Direction).Append(',');
             sb.Append(F(e.Open)).Append(',').Append(F(e.High)).Append(',').Append(F(e.Low)).Append(',')
               .Append(F(e.Close)).Append(',').Append(F(e.Volume)).Append(',');

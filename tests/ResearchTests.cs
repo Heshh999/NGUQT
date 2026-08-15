@@ -155,6 +155,34 @@ namespace MnqTwoTests
             Check(int.Parse(g3("barsObserved")) == 1,
                 "barsObserved marks it as a 1-bar observation so short-horizon rows can be filtered out");
 
+            // ---- multi-timeframe: one CSV, rows tagged by timeframe, 1m EMA200 as context ----
+            {
+                List<string> rows4 = new List<string>();
+                VectorCandleResearchEngine oneMin = new VectorCandleResearchEngine(Levels(), rows4.Add);
+                oneMin.TimeframeLabel = "1m";
+                VectorCandleResearchEngine fifteenSec = new VectorCandleResearchEngine(Levels(), rows4.Add);
+                fifteenSec.TimeframeLabel = "15s";
+                // the sub-minute stream reports the 1m EMA200, not its own
+                fifteenSec.Ema200Provider = delegate() { return 12345.0; };
+                fifteenSec.Ema9Provider = delegate() { return 999.0; };
+
+                WarmUp(fifteenSec, d);
+                fifteenSec.OnBar(RB(d.AddHours(9).AddMinutes(41), 20000, 20020, 19999, 20015, 300));
+                fifteenSec.Finish();
+
+                Check(rows4.Count == 1, "the sub-minute stream emitted its event");
+                string[] c4 = rows4[0].Split(',');
+                Func<string, string> g4 = name =>
+                {
+                    for (int i = 0; i < hdr.Length; i++) if (hdr[i] == name) return c4[i];
+                    return "<missing>";
+                };
+                Check(g4("timeframe") == "15s", "the row is tagged with its own timeframe");
+                Check(g4("ema200") == "12345", "a sub-minute row carries the SUPPLIED 1m EMA200, not its own");
+                Check(g4("ema9") == "999", "same for EMA9 context");
+                Check(g4("timeEt").Length == 8, "sub-minute rows carry seconds in the timestamp: " + g4("timeEt"));
+            }
+
             Console.WriteLine();
             Console.WriteLine(string.Format("RESEARCH ENGINE: {0} passed, {1} failed", passed, failed));
             return failed;

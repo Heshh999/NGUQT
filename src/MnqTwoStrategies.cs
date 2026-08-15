@@ -67,6 +67,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int BipFifteenMin = 3;
         private int BipTick = -1;             // execution-granularity series only (no logic)
         private int BipEs1 = -1, BipEs3 = -1, BipYm1 = -1, BipYm3 = -1;
+        private int BipSec30 = -1, BipSec15 = -1, BipSec10 = -1, BipSec5 = -1;
 
         // Series index that ORDERS are submitted against. Signals are unaffected -
         // this only controls how finely NinjaTrader simulates fills in a backtest.
@@ -99,7 +100,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool crossMarketReady;        // series attached AND carrying bars
 
         // ---- vector-candle research logger (data only, never trades) ----
-        private VectorCandleResearchEngine research;
+        private VectorCandleResearchEngine research;      // 1m
+        private VectorCandleResearchEngine research15m, research3m;
+        private VectorCandleResearchEngine researchS30, researchS15, researchS10, researchS5;
         private System.IO.StreamWriter researchCsv;
 
         // ==================================================================
@@ -195,6 +198,20 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name = "Also log REGULAR candles (much larger file)", GroupName = "00c. Vector Candle Research", Order = 2)]
         public bool ResearchIncludeRegularCandles { get; set; }
+
+        // Adds 15m and 3m research streams so higher-timeframe vector context can be
+        // studied alongside the 1m stream. Cheap: those series already exist.
+        [NinjaScriptProperty]
+        [Display(Name = "Research 15m + 3m vector context", GroupName = "00c. Vector Candle Research", Order = 3)]
+        public bool ResearchHigherTimeframes { get; set; }
+
+        // Adds 30s/15s/10s/5s series for sub-minute execution research. These are NOT
+        // free: NinjaTrader must load and process four extra series, and second-based
+        // history is usually far shallower than minute history. The DATA SERIES STATUS
+        // block reports exactly what actually loaded - never assume.
+        [NinjaScriptProperty]
+        [Display(Name = "Research sub-minute execution (30s/15s/10s/5s)", GroupName = "00c. Vector Candle Research", Order = 4)]
+        public bool ResearchSubMinute { get; set; }
         #endregion
 
         #region 01. Session / Time
@@ -453,6 +470,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 EnableVectorResearch = false;
                 ResearchIncludeRegularCandles = false;
+                ResearchHigherTimeframes = false;
+                ResearchSubMinute = false;
                 WriteCsvTradeLog = true;
                 VerboseDiagnostics = true;
                 UseTickExecutionSeries = true;   // NT8 multi-series fill granularity
@@ -487,6 +506,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BipThreeMin = next++;
                 AddDataSeries(BarsPeriodType.Minute, 15);
                 BipFifteenMin = next++;
+
+                // ---- OPTIONAL sub-minute RESEARCH series (data only, no orders) ----
+                if (EnableVectorResearch && ResearchSubMinute)
+                {
+                    AddDataSeries(BarsPeriodType.Second, 30); BipSec30 = next++;
+                    AddDataSeries(BarsPeriodType.Second, 15); BipSec15 = next++;
+                    AddDataSeries(BarsPeriodType.Second, 10); BipSec10 = next++;
+                    AddDataSeries(BarsPeriodType.Second, 5);  BipSec5 = next++;
+                }
 
                 // Optional execution series (added LAST so the indices above never move).
                 // It carries NO strategy logic - OnBarUpdate ignores it entirely.
@@ -582,8 +610,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                         string.Format("MnqVectorResearch_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now));
                     researchCsv = new System.IO.StreamWriter(rpath, false);
                     researchCsv.WriteLine(VectorCandleResearchEngine.CsvHeader());
-                    research = new VectorCandleResearchEngine(levels, delegate(string row) { researchCsv.WriteLine(row); });
+                    Action<string> sink = delegate(string row) { researchCsv.WriteLine(row); };
+                    research = new VectorCandleResearchEngine(levels, sink);
                     research.IncludeRegularCandles = ResearchIncludeRegularCandles;
+                    research.TimeframeLabel = "1m";
+
+                    // Every non-1m stream reports the ONE-MINUTE EMA200/EMA9 as context,
+                    // exactly as the research brief specifies, rather than its own.
+                    Func<double> ema200Ctx = delegate() { return research.LocalEma200; };
+                    Func<double> ema9Ctx = delegate() { return research.LocalEma9; };
+
+                    if (ResearchHigherTimeframes)
+                    {
+                        research15m = MakeResearch(sink, "15m", ema200Ctx, ema9Ctx);
+                        research3m = MakeResearch(sink, "3m", ema200Ctx, ema9Ctx);
+                    }
+                    if (ResearchSubMinute)
+                    {
+                        researchS30 = MakeResearch(sink, "30s", ema200Ctx, ema9Ctx);
+                        researchS15 = MakeResearch(sink, "15s", ema200Ctx, ema9Ctx);
+                        researchS10 = MakeResearch(sink, "10s", ema200Ctx, ema9Ctx);
+                        researchS5 = MakeResearch(sink, "5s", ema200Ctx, ema9Ctx);
+                    }
                     PrintLine("VECTOR RESEARCH LOGGER ENABLED - writing " + rpath);
                     PrintLine("  This module submits NO orders and does not affect either strategy.");
                 }
@@ -689,6 +737,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ? vbr.Stats.Summary("VECTOR_BREAK_RETEST")
                         : "[VECTOR_BREAK_RETEST] DISABLED - did not trade");
                 }
+                foreach (VectorCandleResearchEngine r in new VectorCandleResearchEngine[]
+                         { research15m, research3m, researchS30, researchS15, researchS10, researchS5 })
+                    if (r != null) r.Finish();
                 if (research != null)
                 {
                     research.Finish();
@@ -804,8 +855,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (EnableFakeBreakout) fb.OnOneMinuteBar(snap);
                 if (EnableVectorBreakRetest) vbr.OnOneMinuteBar(snap);
             }
+            else if (research != null && (BarsInProgress == BipSec30 || BarsInProgress == BipSec15
+                                       || BarsInProgress == BipSec10 || BarsInProgress == BipSec5))
+            {
+                int sb = BarsInProgress;
+                if (CurrentBars[sb] < 1) return;
+                VectorCandleResearchEngine target =
+                    sb == BipSec30 ? researchS30 : sb == BipSec15 ? researchS15
+                    : sb == BipSec10 ? researchS10 : researchS5;
+                int secs = sb == BipSec30 ? 30 : sb == BipSec15 ? 15 : sb == BipSec10 ? 10 : 5;
+                if (target != null) target.OnBar(MakeResearchBar(sb, secs));
+                return;   // sub-minute series carry NO strategy logic
+            }
             else if (BarsInProgress == BipThreeMin)
             {
+                if (research3m != null && CurrentBars[BipThreeMin] >= 1)
+                    research3m.OnBar(MakeResearchBar(BipThreeMin, 180));
                 if (CurrentBars[BipThreeMin] < 11) return;
                 if (!EnableFakeBreakout) return;   // 3m series serves FAKE_BREAKOUT only
                 BarSnap snap = BuildSnap(BipThreeMin, 3, ema3m[0]);
@@ -814,6 +879,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (BarsInProgress == BipFifteenMin)
             {
+                if (research15m != null && CurrentBars[BipFifteenMin] >= 1)
+                    research15m.OnBar(MakeResearchBar(BipFifteenMin, 900));
                 if (CurrentBars[BipFifteenMin] < 11) return;
                 BarSnap snap = BuildSnap(BipFifteenMin, 15, ema15m[0]);
                 double prev15Close = CurrentBars[BipFifteenMin] >= 1 ? Closes[BipFifteenMin][1] : double.NaN;
@@ -998,6 +1065,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnterShort(bipExec, qty, signalName);
         }
 
+        private VectorCandleResearchEngine MakeResearch(Action<string> sink, string label,
+                                                        Func<double> e200, Func<double> e9)
+        {
+            VectorCandleResearchEngine r = new VectorCandleResearchEngine(levels, sink);
+            r.IncludeRegularCandles = ResearchIncludeRegularCandles;
+            r.TimeframeLabel = label;
+            r.Ema200Provider = e200;
+            r.Ema9Provider = e9;
+            return r;
+        }
+
+        private ResearchBar MakeResearchBar(int bip, int periodSeconds)
+        {
+            ResearchBar rb = new ResearchBar();
+            rb.EtClose = ToEt(Times[bip][0]);
+            rb.EtOpen = rb.EtClose.AddSeconds(-periodSeconds);
+            rb.Open = Opens[bip][0]; rb.High = Highs[bip][0];
+            rb.Low = Lows[bip][0]; rb.Close = Closes[bip][0];
+            rb.Volume = Volumes[bip][0];
+            return rb;
+        }
+
         // Prints the exact status of every data series, including what NinjaTrader
         // actually RESOLVED each symbol to. A zero bar count alone cannot tell you
         // whether the symbol was wrong or the data was missing; the resolved
@@ -1013,6 +1102,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             PrintSeriesStatus("ES 3m", BipEs3);
             PrintSeriesStatus("YM 1m", BipYm1);
             PrintSeriesStatus("YM 3m", BipYm3);
+            if (BipTick > 0) PrintSeriesStatus("MNQ 1tick (exec)", BipTick);
+            if (BipSec30 > 0) PrintSeriesStatus("MNQ 30s", BipSec30);
+            if (BipSec15 > 0) PrintSeriesStatus("MNQ 15s", BipSec15);
+            if (BipSec10 > 0) PrintSeriesStatus("MNQ 10s", BipSec10);
+            if (BipSec5 > 0) PrintSeriesStatus("MNQ 5s", BipSec5);
             PrintLine("  configured symbols: ES='" + EsSymbol + "'  YM='" + YmSymbol + "'");
             PrintLine("  If a confirmation series shows resolved='<unresolved>' the SYMBOL TEXT is wrong.");
             PrintLine("  If it resolves but CurrentBars stays -1/0, NinjaTrader loaded no data for that");
@@ -1039,9 +1133,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             string last = "n/a";
             try { if (cb >= 0) last = ToEt(Times[bip][0]).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " ET"; }
             catch (Exception) { }
+            string first = "n/a";
+            try { if (cb >= 0) first = ToEt(Times[bip][cb]).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture); }
+            catch (Exception) { }
             PrintLine(string.Format(CultureInfo.InvariantCulture,
-                "  {0,-18} BIP={1,-3} resolved='{2}'  Count={3}  CurrentBars={4}  lastCompleted={5}",
-                label, bip, resolved, BarsArray[bip].Count, cb, last));
+                "  {0,-18} BIP={1,-3} resolved='{2}'  Count={3}  CurrentBars={4}  first={5}  last={6}",
+                label, bip, resolved, BarsArray[bip].Count, cb, first, last));
         }
 
         // V7.1 diagnostics sink for the confirmation detectors.
