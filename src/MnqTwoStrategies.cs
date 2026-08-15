@@ -98,6 +98,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private CrossMarketConfirmDetector esDet1, esDet3, ymDet1, ymDet3;
         private bool crossMarketReady;        // series attached AND carrying bars
 
+        // ---- vector-candle research logger (data only, never trades) ----
+        private VectorCandleResearchEngine research;
+        private System.IO.StreamWriter researchCsv;
+
         // ==================================================================
         // Parameters — every flagged ambiguity is exposed here instead of
         // being silently hard-coded (spec: "If a coding rule remains
@@ -178,6 +182,19 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Cross-market diagnostics (0=Off 1=Summary 2=Verbose)", GroupName = "00b. Cross-Market Confirmation", Order = 13)]
         [Range(0, 2)]
         public int CrossMarketDiagnostics { get; set; }
+        #endregion
+
+        #region 00c. Vector Candle Research (data collection only — NEVER trades)
+        // Writes one CSV row per completed 1-minute Traders Reality vector candle with
+        // the context known at that moment plus forward-outcome labels. It submits no
+        // orders and cannot influence FAKE_BREAKOUT or VECTOR_BREAK_RETEST in any way.
+        [NinjaScriptProperty]
+        [Display(Name = "Enable vector research logger (no trading effect)", GroupName = "00c. Vector Candle Research", Order = 1)]
+        public bool EnableVectorResearch { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Also log REGULAR candles (much larger file)", GroupName = "00c. Vector Candle Research", Order = 2)]
+        public bool ResearchIncludeRegularCandles { get; set; }
         #endregion
 
         #region 01. Session / Time
@@ -434,6 +451,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TpEnableLweekLow = true; TpEnableR1 = true; TpEnableR3 = true; TpEnableS1 = true;
                 TpEnableS2 = true; TpEnablePsyHigh = true; TpEnablePsyLow = true;
 
+                EnableVectorResearch = false;
+                ResearchIncludeRegularCandles = false;
                 WriteCsvTradeLog = true;
                 VerboseDiagnostics = true;
                 UseTickExecutionSeries = true;   // NT8 multi-series fill granularity
@@ -557,6 +576,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
 
+                if (EnableVectorResearch)
+                {
+                    string rpath = Path.Combine(NinjaTrader.Core.Globals.UserDataDir,
+                        string.Format("MnqVectorResearch_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now));
+                    researchCsv = new System.IO.StreamWriter(rpath, false);
+                    researchCsv.WriteLine(VectorCandleResearchEngine.CsvHeader());
+                    research = new VectorCandleResearchEngine(levels, delegate(string row) { researchCsv.WriteLine(row); });
+                    research.IncludeRegularCandles = ResearchIncludeRegularCandles;
+                    PrintLine("VECTOR RESEARCH LOGGER ENABLED — writing " + rpath);
+                    PrintLine("  This module submits NO orders and does not affect either strategy.");
+                }
+
                 FbConfig fbCfg = new FbConfig();
                 fbCfg.RiskPctAMinus = RiskPctAMinus;
                 fbCfg.RiskPctBPlus = RiskPctBPlus;
@@ -658,6 +689,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ? vbr.Stats.Summary("VECTOR_BREAK_RETEST")
                         : "[VECTOR_BREAK_RETEST] DISABLED — did not trade");
                 }
+                if (research != null)
+                {
+                    research.Finish();
+                    PrintLine(string.Format("VECTOR RESEARCH: {0} vector events written to CSV.", research.EventsEmitted));
+                    research = null;
+                }
+                if (researchCsv != null) { researchCsv.Flush(); researchCsv.Close(); researchCsv = null; }
                 if (logger != null) { logger.Close(); logger = null; }
             }
         }
@@ -747,6 +785,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 : ""));
                     if (EnableFakeBreakout) fb.OnNewDay(etClose);
                     if (EnableVectorBreakRetest) vbr.OnNewDay(etClose);
+                }
+
+                // RESEARCH LOGGER: fed the same completed 1m bar the strategies see.
+                // It is read-only and its return value is never consulted.
+                if (research != null)
+                {
+                    ResearchBar rb = new ResearchBar();
+                    rb.EtClose = etClose; rb.EtOpen = etOpen;
+                    rb.Open = Opens[BipOneMin][0]; rb.High = Highs[BipOneMin][0];
+                    rb.Low = Lows[BipOneMin][0]; rb.Close = Closes[BipOneMin][0];
+                    rb.Volume = Volumes[BipOneMin][0];
+                    research.OnBar(rb);
                 }
 
                 if (CurrentBars[BipOneMin] < 11) return; // vector needs previous 10 completed candles
