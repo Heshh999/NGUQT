@@ -103,6 +103,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private VectorCandleResearchEngine research;      // 1m
         private VectorCandleResearchEngine research15m, research3m;
         private VectorCandleResearchEngine researchS30, researchS15, researchS10, researchS5;
+        private HigherTfStructure htf3m, htf15m;          // shared read-only HTF structure
         private System.IO.StreamWriter researchCsv;
 
         // ==================================================================
@@ -212,6 +213,23 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name = "Research sub-minute execution (30s/15s/10s/5s)", GroupName = "00c. Vector Candle Research", Order = 4)]
         public bool ResearchSubMinute { get; set; }
+
+        // The PLACEBO CONTROL. With "Also log REGULAR candles" on, this keeps only 1 in
+        // N of them, so the control group is present without the file becoming
+        // unmanageable. Vectors are always kept in full. 10 gives a ~10% sample of
+        // regular candles, which is ample for a base-rate comparison.
+        [NinjaScriptProperty]
+        [Range(1, 500)]
+        [Display(Name = "Keep 1 in N regular candles (placebo control sampling)", GroupName = "00c. Vector Candle Research", Order = 5)]
+        public int ResearchRegularCandleSampleRate { get; set; }
+
+        // Bars to the right required before a higher-timeframe swing pivot counts as
+        // confirmed and may be used. Higher = later confirmation, but a pivot that is
+        // less likely to be revised. This directly controls the no-lookahead lag.
+        [NinjaScriptProperty]
+        [Range(1, 10)]
+        [Display(Name = "HTF swing pivot confirmation bars", GroupName = "00c. Vector Candle Research", Order = 6)]
+        public int ResearchHtfPivotConfirmBars { get; set; }
         #endregion
 
         #region 01. Session / Time
@@ -472,6 +490,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ResearchIncludeRegularCandles = false;
                 ResearchHigherTimeframes = false;
                 ResearchSubMinute = false;
+                ResearchRegularCandleSampleRate = 10;
+                ResearchHtfPivotConfirmBars = 2;
                 WriteCsvTradeLog = true;
                 VerboseDiagnostics = true;
                 UseTickExecutionSeries = true;   // NT8 multi-series fill granularity
@@ -613,7 +633,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Action<string> sink = delegate(string row) { researchCsv.WriteLine(row); };
                     research = new VectorCandleResearchEngine(levels, sink);
                     research.IncludeRegularCandles = ResearchIncludeRegularCandles;
+                    research.RegularCandleSampleRate = ResearchRegularCandleSampleRate;
                     research.TimeframeLabel = "1m";
+
+                    // Higher-timeframe structure, shared by every stream. Fed only from
+                    // COMPLETED 3m/15m bars, and every read is gated on the swing having
+                    // been confirmed before the consuming candle closed.
+                    htf3m = new HigherTfStructure("3m");
+                    htf15m = new HigherTfStructure("15m");
+                    htf3m.ConfirmBars = ResearchHtfPivotConfirmBars;
+                    htf15m.ConfirmBars = ResearchHtfPivotConfirmBars;
+                    research.Htf3m = htf3m; research.Htf15m = htf15m;
 
                     // Every non-1m stream reports the ONE-MINUTE EMA200/EMA9 as context,
                     // exactly as the research brief specifies, rather than its own.
@@ -869,6 +899,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (BarsInProgress == BipThreeMin)
             {
+                if (htf3m != null && CurrentBars[BipThreeMin] >= 1)
+                    htf3m.OnBar(MakeResearchBar(BipThreeMin, 180));
                 if (research3m != null && CurrentBars[BipThreeMin] >= 1)
                     research3m.OnBar(MakeResearchBar(BipThreeMin, 180));
                 if (CurrentBars[BipThreeMin] < 11) return;
@@ -879,6 +911,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (BarsInProgress == BipFifteenMin)
             {
+                if (htf15m != null && CurrentBars[BipFifteenMin] >= 1)
+                    htf15m.OnBar(MakeResearchBar(BipFifteenMin, 900));
                 if (research15m != null && CurrentBars[BipFifteenMin] >= 1)
                     research15m.OnBar(MakeResearchBar(BipFifteenMin, 900));
                 if (CurrentBars[BipFifteenMin] < 11) return;
@@ -1070,9 +1104,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             VectorCandleResearchEngine r = new VectorCandleResearchEngine(levels, sink);
             r.IncludeRegularCandles = ResearchIncludeRegularCandles;
+            r.RegularCandleSampleRate = ResearchRegularCandleSampleRate;
             r.TimeframeLabel = label;
             r.Ema200Provider = e200;
             r.Ema9Provider = e9;
+            r.Htf3m = htf3m;
+            r.Htf15m = htf15m;
             return r;
         }
 

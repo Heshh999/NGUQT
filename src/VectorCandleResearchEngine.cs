@@ -54,6 +54,160 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
 
     public enum EmaRegime { ABOVE_RISING, ABOVE_FALLING, BELOW_RISING, BELOW_FALLING, TOUCHING, CROSSING, UNKNOWN }
 
+    // How a lower-timeframe candle interacted with a HIGHER-timeframe structural level.
+    // This is the "1m vector takes out a known 3m high" question, made explicit.
+    public enum HtfSweepEvent
+    {
+        NONE,                  // no level known, or the candle never came near it
+        APPROACHED,            // came within the approach band but never traded through
+        TOUCHED,               // touched the level exactly, no penetration
+        SWEEP_CLOSE_BACK,      // traded THROUGH the level and closed back on the original side
+        BREAK_CLOSE_THROUGH    // traded through and closed beyond it
+    }
+
+    /// A swing point together with the instant it became OBJECTIVELY KNOWN.
+    /// A pivot is not knowable when it forms - only after enough bars have closed
+    /// to its right to confirm it. Consuming it any earlier is lookahead, so
+    /// KnownAtEt is carried with the price and enforced at query time.
+    public struct HtfSwing
+    {
+        public double Price;
+        public DateTime FormedAtEt;    // close time of the pivot bar itself
+        public DateTime KnownAtEt;     // close time of the last confirming bar
+        public bool Valid;
+    }
+
+    /// Tracks confirmed swing highs and lows on ONE higher timeframe.
+    ///
+    /// NO-LOOKAHEAD CONTRACT
+    ///   - A pivot at bar i is published only after ConfirmBars bars to its RIGHT
+    ///     have completed. KnownAtEt is the close time of the last of those bars.
+    ///   - Every query takes the consumer's decision time and refuses to return a
+    ///     swing whose KnownAtEt is later than it.
+    ///   - Only COMPLETED higher-timeframe bars are ever fed in.
+    ///
+    /// Submits no orders and holds no strategy state.
+    public class HigherTfStructure
+    {
+        public readonly string Label;          // "3m", "15m"
+        public int ConfirmBars = 2;            // bars to the right required to confirm a pivot
+        public int PivotLeftBars = 2;          // bars to the left the pivot must exceed
+
+        private readonly List<ResearchBar> bars = new List<ResearchBar>();
+        private readonly List<HtfSwing> swingHighs = new List<HtfSwing>();
+        private readonly List<HtfSwing> swingLows = new List<HtfSwing>();
+
+        // Last fully COMPLETED bar on this timeframe - knowable with no confirmation lag.
+        public double LastBarHigh = double.NaN;
+        public double LastBarLow = double.NaN;
+        public DateTime LastBarCloseEt = DateTime.MinValue;
+
+        public HigherTfStructure(string label) { Label = label; }
+
+        public int SwingHighCount { get { return swingHighs.Count; } }
+        public int SwingLowCount { get { return swingLows.Count; } }
+
+        /// Feed one COMPLETED higher-timeframe bar, in order.
+        public void OnBar(ResearchBar b)
+        {
+            bars.Add(b);
+            if (bars.Count > 400) bars.RemoveAt(0);
+            LastBarHigh = b.High; LastBarLow = b.Low; LastBarCloseEt = b.EtClose;
+
+            // The candidate pivot sits ConfirmBars back from the bar just closed.
+            int ci = bars.Count - 1 - ConfirmBars;
+            if (ci < PivotLeftBars) return;
+            ResearchBar c = bars[ci];
+
+            bool isHigh = true, isLow = true;
+            for (int i = ci - PivotLeftBars; i < ci; i++)
+            {
+                if (bars[i].High >= c.High) isHigh = false;
+                if (bars[i].Low <= c.Low) isLow = false;
+            }
+            for (int i = ci + 1; i < bars.Count; i++)
+            {
+                if (bars[i].High >= c.High) isHigh = false;
+                if (bars[i].Low <= c.Low) isLow = false;
+            }
+
+            // KnownAtEt is the close of the bar that completed the confirmation, which
+            // is the bar just fed in - never the pivot bar's own time.
+            DateTime known = b.EtClose;
+            if (isHigh)
+            {
+                HtfSwing s = new HtfSwing();
+                s.Price = c.High; s.FormedAtEt = c.EtClose; s.KnownAtEt = known; s.Valid = true;
+                swingHighs.Add(s);
+                if (swingHighs.Count > 100) swingHighs.RemoveAt(0);
+            }
+            if (isLow)
+            {
+                HtfSwing s = new HtfSwing();
+                s.Price = c.Low; s.FormedAtEt = c.EtClose; s.KnownAtEt = known; s.Valid = true;
+                swingLows.Add(s);
+                if (swingLows.Count > 100) swingLows.RemoveAt(0);
+            }
+        }
+
+        // ---- Query gate -------------------------------------------------------
+        //
+        // The cutoff passed in by every query below is the consuming candle's OPEN
+        // time, NOT its close time. That is deliberate and it matters:
+        //
+        //   A 15m bar closing at 09:45 CONTAINS the 1m bar closing at 09:45. Asking
+        //   "did the 1m candle sweep the 15m high?" against a 15m bar that includes
+        //   that very candle is circular - the 1m high helped set the 15m high.
+        //   Requiring the higher-timeframe bar to have closed at or before the 1m
+        //   bar OPENED removes every overlapping bar, so the comparison is always
+        //   against structure that was finished and on the chart beforehand.
+        //
+        // This also makes the result independent of the order NinjaTrader happens to
+        // deliver equal-timestamp series in, rather than relying on AddDataSeries
+        // ordering staying the way it is today.
+
+        /// Most recent swing high already confirmed before cutoffEt. Invalid if none.
+        public HtfSwing SwingHighKnownAt(DateTime cutoffEt) { return Latest(swingHighs, cutoffEt); }
+        public HtfSwing SwingLowKnownAt(DateTime cutoffEt) { return Latest(swingLows, cutoffEt); }
+
+        private static HtfSwing Latest(List<HtfSwing> src, DateTime cutoffEt)
+        {
+            for (int i = src.Count - 1; i >= 0; i--)
+                if (src[i].KnownAtEt <= cutoffEt) return src[i];
+            return new HtfSwing();   // Valid == false
+        }
+
+        /// High of the last higher-timeframe bar that had already closed by cutoffEt.
+        public double LastBarHighKnownAt(DateTime cutoffEt)
+        {
+            return LastBarCloseEt <= cutoffEt && LastBarCloseEt != DateTime.MinValue
+                ? LastBarHigh : double.NaN;
+        }
+        public double LastBarLowKnownAt(DateTime cutoffEt)
+        {
+            return LastBarCloseEt <= cutoffEt && LastBarCloseEt != DateTime.MinValue
+                ? LastBarLow : double.NaN;
+        }
+
+        /// Classify how a candle interacted with a level ABOVE it (a high being swept).
+        public static HtfSweepEvent ClassifyAgainstHigh(double high, double close, double level, double band)
+        {
+            if (double.IsNaN(level)) return HtfSweepEvent.NONE;
+            if (high > level) return close > level ? HtfSweepEvent.BREAK_CLOSE_THROUGH : HtfSweepEvent.SWEEP_CLOSE_BACK;
+            if (high == level) return HtfSweepEvent.TOUCHED;
+            return (level - high) <= band ? HtfSweepEvent.APPROACHED : HtfSweepEvent.NONE;
+        }
+
+        /// Classify how a candle interacted with a level BELOW it (a low being swept).
+        public static HtfSweepEvent ClassifyAgainstLow(double low, double close, double level, double band)
+        {
+            if (double.IsNaN(level)) return HtfSweepEvent.NONE;
+            if (low < level) return close < level ? HtfSweepEvent.BREAK_CLOSE_THROUGH : HtfSweepEvent.SWEEP_CLOSE_BACK;
+            if (low == level) return HtfSweepEvent.TOUCHED;
+            return (low - level) <= band ? HtfSweepEvent.APPROACHED : HtfSweepEvent.NONE;
+        }
+    }
+
     public enum TimeBucket { PREMARKET, T0930_1000, T1000_1030, T1030_1100, T1100_1130, AFTER_1130 }
 
     /// Self-contained recursive EMA over completed closes.
@@ -115,6 +269,19 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public VectorType PrevVector, PrevPrevVector;
         public string PrevCandleKind;      // includes REGULAR_* so vector->regular chains are visible
         public int SameDirectionVectorRun;
+
+        // ---- HIGHER-TIMEFRAME STRUCTURE (frozen, and only if already knowable) ----
+        // Answers "did this lower-timeframe vector take out a level the higher
+        // timeframe had already printed and confirmed?" without using any level that
+        // was not yet objectively known when this candle closed.
+        public double H3SwingHigh, H3SwingLow, H15SwingHigh, H15SwingLow;
+        public double DistH3SwingHigh, DistH3SwingLow, DistH15SwingHigh, DistH15SwingLow;
+        public int H3SwingHighAgeMin, H3SwingLowAgeMin, H15SwingHighAgeMin, H15SwingLowAgeMin;
+        public HtfSweepEvent H3SwingHighEvent, H3SwingLowEvent, H15SwingHighEvent, H15SwingLowEvent;
+        public double H3PrevBarHigh, H3PrevBarLow, H15PrevBarHigh, H15PrevBarLow;
+        public HtfSweepEvent H3PrevBarHighEvent, H3PrevBarLowEvent, H15PrevBarHighEvent, H15PrevBarLowEvent;
+        /// Single summary column: the strongest higher-timeframe sweep this candle produced.
+        public string HtfSweepSummary = "NONE";
 
         public TimeBucket Bucket;
         public string TimeframeLabel = "1m";
@@ -183,7 +350,28 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         /// Buffer used by the "key level + buffer" candidate stop.
         public double LevelStopBufferPoints = 2.0;
         /// Log EVERY candle, not only vectors. Off by default: the dataset is about vectors.
+        ///
+        /// TURNING THIS ON IS THE ONLY WAY TO RUN THE PLACEBO TEST. Without regular
+        /// candles in the file there is no control group, so "does the vector
+        /// classification add information?" cannot be answered from the data at all.
         public bool IncludeRegularCandles = false;
+
+        /// Keep only 1 in N regular candles when IncludeRegularCandles is on. A control
+        /// group does not need to be exhaustive, and sampling keeps the file small
+        /// enough to move around. 1 = keep every regular candle. Vectors are ALWAYS
+        /// kept in full regardless of this setting.
+        public int RegularCandleSampleRate = 1;
+        private int regularSeen;
+
+        /// Higher-timeframe structure sources. Set by the host so a 1m engine can be
+        /// asked whether this candle swept a confirmed 3m or 15m swing. Left null, the
+        /// higher-timeframe columns are emitted empty rather than guessed at.
+        public HigherTfStructure Htf3m;
+        public HigherTfStructure Htf15m;
+
+        /// Band, in points, within which a candle counts as having APPROACHED a
+        /// higher-timeframe structural level.
+        public double HtfApproachBandPoints = 10.0;
 
         /// Which series this instance is observing ("15m", "3m", "1m", "30s", "15s", ...).
         /// Emitted as a column so one CSV can hold every timeframe.
@@ -264,7 +452,14 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             if (ema200History.Count > 400) ema200History.RemoveAt(0);
 
             bool isVector = !VectorClassifier.IsRegular(vec);
-            if (n >= 11 && (isVector || IncludeRegularCandles))
+            bool keepRegular = false;
+            if (!isVector && IncludeRegularCandles)
+            {
+                regularSeen++;
+                int rate = RegularCandleSampleRate < 1 ? 1 : RegularCandleSampleRate;
+                keepRegular = (regularSeen % rate) == 0;
+            }
+            if (n >= 11 && (isVector || keepRegular))
                 pending.Add(BuildEvent(b, vec, avgVol10, highestVolSpread10));
 
             // ---- 3. roll sequence state AFTER the event was built ----
@@ -338,6 +533,8 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             e.DistEma200Atr = e.AtrProxy > 0 && !double.IsNaN(e.DistEma200) ? e.DistEma200 / e.AtrProxy : double.NaN;
             e.Ema200Interaction = Classify(b, e.Ema200);
             e.Ema200Regime = Regime(b, e);
+
+            FillHigherTfStructure(e, b);
 
             foreach (KeyLevelId id in Levels)
             {
@@ -572,6 +769,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             foreach (KeyLevelId id in Levels)
                 sb.Append(id + "_interaction," + id + "_seqRole," + id + "_penetrationPts," +
                           id + "_closeDist," + id + "_priorCloseOpposite," + id + "_testNumberToday,");
+            sb.Append("h3SwingHigh,distH3SwingHigh,h3SwingHighAgeMin,h3SwingHighEvent,");
+            sb.Append("h3SwingLow,distH3SwingLow,h3SwingLowAgeMin,h3SwingLowEvent,");
+            sb.Append("h15SwingHigh,distH15SwingHigh,h15SwingHighAgeMin,h15SwingHighEvent,");
+            sb.Append("h15SwingLow,distH15SwingLow,h15SwingLowAgeMin,h15SwingLowEvent,");
+            sb.Append("h3PrevBarHigh,h3PrevBarHighEvent,h3PrevBarLow,h3PrevBarLowEvent,");
+            sb.Append("h15PrevBarHigh,h15PrevBarHighEvent,h15PrevBarLow,h15PrevBarLowEvent,");
+            sb.Append("htfSweepSummary,");
             sb.Append("prevVector,prevPrevVector,prevCandleKind,sameDirVectorRun,timeBucket,");
             sb.Append("stopVectorWickLongPts,stopVectorWickShortPts,stopLocalSwingLongPts,stopLocalSwingShortPts,");
             sb.Append("stopLevelBufferLongPts,stopLevelBufferShortPts,");
@@ -581,6 +785,79 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             foreach (double r in RGrid) sb.Append("barToShort_" + r.ToString("0.##", CultureInfo.InvariantCulture) + "R,");
             sb.Append("barsObserved");
             return sb.ToString();
+        }
+
+        /// Fill the higher-timeframe structure columns for this event.
+        ///
+        /// Every level used here is filtered through *KnownAt(e.EtClose), so a swing
+        /// that had not yet been confirmed when this candle closed is reported as
+        /// missing rather than silently borrowed from the future.
+        private void FillHigherTfStructure(VectorEvent e, ResearchBar b)
+        {
+            double band = HtfApproachBandPoints;
+            FillOneHtf(Htf3m, e, b, band, true);
+            FillOneHtf(Htf15m, e, b, band, false);
+
+            // Summary: a close-through break outranks a sweep-and-reject, and the 15m
+            // structure outranks the 3m. NONE when nothing was interacted with.
+            string best = "NONE";
+            HtfSweepEvent[] evs = new HtfSweepEvent[]
+            {
+                e.H3SwingHighEvent, e.H3SwingLowEvent, e.H15SwingHighEvent, e.H15SwingLowEvent
+            };
+            string[] names = new string[] { "H3_HIGH", "H3_LOW", "H15_HIGH", "H15_LOW" };
+            int bestRank = 0;
+            for (int i = 0; i < evs.Length; i++)
+            {
+                int rank = evs[i] == HtfSweepEvent.BREAK_CLOSE_THROUGH ? 4
+                         : evs[i] == HtfSweepEvent.SWEEP_CLOSE_BACK ? 3
+                         : evs[i] == HtfSweepEvent.TOUCHED ? 2
+                         : evs[i] == HtfSweepEvent.APPROACHED ? 1 : 0;
+                if (i >= 2 && rank > 0) rank += 4;              // 15m structure ranks above 3m
+                if (rank > bestRank) { bestRank = rank; best = names[i] + "_" + evs[i]; }
+            }
+            e.HtfSweepSummary = best;
+        }
+
+        private void FillOneHtf(HigherTfStructure s, VectorEvent e, ResearchBar b, double band, bool isThreeMin)
+        {
+            double sh = double.NaN, sl = double.NaN, pbh = double.NaN, pbl = double.NaN;
+            int shAge = -1, slAge = -1;
+            if (s != null)
+            {
+                // cutoff = this candle's OPEN, so no overlapping higher-timeframe bar
+                // can contribute to the level this candle is being tested against.
+                DateTime cutoff = b.EtOpen;
+                HtfSwing h = s.SwingHighKnownAt(cutoff);
+                HtfSwing l = s.SwingLowKnownAt(cutoff);
+                if (h.Valid) { sh = h.Price; shAge = (int)(e.EtClose - h.FormedAtEt).TotalMinutes; }
+                if (l.Valid) { sl = l.Price; slAge = (int)(e.EtClose - l.FormedAtEt).TotalMinutes; }
+                pbh = s.LastBarHighKnownAt(cutoff);
+                pbl = s.LastBarLowKnownAt(cutoff);
+            }
+            HtfSweepEvent shEv = HigherTfStructure.ClassifyAgainstHigh(b.High, b.Close, sh, band);
+            HtfSweepEvent slEv = HigherTfStructure.ClassifyAgainstLow(b.Low, b.Close, sl, band);
+            HtfSweepEvent phEv = HigherTfStructure.ClassifyAgainstHigh(b.High, b.Close, pbh, band);
+            HtfSweepEvent plEv = HigherTfStructure.ClassifyAgainstLow(b.Low, b.Close, pbl, band);
+
+            if (isThreeMin)
+            {
+                e.H3SwingHigh = sh; e.H3SwingLow = sl;
+                e.DistH3SwingHigh = b.Close - sh; e.DistH3SwingLow = b.Close - sl;
+                e.H3SwingHighAgeMin = shAge; e.H3SwingLowAgeMin = slAge;
+                e.H3SwingHighEvent = shEv; e.H3SwingLowEvent = slEv;
+                e.H3PrevBarHigh = pbh; e.H3PrevBarLow = pbl;
+                e.H3PrevBarHighEvent = phEv; e.H3PrevBarLowEvent = plEv;
+            }
+            else
+            {
+                e.H15SwingHigh = sh; e.H15SwingLow = sl;
+                e.DistH15SwingHigh = b.Close - sh; e.DistH15SwingLow = b.Close - sl;
+                e.H15SwingHighAgeMin = shAge; e.H15SwingLowAgeMin = slAge;
+                e.H15SwingHighEvent = shEv; e.H15SwingLowEvent = slEv;
+                e.H15PrevBarHigh = pbh; e.H15PrevBarLow = pbl;
+                e.H15PrevBarHighEvent = phEv; e.H15PrevBarLowEvent = plEv;
+            }
         }
 
         private static string F(double v)
@@ -617,6 +894,19 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
                   .Append(F(e.PenetrationPts[id])).Append(',').Append(F(e.CloseDistFromLevel[id])).Append(',')
                   .Append(e.PriorCloseOppositeSide[id] ? "1" : "0").Append(',').Append(e.TestNumberToday[id]).Append(',');
             }
+            sb.Append(F(e.H3SwingHigh)).Append(',').Append(F(e.DistH3SwingHigh)).Append(',')
+              .Append(e.H3SwingHighAgeMin).Append(',').Append(e.H3SwingHighEvent).Append(',');
+            sb.Append(F(e.H3SwingLow)).Append(',').Append(F(e.DistH3SwingLow)).Append(',')
+              .Append(e.H3SwingLowAgeMin).Append(',').Append(e.H3SwingLowEvent).Append(',');
+            sb.Append(F(e.H15SwingHigh)).Append(',').Append(F(e.DistH15SwingHigh)).Append(',')
+              .Append(e.H15SwingHighAgeMin).Append(',').Append(e.H15SwingHighEvent).Append(',');
+            sb.Append(F(e.H15SwingLow)).Append(',').Append(F(e.DistH15SwingLow)).Append(',')
+              .Append(e.H15SwingLowAgeMin).Append(',').Append(e.H15SwingLowEvent).Append(',');
+            sb.Append(F(e.H3PrevBarHigh)).Append(',').Append(e.H3PrevBarHighEvent).Append(',')
+              .Append(F(e.H3PrevBarLow)).Append(',').Append(e.H3PrevBarLowEvent).Append(',');
+            sb.Append(F(e.H15PrevBarHigh)).Append(',').Append(e.H15PrevBarHighEvent).Append(',')
+              .Append(F(e.H15PrevBarLow)).Append(',').Append(e.H15PrevBarLowEvent).Append(',');
+            sb.Append(e.HtfSweepSummary).Append(',');
             sb.Append(e.PrevVector).Append(',').Append(e.PrevPrevVector).Append(',').Append(e.PrevCandleKind).Append(',')
               .Append(e.SameDirectionVectorRun).Append(',').Append(e.Bucket).Append(',');
             sb.Append(F(e.StopVectorWickLongPts)).Append(',').Append(F(e.StopVectorWickShortPts)).Append(',')

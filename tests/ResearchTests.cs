@@ -183,6 +183,124 @@ namespace MnqTwoTests
                 Check(g4("timeEt").Length == 8, "sub-minute rows carry seconds in the timestamp: " + g4("timeEt"));
             }
 
+            // ================================================================
+            // HIGHER-TIMEFRAME STRUCTURE - the no-lookahead contract
+            // ================================================================
+            {
+                Func<DateTime, double, double, double, double, ResearchBar> HB =
+                    delegate(DateTime open, double o, double h, double l, double c)
+                    {
+                        ResearchBar b = new ResearchBar();
+                        b.EtOpen = open; b.EtClose = open.AddMinutes(3);
+                        b.Open = o; b.High = h; b.Low = l; b.Close = c; b.Volume = 1000;
+                        return b;
+                    };
+                HigherTfStructure s = new HigherTfStructure("3m");
+                s.ConfirmBars = 2; s.PivotLeftBars = 2;
+                DateTime t = d.AddHours(9);
+                // bars 0..1 rising, bar 2 is the peak, bars 3..4 confirm it
+                double[] highs = new double[] { 20010, 20020, 20050, 20030, 20025 };
+                double[] lows = new double[] { 20000, 20005, 20040, 20015, 20010 };
+                for (int i = 0; i < 5; i++)
+                    s.OnBar(HB(t.AddMinutes(3 * i), lows[i], highs[i], lows[i], highs[i]));
+
+                HtfSwing sw = s.SwingHighKnownAt(t.AddHours(2));
+                Check(sw.Valid && sw.Price == 20050, "a 3m swing high is published once bars to its right confirm it");
+                Check(sw.FormedAtEt == t.AddMinutes(6).AddMinutes(3),
+                      "the swing records the close of the PIVOT bar as its formation time");
+                Check(sw.KnownAtEt == t.AddMinutes(12).AddMinutes(3),
+                      "the swing becomes KNOWN only at the close of the 2nd confirming bar");
+                Check(sw.KnownAtEt > sw.FormedAtEt, "confirmation always lags formation - never the reverse");
+
+                // the decisive lookahead test: query BEFORE confirmation completed
+                HtfSwing early = s.SwingHighKnownAt(sw.FormedAtEt);
+                Check(!early.Valid,
+                      "querying at the pivot's own close returns NOTHING - the pivot was not knowable yet");
+                HtfSwing justBefore = s.SwingHighKnownAt(sw.KnownAtEt.AddSeconds(-1));
+                Check(!justBefore.Valid, "one second before confirmation the swing is still invisible");
+                HtfSwing exactly = s.SwingHighKnownAt(sw.KnownAtEt);
+                Check(exactly.Valid, "at the confirming close, and not before, the swing becomes usable");
+
+                // overlapping-bar guard: an HTF bar closing at 09:15 must NOT be visible
+                // to a 1m candle that opened at 09:14, because it contains that candle
+                Check(double.IsNaN(s.LastBarHighKnownAt(t.AddMinutes(14))),
+                      "a 3m bar closing at 09:15 is invisible to a candle that opened at 09:14 (it contains it)");
+                Check(!double.IsNaN(s.LastBarHighKnownAt(t.AddMinutes(15))),
+                      "the same 3m bar IS visible to a candle opening at 09:15, after it closed");
+
+                // sweep classification
+                Check(HigherTfStructure.ClassifyAgainstHigh(20060, 20040, 20050, 10) == HtfSweepEvent.SWEEP_CLOSE_BACK,
+                      "trading through a 3m high and closing back under it is a SWEEP");
+                Check(HigherTfStructure.ClassifyAgainstHigh(20060, 20055, 20050, 10) == HtfSweepEvent.BREAK_CLOSE_THROUGH,
+                      "closing beyond the high is a BREAK, not a sweep");
+                Check(HigherTfStructure.ClassifyAgainstHigh(20045, 20043, 20050, 10) == HtfSweepEvent.APPROACHED,
+                      "coming within the band without trading through is APPROACHED");
+                Check(HigherTfStructure.ClassifyAgainstHigh(20020, 20018, 20050, 10) == HtfSweepEvent.NONE,
+                      "staying outside the band is NONE");
+                Check(HigherTfStructure.ClassifyAgainstLow(19990, 20010, 20000, 10) == HtfSweepEvent.SWEEP_CLOSE_BACK,
+                      "the mirror case below a 3m low is also a SWEEP");
+                Check(HigherTfStructure.ClassifyAgainstHigh(20060, 20055, double.NaN, 10) == HtfSweepEvent.NONE,
+                      "with no known level there is no event - never a guessed one");
+            }
+
+            // ---- placebo control: regular-candle sampling ----
+            //
+            // The quiet bars must have STRICTLY DECREASING volume*spread. Constant bars
+            // all tie the 10-bar volume-spread maximum and every one of them classifies
+            // as a VOLSPREAD_MAX vector - real Traders Reality behaviour, but it makes a
+            // useless control fixture. This is the same trap the warm-up helper avoids.
+            Action<VectorCandleResearchEngine> quiet = delegate(VectorCandleResearchEngine en)
+            {
+                for (int i = 0; i < 20; i++)
+                    en.OnBar(RB(d.AddHours(10).AddMinutes(i), 20000, 20002, 19998, 20000, 99 - i));
+            };
+            {
+                List<string> rowsOff = new List<string>();
+                VectorCandleResearchEngine off = new VectorCandleResearchEngine(Levels(), rowsOff.Add);
+                off.IncludeRegularCandles = false;
+                WarmUp(off, d); quiet(off); off.Finish();
+                Check(rowsOff.Count == 0,
+                      "control OFF: not one regular candle is logged - this is exactly why the 2026 dataset "
+                      + "has no placebo group (" + rowsOff.Count + " rows)");
+
+                List<string> rowsAll = new List<string>();
+                VectorCandleResearchEngine all = new VectorCandleResearchEngine(Levels(), rowsAll.Add);
+                all.IncludeRegularCandles = true; all.RegularCandleSampleRate = 1;
+                WarmUp(all, d); quiet(all); all.Finish();
+                Check(rowsAll.Count >= 20, "control ON at 1-in-1: every regular candle is logged (" + rowsAll.Count + ")");
+
+                List<string> rows5 = new List<string>();
+                VectorCandleResearchEngine s5 = new VectorCandleResearchEngine(Levels(), rows5.Add);
+                s5.IncludeRegularCandles = true; s5.RegularCandleSampleRate = 5;
+                WarmUp(s5, d); quiet(s5); s5.Finish();
+                Check(rows5.Count > 0, "1-in-5 sampling still produces a control group");
+                Check(rows5.Count <= rowsAll.Count / 4,
+                      "1-in-5 sampling really does thin the control group: " + rows5.Count + " vs " + rowsAll.Count);
+                bool anyRegular = false;
+                foreach (string r in rows5) if (r.Contains("REGULAR_")) anyRegular = true;
+                Check(anyRegular, "the sampled rows really are REGULAR candles - a usable control group");
+            }
+
+            // ---- the new columns exist and stay aligned with the header ----
+            {
+                string[] h2 = VectorCandleResearchEngine.CsvHeader().Split(',');
+                Check(Array.IndexOf(h2, "h3SwingHigh") >= 0, "CSV exposes h3SwingHigh");
+                Check(Array.IndexOf(h2, "h15SwingLowEvent") >= 0, "CSV exposes h15SwingLowEvent");
+                Check(Array.IndexOf(h2, "htfSweepSummary") >= 0, "CSV exposes the htfSweepSummary roll-up");
+
+                List<string> rowsH = new List<string>();
+                VectorCandleResearchEngine eh = new VectorCandleResearchEngine(Levels(), rowsH.Add);
+                WarmUp(eh, d);
+                eh.OnBar(RB(d.AddHours(9).AddMinutes(41), 20000, 20020, 19999, 20015, 300));
+                eh.Finish();
+                Check(rowsH.Count == 1, "an event is still emitted with the HTF columns added");
+                Check(rowsH[0].Split(',').Length == h2.Length,
+                      "row width still matches the header exactly: " + rowsH[0].Split(',').Length + " vs " + h2.Length);
+                int hi = Array.IndexOf(h2, "htfSweepSummary");
+                Check(rowsH[0].Split(',')[hi] == "NONE",
+                      "with no HTF structure attached the sweep column is NONE, not a fabricated level");
+            }
+
             Console.WriteLine();
             Console.WriteLine(string.Format("RESEARCH ENGINE: {0} passed, {1} failed", passed, failed));
             return failed;
