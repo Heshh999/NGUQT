@@ -301,6 +301,73 @@ namespace MnqTwoTests
                       "with no HTF structure attached the sweep column is NONE, not a fabricated level");
             }
 
+            // ================================================================
+            // SESSION CONTEXT - opening range, session extremes, compression
+            // ================================================================
+            {
+                SessionContext sc = new SessionContext();
+                sc.OpeningRangeMinutes = 15; sc.CompressionLookback = 3;
+                DateTime t930 = d.AddHours(9).AddMinutes(30);
+                double pos, comp, pull;
+
+                // a bar closing at 09:31 is INSIDE the opening range window
+                ResearchBar b1 = RB(t930, 20000, 20020, 19990, 20010, 100);   // closes 09:31
+                sc.Describe(b1, 5.0, out pos, out comp, out pull);
+                Check(!sc.OrComplete, "inside the opening-range window the range is not complete");
+                Check(double.IsNaN(pos), "with no prior RTH bars there is no session range to place price in");
+                sc.OnBarClosed(b1);
+
+                for (int i = 1; i < 15; i++)
+                    sc.OnBarClosed(RB(t930.AddMinutes(i), 20000, 20020, 19990, 20010, 100));
+                Check(sc.OrComplete, "once the 15-minute window has elapsed the opening range is complete");
+                Check(sc.OrHigh == 20020 && sc.OrLow == 19990,
+                      "the opening range is the high/low of its window: " + sc.OrHigh + "/" + sc.OrLow);
+
+                // a later bar that pushes to a new session high
+                ResearchBar b2 = RB(t930.AddMinutes(20), 20010, 20060, 20005, 20055, 100);
+                double sessHighBefore = sc.SessHigh;
+                sc.Describe(b2, 5.0, out pos, out comp, out pull);
+                Check(sessHighBefore == 20020,
+                      "the session high SEEN BY this bar excludes the bar itself: " + sessHighBefore);
+                Check(HigherTfStructure.ClassifyAgainstHigh(b2.High, b2.Close, sessHighBefore, 10)
+                        == HtfSweepEvent.BREAK_CLOSE_THROUGH,
+                      "so 'this candle broke the session high' is a real question, not a tautology");
+                sc.OnBarClosed(b2);
+                Check(sc.SessHigh == 20060, "after it closes, the session high updates to include it");
+
+                // position in range and pullback
+                ResearchBar b3 = RB(t930.AddMinutes(25), 20050, 20052, 20040, 20042, 100);
+                sc.Describe(b3, 5.0, out pos, out comp, out pull);
+                Check(pos > 60 && pos < 80, "close at 20042 in a 19990-20060 range is ~74% up it: " + pos.ToString("0.0"));
+                Check(pull > 20 && pull < 30, "and that is a ~26% pullback from the session high: " + pull.ToString("0.0"));
+                Check(!double.IsNaN(comp), "compression is reported once the lookback is filled: " + comp.ToString("0.00"));
+
+                // a NEW day resets everything
+                sc.OnBarClosed(RB(d.AddDays(1).AddHours(9).AddMinutes(30), 21000, 21010, 20990, 21000, 100));
+                Check(double.IsNaN(sc.OrHigh) || sc.OrHigh == 21010, "a new day rebuilds the opening range from scratch");
+                Check(sc.SessHigh == 21010, "and the session extremes reset with it, not carrying yesterday's");
+
+                // outside RTH nothing accumulates
+                SessionContext oc = new SessionContext();
+                oc.OnBarClosed(RB(d.AddHours(3), 20000, 20500, 19500, 20000, 100));   // 03:00-04:00 ET
+                Check(double.IsNaN(oc.SessHigh), "overnight bars do not set the RTH session high");
+            }
+
+            // ---- session columns present and row width still aligned ----
+            {
+                string[] h3 = VectorCandleResearchEngine.CsvHeader().Split(',');
+                foreach (string c in new string[]{"orHigh","orHighEvent","sessHigh","sessLowEvent",
+                                                  "posInSessRange","pullbackPct","compressionRatio"})
+                    Check(Array.IndexOf(h3, c) >= 0, "CSV exposes " + c);
+                List<string> rowsS = new List<string>();
+                VectorCandleResearchEngine es = new VectorCandleResearchEngine(Levels(), rowsS.Add);
+                WarmUp(es, d);
+                es.OnBar(RB(d.AddHours(9).AddMinutes(41), 20000, 20020, 19999, 20015, 300));
+                es.Finish();
+                Check(rowsS.Count == 1 && rowsS[0].Split(',').Length == h3.Length,
+                      "row width still matches the header: " + rowsS[0].Split(',').Length + " vs " + h3.Length);
+            }
+
             Console.WriteLine();
             Console.WriteLine(string.Format("RESEARCH ENGINE: {0} passed, {1} failed", passed, failed));
             return failed;

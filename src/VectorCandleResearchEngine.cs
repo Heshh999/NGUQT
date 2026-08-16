@@ -77,6 +77,99 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public bool Valid;
     }
 
+    /// Intraday session context: the reference points most discretionary scalping
+    /// frameworks are built on. Opening range, session extremes so far, how compressed
+    /// recent range is, and how deep the current pullback is.
+    ///
+    /// NO-LOOKAHEAD CONTRACT
+    ///   - Session extremes are the extremes of bars that closed BEFORE the bar being
+    ///     described, so "did this candle break the session high" is a real question
+    ///     rather than a tautology.
+    ///   - The opening range is reported as incomplete, and its levels withheld, until
+    ///     the opening-range window has actually finished.
+    ///   - Everything resets on the RTH open, not the exchange day, because that is the
+    ///     session these reference points belong to.
+    ///
+    /// Read-only. Submits no orders.
+    public class SessionContext
+    {
+        public int RthStartMinutesEt = 570;      // 09:30
+        public int RthEndMinutesEt = 960;        // 16:00
+        public int OpeningRangeMinutes = 15;
+        public int CompressionLookback = 10;
+
+        private DateTime curDay = DateTime.MinValue;
+        private readonly List<double> recentHigh = new List<double>();
+        private readonly List<double> recentLow = new List<double>();
+
+        public double OrHigh = double.NaN, OrLow = double.NaN;
+        public bool OrComplete;
+        /// Extremes of RTH bars that have ALREADY CLOSED - excludes the bar being described.
+        public double SessHigh = double.NaN, SessLow = double.NaN;
+        public bool InRth;
+
+        private static int MinOfDay(DateTime et) { return et.Hour * 60 + et.Minute; }
+
+        /// Feed one COMPLETED bar, in order, AFTER it has been used to describe itself.
+        public void OnBarClosed(ResearchBar b)
+        {
+            DateTime day = b.EtClose.Date;
+            if (day != curDay)
+            {
+                curDay = day;
+                OrHigh = double.NaN; OrLow = double.NaN; OrComplete = false;
+                SessHigh = double.NaN; SessLow = double.NaN;
+                recentHigh.Clear(); recentLow.Clear();
+            }
+            int m = MinOfDay(b.EtClose);
+            if (m <= RthStartMinutesEt || m > RthEndMinutesEt) return;   // RTH only
+
+            // opening range accumulates until its window closes
+            if (m <= RthStartMinutesEt + OpeningRangeMinutes)
+            {
+                if (double.IsNaN(OrHigh) || b.High > OrHigh) OrHigh = b.High;
+                if (double.IsNaN(OrLow) || b.Low < OrLow) OrLow = b.Low;
+                if (m == RthStartMinutesEt + OpeningRangeMinutes) OrComplete = true;
+            }
+            else OrComplete = true;
+
+            if (double.IsNaN(SessHigh) || b.High > SessHigh) SessHigh = b.High;
+            if (double.IsNaN(SessLow) || b.Low < SessLow) SessLow = b.Low;
+
+            recentHigh.Add(b.High); recentLow.Add(b.Low);
+            if (recentHigh.Count > CompressionLookback) { recentHigh.RemoveAt(0); recentLow.RemoveAt(0); }
+        }
+
+        /// Called BEFORE OnBarClosed for the same bar, so it describes the state the bar
+        /// arrived into rather than the state it created.
+        public void Describe(ResearchBar b, double atr, out double posInRange,
+                             out double compression, out double pullbackPct)
+        {
+            InRth = MinOfDay(b.EtClose) > RthStartMinutesEt && MinOfDay(b.EtClose) <= RthEndMinutesEt;
+            posInRange = double.NaN; pullbackPct = double.NaN; compression = double.NaN;
+
+            if (!double.IsNaN(SessHigh) && !double.IsNaN(SessLow) && SessHigh > SessLow)
+            {
+                double rng = SessHigh - SessLow;
+                posInRange = 100.0 * (b.Close - SessLow) / rng;
+                // how far price has retraced from whichever extreme it set most recently
+                double fromHigh = 100.0 * (SessHigh - b.Close) / rng;
+                double fromLow = 100.0 * (b.Close - SessLow) / rng;
+                pullbackPct = fromHigh < fromLow ? fromHigh : fromLow;
+            }
+            if (recentHigh.Count >= CompressionLookback && atr > 0)
+            {
+                double hi = recentHigh[0], lo = recentLow[0];
+                for (int i = 1; i < recentHigh.Count; i++)
+                {
+                    if (recentHigh[i] > hi) hi = recentHigh[i];
+                    if (recentLow[i] < lo) lo = recentLow[i];
+                }
+                compression = (hi - lo) / atr;   // low = coiled, high = expanding
+            }
+        }
+    }
+
     /// Tracks confirmed swing highs and lows on ONE higher timeframe.
     ///
     /// NO-LOOKAHEAD CONTRACT
@@ -283,6 +376,16 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         /// Single summary column: the strongest higher-timeframe sweep this candle produced.
         public string HtfSweepSummary = "NONE";
 
+        // ---- INTRADAY SESSION CONTEXT (frozen, describes what the bar arrived into) ----
+        public double OrHigh, OrLow, DistOrHigh, DistOrLow;
+        public bool OrComplete;
+        public HtfSweepEvent OrHighEvent, OrLowEvent;
+        public double SessHigh, SessLow, DistSessHigh, DistSessLow;
+        public HtfSweepEvent SessHighEvent, SessLowEvent;
+        public double PosInSessRange;      // 0 = at the session low, 100 = at the session high
+        public double PullbackPct;         // how far price has retraced from the nearer extreme
+        public double CompressionRatio;    // recent N-bar range / ATR: low = coiled, high = expanding
+
         public TimeBucket Bucket;
         public string TimeframeLabel = "1m";
 
@@ -372,6 +475,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         /// Band, in points, within which a candle counts as having APPROACHED a
         /// higher-timeframe structural level.
         public double HtfApproachBandPoints = 10.0;
+
+        /// Intraday session reference points (opening range, session extremes, range
+        /// compression, pullback depth). Each engine owns its own, fed from its own
+        /// series, because "the session high on the 3m chart" is a different number
+        /// from "the session high on the 1m chart" only by rounding - but the
+        /// compression measure is genuinely per-series.
+        public readonly SessionContext Session = new SessionContext();
 
         /// Which series this instance is observing ("15m", "3m", "1m", "30s", "15s", ...).
         /// Emitted as a column so one CSV can hold every timeframe.
@@ -475,6 +585,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             else sameDirRun = 0;
 
             UpdateLevelState(b);
+            // Session state is advanced AFTER the event was built, so the event describes
+            // the session it arrived into rather than the one it just changed.
+            Session.OnBarClosed(b);
             FlushComplete();
         }
 
@@ -535,6 +648,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             e.Ema200Regime = Regime(b, e);
 
             FillHigherTfStructure(e, b);
+            FillSessionContext(e, b);
 
             foreach (KeyLevelId id in Levels)
             {
@@ -776,6 +890,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             sb.Append("h3PrevBarHigh,h3PrevBarHighEvent,h3PrevBarLow,h3PrevBarLowEvent,");
             sb.Append("h15PrevBarHigh,h15PrevBarHighEvent,h15PrevBarLow,h15PrevBarLowEvent,");
             sb.Append("htfSweepSummary,");
+            sb.Append("orComplete,orHigh,distOrHigh,orHighEvent,orLow,distOrLow,orLowEvent,");
+            sb.Append("sessHigh,distSessHigh,sessHighEvent,sessLow,distSessLow,sessLowEvent,");
+            sb.Append("posInSessRange,pullbackPct,compressionRatio,");
             sb.Append("prevVector,prevPrevVector,prevCandleKind,sameDirVectorRun,timeBucket,");
             sb.Append("stopVectorWickLongPts,stopVectorWickShortPts,stopLocalSwingLongPts,stopLocalSwingShortPts,");
             sb.Append("stopLevelBufferLongPts,stopLevelBufferShortPts,");
@@ -860,6 +977,31 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             }
         }
 
+        /// Fill the intraday session columns. Everything here comes from bars that had
+        /// already closed, so a candle can be asked whether it broke the session high
+        /// without its own high having helped set that level.
+        private void FillSessionContext(VectorEvent e, ResearchBar b)
+        {
+            double pos, comp, pull;
+            Session.Describe(b, e.AtrProxy, out pos, out comp, out pull);
+            e.PosInSessRange = pos; e.CompressionRatio = comp; e.PullbackPct = pull;
+
+            e.OrComplete = Session.OrComplete;
+            // an incomplete opening range is not a level yet, so it is withheld entirely
+            e.OrHigh = Session.OrComplete ? Session.OrHigh : double.NaN;
+            e.OrLow = Session.OrComplete ? Session.OrLow : double.NaN;
+            e.DistOrHigh = b.Close - e.OrHigh;
+            e.DistOrLow = b.Close - e.OrLow;
+            e.OrHighEvent = HigherTfStructure.ClassifyAgainstHigh(b.High, b.Close, e.OrHigh, HtfApproachBandPoints);
+            e.OrLowEvent = HigherTfStructure.ClassifyAgainstLow(b.Low, b.Close, e.OrLow, HtfApproachBandPoints);
+
+            e.SessHigh = Session.SessHigh; e.SessLow = Session.SessLow;
+            e.DistSessHigh = b.Close - e.SessHigh;
+            e.DistSessLow = b.Close - e.SessLow;
+            e.SessHighEvent = HigherTfStructure.ClassifyAgainstHigh(b.High, b.Close, e.SessHigh, HtfApproachBandPoints);
+            e.SessLowEvent = HigherTfStructure.ClassifyAgainstLow(b.Low, b.Close, e.SessLow, HtfApproachBandPoints);
+        }
+
         private static string F(double v)
         {
             return double.IsNaN(v) ? "" : v.ToString("0.####", CultureInfo.InvariantCulture);
@@ -907,6 +1049,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             sb.Append(F(e.H15PrevBarHigh)).Append(',').Append(e.H15PrevBarHighEvent).Append(',')
               .Append(F(e.H15PrevBarLow)).Append(',').Append(e.H15PrevBarLowEvent).Append(',');
             sb.Append(e.HtfSweepSummary).Append(',');
+            sb.Append(e.OrComplete ? "TRUE" : "FALSE").Append(',')
+              .Append(F(e.OrHigh)).Append(',').Append(F(e.DistOrHigh)).Append(',').Append(e.OrHighEvent).Append(',')
+              .Append(F(e.OrLow)).Append(',').Append(F(e.DistOrLow)).Append(',').Append(e.OrLowEvent).Append(',');
+            sb.Append(F(e.SessHigh)).Append(',').Append(F(e.DistSessHigh)).Append(',').Append(e.SessHighEvent).Append(',')
+              .Append(F(e.SessLow)).Append(',').Append(F(e.DistSessLow)).Append(',').Append(e.SessLowEvent).Append(',');
+            sb.Append(F(e.PosInSessRange)).Append(',').Append(F(e.PullbackPct)).Append(',')
+              .Append(F(e.CompressionRatio)).Append(',');
             sb.Append(e.PrevVector).Append(',').Append(e.PrevPrevVector).Append(',').Append(e.PrevCandleKind).Append(',')
               .Append(e.SameDirectionVectorRun).Append(',').Append(e.Bucket).Append(',');
             sb.Append(F(e.StopVectorWickLongPts)).Append(',').Append(F(e.StopVectorWickShortPts)).Append(',')
