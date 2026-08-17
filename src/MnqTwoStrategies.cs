@@ -68,6 +68,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int BipTick = -1;             // execution-granularity series only (no logic)
         private int BipEs1 = -1, BipEs3 = -1, BipYm1 = -1, BipYm3 = -1;
         private int BipSec30 = -1, BipSec15 = -1, BipSec10 = -1, BipSec5 = -1;
+        private int BipFiveMin = -1, BipThirtyMin = -1, BipSixtyMin = -1;   // scalp research context only
 
         // Series index that ORDERS are submitted against. Signals are unaffected -
         // this only controls how finely NinjaTrader simulates fills in a backtest.
@@ -105,6 +106,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private VectorCandleResearchEngine researchS30, researchS15, researchS10, researchS5;
         private HigherTfStructure htf3m, htf15m;          // shared read-only HTF structure
         private System.IO.StreamWriter researchCsv;
+
+        // ---- scalp research capture (independent of candle classification) ----
+        private ScalpResearchEngine scalp1m, scalpS30, scalpS15, scalpS10, scalpS5;
+        private HigherTfStructure sHtf3, sHtf5, sHtf15, sHtf30, sHtf60;
+        private System.IO.StreamWriter scalpCsv;
 
         // ==================================================================
         // Parameters - every flagged ambiguity is exposed here instead of
@@ -230,6 +236,53 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(1, 10)]
         [Display(Name = "HTF swing pivot confirmation bars", GroupName = "00c. Vector Candle Research", Order = 6)]
         public int ResearchHtfPivotConfirmBars { get; set; }
+
+        #endregion
+
+        #region 00d. Scalp Research (structure-based, no candle classification)
+
+        // A SEPARATE capture with no dependency on candle classification of any kind.
+        // Its sampling frame is price interacting with structure, plus a sampled
+        // control group of bars that interacted with nothing - which is what makes
+        // "better at a level than away from one?" an answerable question.
+        [NinjaScriptProperty]
+        [Display(Name = "Enable scalp research capture (no trading effect)", GroupName = "00d. Scalp Research", Order = 1)]
+        public bool EnableScalpResearch { get; set; }
+
+        // Adds 5m/30m/60m purely as CONTEXT structure for the scalp capture. 3m and 15m
+        // already exist for the strategies and are reused.
+        [NinjaScriptProperty]
+        [Display(Name = "Add 5m/30m/60m context structure", GroupName = "00d. Scalp Research", Order = 2)]
+        public bool ScalpContextTimeframes { get; set; }
+
+        // Keep 1 in N bars that interacted with NO tracked level. This control group is
+        // required for the placebo and incremental-value tests; 0 disables it.
+        [NinjaScriptProperty]
+        [Range(0, 5000)]
+        [Display(Name = "Keep 1 in N no-interaction bars (control group)", GroupName = "00d. Scalp Research", Order = 3)]
+        public int ScalpControlSampleRate { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0.25, 100)]
+        [Display(Name = "Approach band (points) for level interaction", GroupName = "00d. Scalp Research", Order = 4)]
+        public double ScalpApproachBandPoints { get; set; }
+
+        // Round-number levels, in points. 100 tracks 20000/20100/...; 0 disables them.
+        [NinjaScriptProperty]
+        [Range(0, 1000)]
+        [Display(Name = "Round-number level step (points, 0 = off)", GroupName = "00d. Scalp Research", Order = 5)]
+        public double ScalpRoundNumberStep { get; set; }
+
+        // Emit only inside this ET window, to keep the file to the session being studied.
+        [NinjaScriptProperty]
+        [Range(0, 1440)]
+        [Display(Name = "Emit from (ET minutes, 0=midnight, 570=09:30)", GroupName = "00d. Scalp Research", Order = 6)]
+        public int ScalpEmitStartMinutesEt { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 1440)]
+        [Display(Name = "Emit until (ET minutes, 660=11:00, 1440=all)", GroupName = "00d. Scalp Research", Order = 7)]
+        public int ScalpEmitEndMinutesEt { get; set; }
         #endregion
 
         #region 01. Session / Time
@@ -492,6 +545,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ResearchSubMinute = false;
                 ResearchRegularCandleSampleRate = 10;
                 ResearchHtfPivotConfirmBars = 2;
+                EnableScalpResearch = false;
+                ScalpContextTimeframes = true;
+                ScalpControlSampleRate = 150;
+                ScalpApproachBandPoints = 6.0;
+                ScalpRoundNumberStep = 100.0;
+                ScalpEmitStartMinutesEt = 0;
+                ScalpEmitEndMinutesEt = 1440;
                 WriteCsvTradeLog = true;
                 VerboseDiagnostics = true;
                 UseTickExecutionSeries = true;   // NT8 multi-series fill granularity
@@ -527,8 +587,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AddDataSeries(BarsPeriodType.Minute, 15);
                 BipFifteenMin = next++;
 
+                // ---- OPTIONAL scalp-research CONTEXT series (data only, no orders) ----
+                // 3m and 15m already exist above and are reused rather than duplicated.
+                if (EnableScalpResearch && ScalpContextTimeframes)
+                {
+                    AddDataSeries(BarsPeriodType.Minute, 5);  BipFiveMin = next++;
+                    AddDataSeries(BarsPeriodType.Minute, 30); BipThirtyMin = next++;
+                    AddDataSeries(BarsPeriodType.Minute, 60); BipSixtyMin = next++;
+                }
+
                 // ---- OPTIONAL sub-minute RESEARCH series (data only, no orders) ----
-                if (EnableVectorResearch && ResearchSubMinute)
+                if ((EnableVectorResearch && ResearchSubMinute) || (EnableScalpResearch && ResearchSubMinute))
                 {
                     AddDataSeries(BarsPeriodType.Second, 30); BipSec30 = next++;
                     AddDataSeries(BarsPeriodType.Second, 15); BipSec15 = next++;
@@ -666,6 +735,35 @@ namespace NinjaTrader.NinjaScript.Strategies
                     PrintLine("  This module submits NO orders and does not affect either strategy.");
                 }
 
+                if (EnableScalpResearch)
+                {
+                    string spath = Path.Combine(NinjaTrader.Core.Globals.UserDataDir,
+                        string.Format("MnqScalpResearch_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now));
+                    scalpCsv = new System.IO.StreamWriter(spath, false);
+                    scalpCsv.WriteLine(ScalpResearchEngine.CsvHeader());
+                    Action<string> ssink = delegate(string row) { scalpCsv.WriteLine(row); };
+
+                    sHtf3 = new HigherTfStructure("3m"); sHtf15 = new HigherTfStructure("15m");
+                    if (ScalpContextTimeframes)
+                    {
+                        sHtf5 = new HigherTfStructure("5m");
+                        sHtf30 = new HigherTfStructure("30m");
+                        sHtf60 = new HigherTfStructure("60m");
+                    }
+                    foreach (HigherTfStructure h in new HigherTfStructure[] { sHtf3, sHtf5, sHtf15, sHtf30, sHtf60 })
+                        if (h != null) h.ConfirmBars = ResearchHtfPivotConfirmBars;
+
+                    scalp1m = MakeScalp(ssink, "1m");
+                    if (ResearchSubMinute)
+                    {
+                        scalpS30 = MakeScalp(ssink, "30s"); scalpS15 = MakeScalp(ssink, "15s");
+                        scalpS10 = MakeScalp(ssink, "10s"); scalpS5 = MakeScalp(ssink, "5s");
+                    }
+                    PrintLine("SCALP RESEARCH CAPTURE ENABLED - writing " + spath);
+                    PrintLine("  Structure-based sampling. No candle classification is used anywhere in it.");
+                    PrintLine("  This module submits NO orders and does not affect either strategy.");
+                }
+
                 FbConfig fbCfg = new FbConfig();
                 fbCfg.RiskPctAMinus = RiskPctAMinus;
                 fbCfg.RiskPctBPlus = RiskPctBPlus;
@@ -777,6 +875,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                     research = null;
                 }
                 if (researchCsv != null) { researchCsv.Flush(); researchCsv.Close(); researchCsv = null; }
+
+                foreach (ScalpResearchEngine s in new ScalpResearchEngine[]
+                         { scalpS30, scalpS15, scalpS10, scalpS5 })
+                    if (s != null) s.Finish();
+                if (scalp1m != null)
+                {
+                    scalp1m.Finish();
+                    int ev = scalp1m.EventsEmitted, ct = scalp1m.ControlsEmitted;
+                    foreach (ScalpResearchEngine s in new ScalpResearchEngine[]
+                             { scalpS30, scalpS15, scalpS10, scalpS5 })
+                        if (s != null) { ev += s.EventsEmitted; ct += s.ControlsEmitted; }
+                    PrintLine(string.Format(
+                        "SCALP RESEARCH: {0} structure rows + {1} control rows written to CSV.", ev, ct));
+                    scalp1m = null;
+                }
+                if (scalpCsv != null) { scalpCsv.Flush(); scalpCsv.Close(); scalpCsv = null; }
                 if (logger != null) { logger.Close(); logger = null; }
             }
         }
@@ -879,28 +993,60 @@ namespace NinjaTrader.NinjaScript.Strategies
                     rb.Volume = Volumes[BipOneMin][0];
                     research.OnBar(rb);
                 }
+                if (scalp1m != null)
+                {
+                    ResearchBar sb2 = new ResearchBar();
+                    sb2.EtClose = etClose; sb2.EtOpen = etOpen;
+                    sb2.Open = Opens[BipOneMin][0]; sb2.High = Highs[BipOneMin][0];
+                    sb2.Low = Lows[BipOneMin][0]; sb2.Close = Closes[BipOneMin][0];
+                    sb2.Volume = Volumes[BipOneMin][0];
+                    scalp1m.OnBar(sb2);
+                }
 
                 if (CurrentBars[BipOneMin] < 11) return; // vector needs previous 10 completed candles
                 BarSnap snap = BuildSnap(BipOneMin, 1, ema1m[0]);
                 if (EnableFakeBreakout) fb.OnOneMinuteBar(snap);
                 if (EnableVectorBreakRetest) vbr.OnOneMinuteBar(snap);
             }
-            else if (research != null && (BarsInProgress == BipSec30 || BarsInProgress == BipSec15
-                                       || BarsInProgress == BipSec10 || BarsInProgress == BipSec5))
+            else if (BipSec30 > 0 && (BarsInProgress == BipSec30 || BarsInProgress == BipSec15
+                                   || BarsInProgress == BipSec10 || BarsInProgress == BipSec5))
             {
                 int sb = BarsInProgress;
                 if (CurrentBars[sb] < 1) return;
-                VectorCandleResearchEngine target =
-                    sb == BipSec30 ? researchS30 : sb == BipSec15 ? researchS15
-                    : sb == BipSec10 ? researchS10 : researchS5;
                 int secs = sb == BipSec30 ? 30 : sb == BipSec15 ? 15 : sb == BipSec10 ? 10 : 5;
-                if (target != null) target.OnBar(MakeResearchBar(sb, secs));
+                ResearchBar rb = MakeResearchBar(sb, secs);
+                if (research != null)
+                {
+                    VectorCandleResearchEngine target =
+                        sb == BipSec30 ? researchS30 : sb == BipSec15 ? researchS15
+                        : sb == BipSec10 ? researchS10 : researchS5;
+                    if (target != null) target.OnBar(rb);
+                }
+                ScalpResearchEngine starget =
+                    sb == BipSec30 ? scalpS30 : sb == BipSec15 ? scalpS15
+                    : sb == BipSec10 ? scalpS10 : scalpS5;
+                if (starget != null) starget.OnBar(rb);
                 return;   // sub-minute series carry NO strategy logic
+            }
+            else if (BipFiveMin > 0 && (BarsInProgress == BipFiveMin || BarsInProgress == BipThirtyMin
+                                     || BarsInProgress == BipSixtyMin))
+            {
+                // CONTEXT ONLY. These series exist purely so the scalp capture can ask
+                // whether a fast move took out structure the slower chart had already
+                // confirmed. No strategy logic reads them.
+                int sb = BarsInProgress;
+                if (CurrentBars[sb] < 1) return;
+                int mins = sb == BipFiveMin ? 5 : sb == BipThirtyMin ? 30 : 60;
+                HigherTfStructure h = sb == BipFiveMin ? sHtf5 : sb == BipThirtyMin ? sHtf30 : sHtf60;
+                if (h != null) h.OnBar(MakeResearchBar(sb, mins * 60));
+                return;
             }
             else if (BarsInProgress == BipThreeMin)
             {
                 if (htf3m != null && CurrentBars[BipThreeMin] >= 1)
                     htf3m.OnBar(MakeResearchBar(BipThreeMin, 180));
+                if (sHtf3 != null && CurrentBars[BipThreeMin] >= 1)
+                    sHtf3.OnBar(MakeResearchBar(BipThreeMin, 180));
                 if (research3m != null && CurrentBars[BipThreeMin] >= 1)
                     research3m.OnBar(MakeResearchBar(BipThreeMin, 180));
                 if (CurrentBars[BipThreeMin] < 11) return;
@@ -913,6 +1059,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (htf15m != null && CurrentBars[BipFifteenMin] >= 1)
                     htf15m.OnBar(MakeResearchBar(BipFifteenMin, 900));
+                if (sHtf15 != null && CurrentBars[BipFifteenMin] >= 1)
+                    sHtf15.OnBar(MakeResearchBar(BipFifteenMin, 900));
                 if (research15m != null && CurrentBars[BipFifteenMin] >= 1)
                     research15m.OnBar(MakeResearchBar(BipFifteenMin, 900));
                 if (CurrentBars[BipFifteenMin] < 11) return;
@@ -1111,6 +1259,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             r.Htf3m = htf3m;
             r.Htf15m = htf15m;
             return r;
+        }
+
+        private ScalpResearchEngine MakeScalp(Action<string> sink, string label)
+        {
+            ScalpResearchEngine s = new ScalpResearchEngine(levels, sink);
+            s.TimeframeLabel = label;
+            s.ControlSampleRate = ScalpControlSampleRate;
+            s.ApproachBandPoints = ScalpApproachBandPoints;
+            s.RoundNumberStep = ScalpRoundNumberStep;
+            s.EmitStartMinutesEt = ScalpEmitStartMinutesEt;
+            s.EmitEndMinutesEt = ScalpEmitEndMinutesEt;
+            s.AddHtf("3m", sHtf3); s.AddHtf("15m", sHtf15);
+            if (sHtf5 != null) { s.AddHtf("5m", sHtf5); s.AddHtf("30m", sHtf30); s.AddHtf("60m", sHtf60); }
+            return s;
         }
 
         private ResearchBar MakeResearchBar(int bip, int periodSeconds)
