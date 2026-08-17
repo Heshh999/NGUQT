@@ -25,6 +25,15 @@ namespace MnqTwoTests
             return b;
         }
 
+        /// A 30-second bar, for the sub-minute parent-join tests.
+        private static ResearchBar RB30(DateTime etOpen, double o, double h, double l, double c)
+        {
+            ResearchBar b = new ResearchBar();
+            b.EtOpen = etOpen; b.EtClose = etOpen.AddSeconds(30);
+            b.Open = o; b.High = h; b.Low = l; b.Close = c; b.Volume = 100;
+            return b;
+        }
+
         private static KeyLevelEngine Levels()
         {
             KeyLevelEngine lv = new KeyLevelEngine();
@@ -366,6 +375,124 @@ namespace MnqTwoTests
                 es.Finish();
                 Check(rowsS.Count == 1 && rowsS[0].Split(',').Length == h3.Length,
                       "row width still matches the header: " + rowsS[0].Split(',').Length + " vs " + h3.Length);
+            }
+
+            // ================================================================
+            // PHASE-2 JOIN MACHINERY - event ids, parent snapping, warm-up,
+            // monthly routing. These are what let sub-minute observations be
+            // joined back to a frozen Phase-1 parent event.
+            // ================================================================
+            Console.WriteLine();
+            Console.WriteLine("PHASE 2 JOIN MACHINERY:");
+            {
+                DateTime t = new DateTime(2025, 8, 15, 9, 31, 0);
+                string id = ScalpResearchEngine.MakeEventId("1m", t);
+                Check(id == "1m-20250815093100", "event id is timeframe + timestamp: " + id);
+                Check(ScalpResearchEngine.MakeEventId("1m", t) == id,
+                      "the SAME bar always produces the SAME id - it must survive a re-run");
+                Check(ScalpResearchEngine.MakeEventId("30s", t) != id,
+                      "different timeframes on the same timestamp get different ids");
+
+                // month routing reads the row's OWN date, not the wall clock, because
+                // rows are emitted late - after their forward horizon has elapsed
+                Check(ScalpResearchEngine.MonthKeyFromEventId("1m-20250815093100,,FALSE,2025-08-15") == "2025-08",
+                      "monthly routing reads the month out of the row's own event id");
+                Check(ScalpResearchEngine.MonthKeyFromEventId("30s-20240101180030,x,TRUE") == "2024-01",
+                      "and works for a sub-minute row too");
+                Check(ScalpResearchEngine.MonthKeyFromEventId("garbage") == "unknown",
+                      "a malformed row routes to 'unknown' rather than being guessed at");
+                Check(ScalpResearchEngine.MonthKeyFromEventId("1m-20xx0815093100,,") == "unknown",
+                      "non-numeric where digits belong is also 'unknown', not a bad guess");
+                Check(ScalpResearchEngine.MonthKeyFromEventId(null) == "unknown",
+                      "and a null row does not throw");
+            }
+
+            // ---- warm-up flagging: processed but not part of the sample ----
+            {
+                List<string> rowsW = new List<string>();
+                ScalpResearchEngine sc = new ScalpResearchEngine(Levels(), rowsW.Add);
+                sc.TimeframeLabel = "1m";
+                sc.TargetSampleStartEt = new DateTime(2026, 8, 5, 10, 0, 0);
+                sc.ControlSampleRate = 1;       // keep everything so the flag is observable
+                DateTime d2 = new DateTime(2026, 8, 5);
+                for (int i = 0; i < 80; i++)
+                    sc.OnBar(RB(d2.AddHours(9).AddMinutes(30 + i), 20000 + i, 20010 + i, 19990 + i, 20005 + i, 100));
+                sc.Finish();
+                string[] hs = ScalpResearchEngine.CsvHeader().Split(',');
+                int iw = Array.IndexOf(hs, "isWarmup"), ie = Array.IndexOf(hs, "eventId");
+                Check(iw == 2 && ie == 0, "isWarmup and eventId are the leading columns");
+                int warm = 0, real = 0;
+                foreach (string r in rowsW)
+                {
+                    string[] c = r.Split(',');
+                    if (c[iw] == "TRUE") warm++; else real++;
+                }
+                Check(warm > 0, "bars before the target start are flagged isWarmup=TRUE (" + warm + ")");
+                Check(real > 0, "bars after it are not (" + real + ")");
+                Check(rowsW.Count == warm + real, "every row carries one flag or the other, none blank");
+            }
+
+            // ---- a sub-minute row names the 1m parent bar that CONTAINS it ----
+            {
+                List<string> rowsP = new List<string>();
+                ScalpResearchEngine s30 = new ScalpResearchEngine(Levels(), rowsP.Add);
+                s30.TimeframeLabel = "30s";
+                s30.ParentTimeframeLabel = "1m"; s30.ParentBarSeconds = 60;
+                s30.ControlSampleRate = 1;
+                DateTime d3 = new DateTime(2026, 8, 5);
+                // NOTE: the engine needs its ATR/EMA lookback filled before it emits
+                // anything, so the first ~20 bars produce no rows at all. The bars
+                // asserted on below are chosen to sit comfortably past that warm-up.
+                for (int i = 0; i < 80; i++)
+                    s30.OnBar(RB30(d3.AddHours(9).AddMinutes(30).AddSeconds(30 * i), 20000, 20010, 19990, 20005));
+                s30.Finish();
+                string[] hs = ScalpResearchEngine.CsvHeader().Split(',');
+                int ie = Array.IndexOf(hs, "eventId"), ip = Array.IndexOf(hs, "parentEventId");
+                bool found = false, allParented = true;
+                foreach (string r in rowsP)
+                {
+                    string[] c = r.Split(',');
+                    if (c[ip].Length == 0) { allParented = false; continue; }
+                    if (!c[ip].StartsWith("1m-")) allParented = false;
+                    if (c[ie] == "30s-20260805094130" && c[ip] == "1m-20260805094200") found = true;
+                }
+                Check(rowsP.Count > 0, "the 30s engine emitted rows");
+                Check(allParented, "every sub-minute row names a 1m parent");
+                Check(found, "a 30s bar closing 09:41:30 is stamped with the 1m parent closing 09:42:00 "
+                           + "- the bar it is INSIDE, not the one already finished");
+                // and a 30s bar landing exactly on the minute belongs to THAT minute
+                bool onBoundary = false;
+                foreach (string r in rowsP)
+                {
+                    string[] c = r.Split(',');
+                    if (c[ie] == "30s-20260805094200" && c[ip] == "1m-20260805094200") onBoundary = true;
+                }
+                Check(onBoundary, "a 30s bar closing exactly at 09:42:00 belongs to the 1m bar closing 09:42:00");
+                // ids must be UNIQUE per bar - a shared id would silently collapse the join
+                System.Collections.Generic.Dictionary<string, int> seen =
+                    new System.Collections.Generic.Dictionary<string, int>();
+                foreach (string r in rowsP)
+                {
+                    string k = r.Split(',')[ie];
+                    seen[k] = seen.ContainsKey(k) ? seen[k] + 1 : 1;
+                }
+                Check(seen.Count > 30, "one distinct event id per bar, not one per run: " + seen.Count + " ids");
+            }
+
+            // ---- a Phase-1 engine is the parent, so carries no parent id ----
+            {
+                List<string> rows1 = new List<string>();
+                ScalpResearchEngine p1 = new ScalpResearchEngine(Levels(), rows1.Add);
+                p1.TimeframeLabel = "1m"; p1.ControlSampleRate = 1;
+                DateTime d4 = new DateTime(2026, 8, 5);
+                for (int i = 0; i < 40; i++)
+                    p1.OnBar(RB(d4.AddHours(9).AddMinutes(30 + i), 20000, 20010, 19990, 20005, 100));
+                p1.Finish();
+                string[] hs = ScalpResearchEngine.CsvHeader().Split(',');
+                int ip = Array.IndexOf(hs, "parentEventId");
+                bool anyParent = false;
+                foreach (string r in rows1) if (r.Split(',')[ip].Length > 0) anyParent = true;
+                Check(!anyParent, "a Phase-1 1m row has an EMPTY parent id - it IS the parent");
             }
 
             Console.WriteLine();

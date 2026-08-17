@@ -24,7 +24,14 @@ namespace NinjaTrader.Data
 {
     public enum MarketDataType { Last, Bid, Ask }
     public enum BarsPeriodType { Tick, Volume, Range, Second, Minute, Day, Week, Month, Year }
-    public class Bars { public int Count { get; set; } public NinjaTrader.Cbi.Instrument Instrument { get; set; } }
+    public class Bars
+    {
+        public int Count { get; set; }
+        public NinjaTrader.Cbi.Instrument Instrument { get; set; }
+        /// Real NT8 API: timestamp of a bar by absolute index. Used by the data-coverage
+        /// report to state the true first/last bar of each series.
+        public System.DateTime GetTime(int barIndex) { return System.DateTime.MinValue; }
+    }
 }
 
 namespace NinjaTrader.Core

@@ -111,6 +111,43 @@ namespace NinjaTrader.NinjaScript.Strategies
         private ScalpResearchEngine scalp1m, scalpS30, scalpS15, scalpS10, scalpS5;
         private HigherTfStructure sHtf3, sHtf5, sHtf15, sHtf30, sHtf60;
         private System.IO.StreamWriter scalpCsv;
+        private bool scalpMonthly;
+        private string scalpStem;
+        private string scalpCurMonth = "";
+        private bool phase1Requested;
+        private DateTime targetSampleStart = DateTime.MinValue;
+
+        /// Names the capture after the phase and the finest series in it, so a folder of
+        /// monthly files is self-describing: V3_1m_..., V3_30s_..., V3_tick_...
+        private string ScalpFileTag()
+        {
+            if (ResearchPhaseParam == ResearchPhase.PHASE3_TICK) return "tick";
+            if (ResearchPhaseParam == ResearchPhase.PHASE2_EXECUTION)
+                return SubMinuteCompareAll ? "submin" : "30s";
+            return "1m";
+        }
+
+        /// Routes one research row to the right file. In monthly mode the destination is
+        /// chosen from the row's OWN date - the first field is the eventId, which begins
+        /// with the timeframe and then yyyyMMdd - so rows always land in the month they
+        /// belong to even though the engines emit them late, after their forward horizon
+        /// has elapsed.
+        private void WriteScalpRow(string row)
+        {
+            if (!scalpMonthly) { if (scalpCsv != null) scalpCsv.WriteLine(row); return; }
+            string month = ScalpResearchEngine.MonthKeyFromEventId(row);
+            if (month != scalpCurMonth)
+            {
+                if (scalpCsv != null) { scalpCsv.Flush(); scalpCsv.Close(); }
+                string path = scalpStem + "_" + month + ".csv";
+                bool existed = File.Exists(path);
+                scalpCsv = new System.IO.StreamWriter(path, true);
+                if (!existed) scalpCsv.WriteLine(ScalpResearchEngine.CsvHeader());
+                scalpCurMonth = month;
+                PrintLine("  SCALP RESEARCH: writing " + Path.GetFileName(path));
+            }
+            scalpCsv.WriteLine(row);
+        }
 
         // ==================================================================
         // Parameters - every flagged ambiguity is exposed here instead of
@@ -236,6 +273,37 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(1, 10)]
         [Display(Name = "HTF swing pivot confirmation bars", GroupName = "00c. Vector Candle Research", Order = 6)]
         public int ResearchHtfPivotConfirmBars { get; set; }
+
+        #endregion
+
+        #region 00e. Research Phase (controls which series are loaded at all)
+
+        // PHASE 1 is broad historical discovery on 60m/15m/3m/1m and nothing else.
+        // PHASE 2 opens the sub-minute series, for execution refinement around parent
+        // events that already survived Phase 1. PHASE 3 opens 1-tick, for fill
+        // realism only. The phase is the ONLY thing that permits the expensive series.
+        [NinjaScriptProperty]
+        [Display(Name = "Research phase", GroupName = "00e. Research Phase", Order = 1)]
+        public ResearchPhase ResearchPhaseParam { get; set; }
+
+        // Phase 2 tests 30s FIRST. Leave this off for that comparison; turn it on only
+        // once 30s has shown incremental execution information worth chasing finer.
+        [NinjaScriptProperty]
+        [Display(Name = "PHASE 2: also load 15s/10s/5s (leave OFF for the 30s-first test)", GroupName = "00e. Research Phase", Order = 2)]
+        public bool SubMinuteCompareAll { get; set; }
+
+        // Splits the research CSV by calendar month. Monthly boundaries never reset
+        // engine state - only the file being written to changes.
+        [NinjaScriptProperty]
+        [Display(Name = "Write one research file per calendar month", GroupName = "00e. Research Phase", Order = 3)]
+        public bool MonthlyResearchFiles { get; set; }
+
+        // Bars before this date are still fed to every engine, so context, EMAs and
+        // structure are fully warmed, but their rows are flagged isWarmup=TRUE so they
+        // can be excluded from the official sample.
+        [NinjaScriptProperty]
+        [Display(Name = "Target sample starts (yyyy-MM-dd, blank = whole range)", GroupName = "00e. Research Phase", Order = 4)]
+        public string TargetSampleStartDate { get; set; }
 
         #endregion
 
@@ -546,6 +614,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ResearchRegularCandleSampleRate = 10;
                 ResearchHtfPivotConfirmBars = 2;
                 EnableScalpResearch = false;
+                ResearchPhaseParam = ResearchPhase.PHASE1_DISCOVERY;
+                SubMinuteCompareAll = false;
+                MonthlyResearchFiles = false;
+                TargetSampleStartDate = "";
                 ScalpContextTimeframes = true;
                 ScalpControlSampleRate = 150;
                 ScalpApproachBandPoints = 6.0;
@@ -587,29 +659,56 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AddDataSeries(BarsPeriodType.Minute, 15);
                 BipFifteenMin = next++;
 
-                // ---- OPTIONAL scalp-research CONTEXT series (data only, no orders) ----
+                // ---- RESEARCH PHASE GATING ------------------------------------
+                // The phase decides which series may be loaded at all, so a Phase-1
+                // discovery run cannot accidentally drag in years of sub-minute or
+                // tick data it has no use for. Loading them is the expensive part of
+                // a multi-year capture, and the phase setting is the only thing that
+                // opens that door.
+                //
+                //   PHASE1_DISCOVERY  60m / 15m / 3m / 1m only. Primary series 1m.
+                //   PHASE2_EXECUTION  adds sub-minute, for frozen Phase-1 events only.
+                //   PHASE3_TICK       adds 1-tick, for fill/slippage realism only.
+                bool phase1 = ResearchPhaseParam == ResearchPhase.PHASE1_DISCOVERY;
+                bool phase2 = ResearchPhaseParam == ResearchPhase.PHASE2_EXECUTION;
+                bool phase3 = ResearchPhaseParam == ResearchPhase.PHASE3_TICK;
+
+                // ---- CONTEXT series (data only, no orders) ----
                 // 3m and 15m already exist above and are reused rather than duplicated.
-                if (EnableScalpResearch && ScalpContextTimeframes)
+                // 60m is loaded in EVERY phase because it is the broad structural layer
+                // the discovery run is built on; 5m and 30m stay optional.
+                if (EnableScalpResearch || EnableVectorResearch)
                 {
-                    AddDataSeries(BarsPeriodType.Minute, 5);  BipFiveMin = next++;
-                    AddDataSeries(BarsPeriodType.Minute, 30); BipThirtyMin = next++;
+                    if (ScalpContextTimeframes)
+                    {
+                        AddDataSeries(BarsPeriodType.Minute, 5);  BipFiveMin = next++;
+                        AddDataSeries(BarsPeriodType.Minute, 30); BipThirtyMin = next++;
+                    }
                     AddDataSeries(BarsPeriodType.Minute, 60); BipSixtyMin = next++;
                 }
 
-                // ---- OPTIONAL sub-minute RESEARCH series (data only, no orders) ----
-                if ((EnableVectorResearch && ResearchSubMinute) || (EnableScalpResearch && ResearchSubMinute))
+                // ---- SUB-MINUTE series: PHASE 2 AND 3 ONLY ----
+                // Phase 1 refuses these even when the sub-minute toggle is on, and says
+                // so in the log rather than silently ignoring the setting.
+                if (ResearchSubMinute && (phase2 || phase3))
                 {
                     AddDataSeries(BarsPeriodType.Second, 30); BipSec30 = next++;
-                    AddDataSeries(BarsPeriodType.Second, 15); BipSec15 = next++;
-                    AddDataSeries(BarsPeriodType.Second, 10); BipSec10 = next++;
-                    AddDataSeries(BarsPeriodType.Second, 5);  BipSec5 = next++;
+                    // Phase 2 tests 30s FIRST. The finer series are only added once the
+                    // 30s comparison has earned them.
+                    if (SubMinuteCompareAll)
+                    {
+                        AddDataSeries(BarsPeriodType.Second, 15); BipSec15 = next++;
+                        AddDataSeries(BarsPeriodType.Second, 10); BipSec10 = next++;
+                        AddDataSeries(BarsPeriodType.Second, 5);  BipSec5 = next++;
+                    }
                 }
 
                 // Optional execution series (added LAST so the indices above never move).
                 // It carries NO strategy logic - OnBarUpdate ignores it entirely.
-                // Its only job is to give the backtester tick-by-tick granularity for
-                // entry fills and, critically, for the structure stops.
-                if (UseTickExecutionSeries)
+                // 1-tick is NOT a discovery timeframe: it is for fill sequencing,
+                // same-bar stop/target ambiguity and slippage, so it is gated to Phase 3
+                // unless a live/trading run explicitly asks for execution granularity.
+                if (UseTickExecutionSeries && (phase3 || !EnableScalpResearch))
                 {
                     AddDataSeries(BarsPeriodType.Tick, 1);
                     BipTick = next++;
@@ -619,6 +718,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     bipExec = BipOneMin;
                 }
+                phase1Requested = phase1;
 
                 IsExitOnSessionCloseStrategy = ExitOnSessionCloseEnabled;
             }
@@ -737,31 +837,65 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (EnableScalpResearch)
                 {
-                    string spath = Path.Combine(NinjaTrader.Core.Globals.UserDataDir,
-                        string.Format("MnqScalpResearch_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now));
-                    scalpCsv = new System.IO.StreamWriter(spath, false);
-                    scalpCsv.WriteLine(ScalpResearchEngine.CsvHeader());
-                    Action<string> ssink = delegate(string row) { scalpCsv.WriteLine(row); };
+                    // Monthly rotation splits the OUTPUT only. No engine is reset, no
+                    // context is rebuilt and no state is cleared at a month boundary -
+                    // the run is continuous and only the destination file changes.
+                    scalpMonthly = MonthlyResearchFiles;
+                    scalpStem = Path.Combine(NinjaTrader.Core.Globals.UserDataDir,
+                        string.Format("V3_{0}_{1:yyyyMMdd_HHmmss}", ScalpFileTag(), DateTime.Now));
+                    if (!scalpMonthly)
+                    {
+                        scalpCsv = new System.IO.StreamWriter(scalpStem + ".csv", false);
+                        scalpCsv.WriteLine(ScalpResearchEngine.CsvHeader());
+                    }
+                    Action<string> ssink = delegate(string row) { WriteScalpRow(row); };
 
+                    // 60m is the broad structural layer every phase carries; 5m and 30m
+                    // are the optional extras.
                     sHtf3 = new HigherTfStructure("3m"); sHtf15 = new HigherTfStructure("15m");
+                    sHtf60 = new HigherTfStructure("60m");
                     if (ScalpContextTimeframes)
                     {
                         sHtf5 = new HigherTfStructure("5m");
                         sHtf30 = new HigherTfStructure("30m");
-                        sHtf60 = new HigherTfStructure("60m");
+                    }
+                    if (!string.IsNullOrEmpty(TargetSampleStartDate))
+                    {
+                        DateTime tsd;
+                        if (DateTime.TryParse(TargetSampleStartDate, CultureInfo.InvariantCulture,
+                                              DateTimeStyles.None, out tsd))
+                            targetSampleStart = tsd;
+                        else
+                            PrintLine("  WARNING: could not parse target sample start '" + TargetSampleStartDate
+                                      + "' - every row will be treated as part of the sample.");
                     }
                     foreach (HigherTfStructure h in new HigherTfStructure[] { sHtf3, sHtf5, sHtf15, sHtf30, sHtf60 })
                         if (h != null) h.ConfirmBars = ResearchHtfPivotConfirmBars;
 
                     scalp1m = MakeScalp(ssink, "1m");
-                    if (ResearchSubMinute)
+                    // Sub-minute engines exist only where the phase actually loaded the
+                    // series. BipSec30 < 0 means Phase 1 refused them.
+                    if (BipSec30 > 0)
                     {
-                        scalpS30 = MakeScalp(ssink, "30s"); scalpS15 = MakeScalp(ssink, "15s");
-                        scalpS10 = MakeScalp(ssink, "10s"); scalpS5 = MakeScalp(ssink, "5s");
+                        scalpS30 = MakeScalp(ssink, "30s");
+                        if (BipSec15 > 0)
+                        {
+                            scalpS15 = MakeScalp(ssink, "15s");
+                            scalpS10 = MakeScalp(ssink, "10s"); scalpS5 = MakeScalp(ssink, "5s");
+                        }
                     }
-                    PrintLine("SCALP RESEARCH CAPTURE ENABLED - writing " + spath);
+                    PrintLine("SCALP RESEARCH CAPTURE ENABLED - phase " + ResearchPhaseParam);
+                    PrintLine("  writing " + (scalpMonthly ? scalpStem + "_YYYY-MM.csv (one file per month)"
+                                                           : scalpStem + ".csv"));
                     PrintLine("  Structure-based sampling. No candle classification is used anywhere in it.");
                     PrintLine("  This module submits NO orders and does not affect either strategy.");
+                    if (phase1Requested && ResearchSubMinute)
+                        PrintLine("  NOTE: sub-minute is switched ON but PHASE1_DISCOVERY does not load those"
+                                  + " series. Switch to PHASE2_EXECUTION if you meant to capture them.");
+                    if (targetSampleStart > DateTime.MinValue)
+                        PrintLine(string.Format(CultureInfo.InvariantCulture,
+                            "  Target sample starts {0:yyyy-MM-dd}; earlier rows are emitted with isWarmup=TRUE"
+                            + " and must be filtered out before any statistic.", targetSampleStart));
                 }
 
                 FbConfig fbCfg = new FbConfig();
@@ -888,6 +1022,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (s != null) { ev += s.EventsEmitted; ct += s.ControlsEmitted; }
                     PrintLine(string.Format(
                         "SCALP RESEARCH: {0} structure rows + {1} control rows written to CSV.", ev, ct));
+                    PrintDataCoverage();
                     scalp1m = null;
                 }
                 if (scalpCsv != null) { scalpCsv.Flush(); scalpCsv.Close(); scalpCsv = null; }
@@ -1028,8 +1163,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (starget != null) starget.OnBar(rb);
                 return;   // sub-minute series carry NO strategy logic
             }
-            else if (BipFiveMin > 0 && (BarsInProgress == BipFiveMin || BarsInProgress == BipThirtyMin
-                                     || BarsInProgress == BipSixtyMin))
+            else if ((BipFiveMin > 0 && BarsInProgress == BipFiveMin)
+                  || (BipThirtyMin > 0 && BarsInProgress == BipThirtyMin)
+                  || (BipSixtyMin > 0 && BarsInProgress == BipSixtyMin))
             {
                 // CONTEXT ONLY. These series exist purely so the scalp capture can ask
                 // whether a fast move took out structure the slower chart had already
@@ -1261,6 +1397,40 @@ namespace NinjaTrader.NinjaScript.Strategies
             return r;
         }
 
+        /// Reports what data each series ACTUALLY delivered, series by series.
+        ///
+        /// A series can resolve to the right instrument and still load nothing, which
+        /// is exactly what happened on three earlier sub-minute runs - correct symbol,
+        /// zero bars, no data for those windows. Precision that was never in the file
+        /// must not be claimed downstream, so the counts are printed rather than
+        /// assumed, and a series that loaded nothing is called out explicitly.
+        private void PrintDataCoverage()
+        {
+            PrintLine("================ DATA COVERAGE ACTUALLY LOADED ================");
+            PrintLine("  Report these counts with any result. A series can resolve correctly");
+            PrintLine("  and still contain zero bars - that is not the same as no signal.");
+            int[] bips = new int[] { BipOneMin, BipThreeMin, BipFifteenMin, BipFiveMin,
+                                     BipThirtyMin, BipSixtyMin, BipSec30, BipSec15,
+                                     BipSec10, BipSec5, BipTick };
+            string[] names = new string[] { "1m", "3m", "15m", "5m", "30m", "60m",
+                                            "30s", "15s", "10s", "5s", "1tick" };
+            for (int i = 0; i < bips.Length; i++)
+            {
+                int b = bips[i];
+                if (b < 0) { PrintLine(string.Format("  {0,-6} NOT LOADED (phase {1})", names[i], ResearchPhaseParam)); continue; }
+                if (BarsArray.Length <= b || BarsArray[b] == null)
+                { PrintLine(string.Format("  {0,-6} *** SERIES MISSING ***", names[i])); continue; }
+                int cnt = BarsArray[b].Count;
+                string span = cnt > 0
+                    ? string.Format(CultureInfo.InvariantCulture, "  {0:yyyy-MM-dd} -> {1:yyyy-MM-dd}",
+                        ToEt(BarsArray[b].GetTime(0)), ToEt(BarsArray[b].GetTime(cnt - 1)))
+                    : "";
+                PrintLine(string.Format("  {0,-6} bars={1,-12}{2}{3}", names[i], cnt, span,
+                    cnt == 0 ? "   *** ZERO BARS - NO DATA FOR THIS RANGE ***" : ""));
+            }
+            PrintLine("===============================================================");
+        }
+
         private ScalpResearchEngine MakeScalp(Action<string> sink, string label)
         {
             ScalpResearchEngine s = new ScalpResearchEngine(levels, sink);
@@ -1270,8 +1440,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             s.RoundNumberStep = ScalpRoundNumberStep;
             s.EmitStartMinutesEt = ScalpEmitStartMinutesEt;
             s.EmitEndMinutesEt = ScalpEmitEndMinutesEt;
+            s.TargetSampleStartEt = targetSampleStart;
+            // Sub-minute engines stamp the 1m parent bar they fall inside, so Phase-2
+            // rows join back to the Phase-1 parent event. The 1m engine IS the parent.
+            if (label != "1m") { s.ParentTimeframeLabel = "1m"; s.ParentBarSeconds = 60; }
             s.AddHtf("3m", sHtf3); s.AddHtf("15m", sHtf15);
-            if (sHtf5 != null) { s.AddHtf("5m", sHtf5); s.AddHtf("30m", sHtf30); s.AddHtf("60m", sHtf60); }
+            if (sHtf5 != null) { s.AddHtf("5m", sHtf5); s.AddHtf("30m", sHtf30); }
+            if (sHtf60 != null) s.AddHtf("60m", sHtf60);
             return s;
         }
 

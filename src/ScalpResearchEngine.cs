@@ -403,6 +403,26 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         // identity
         public DateTime EtClose;
         public long BarIndex;
+
+        /// Stable, reproducible identity for this observation.
+        ///
+        /// Phase 2 researches sub-minute behaviour ONLY inside the windows of parent
+        /// events that survived Phase 1, and the sub-minute rows have to be joinable
+        /// back to the 60m/15m/3m/1m context they came from. That join needs an id
+        /// that is identical every time the same bar is reprocessed, so it is derived
+        /// purely from (timeframe, bar close time) rather than from a run-local
+        /// counter. Re-running the capture, or splitting it into monthly files,
+        /// produces the same ids.
+        public string EventId = "";
+
+        /// Set on the frozen Phase-1 parent event this observation belongs to. Empty
+        /// on Phase-1 rows, which ARE the parents.
+        public string ParentEventId = "";
+
+        /// TRUE for rows before the target sample start. They are fully processed so
+        /// context is warm, but they are not part of the official sample and must be
+        /// filtered out before any statistic is computed.
+        public bool IsWarmup;
         public string Timeframe;
         public string EventKind;            // STRUCTURE or CONTROL
         public double Open, High, Low, Close, Volume;
@@ -498,6 +518,54 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         /// Restrict emission to a session window, in ET minutes. Defaults to everything.
         public int EmitStartMinutesEt = 0;
         public int EmitEndMinutesEt = 1440;
+
+        /// Rows closing before this are flagged isWarmup=TRUE. They are still fully
+        /// processed - context, EMAs, level book and structure all need the history -
+        /// but they are not part of the official sample. Default MinValue = no warm-up
+        /// period, every row counts.
+        public DateTime TargetSampleStartEt = DateTime.MinValue;
+
+        /// For a Phase-2 sub-minute engine: the label of the parent timeframe whose
+        /// event id each row should carry ("1m"). Null on Phase-1 engines, which are
+        /// themselves the parents.
+        public string ParentTimeframeLabel;
+        /// Length of one parent bar in seconds, used to snap an observation to the
+        /// parent bar that contains it. 60 = a 1-minute parent.
+        public int ParentBarSeconds = 60;
+
+        /// Deterministic id for one bar on one timeframe. Reproducible across runs and
+        /// across monthly file splits, because it depends on nothing run-local.
+        public static string MakeEventId(string timeframe, DateTime etClose)
+        {
+            return timeframe + "-" + etClose.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+        }
+
+        /// Which calendar month a CSV row belongs to, read from the eventId in its first
+        /// field. Rows are emitted LATE - only once their forward horizon has elapsed -
+        /// so a monthly writer must route on the row's own timestamp rather than on
+        /// whatever the clock says when the row is written.
+        /// Returns "unknown" rather than guessing when the shape is not what it expects.
+        public static string MonthKeyFromEventId(string row)
+        {
+            if (row == null) return "unknown";
+            int dash = row.IndexOf('-');
+            if (dash < 0 || row.Length < dash + 7) return "unknown";
+            string digits = row.Substring(dash + 1, 6);
+            for (int i = 0; i < digits.Length; i++)
+                if (digits[i] < '0' || digits[i] > '9') return "unknown";
+            return digits.Substring(0, 4) + "-" + digits.Substring(4, 2);
+        }
+
+        /// Close time of the parent bar containing this sub-minute observation. A 5s bar
+        /// closing 09:31:25 belongs to the 1m parent closing 09:32:00 - the parent that
+        /// is still forming. Rounding UP to the next parent boundary is what makes the
+        /// join land on the bar the observation is inside of.
+        private DateTime ParentBarCloseFor(DateTime etClose)
+        {
+            long tick = TimeSpan.FromSeconds(ParentBarSeconds).Ticks;
+            long n = (etClose.Ticks + tick - 1) / tick;
+            return new DateTime(n * tick, etClose.Kind);
+        }
 
         public int EventsEmitted { get; private set; }
         public int ControlsEmitted { get; private set; }
@@ -659,6 +727,12 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         {
             ScalpEvent e = new ScalpEvent();
             e.EtClose = b.EtClose; e.BarIndex = barIndex; e.Timeframe = TimeframeLabel;
+            e.EventId = MakeEventId(TimeframeLabel, b.EtClose);
+            e.IsWarmup = b.EtClose < TargetSampleStartEt;
+            // A sub-minute engine stamps the 1m parent bar its observation falls inside,
+            // which is what lets Phase-2 rows join back to the Phase-1 parent event.
+            e.ParentEventId = ParentTimeframeLabel == null ? ""
+                : MakeEventId(ParentTimeframeLabel, ParentBarCloseFor(b.EtClose));
             e.EventKind = t == null ? "CONTROL" : "STRUCTURE";
             e.Open = b.Open; e.High = b.High; e.Low = b.Low; e.Close = b.Close; e.Volume = b.Volume;
             e.RangePts = b.High - b.Low; e.BodyPts = Math.Abs(b.Close - b.Open);
@@ -868,6 +942,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         public static string CsvHeader()
         {
             StringBuilder sb = new StringBuilder();
+            sb.Append("eventId,parentEventId,isWarmup,");
             sb.Append("date,timeEt,timeframe,barIndex,eventKind,barDir,open,high,low,close,volume,");
             sb.Append("rangePts,bodyPts,bodyPctOfRange,upperWickPts,lowerWickPts,relVolume,atr,");
             sb.Append("levelName,levelPrice,distLevelPts,distLevelAtr,interaction,seqState,testNumberToday,");
@@ -896,6 +971,8 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
         {
             CultureInfo ci = CultureInfo.InvariantCulture;
             StringBuilder sb = new StringBuilder(600);
+            sb.Append(e.EventId).Append(',').Append(e.ParentEventId).Append(',')
+              .Append(e.IsWarmup ? "TRUE" : "FALSE").Append(',');
             sb.Append(e.EtClose.ToString("yyyy-MM-dd", ci)).Append(',')
               .Append(e.EtClose.ToString("HH:mm:ss", ci)).Append(',')
               .Append(e.Timeframe).Append(',').Append(e.BarIndex).Append(',')

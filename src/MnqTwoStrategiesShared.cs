@@ -925,6 +925,16 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
     // ======================================================================
     public enum ConfirmMarket { ES, YM }
 
+    /// Which stage of the research programme a run belongs to. This is not a label -
+    /// it decides which data series are loaded, because loading sub-minute and tick
+    /// history is what makes a multi-year capture expensive, and neither belongs in
+    /// signal discovery.
+    ///
+    ///   PHASE1_DISCOVERY  60m / 15m / 3m / 1m. Broad multi-year parent-behaviour search.
+    ///   PHASE2_EXECUTION  adds sub-minute, around frozen Phase-1 events only.
+    ///   PHASE3_TICK       adds 1-tick, for fill sequencing and slippage realism only.
+    public enum ResearchPhase { PHASE1_DISCOVERY, PHASE2_EXECUTION, PHASE3_TICK }
+
     public struct CrossMarketConfirm
     {
         public bool Confirmed;
