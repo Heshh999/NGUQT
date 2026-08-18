@@ -451,6 +451,42 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // ---- output routing -------------------------------------------------
 
+
+        /// Paths this RUN has already opened. Empty at the start of every run.
+        ///
+        /// Monthly rotation has to REOPEN a file it wrote earlier - rows are
+        /// emitted late, once their forward horizon elapses, so a month can be
+        /// revisited at a month boundary. That forced append mode, and append
+        /// mode meant re-running the same date range appended a second complete
+        /// copy of the data instead of replacing it.
+        ///
+        /// That is worse than it sounds. Duplicated rows do not look wrong: the
+        /// means and medians of a tripled file are identical to the original, so
+        /// nothing looks off, while every count triples and every standard error
+        /// shrinks by sqrt(3). A result at t=1.7 reads as t=2.9 purely because a
+        /// run was repeated. It happened on the first order-flow capture - three
+        /// identical copies of all 31,498 bars.
+        ///
+        /// Tracking paths per run fixes it without breaking rotation: the first
+        /// time a run touches a path it truncates, every reopen after that
+        /// appends. Re-running replaces; rotation still accumulates.
+        private readonly HashSet<string> pathsOpenedThisRun = new HashSet<string>();
+
+        /// Opens a monthly file, truncating it if this run has not written to it
+        /// before. Returns a writer positioned to append.
+        private StreamWriter OpenMonthly(string path, string header)
+        {
+            bool firstTouchThisRun = !pathsOpenedThisRun.Contains(path);
+            if (firstTouchThisRun) pathsOpenedThisRun.Add(path);
+            bool append = !firstTouchThisRun;
+            bool needHeader = firstTouchThisRun || !File.Exists(path);
+            StreamWriter w = new StreamWriter(path, append);
+            if (needHeader) w.WriteLine(header);
+            if (firstTouchThisRun && File.Exists(path))
+                PrintLine("  (replacing " + Path.GetFileName(path) + " from a previous run)");
+            return w;
+        }
+
         private void WriteStructRow(string row)
         {
             if (!MonthlyFiles) { if (structCsv != null) structCsv.WriteLine(row); return; }
@@ -459,9 +495,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (structCsv != null) { structCsv.Flush(); structCsv.Close(); }
                 string path = structStem + "_" + month + ".csv";
-                bool existed = File.Exists(path);
-                structCsv = new StreamWriter(path, true);
-                if (!existed) structCsv.WriteLine(V4ResearchEngine.StructureCsvHeader());
+                structCsv = OpenMonthly(path, V4ResearchEngine.StructureCsvHeader());
                 structMonth = month;
                 PrintLine("  V4 STRUCTURE: writing " + Path.GetFileName(path));
             }
@@ -476,9 +510,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (entryCsv != null) { entryCsv.Flush(); entryCsv.Close(); }
                 string path = entryStem + "_" + month + ".csv";
-                bool existed = File.Exists(path);
-                entryCsv = new StreamWriter(path, true);
-                if (!existed) entryCsv.WriteLine(V4ResearchEngine.EntryCsvHeader());
+                entryCsv = OpenMonthly(path, V4ResearchEngine.EntryCsvHeader());
                 entryMonth = month;
                 PrintLine("  V4 ENTRIES: writing " + Path.GetFileName(path));
             }

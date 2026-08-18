@@ -113,9 +113,30 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         /// bar is counted as a classification mismatch.
         public double VolumeTolerancePct = 1.0;
         /// Minutes between consecutive 1m bars beyond which a gap is recorded.
-        /// The CME index-futures daily halt is 17:00-18:00 ET and is expected;
-        /// anything else is missing data.
         public int GapMinutes = 2;
+
+        /// A gap that ENDS at the session open is a session boundary, not
+        /// missing data. This is deliberately expressed as a property of the
+        /// bar AFTER the gap rather than the bar before it.
+        ///
+        /// The first version of this check asked whether the bar BEFORE the gap
+        /// closed at 16:59 ET. NinjaTrader stamps a bar with its CLOSE time, so
+        /// the last bar before the daily halt is stamped 17:00, not 16:59 - the
+        /// test never fired, and every single normal trading day was counted as
+        /// missing data. On the first MNQ month that was 22 of 22 gaps reported
+        /// as data loss when the true figure was zero.
+        ///
+        /// Anchoring on the reopen also covers the weekend and the early closes
+        /// around holidays with one rule, instead of a holiday calendar that
+        /// would need maintaining and would be wrong the first year it wasn't.
+        public int SessionOpenHourEt = 18;
+        public int SessionOpenGraceMinutes = 5;
+
+        public bool IsSessionBoundary(DateTime barAfterGapEt)
+        {
+            return barAfterGapEt.Hour == SessionOpenHourEt
+                && barAfterGapEt.Minute <= SessionOpenGraceMinutes;
+        }
 
         // -- gate thresholds -------------------------------------------------
         public double MinLevelCoveragePct = 98.0;
@@ -132,8 +153,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             if (prevClose != DateTime.MinValue)
             {
                 double gap = (b.EtClose - prevClose).TotalMinutes;
-                bool expectedHalt = prevClose.Hour == 16 && prevClose.Minute >= 59;
-                if (gap > GapMinutes && !expectedHalt) BarsAfterGap++;
+                if (gap > GapMinutes && !IsSessionBoundary(b.EtClose)) BarsAfterGap++;
             }
             prevClose = b.EtClose;
 
@@ -199,7 +219,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             sb.AppendLine("  bars WITHOUT levels     " + BarsNoLevels.ToString(ci));
             sb.AppendLine("  bars with zero volume   " + BarsZeroVolume.ToString(ci));
             sb.AppendLine("  bars after a time gap   " + BarsAfterGap.ToString(ci)
-                          + "  (gap > " + GapMinutes.ToString(ci) + "m, excluding the 17:00 ET halt)");
+                          + "  (gap > " + GapMinutes.ToString(ci)
+                          + "m, excluding gaps that end at the "
+                          + SessionOpenHourEt.ToString(ci) + ":00 ET session open)");
             sb.AppendLine("Bid/ask classification");
             sb.AppendLine("  bars where |ask+bid - volume| > " + VolumeTolerancePct.ToString("0.##", ci) + "%   "
                           + BarsVolumeMismatch.ToString(ci) + "  (" + MismatchPct.ToString("0.00", ci) + "%)");
@@ -298,7 +320,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                 q = V4FlowQuality.VOLUME_MISMATCH;
             else if (prevClose != DateTime.MinValue
                      && (b.EtClose - prevClose).TotalMinutes > Audit.GapMinutes
-                     && !(prevClose.Hour == 16 && prevClose.Minute >= 59))
+                     && !Audit.IsSessionBoundary(b.EtClose))
                 q = V4FlowQuality.TIME_GAP;
 
             // ---- features computed from THIS bar only ----------------------

@@ -62,6 +62,7 @@ namespace MnqTwoTests
             CsvShape();
             HorizonsAcrossGaps();
             OrderFlow();
+            SessionBoundaries();
 
             Console.WriteLine();
             Console.WriteLine(string.Format("V4 ENGINES: {0} passed, {1} failed", passed, failed));
@@ -743,6 +744,57 @@ namespace MnqTwoTests
             grid.OnBar(og);
             Check(grid.Audit.BarsOffTickGrid == 1 && !grid.Audit.Passed,
                   "price levels off the instrument's tick grid fail the gate");
+        }
+
+        // ====================================================================
+        /// The daily halt and the weekend are not missing data.
+        ///
+        /// The first version of this check asked whether the bar BEFORE the gap
+        /// closed at 16:59 ET. NinjaTrader stamps a bar with its CLOSE time, so
+        /// the last bar before the halt is stamped 17:00 - the test never fired.
+        /// On the first real MNQ month it reported 22 gaps as missing data when
+        /// the true count was zero: every ordinary trading day, plus the
+        /// weekends, plus a holiday early close.
+        private static void SessionBoundaries()
+        {
+            // Each scenario gets its OWN engine. Sharing one would make the jump
+            // BETWEEN scenarios look like a gap and score the case it was meant
+            // to test - the fixture would be measuring itself.
+            Check(GapsFor(new DateTime(2026, 7, 1, 16, 59, 0),
+                          new DateTime(2026, 7, 1, 18, 0, 0)) == 0,
+                  "the 17:00-18:00 ET daily halt is a session boundary, not missing data");
+
+            Check(GapsFor(new DateTime(2026, 7, 3, 16, 59, 0),
+                          new DateTime(2026, 7, 5, 18, 0, 0)) == 0,
+                  "the weekend is a session boundary too");
+
+            Check(GapsFor(new DateTime(2026, 7, 3, 12, 59, 0),
+                          new DateTime(2026, 7, 5, 18, 0, 0)) == 0,
+                  "an early close before a holiday needs no calendar - the reopen identifies it");
+
+            Check(GapsFor(new DateTime(2026, 7, 6, 10, 0, 0),
+                          new DateTime(2026, 7, 6, 10, 30, 0)) == 1,
+                  "a 30-minute hole inside the session is still reported as missing data");
+
+            Check(GapsFor(new DateTime(2026, 7, 6, 10, 0, 0),
+                          new DateTime(2026, 7, 6, 10, 1, 0)) == 0,
+                  "consecutive bars are not a gap");
+
+            V4OrderFlowAudit a = new V4OrderFlowAudit();
+            Check(a.IsSessionBoundary(new DateTime(2026, 7, 6, 18, 0, 0))
+                  && a.IsSessionBoundary(new DateTime(2026, 7, 6, 18, 5, 0))
+                  && !a.IsSessionBoundary(new DateTime(2026, 7, 6, 19, 0, 0))
+                  && !a.IsSessionBoundary(new DateTime(2026, 7, 6, 17, 0, 0)),
+                  "the boundary test keys on the reopen hour, not on the bar before the gap");
+        }
+
+        /// Feeds exactly two bars to a fresh engine and returns the gap count.
+        private static long GapsFor(DateTime firstBarOpen, DateTime secondBarOpen)
+        {
+            V4OrderFlowEngine of = new V4OrderFlowEngine(delegate(string r) { });
+            of.OnBar(Foot(firstBarOpen, 100, 101, 99, 100, 10));
+            of.OnBar(Foot(secondBarOpen, 100, 101, 99, 100, 10));
+            return of.Audit.BarsAfterGap;
         }
 
         private static V4FootprintBar Foot(DateTime open, double o, double h, double l, double c, double v)
