@@ -192,6 +192,83 @@ namespace MnqTwoTests
                       "and its MFE reflects the forward rally: " + c0[mi]);
             }
 
+            // ================================================================
+            // THE CLASSIFIER MUST BE ABLE TO REACH EVERY VALUE IT DEFINES
+            //
+            // The side was previously chosen with b.Close, which made
+            // BREAK_CLOSE_THROUGH unreachable: ClassifyAgainstHigh is selected
+            // only when level > close, but it returns BROKE only when close >
+            // level. In a 3.5M-row capture the value never appeared once, and
+            // every genuine break was recorded as SWEEP_CLOSE_BACK - two
+            // opposite behaviours in one bucket at nearly 50/50.
+            // ================================================================
+            {
+                int levelIdx = Array.IndexOf(hdr, "interaction");
+                int nameIdx = Array.IndexOf(hdr, "levelName");
+                Func<double,double,double,double,List<string>> run =
+                    delegate(double o, double h, double l, double c)
+                    {
+                        List<string> rows = new List<string>();
+                        ScalpResearchEngine eng = new ScalpResearchEngine(Levels(), rows.Add);
+                        eng.TimeframeLabel = "1m";
+                        eng.ControlSampleRate = 0; eng.RoundNumberStep = 0;
+                        DateTime t = d.AddHours(9);
+                        for (int i = 0; i < 40; i++)
+                            eng.OnBar(B(t.AddMinutes(i), 20000, 20002, 19998, 20000, 100));
+                        eng.OnBar(B(t.AddMinutes(40), o, h, l, c, 500));
+                        for (int i = 41; i < 130; i++)
+                            eng.OnBar(B(t.AddMinutes(i), c, c + 2, c - 2, c, 100));
+                        eng.Finish();
+                        return rows;
+                    };
+                Func<List<string>,string,bool> has = delegate(List<string> rows, string want)
+                {
+                    foreach (string r in rows)
+                    {
+                        string[] c2 = r.Split(',');
+                        if (c2[levelIdx] == want) return true;
+                    }
+                    return false;
+                };
+
+                // opens BELOW a level, closes ABOVE it -> a break, not a sweep
+                List<string> up = run(20000, 20030, 19999, 20025);
+                Check(has(up, "BREAK_CLOSE_THROUGH"),
+                      "a bar opening below a level and closing above it is BREAK_CLOSE_THROUGH");
+                Check(!has(up, "SWEEP_CLOSE_BACK") || true, "(sweeps of other levels may co-exist)");
+
+                // opens ABOVE a level, closes BELOW it -> a break the other way
+                List<string> dn = run(20020, 20021, 19990, 19995);
+                Check(has(dn, "BREAK_CLOSE_THROUGH"),
+                      "and the mirror case, opening above and closing below, is also a break");
+
+                // wicks through and closes back on the SAME side -> a genuine sweep
+                List<string> sw = run(20000, 20030, 19999, 20001);
+                Check(has(sw, "SWEEP_CLOSE_BACK"),
+                      "a bar that wicks through and closes back on its original side is a SWEEP");
+                Check(!has(sw, "BREAK_CLOSE_THROUGH"),
+                      "and that same bar is NOT recorded as a break");
+
+                // the decisive regression guard: a break must never be filed as a sweep
+                bool breakFiledAsSweep = false;
+                foreach (string r in up)
+                {
+                    string[] c2 = r.Split(',');
+                    if (c2[levelIdx] == "SWEEP_CLOSE_BACK")
+                    {
+                        // for this fixture the bar opened at 20000 and closed at 20025,
+                        // so any level strictly between them was BROKEN, not swept
+                        int lp = Array.IndexOf(hdr, "levelPrice");
+                        double price;
+                        if (double.TryParse(c2[lp], System.Globalization.NumberStyles.Float,
+                                            System.Globalization.CultureInfo.InvariantCulture, out price)
+                            && price > 20000 && price < 20025) breakFiledAsSweep = true;
+                    }
+                }
+                Check(!breakFiledAsSweep,
+                      "no level crossed from open to close is ever filed as SWEEP_CLOSE_BACK");
+            }
+
             Console.WriteLine();
             Console.WriteLine(string.Format("SCALP ENGINE: {0} passed, {1} failed", passed, failed));
             return failed;

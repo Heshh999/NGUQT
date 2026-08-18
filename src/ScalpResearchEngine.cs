@@ -708,7 +708,19 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqTwo
             {
                 TrackedLevel t = kv.Value;
                 if (!t.UsableAt(b.EtOpen)) continue;
-                bool above = t.Price > b.Close;
+                // Which side of the level price STARTED on decides how the bar is read.
+                //
+                // This used to test against b.Close, which made BROKE_CLOSED_THROUGH
+                // impossible to reach: picking ClassifyAgainstHigh requires level > close,
+                // but that classifier only returns BROKE when close > level. The two
+                // conditions contradict, so in a 3.5M-row capture the value never once
+                // appeared - and every genuine break landed in SWEEP_CLOSE_BACK instead,
+                // which put two opposite behaviours in one bucket at nearly 50/50.
+                //
+                // The open is also the honest reference: it is the state the bar arrived
+                // into, and it is known at b.EtOpen, which is the cutoff every level in
+                // this book is already gated on.
+                bool above = t.Price > b.Open;
                 HtfSweepEvent ev = above
                     ? HigherTfStructure.ClassifyAgainstHigh(b.High, b.Close, t.Price, ApproachBandPoints)
                     : HigherTfStructure.ClassifyAgainstLow(b.Low, b.Close, t.Price, ApproachBandPoints);
