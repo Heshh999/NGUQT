@@ -196,6 +196,24 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
 
         private const int MaxHorizonMinutes = 240;
 
+        /// How long after the break a probe may still fill.
+        ///
+        /// Without a limit, a probe stays armed for the whole of the parent's
+        /// forward window, so a "break of a 3-minute swing" could be executed
+        /// four hours later - or, across a weekend gap, on the first bar of the
+        /// next session, dozens of hours after the structure it was supposed to
+        /// be trading. That is not an execution of the break by any reasonable
+        /// reading, and it also silently steals the probe's own measurement
+        /// window from it.
+        public int MaxEntryDelayMinutes = 60;
+
+        /// The parent event's total lifetime. It is the label horizon PLUS the
+        /// entry window, so that a probe filling at the very last permitted
+        /// minute still gets the full 240 minutes measured from ITS OWN entry
+        /// rather than from the break. Before this, a probe entering at minute 6
+        /// was measured for 234 minutes and its 240-minute column stayed empty.
+        private int EventBudgetMinutes { get { return MaxHorizonMinutes + MaxEntryDelayMinutes; } }
+
         // -- configuration ----------------------------------------------------
         public string Symbol = "MNQ";
         /// Inside this many ATR of a level counts as APPROACHED.
@@ -683,6 +701,17 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                 V4Event e = pending[i];
                 if (e.Complete || e.EventKind == "CONTROL") continue;
                 if (b.EtClose <= e.EtClose) continue;
+                // Past the entry window this break is no longer being executed,
+                // it is just being watched. Expire the probes rather than
+                // letting one fill on the far side of a session gap.
+                if ((b.EtClose - e.EtClose).TotalMinutes > MaxEntryDelayMinutes)
+                {
+                    for (int k = 0; k < e.Probes.Count; k++)
+                        if (e.Probes[k].State == V4ProbeState.ARMED
+                            || e.Probes[k].State == V4ProbeState.WAITING_RECLAIM)
+                            e.Probes[k].State = V4ProbeState.EXPIRED;
+                    continue;
+                }
                 double atr = e.TfAtr;
                 if (double.IsNaN(atr) || atr <= 0) continue;
 
@@ -772,10 +801,17 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                 for (int h = 0; h < HorizonMinutes.Length; h++)
                 {
                     if (mins <= HorizonMinutes[h])
-                    {
-                        e.MfeAtMin[h] = e.RunMfePts; e.MaeAtMin[h] = e.RunMaePts;
-                        if (mins == HorizonMinutes[h]) e.NetAtMin[h] = up ? b.Close - e.Close : e.Close - b.Close;
-                    }
+                    { e.MfeAtMin[h] = e.RunMfePts; e.MaeAtMin[h] = e.RunMaePts; }
+                    // Fill at the FIRST bar at or beyond the horizon, once.
+                    //
+                    // This used to require mins to equal the horizon exactly,
+                    // which quietly failed every time a session gap stepped the
+                    // minute counter straight over the mark - the 17:00 ET halt,
+                    // a weekend, a holiday. The hole that left was not random:
+                    // it concentrated on events near session boundaries, so the
+                    // column was both incomplete AND biased.
+                    if (double.IsNaN(e.NetAtMin[h]) && mins >= HorizonMinutes[h])
+                        e.NetAtMin[h] = up ? b.Close - e.Close : e.Close - b.Close;
                 }
 
                 // ---- continuation beyond the broken level --------------------
@@ -870,7 +906,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                     if (pf > p.RunMfePts) p.RunMfePts = pf;
                     if (pa > p.RunMaePts) p.RunMaePts = pa;
                     for (int h = 0; h < HorizonMinutes.Length; h++)
-                        if (p.MinutesObserved == HorizonMinutes[h])
+                        if (double.IsNaN(p.NetAtMin[h]) && p.MinutesObserved >= HorizonMinutes[h])
                             p.NetAtMin[h] = up ? b.Close - p.EntryPrice : p.EntryPrice - b.Close;
                     if (!double.IsNaN(p.StopPts) && p.StopPts > 0)
                     {
@@ -889,7 +925,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                     }
                 }
 
-                if (mins >= MaxHorizonMinutes) { Resolve(e); e.Complete = true; }
+                if (mins >= EventBudgetMinutes) { Resolve(e); e.Complete = true; }
             }
         }
 

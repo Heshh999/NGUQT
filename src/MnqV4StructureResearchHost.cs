@@ -219,6 +219,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0.0, 5.0)]
         [Display(Name = "At-location band (ATR)", GroupName = "04. Outcome definitions", Order = 7)]
         public double AtLocationAtr { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 240)]
+        [Display(Name = "Max entry delay (minutes)", GroupName = "04. Outcome definitions", Order = 8,
+                 Description = "How long after the break a candidate entry may still fill. Past this the probe expires.")]
+        public int MaxEntryDelayMinutes { get; set; }
         #endregion
 
         #region 05. Sampling window
@@ -283,6 +289,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AtrStopMultiple = 1.0;
                 TransitionBars = 2;
                 AtLocationAtr = 0.35;
+                MaxEntryDelayMinutes = 60;
 
                 ControlSampleRate = 400;
                 EmitStartMinutesEt = 0;
@@ -352,6 +359,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 engine.AtrStopMultiple = AtrStopMultiple;
                 engine.TransitionBars = TransitionBars;
                 engine.AtLocationAtr = AtLocationAtr;
+                engine.MaxEntryDelayMinutes = MaxEntryDelayMinutes;
                 engine.ControlSampleRate = ControlSampleRate;
                 engine.EmitStartMinutesEt = EmitStartMinutesEt;
                 engine.EmitEndMinutesEt = EmitEndMinutesEt;
@@ -495,6 +503,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                       + " ATR, displacement body>=" + DisplacementBodyAtr.ToString("0.##", CultureInfo.InvariantCulture)
                       + " ATR and close>=" + DisplacementCloseAtr.ToString("0.##", CultureInfo.InvariantCulture) + " ATR");
             PrintLine("  forward horizons      5/15/30/60/120/240 MINUTES, measured on the 1m series");
+            PrintLine("  entry window          " + MaxEntryDelayMinutes
+                      + " minutes after the break; each fill then gets its own full 240m");
             PrintLine("  control sample        1 in " + ControlSampleRate + " per timeframe, both directions"
                       + (ControlSampleRate <= 0 ? "  *** DISABLED - breaks will have nothing to be compared against ***" : ""));
             PrintLine("  emit window (ET min)  " + EmitStartMinutesEt + " to " + EmitEndMinutesEt);

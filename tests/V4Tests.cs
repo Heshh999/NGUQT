@@ -60,6 +60,7 @@ namespace MnqTwoTests
             EngineLabels();
             EntryProbes();
             CsvShape();
+            HorizonsAcrossGaps();
             OrderFlow();
 
             Console.WriteLine();
@@ -324,8 +325,9 @@ namespace MnqTwoTests
             Check(V4ResearchEngine.SnapshotCutoff(probe) < probe.EtClose,
                   "the cross-timeframe cutoff is strictly before the consuming bar's close");
 
-            // Feed the label clock and let one event resolve.
-            for (int i = 0; i <= 245; i++)
+            // Feed the label clock past the event budget (horizon + entry window)
+            // and let one event resolve.
+            for (int i = 0; i <= 320; i++)
                 eng.OnOneMinuteBar(B(s.AddMinutes(11 + i), 1, 119, 121, 118, 120));
             Check(rows.Count > 0, "an event is written once its 240-minute horizon has elapsed");
             Check(eng.BreaksEmitted > 0, "the staircase peak was recorded as a break");
@@ -571,6 +573,95 @@ namespace MnqTwoTests
                 seen[id] = 1;
             }
             Check(!dup, "event ids are unique within a capture");
+        }
+
+        // ====================================================================
+        /// Regression tests for two defects found on the first real MNQ capture.
+        ///
+        /// DEFECT 1  net_H was filled only when the elapsed minute count EQUALLED
+        ///           the horizon exactly. Any session gap - the 17:00 ET halt, a
+        ///           weekend, a holiday - stepped the counter straight over the
+        ///           mark and left the column empty. In a live month that emptied
+        ///           net_240m on 79% of entry rows, and the hole was concentrated
+        ///           near session boundaries, so it was biased as well as missing.
+        ///
+        /// DEFECT 2  A probe stayed armed for the parent's whole forward window,
+        ///           so an entry could fill on the far side of a weekend - one did
+        ///           so 3181 minutes after its break - and a probe that filled
+        ///           late had its own measurement window truncated to whatever
+        ///           the parent had left.
+        private static void HorizonsAcrossGaps()
+        {
+            List<string> srows = new List<string>(), erows = new List<string>();
+            V4ResearchEngine eng = new V4ResearchEngine(
+                delegate(string r) { srows.Add(r); }, delegate(string r) { erows.Add(r); });
+            eng.ControlSampleRate = 0;
+            eng.MaxEntryDelayMinutes = 60;
+            V4StructureTracker t = new V4StructureTracker("1m", 1);
+            t.ConfirmBars = 1; t.PivotLeftBars = 1; t.AtrPeriod = 5;
+            eng.AddTracker(t);
+
+            DateTime s = new DateTime(2026, 3, 2, 9, 30, 0);
+            double[] hi = { 100, 104, 112, 108, 106, 105, 104, 103, 102, 101, 120 };
+            double[] lo = { 95, 99, 107, 103, 101, 100, 99, 98, 97, 96, 100 };
+            double[] cl = { 99, 103, 111, 105, 103, 102, 101, 100, 99, 98, 119 };
+            for (int i = 0; i < hi.Length; i++)
+            {
+                V4Bar b = B(s.AddMinutes(i), 1, cl[i] - 1, hi[i], lo[i], cl[i]);
+                eng.OnStructureBar("1m", b); eng.OnOneMinuteBar(b);
+            }
+            // Ten minutes of trading, then a HOLE that jumps clean over every
+            // remaining horizon - exactly what a weekend does to the clock.
+            for (int i = 0; i < 10; i++)
+            {
+                V4Bar b = B(s.AddMinutes(11 + i), 1, 119 + i, 121 + i, 118 + i, 120 + i);
+                eng.OnStructureBar("1m", b); eng.OnOneMinuteBar(b);
+            }
+            for (int i = 0; i < 5; i++)
+            {
+                V4Bar b = B(s.AddMinutes(4000 + i), 1, 200, 202, 198, 201);
+                eng.OnStructureBar("1m", b); eng.OnOneMinuteBar(b);
+            }
+            eng.Finish();
+
+            string[] hdr = V4ResearchEngine.StructureCsvHeader().Split(',');
+            int iKind = Array.IndexOf(hdr, "eventKind");
+            int[] hcol = new int[V4ResearchEngine.HorizonMinutes.Length];
+            for (int i = 0; i < hcol.Length; i++)
+                hcol[i] = Array.IndexOf(hdr, "net_" + V4ResearchEngine.HorizonMinutes[i] + "m");
+
+            bool everyHorizonFilled = srows.Count > 0;
+            for (int r = 0; r < srows.Count; r++)
+            {
+                string[] c = srows[r].Split(',');
+                if (c[iKind] != "BREAK") continue;
+                for (int i = 0; i < hcol.Length; i++)
+                    if (c[hcol[i]].Length == 0) everyHorizonFilled = false;
+            }
+            Check(everyHorizonFilled,
+                  "every net_H column is filled even when a session gap steps over the horizon");
+
+            string[] ehdr = V4ResearchEngine.EntryCsvHeader().Split(',');
+            int iState = Array.IndexOf(ehdr, "probeState");
+            int iMins = Array.IndexOf(ehdr, "minsToEntry");
+            int iObs = Array.IndexOf(ehdr, "minutesObserved");
+            int iNet240 = Array.IndexOf(ehdr, "netR_240m");
+
+            bool noLateFill = true, fullWindow = erows.Count > 0, net240Filled = erows.Count > 0;
+            for (int r = 0; r < erows.Count; r++)
+            {
+                string[] c = erows[r].Split(',');
+                if (c[iState] != "TRIGGERED") continue;
+                if (Num(c[iMins]) > 60) noLateFill = false;
+                if (Num(c[iObs]) < 240) fullWindow = false;
+                if (c[iNet240].Length == 0) net240Filled = false;
+            }
+            Check(noLateFill,
+                  "no probe fills after the entry window, however long the gap that follows");
+            Check(fullWindow,
+                  "a probe that fills inside the window still gets its own full 240 minutes");
+            Check(net240Filled,
+                  "netR_240m is populated on every triggered probe, not only exact-minute ones");
         }
 
         // ====================================================================

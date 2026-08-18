@@ -62,6 +62,7 @@ not add them yourself.
 | Retest band (ATR) | 0.25 | |
 | Reversal distance (ATR) | 1.00 | |
 | Control sample rate | 400 | 1 in 400 non-break bars per timeframe, **both directions**. |
+| Max entry delay (minutes) | 60 | How long after the break a candidate entry may still fill. Past this the probe expires. Each fill then gets its own full 240-minute measurement window. |
 | Capture 1-minute break events | **OFF** | *"Do not search for a 1-minute pattern simply because 1-minute data exists."* 1m is loaded because it is the label clock; making it an event source too would swamp the file on count alone. Turn it on only to test the stated 15m→1m architecture. |
 | Emit from / to (ET minutes) | 0 / 1440 | Capture the whole session. **Do not pre-narrow to 09:30–11:00.** Whether that window is special is one of the questions; hard-coding it makes the answer unfalsifiable. Filter in analysis instead. |
 
@@ -163,6 +164,14 @@ to entry timeframes no coarser than the event's own.
 - `minsToEntry = 0` on a same-timeframe IMMEDIATE probe means the fill is the
   break bar's own close. That is the honest price for acting on the signal.
 - `netR_*`, `mfeR`, `maeR` are in R against that probe's own structural stop.
+- **`netR_*` does NOT apply the stop.** It is the raw forward return of the
+  position, whether or not the stop was hit first. On the first MNQ month, 86%
+  of triggered probes hit their structural stop, at a median of 9 minutes — so
+  a `netR_240m` of +6R on a trade stopped out at minute 48 is not a number
+  anyone could have collected. To get a realizable outcome, race `minsToStop`
+  against `minsTo_XR`: whichever is smaller happened first. Roughly 1% land in
+  the same minute and cannot be resolved at this resolution; count them rather
+  than assigning them a winner.
 - `slipFromBreakClosePts` is what waiting for the trigger cost or saved,
   relative to the break bar close.
 
