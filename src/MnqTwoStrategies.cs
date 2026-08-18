@@ -690,7 +690,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // ---- SUB-MINUTE series: PHASE 2 AND 3 ONLY ----
                 // Phase 1 refuses these even when the sub-minute toggle is on, and says
                 // so in the log rather than silently ignoring the setting.
-                if (ResearchSubMinute && (phase2 || phase3))
+                //
+                // The PHASE alone opens this door. It used to also require
+                // ResearchSubMinute, which is a parameter in the VECTOR research group -
+                // so selecting PHASE2_EXECUTION and disabling vector research, which is
+                // the correct combination for a scalp execution study, silently produced
+                // a capture with no sub-minute data in it at all. Loading sub-minute
+                // series IS what Phase 2 means; it does not need a second opt-in living
+                // under an unrelated feature.
+                if (phase2 || phase3)
                 {
                     AddDataSeries(BarsPeriodType.Second, 30); BipSec30 = next++;
                     // Phase 2 tests 30s FIRST. The finer series are only added once the
@@ -1417,7 +1425,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             for (int i = 0; i < bips.Length; i++)
             {
                 int b = bips[i];
-                if (b < 0) { PrintLine(string.Format("  {0,-6} NOT LOADED (phase {1})", names[i], ResearchPhaseParam)); continue; }
+                if (b < 0)
+                {
+                    // Say WHY, not just that it did not load. "NOT LOADED (phase X)"
+                    // blamed the phase even when the phase was correct and some other
+                    // switch was the thing that refused, which sent a Phase 2 run out
+                    // the door with no sub-minute data and a log that looked normal.
+                    string why;
+                    bool sub = names[i] == "30s" || names[i] == "15s"
+                            || names[i] == "10s" || names[i] == "5s";
+                    if (sub && ResearchPhaseParam == ResearchPhase.PHASE1_DISCOVERY)
+                        why = "phase PHASE1_DISCOVERY refuses sub-minute";
+                    else if (sub && !SubMinuteCompareAll && names[i] != "30s")
+                        why = "30s-first gate: turn on 'also load 15s/10s/5s' to add it";
+                    else if (names[i] == "1tick" && ResearchPhaseParam != ResearchPhase.PHASE3_TICK)
+                        why = "tick is PHASE3_TICK only";
+                    else if ((names[i] == "5m" || names[i] == "30m") && !ScalpContextTimeframes)
+                        why = "'Add 5m/30m/60m context structure' is off";
+                    else
+                        why = "not requested by this configuration";
+                    PrintLine(string.Format("  {0,-6} NOT LOADED - {1}", names[i], why));
+                    continue;
+                }
                 if (BarsArray.Length <= b || BarsArray[b] == null)
                 { PrintLine(string.Format("  {0,-6} *** SERIES MISSING ***", names[i])); continue; }
                 int cnt = BarsArray[b].Count;
