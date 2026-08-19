@@ -311,6 +311,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.DataLoaded)
             {
+                // A reused strategy instance must not remember which files the
+                // PREVIOUS run opened. IsInstantiatedOnEachOptimizationIteration
+                // is false, so NinjaTrader may hand the same object a second
+                // run - and the truncate-on-first-touch rule then sees every
+                // path as already touched and appends instead of replacing.
+                // That is exactly how a re-run produced two identical copies of
+                // every row. DataLoaded fires at the start of every run, so
+                // clearing here is what makes "this run" mean this run.
+                pathsOpenedThisRun.Clear();
                 try { etZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); }
                 catch (Exception)
                 {

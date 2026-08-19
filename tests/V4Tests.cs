@@ -63,6 +63,7 @@ namespace MnqTwoTests
             HorizonsAcrossGaps();
             OrderFlow();
             SessionBoundaries();
+            EntryWindowGuard();
 
             Console.WriteLine();
             Console.WriteLine(string.Format("V4 ENGINES: {0} passed, {1} failed", passed, failed));
@@ -786,6 +787,128 @@ namespace MnqTwoTests
                   && !a.IsSessionBoundary(new DateTime(2026, 7, 6, 19, 0, 0))
                   && !a.IsSessionBoundary(new DateTime(2026, 7, 6, 17, 0, 0)),
                   "the boundary test keys on the reopen hour, not on the bar before the gap");
+        }
+
+        // ====================================================================
+        /// A probe must never fill outside the entry window, whatever path the
+        /// fill arrives by.
+        ///
+        /// The caller-side expiry was correct and still ran, but it needed a bar
+        /// to arrive on some tracked timeframe between the event and the fill.
+        /// On a holiday half-day the market closes early and the next bar is the
+        /// Sunday reopen, so the first bar the probe saw after the event WAS the
+        /// fill candidate - and it filled, 3,446 minutes later, on a break from
+        /// the previous Friday morning. 6.8% of real fills were beyond the
+        /// window this way. The guard now sits inside the fill itself.
+        private static void EntryWindowGuard()
+        {
+            List<string> srows = new List<string>(), erows = new List<string>();
+            V4ResearchEngine eng = new V4ResearchEngine(
+                delegate(string r) { srows.Add(r); }, delegate(string r) { erows.Add(r); });
+            eng.ControlSampleRate = 0;
+            eng.MaxEntryDelayMinutes = 60;
+            V4StructureTracker t = new V4StructureTracker("1m", 1);
+            t.ConfirmBars = 1; t.PivotLeftBars = 1; t.AtrPeriod = 5;
+            eng.AddTracker(t);
+
+            DateTime s = new DateTime(2026, 4, 3, 9, 30, 0);   // a Friday
+            double[] hi = { 100, 104, 112, 108, 106, 105, 104, 103, 102, 101, 120 };
+            double[] lo = {  95,  99, 107, 103, 101, 100,  99,  98,  97,  96, 100 };
+            double[] cl = {  99, 103, 111, 105, 103, 102, 101, 100,  99,  98, 119 };
+            for (int i = 0; i < hi.Length; i++)
+            {
+                V4Bar b = B(s.AddMinutes(i), 1, cl[i] - 1, hi[i], lo[i], cl[i]);
+                eng.OnStructureBar("1m", b);
+                eng.OnOneMinuteBar(b);
+            }
+
+            // The market now closes early. The NEXT bar is the Sunday reopen,
+            // two and a half days later - and it closes beyond the broken level,
+            // so it is a fill candidate for every still-armed probe.
+            DateTime reopen = new DateTime(2026, 4, 5, 18, 1, 0);
+            for (int i = 0; i < 300; i++)
+            {
+                V4Bar b = B(reopen.AddMinutes(i), 1, 125 + i, 126 + i, 124 + i, 125 + i);
+                eng.OnStructureBar("1m", b);
+                eng.OnOneMinuteBar(b);
+            }
+            eng.Finish();
+
+            string[] hdr = V4ResearchEngine.EntryCsvHeader().Split(',');
+            int iState = Array.IndexOf(hdr, "probeState");
+            int iMins = Array.IndexOf(hdr, "minsToEntry");
+            int worst = -1, filled = 0;
+            for (int r = 0; r < erows.Count; r++)
+            {
+                string[] c = erows[r].Split(',');
+                if (c[iState] != "TRIGGERED") continue;
+                filled++;
+                int m = int.Parse(c[iMins]);
+                if (m > worst) worst = m;
+            }
+            Check(erows.Count > 0, "the holiday-gap fixture produced entry rows");
+            Check(worst <= 60,
+                  "no probe fills across a weekend gap - the entry window is enforced at the fill");
+            Check(filled == 0 || worst >= 0,
+                  "a fill that does happen still reports a sane delay");
+
+            // and the ordinary case still fills
+            Check(GapFillMinutes(30) == 30, "a fill 30 minutes after the break is allowed");
+            Check(GapFillMinutes(90) < 0, "a fill 90 minutes after the break is refused");
+        }
+
+        /// Builds a break, then offers the first fill candidate delayMin later.
+        /// Returns the delay actually recorded, or -1 if nothing filled.
+        private static int GapFillMinutes(int delayMin)
+        {
+            List<string> erows = new List<string>();
+            V4ResearchEngine eng = new V4ResearchEngine(
+                delegate(string r) { }, delegate(string r) { erows.Add(r); });
+            eng.ControlSampleRate = 0;
+            eng.MaxEntryDelayMinutes = 60;
+            V4StructureTracker t = new V4StructureTracker("1m", 1);
+            t.ConfirmBars = 1; t.PivotLeftBars = 1; t.AtrPeriod = 5;
+            eng.AddTracker(t);
+
+            DateTime s = new DateTime(2026, 4, 6, 9, 30, 0);
+            // The break bar WICKS through and closes back. A bar that closed
+            // beyond would fill the same-timeframe IMMEDIATE probe at its own
+            // close, minsToEntry 0, and the fixture could never observe a delay
+            // at all - it would be measuring the wrong thing and passing.
+            double[] hi = { 100, 104, 112, 108, 106, 105, 104, 103, 102, 101, 120 };
+            double[] lo = {  95,  99, 107, 103, 101, 100,  99,  98,  97,  96, 100 };
+            double[] cl = {  99, 103, 111, 105, 103, 102, 101, 100,  99,  98, 108 };
+            for (int i = 0; i < hi.Length; i++)
+            {
+                V4Bar b = B(s.AddMinutes(i), 1, cl[i] - 1, hi[i], lo[i], cl[i]);
+                eng.OnStructureBar("1m", b); eng.OnOneMinuteBar(b);
+            }
+            // sit below the level so nothing fills, then pop above it
+            for (int i = 0; i < delayMin - 1; i++)
+            {
+                V4Bar b = B(s.AddMinutes(11 + i), 1, 108, 109, 107, 108);
+                eng.OnStructureBar("1m", b); eng.OnOneMinuteBar(b);
+            }
+            for (int i = 0; i < 300; i++)
+            {
+                V4Bar b = B(s.AddMinutes(11 + delayMin - 1 + i), 1, 125 + i, 126 + i, 124 + i, 125 + i);
+                eng.OnStructureBar("1m", b); eng.OnOneMinuteBar(b);
+            }
+            eng.Finish();
+
+            string[] hdr = V4ResearchEngine.EntryCsvHeader().Split(',');
+            int iState = Array.IndexOf(hdr, "probeState"), iMins = Array.IndexOf(hdr, "minsToEntry");
+            int iTrig = Array.IndexOf(hdr, "trigger");
+            for (int r = 0; r < erows.Count; r++)
+            {
+                string[] c = erows[r].Split(',');
+                if (c[iState] == "TRIGGERED" && c[iTrig] == "IMMEDIATE")
+                {
+                    int m = int.Parse(c[iMins]);
+                    if (m > 0) return m;
+                }
+            }
+            return -1;
         }
 
         /// Feeds exactly two bars to a fresh engine and returns the gap count.

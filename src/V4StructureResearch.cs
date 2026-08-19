@@ -753,8 +753,27 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             }
         }
 
+        /// Fills a probe, or refuses to.
+        ///
+        /// The window guard lives HERE, at the point where the mistake would
+        /// actually be made, not only in the caller that is supposed to expire
+        /// the probe first. The caller-side check was correct and still ran, but
+        /// it depended on a bar arriving on some tracked timeframe between the
+        /// event and the fill. On a holiday half-day the market closes early and
+        /// the next bar is the Sunday reopen, so the first thing the probe saw
+        /// after the event WAS the fill candidate - 3,446 minutes later, at
+        /// 18:01 on a Sunday, on a break that happened Friday morning. 6.8% of
+        /// filled probes were beyond the window this way.
+        ///
+        /// A guard the fill itself cannot get past is immune to call order,
+        /// session gaps and any future caller that forgets to check.
         private void FillProbe(V4Event e, V4EntryProbe p, V4Bar b)
         {
+            if ((b.EtClose - e.EtClose).TotalMinutes > MaxEntryDelayMinutes)
+            {
+                p.State = V4ProbeState.EXPIRED;
+                return;
+            }
             double atr = e.TfAtr;
             double buf = double.IsNaN(atr) || atr <= 0 ? 0 : StopBufferAtr * atr;
             p.State = V4ProbeState.TRIGGERED;
