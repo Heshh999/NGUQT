@@ -39,6 +39,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
@@ -47,63 +48,179 @@ using NinjaTrader.NinjaScript.Strategies.MnqV4;
 namespace NinjaTrader.NinjaScript.Strategies
 {
     /// Pulls per-price executed volume out of a NinjaTrader volumetric series
-    /// without compile-time knowledge of its types. Every failure mode returns
-    /// FALSE and is recorded as missing data rather than substituted for.
+    /// without compile-time knowledge of its types.
+    ///
+    /// WHY THIS IS METHOD-BASED
+    ///   The first version looked for a member called "Volumes" on the
+    ///   individual volumetric bar and expected a dictionary of price ->
+    ///   level. NinjaTrader does not expose one. VolumetricBarsType.Volumes is
+    ///   an ARRAY of bars, and each bar publishes its per-price figures through
+    ///   METHODS - GetAskVolumeForPrice(price), GetBidVolumeForPrice(price) -
+    ///   not through a public dictionary.
+    ///
+    ///   So the read found the array, indexed it correctly, got a real bar
+    ///   back, then asked it for a member that does not exist and quietly
+    ///   returned false. Every bar came out NO_LEVELS on a series that was
+    ///   genuinely volumetric, and because the failure was silent the audit
+    ///   blamed the data instead of the reader.
+    ///
+    ///   It now walks the bar's own price range a tick at a time and asks the
+    ///   documented methods, falling back to a dictionary member only if some
+    ///   NinjaTrader build happens to expose one.
+    ///
+    /// EVERY FAILURE IS NOW NAMED
+    ///   The old code had three paths that returned false without recording
+    ///   anything. That is what made this cost three full runs to diagnose.
+    ///   Each one now writes a reason, and the first failure captures the type
+    ///   name and its public members so the next mismatch is readable rather
+    ///   than guessed at.
     public class V4VolumetricReader
     {
         private bool resolved, failed;
         private object barsTypeObj;
-        private Array volumesArray;
+        private MethodInfo askMethod, bidMethod;
+        private bool methodsProbed;
         public string LastError = "";
+        public string Diagnostics = "";
 
-        /// Fill the per-price levels of bar barIndex from series bars. Returns
-        /// FALSE when the series is not volumetric or the bar has no levels.
-        public bool TryRead(object bars, int barIndex, V4FootprintBar into)
+        /// Hard cap on the ticks walked per bar. A 1-minute MNQ bar spans a few
+        /// hundred ticks at most; anything wilder means the range is wrong and
+        /// should not turn into a million-iteration loop.
+        public int MaxLevelsPerBar = 4000;
+
+        public bool TryRead(object bars, int barIndex, V4FootprintBar into, double tickSize)
         {
             if (failed) return false;
             try
             {
                 if (!resolved)
                 {
-                    if (bars == null) { failed = true; LastError = "series is null"; return false; }
+                    if (bars == null) { Fail("series is null"); return false; }
                     object bt = GetMember(bars, "BarsType");
-                    if (bt == null) { failed = true; LastError = "series has no BarsType"; return false; }
+                    if (bt == null) { Fail("series has no BarsType"); return false; }
                     barsTypeObj = bt;
                     resolved = true;
                 }
-                object vols = GetMember(barsTypeObj, "Volumes");
-                volumesArray = vols as Array;
+
+                Array volumesArray = GetMember(barsTypeObj, "Volumes") as Array;
                 if (volumesArray == null)
                 {
-                    failed = true;
-                    LastError = "BarsType has no Volumes array - the series is not Volumetric";
+                    Fail("BarsType has no Volumes array - the series is not Volumetric");
                     return false;
                 }
-                if (barIndex < 0 || barIndex >= volumesArray.Length) return false;
-                object vb = volumesArray.GetValue(barIndex);
-                if (vb == null) return false;
-
-                IDictionary levels = GetMember(vb, "Volumes") as IDictionary;
-                if (levels == null || levels.Count == 0) return false;
-
-                foreach (DictionaryEntry kv in levels)
+                if (barIndex < 0 || barIndex >= volumesArray.Length)
                 {
-                    V4FootprintLevel l = new V4FootprintLevel();
-                    l.Price = Convert.ToDouble(kv.Key, CultureInfo.InvariantCulture);
-                    object v = kv.Value;
-                    l.AskVolume = Num(v, "AskVolume");
-                    l.BidVolume = Num(v, "BidVolume");
-                    into.Levels.Add(l);
+                    LastError = "bar index " + barIndex + " outside Volumes array of "
+                              + volumesArray.Length + " - check Maximum bars look back is Infinite";
+                    return false;
                 }
-                into.HasLevels = into.Levels.Count > 0;
-                return into.HasLevels;
+                object vb = volumesArray.GetValue(barIndex);
+                if (vb == null) { LastError = "Volumes[" + barIndex + "] was null"; return false; }
+
+                if (!methodsProbed) ProbeMethods(vb);
+
+                if (askMethod != null && bidMethod != null && tickSize > 0)
+                    return ReadByPrice(vb, into, tickSize);
+
+                return ReadByDictionary(vb, into);
             }
             catch (Exception ex)
             {
-                failed = true;
-                LastError = ex.GetType().Name + ": " + ex.Message;
+                Fail(ex.GetType().Name + ": " + ex.Message);
                 return false;
             }
+        }
+
+        /// The documented path: ask the bar for each price in its own range.
+        private bool ReadByPrice(object vb, V4FootprintBar into, double tickSize)
+        {
+            if (double.IsNaN(into.Low) || double.IsNaN(into.High) || into.High < into.Low) return false;
+            int steps = (int)Math.Round((into.High - into.Low) / tickSize) + 1;
+            if (steps < 1 || steps > MaxLevelsPerBar)
+            {
+                LastError = "bar spans " + steps + " ticks, outside the sane range";
+                return false;
+            }
+            object[] arg = new object[1];
+            for (int i = 0; i < steps; i++)
+            {
+                double price = into.Low + i * tickSize;
+                arg[0] = price;
+                double ask = ToDouble(askMethod.Invoke(vb, arg));
+                double bid = ToDouble(bidMethod.Invoke(vb, arg));
+                if (ask == 0 && bid == 0) continue;      // nothing traded at this price
+                V4FootprintLevel l = new V4FootprintLevel();
+                l.Price = price; l.AskVolume = ask; l.BidVolume = bid;
+                into.Levels.Add(l);
+            }
+            into.HasLevels = into.Levels.Count > 0;
+            if (!into.HasLevels) LastError = "no traded price levels returned for a bar with volume";
+            return into.HasLevels;
+        }
+
+        /// Fallback for any build that does expose a price -> level map.
+        private bool ReadByDictionary(object vb, V4FootprintBar into)
+        {
+            string[] names = new string[] { "Volumes", "Levels", "PriceLevels" };
+            IDictionary levels = null;
+            for (int i = 0; i < names.Length && levels == null; i++)
+                levels = GetMember(vb, names[i]) as IDictionary;
+            if (levels == null || levels.Count == 0)
+            {
+                LastError = "volumetric bar exposes neither GetAskVolumeForPrice nor a price map";
+                return false;
+            }
+            foreach (DictionaryEntry kv in levels)
+            {
+                V4FootprintLevel l = new V4FootprintLevel();
+                l.Price = Convert.ToDouble(kv.Key, CultureInfo.InvariantCulture);
+                l.AskVolume = Num(kv.Value, "AskVolume");
+                l.BidVolume = Num(kv.Value, "BidVolume");
+                into.Levels.Add(l);
+            }
+            into.HasLevels = into.Levels.Count > 0;
+            return into.HasLevels;
+        }
+
+        /// Finds the per-price accessors once, and records what the type
+        /// actually offers so a future mismatch is diagnosable from the audit.
+        private void ProbeMethods(object vb)
+        {
+            methodsProbed = true;
+            Type t = vb.GetType();
+            askMethod = FindOne(t, new string[] { "GetAskVolumeForPrice", "GetAskVolume" });
+            bidMethod = FindOne(t, new string[] { "GetBidVolumeForPrice", "GetBidVolume" });
+
+            StringBuilder sb = new StringBuilder();
+            sb.Append("volumetric bar type: ").Append(t.FullName);
+            sb.Append("  ask accessor: ").Append(askMethod == null ? "NOT FOUND" : askMethod.Name);
+            sb.Append("  bid accessor: ").Append(bidMethod == null ? "NOT FOUND" : bidMethod.Name);
+            if (askMethod == null || bidMethod == null)
+            {
+                sb.Append(Environment.NewLine).Append("  members seen: ");
+                MemberInfo[] ms = t.GetMembers(BindingFlags.Public | BindingFlags.Instance);
+                for (int i = 0; i < ms.Length && i < 40; i++) sb.Append(ms[i].Name).Append(' ');
+            }
+            Diagnostics = sb.ToString();
+        }
+
+        private static MethodInfo FindOne(Type t, string[] names)
+        {
+            for (int i = 0; i < names.Length; i++)
+            {
+                MethodInfo m = t.GetMethod(names[i], new Type[] { typeof(double) });
+                if (m != null) return m;
+            }
+            return null;
+        }
+
+        private void Fail(string why) { failed = true; LastError = why; }
+
+        private static double ToDouble(object o)
+        {
+            if (o == null) return 0;
+            try { return Convert.ToDouble(o, CultureInfo.InvariantCulture); }
+            catch (Exception) { return 0; }
         }
 
         private static object GetMember(object o, string name)
@@ -116,13 +233,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             return f != null ? f.GetValue(o) : null;
         }
 
-        private static double Num(object o, string name)
-        {
-            object v = GetMember(o, name);
-            if (v == null) return 0;
-            try { return Convert.ToDouble(v, CultureInfo.InvariantCulture); }
-            catch (Exception) { return 0; }
-        }
+        private static double Num(object o, string name) { return ToDouble(GetMember(o, name)); }
     }
 
     public class MnqV4OrderFlowResearch : Strategy
@@ -309,7 +420,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             b.Close = Close[0]; b.Volume = Volume[0];
 
             barsSeen++;
-            if (reader.TryRead(BarsArray[0], CurrentBar, b)) barsWithLevels++;
+            if (reader.TryRead(BarsArray[0], CurrentBar, b, engine.TickSize)) barsWithLevels++;
 
             engine.OnBar(b);
         }
@@ -372,6 +483,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (engine == null) return;
             string report = engine.Audit.Report();
+            if (reader != null && reader.Diagnostics.Length > 0)
+                report += reader.Diagnostics + Environment.NewLine;
             if (reader != null && reader.LastError.Length > 0)
                 report += "Volumetric read error: " + reader.LastError + Environment.NewLine;
             report += "Rows written: " + engine.RowsEmitted.ToString(CultureInfo.InvariantCulture)
