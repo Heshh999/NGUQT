@@ -132,10 +132,36 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         public int SessionOpenHourEt = 18;
         public int SessionOpenGraceMinutes = 5;
 
+        /// CME equity index futures also pause 16:15-16:30 ET, every weekday,
+        /// separately from the 17:00-18:00 halt. The first version of this check
+        /// knew only about the 18:00 reopen, so the afternoon pause was reported
+        /// as data loss on essentially every trading day: on a real MNQ sample,
+        /// 436 gaps of exactly 16:15 -> 16:31, all of them scheduled.
+        public int MaintenanceHaltEndMinutesEt = 990;   // 16:30 ET
+
+        /// Below this many minutes, a gap is a minute in which nothing traded
+        /// rather than a minute that went missing.
+        ///
+        /// NinjaTrader does not print a bar for a minute with no volume, so in
+        /// thin overnight hours the series legitimately skips. Counting those as
+        /// missing data conflates "the market was quiet" with "the history is
+        /// broken", which are opposite conclusions about whether the data can be
+        /// trusted. They are now counted and reported separately.
+        public int ShortGapMinutes = 5;
+
+        /// Gaps that are quiet minutes rather than lost ones. Reported, but not
+        /// treated as a defect.
+        public long ShortNoTradeGaps;
+
+        /// TRUE when the bar AFTER a gap is the first bar of a scheduled
+        /// session, so the gap before it was scheduled too.
         public bool IsSessionBoundary(DateTime barAfterGapEt)
         {
-            return barAfterGapEt.Hour == SessionOpenHourEt
-                && barAfterGapEt.Minute <= SessionOpenGraceMinutes;
+            if (barAfterGapEt.Hour == SessionOpenHourEt
+                && barAfterGapEt.Minute <= SessionOpenGraceMinutes) return true;
+            int m = barAfterGapEt.Hour * 60 + barAfterGapEt.Minute;
+            return m > MaintenanceHaltEndMinutesEt
+                && m <= MaintenanceHaltEndMinutesEt + SessionOpenGraceMinutes;
         }
 
         // -- gate thresholds -------------------------------------------------
@@ -153,7 +179,11 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             if (prevClose != DateTime.MinValue)
             {
                 double gap = (b.EtClose - prevClose).TotalMinutes;
-                if (gap > GapMinutes && !IsSessionBoundary(b.EtClose)) BarsAfterGap++;
+                if (gap > GapMinutes && !IsSessionBoundary(b.EtClose))
+                {
+                    if (gap < ShortGapMinutes) ShortNoTradeGaps++;
+                    else BarsAfterGap++;
+                }
             }
             prevClose = b.EtClose;
 
@@ -218,10 +248,12 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                           + "  (" + LevelCoveragePct.ToString("0.00", ci) + "%)");
             sb.AppendLine("  bars WITHOUT levels     " + BarsNoLevels.ToString(ci));
             sb.AppendLine("  bars with zero volume   " + BarsZeroVolume.ToString(ci));
-            sb.AppendLine("  bars after a time gap   " + BarsAfterGap.ToString(ci)
-                          + "  (gap > " + GapMinutes.ToString(ci)
-                          + "m, excluding gaps that end at the "
-                          + SessionOpenHourEt.ToString(ci) + ":00 ET session open)");
+            sb.AppendLine("  unexplained gaps        " + BarsAfterGap.ToString(ci)
+                          + "  (>= " + ShortGapMinutes.ToString(ci)
+                          + "m, outside the 16:15-16:30 and 17:00-18:00 ET halts)");
+            sb.AppendLine("  quiet minutes (no trade)" + ShortNoTradeGaps.ToString(ci)
+                          + "  (< " + ShortGapMinutes.ToString(ci)
+                          + "m; NinjaTrader prints no bar when nothing trades)");
             sb.AppendLine("Bid/ask classification");
             sb.AppendLine("  bars where |ask+bid - volume| > " + VolumeTolerancePct.ToString("0.##", ci) + "%   "
                           + BarsVolumeMismatch.ToString(ci) + "  (" + MismatchPct.ToString("0.00", ci) + "%)");

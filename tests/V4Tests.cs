@@ -777,6 +777,24 @@ namespace MnqTwoTests
                           new DateTime(2026, 7, 6, 10, 30, 0)) == 1,
                   "a 30-minute hole inside the session is still reported as missing data");
 
+            // The CME equity-index afternoon pause, 16:15-16:30 ET. On real MNQ
+            // data this fires on essentially every weekday - 436 gaps of exactly
+            // 16:15 -> 16:31 in one sample - so failing to recognise it reported
+            // the whole history as broken.
+            Check(GapsFor(new DateTime(2026, 7, 6, 16, 14, 0),
+                          new DateTime(2026, 7, 6, 16, 30, 0)) == 0,
+                  "the 16:15-16:30 ET maintenance halt is a session boundary");
+
+            // A quiet overnight minute is not a missing one. NinjaTrader prints
+            // no bar when nothing trades, so a three-minute skip at 02:00 means
+            // the market was silent, not that the history lost anything.
+            Check(GapsFor(new DateTime(2026, 7, 7, 2, 0, 0),
+                          new DateTime(2026, 7, 7, 2, 3, 0)) == 0,
+                  "a sub-5-minute overnight skip is a quiet minute, not missing data");
+            Check(QuietFor(new DateTime(2026, 7, 7, 2, 0, 0),
+                           new DateTime(2026, 7, 7, 2, 3, 0)) == 1,
+                  "quiet minutes are still counted, just counted separately");
+
             Check(GapsFor(new DateTime(2026, 7, 6, 10, 0, 0),
                           new DateTime(2026, 7, 6, 10, 1, 0)) == 0,
                   "consecutive bars are not a gap");
@@ -909,6 +927,15 @@ namespace MnqTwoTests
                 }
             }
             return -1;
+        }
+
+        /// Quiet-minute count for the same two-bar fixture.
+        private static long QuietFor(DateTime a, DateTime b)
+        {
+            V4OrderFlowEngine of = new V4OrderFlowEngine(delegate(string r) { });
+            of.OnBar(Foot(a, 100, 101, 99, 100, 10));
+            of.OnBar(Foot(b, 100, 101, 99, 100, 10));
+            return of.Audit.ShortNoTradeGaps;
         }
 
         /// Feeds exactly two bars to a fresh engine and returns the gap count.
