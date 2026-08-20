@@ -1155,6 +1155,22 @@ namespace MnqTwoTests
             }
             string src = File.ReadAllText(host);
 
+            // Warm-up must be sized from the fans that are actually WRITTEN.
+            // It used to scan every tracked series and land on 4h - a fan is
+            // constructed for every series but only 15m/3m/5m are emitted, so
+            // the reported requirement was 576,000 1m bars (400 days) when
+            // the real one is 36,000 (25 days). A 16x overstatement pushes
+            // the official sample start a year late and discards warm rows.
+            Check(src.IndexOf("FanTimeframes") > 0,
+                  "the emitted fan timeframes are declared in ONE list");
+            Check(src.IndexOf("for (int i = 0; i < FanTimeframes.Length; i++)\n            {\n                if (!fans.ContainsKey(FanTimeframes[i])) continue;") > 0
+                  || src.IndexOf("if (!fans.ContainsKey(FanTimeframes[i])) continue;") > 0,
+                  "warm-up is sized from FanTimeframes, not from every tracked series");
+            int warmIdx = src.IndexOf("diag.RequiredWarmupBars1m");
+            Check(warmIdx > 0 && src.LastIndexOf("FanTimeframes", warmIdx) > 0
+                  && src.LastIndexOf("bipLabel", warmIdx) < src.LastIndexOf("FanTimeframes", warmIdx),
+                  "the warm-up loop reads FanTimeframes rather than the full series map");
+
             int assigns = Count(src, "AssignTargets(");
             Check(assigns >= 3,
                   "AssignTargets is declared and called from BOTH the probe and the "

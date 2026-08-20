@@ -392,6 +392,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        /// The timeframes whose EMA fan is written to the row, in column
+        /// order. Warm-up is sized from this list and nothing else.
+        private static readonly string[] FanTimeframes = new string[] { "15m", "3m", "5m" };
+
         private static int MinutesOf(string tf)
         {
             if (tf == "1d") return 1440;
@@ -445,18 +449,29 @@ namespace NinjaTrader.NinjaScript.Strategies
             diag.DepthAvailable = false;
             diag.SampleStartEt = sampleStartEt;
 
-            // EMA800 on the slowest series drives warm-up. V4Ema needs three
-            // periods before it reports a value, so 800 x 3 bars of the
-            // slowest fan timeframe is the real requirement.
+            // EMA800 on the slowest series THAT ACTUALLY CARRIES A FAN
+            // drives warm-up. V4Ema needs three periods before it reports a
+            // value, so 800 x 3 bars of that timeframe is the requirement.
+            //
+            // This used to scan every tracked series and land on 4h, which
+            // reported 576,000 1m bars - 400 days. A fan is CONSTRUCTED for
+            // every series but only 15m, 3m and 5m are ever EMITTED, so the
+            // 4h EMA800 was computed and thrown away while its warm-up cost
+            // was charged to the user. The real slowest emitted fan is 15m:
+            // 36,000 1m bars, 25 days. Overstating it by 16x pushes the
+            // official sample start a year later than it needs to be and
+            // discards rows that were fully warm.
             int slowest = 1;
-            foreach (KeyValuePair<int, string> kv in bipLabel)
+            for (int i = 0; i < FanTimeframes.Length; i++)
             {
-                int m = MinutesOf(kv.Value);
-                if (m != 1440 && m > slowest) slowest = m;
+                if (!fans.ContainsKey(FanTimeframes[i])) continue;
+                int m = MinutesOf(FanTimeframes[i]);
+                if (m > slowest) slowest = m;
             }
             diag.RequiredWarmupBars1m = 800 * 3 * slowest;
-            diag.WarmupReason = "EMA800 on the " + slowest + "m series needs 2400 completed bars ("
-                              + (800 * 3 * slowest / 1440) + " days) before it reports a value";
+            diag.WarmupReason = "EMA800 on the " + slowest + "m fan needs 2400 completed bars ("
+                              + (800 * 3 * slowest / 1440) + " days) before it reports a value."
+                              + " Per-row truth is f_ema800Ready_/f_emaFanState_, not this date.";
 
             foreach (KeyValuePair<int, string> kv in bipLabel)
             {
@@ -950,9 +965,14 @@ namespace NinjaTrader.NinjaScript.Strategies
              .F("vectorPushPoorProgress", poor);
 
             // EMA fans
-            V4RowBuilder.Fan(r, "15m", fans["15m"], b.Close, atr);
-            if (fans.ContainsKey("3m")) V4RowBuilder.Fan(r, "3m", fans["3m"], b.Close, atr);
-            if (fans.ContainsKey("5m")) V4RowBuilder.Fan(r, "5m", fans["5m"], b.Close, atr);
+            // FanTimeframes is the ONE list of emitted fans. The warm-up
+            // calculation reads the same list, so it can never again be
+            // sized off a series whose EMA no column reports.
+            for (int i = 0; i < FanTimeframes.Length; i++)
+            {
+                string ft = FanTimeframes[i];
+                if (fans.ContainsKey(ft)) V4RowBuilder.Fan(r, ft, fans[ft], b.Close, atr);
+            }
             r.F("ema9_1m", lastEma9_1m)
              .F("closeVsEma9_1m", V4Num.Ok(lastEma9_1m) ? (b.Close > lastEma9_1m ? 1 : -1) : 0);
 
