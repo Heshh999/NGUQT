@@ -264,9 +264,24 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
              .F("vectorBrokeStructure_" + tfTag, has && v.BrokeStructure)
              .F("vectorClosedBeyond_" + tfTag, has && v.ClosedBeyondStructure)
              .F("vectorWickedBeyond_" + tfTag, has && v.WickedBeyondStructure)
-             .F("vectorAgeMinutes_" + tfTag, has ? (int)(cutoff - v.CreatedEt).TotalMinutes : -1)
-             .F("unrecoveredVectorCount_" + tfTag, eng == null ? 0 : eng.UnrecoveredCount(cutoff))
-             .F("untouchedVectorCount_" + tfTag, eng == null ? 0 : eng.UntouchedCount(cutoff));
+             // Age of the MOST RECENT vector on this timeframe, whenever it
+             // formed - not of the current bar's vector, whose age is zero by
+             // construction. That mistake made this column report only -1 or 0
+             // on 15m across a whole sample.
+             .F("minutesSinceVector_" + tfTag, MinutesSinceVector(eng, cutoff))
+             .F("unrecoveredVectorCount_" + tfTag, eng == null ? 0 : eng.UnrecoveredCount(cutoff));
+        }
+
+
+        /// Minutes since the last vector of this timeframe became knowable,
+        /// or -1 when none has yet.
+        private static int MinutesSinceVector(V4VectorEngine eng, DateTime cutoff)
+        {
+            if (eng == null) return -1;
+            V4Vector last = eng.LatestKnownAt(cutoff);
+            if (last == null) return -1;
+            int m = (int)(cutoff - last.CreatedEt).TotalMinutes;
+            return m < 0 ? 0 : m;
         }
 
         /// Vector recovery is a LABEL: it needs bars after the vector formed.

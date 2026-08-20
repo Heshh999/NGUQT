@@ -518,7 +518,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         }
 
         /// The strict reading: created, knowable, and never touched at all.
-        /// Kept because it is a different and also meaningful question.
+        ///
+        /// NOT emitted to the schema. Measured across a 659-row sample it was
+        /// 0 on every single row, and structurally it always will be: a zone's
+        /// own edge is part of the price action, so the bar after creation
+        /// almost always grazes it and ends the untouched state. The query is
+        /// kept because it is correct; it is not a column because a constant
+        /// is not a feature.
         public int UntouchedCount(DateTime cutoffEt)
         {
             int n = 0;
