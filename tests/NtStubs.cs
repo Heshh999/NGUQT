@@ -154,12 +154,20 @@ namespace System.ComponentModel.DataAnnotations
         public string Description { get; set; }
         public int Order { get; set; }
     }
+    // Minimum and Maximum are STORED, matching the real DataAnnotations
+    // attribute. They used to be discarded, which made [Range] a no-op
+    // off-platform - and that is exactly how a [Range(1,20)] sitting on a
+    // property that defaults to 60 compiled clean, passed every test, and
+    // was then rejected by NinjaTrader at load time. A stub that accepts
+    // anything verifies nothing.
     [AttributeUsage(AttributeTargets.All, AllowMultiple = true)]
     public class RangeAttribute : Attribute
     {
-        public RangeAttribute(double min, double max) { }
-        public RangeAttribute(int min, int max) { }
-        public RangeAttribute(Type t, string min, string max) { }
+        public object Minimum { get; private set; }
+        public object Maximum { get; private set; }
+        public RangeAttribute(double min, double max) { Minimum = min; Maximum = max; }
+        public RangeAttribute(int min, int max) { Minimum = min; Maximum = max; }
+        public RangeAttribute(Type t, string min, string max) { Minimum = min; Maximum = max; }
     }
 }
 

@@ -154,7 +154,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int ControlSampleRate { get; set; }
 
         [NinjaScriptProperty]
-        [Range(1, 20)]
+        [Range(1, 480)]
         [Display(Name = "Thesis cluster window (minutes)", Order = 3, GroupName = "05 Entry probes",
                  Description = "Events on one timeframe and side inside this window share a ParentEventID.")]
         public int ThesisClusterMinutes { get; set; }
