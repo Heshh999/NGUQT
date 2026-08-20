@@ -1218,6 +1218,10 @@ namespace MnqTwoTests
                       && of.IndexOf("NoBarsExplanation") > 0,
                       "Finish() populates the diagnostic and states the cause when "
                       + "no bar ever arrived - the zero-bar run wrote PASS without this");
+                Check(of.IndexOf("if (!aborted && dataWasLoaded) Finish();") > 0,
+                      "Terminated only writes from an instance that LOADED DATA - "
+                      + "NT8's ghost defaults-probe instances wrote three zero-bar "
+                      + "FAILED audits after the real PASSED run without this");
             }
             Check(StripComments("a // EnterLong\nb").IndexOf("EnterLong") < 0,
                   "StripComments removes a line comment");

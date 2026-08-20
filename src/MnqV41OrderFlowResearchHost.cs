@@ -104,7 +104,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double sessionHigh = double.NaN, sessionLow = double.NaN;
         private DateTime detailUntilEt = DateTime.MinValue;
         private long rows, detailRows;
-        private bool aborted, diagPrinted;
+        private bool aborted, diagPrinted, dataWasLoaded;
         private string outDir = "";
         private DateTime firstEt = DateTime.MaxValue, lastEt = DateTime.MinValue;
         private readonly HashSet<int> profileDays = new HashSet<int>();
@@ -138,6 +138,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.DataLoaded)
             {
+                dataWasLoaded = true;
                 pathsOpenedThisRun.Clear();
                 rows = detailRows = 0;
                 cumDelta = prevCumDelta = 0;
@@ -168,7 +169,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Terminated)
             {
-                if (!aborted) Finish();
+                // Only an instance that actually LOADED DATA may write.
+                // NinjaTrader creates extra instances of a strategy - a
+                // defaults probe when the UI reads its properties - that go
+                // straight to Terminated without ever reaching DataLoaded.
+                // Without this guard every such ghost ran Finish() and wrote
+                // a zero-bar FAILED audit: the 9.5-month capture's output
+                // window shows THREE of them stacked after the real PASSED
+                // run, each one a clobber of the audit files had its blank
+                // working directory resolved to the output folder. A real
+                // run whose series loads zero bars still reaches DataLoaded,
+                // so the zero-bar explanation still fires where it should.
+                if (!aborted && dataWasLoaded) Finish();
             }
         }
 
