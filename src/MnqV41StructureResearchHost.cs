@@ -431,7 +431,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             diagPrinted = true;
             diag.Instrument = SymbolName();
             diag.MergePolicy = "back-adjusted continuous (assumed) - PSY / round-number family disabled";
-            diag.SessionTemplate = "CME US Index Futures RTH+ETH (as configured on the series)";
+            // The NT8 picker offers "CME US Index Futures RTH" and
+            // "...ETH". ETH is the full 24h session and is the one this
+            // engine's halt map assumes; there is no combined "RTH+ETH"
+            // entry, and printing one here sent a user looking for it.
+            diag.SessionTemplate = "CME US Index Futures ETH (the full 24h session, as configured on the series)";
             diag.TimeZone = etZone == null ? "LOCAL (ET zone NOT resolved - timestamps are local)" : etZone.Id;
             diag.PrimarySeries = "chart series, unused (BarsInProgress 0)";
             diag.FileTag = FileTag;
