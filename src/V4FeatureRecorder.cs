@@ -264,7 +264,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
              .F("vectorBrokeStructure_" + tfTag, has && v.BrokeStructure)
              .F("vectorClosedBeyond_" + tfTag, has && v.ClosedBeyondStructure)
              .F("vectorWickedBeyond_" + tfTag, has && v.WickedBeyondStructure)
-             .F("unrecoveredVectorCount_" + tfTag, eng == null ? 0 : eng.UnrecoveredCount(cutoff));
+             .F("vectorAgeMinutes_" + tfTag, has ? (int)(cutoff - v.CreatedEt).TotalMinutes : -1)
+             .F("unrecoveredVectorCount_" + tfTag, eng == null ? 0 : eng.UnrecoveredCount(cutoff))
+             .F("untouchedVectorCount_" + tfTag, eng == null ? 0 : eng.UntouchedCount(cutoff));
         }
 
         /// Vector recovery is a LABEL: it needs bars after the vector formed.

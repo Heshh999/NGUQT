@@ -338,7 +338,8 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         /// Order matters and is deliberate: existing vectors are advanced
         /// with this bar BEFORE the bar is classified, so a vector can
         /// never recover itself on the bar that created it.
-        public V4Vector OnBar(V4Bar b, double atr, V4Swing knownHigh, V4Swing knownLow)
+        public V4Vector OnBar(V4Bar b, double atr, V4Swing knownHigh, V4Swing knownLow,
+                              V4Swing priorHigh, V4Swing priorLow)
         {
             AdvanceRecovery(b);
 
@@ -359,7 +360,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             sameDirRun = (dir != V4VectorDir.NONE && dir == prevDir) ? sameDirRun + 1 : (dir == V4VectorDir.NONE ? 0 : 1);
             prevColor = lastColor; lastColor = c;
 
-            UpdateFormation(knownHigh, knownLow, atr, b);
+            UpdateFormation(knownHigh, knownLow, priorHigh, priorLow, atr, b);
 
             if (c == V4VectorColor.NONE) return null;
 
@@ -500,7 +501,25 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             return null;
         }
 
+        /// Zones still open - created, knowable, and not yet fully recovered.
+        ///
+        /// This deliberately matches what NearestUnrecoveredAbove/Below
+        /// iterate. The previous version used the STRICT never-touched
+        /// definition instead, and since AdvanceRecovery marks FIRST_TOUCH on
+        /// any bar that grazes the zone, the count was 0 on all 659 rows of
+        /// the first clean sample - which made H5, a Class A hypothesis about
+        /// unrecovered zones, untestable from the data it depended on.
         public int UnrecoveredCount(DateTime cutoffEt)
+        {
+            int n = 0;
+            for (int i = 0; i < live.Count; i++)
+                if (live[i].CreatedEt <= cutoffEt) n++;
+            return n;
+        }
+
+        /// The strict reading: created, knowable, and never touched at all.
+        /// Kept because it is a different and also meaningful question.
+        public int UntouchedCount(DateTime cutoffEt)
         {
             int n = 0;
             for (int i = 0; i < live.Count; i++)
@@ -557,74 +576,95 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
 
         // ---- W / M -----------------------------------------------------
 
-        /// Rebuild the formation state from the swings that are knowable
-        /// now. Deliberately re-derived each bar rather than carried
-        /// forward, so a formation can never survive on stale pivots.
-        private void UpdateFormation(V4Swing knownHigh, V4Swing knownLow, double atr, V4Bar b)
+        /// Rebuild the formation from the last THREE confirmed swings, every
+        /// bar, from scratch.
+        ///
+        /// The previous version was stateful and only re-seeded when the
+        /// formation was NONE or invalidated - so once an M was confirmed it
+        /// stuck forever. The first clean sample proved it: across 659 rows
+        /// spanning two months, formationStartEt and formationNeckline each
+        /// had exactly ONE distinct value, and no W was ever produced at all.
+        ///
+        /// Re-deriving from the swings themselves cannot get stuck, because
+        /// it carries no memory to get stuck in.
+        ///
+        ///   ends on a HIGH -> M candidate: priorHigh, latestLow, latestHigh
+        ///   ends on a LOW  -> W candidate: priorLow,  latestHigh, latestLow
+        ///
+        /// Break and retest DO need memory - they are about what price did
+        /// after the shape completed - so those are the only carried fields,
+        /// and they reset whenever the shape's own pivots change.
+        private void UpdateFormation(V4Swing knownHigh, V4Swing knownLow,
+                                     V4Swing priorHigh, V4Swing priorLow, double atr, V4Bar b)
         {
             if (!knownHigh.Valid || !knownLow.Valid || !V4Num.Ok(atr) || atr <= 0) return;
+
             double tol = EqualityTolAtr * atr;
+            bool endsOnHigh = knownHigh.KnownAtEt >= knownLow.KnownAtEt;
 
-            // Which came last tells us which shape can be complete.
-            bool highLast = knownHigh.KnownAtEt >= knownLow.KnownAtEt;
+            V4Formation type = V4Formation.NONE;
+            double first = double.NaN, mid = double.NaN, second = double.NaN;
+            DateTime startEt = DateTime.MinValue, secondEt = DateTime.MinValue;
+            bool secondConfirmed = false;
 
-            if (highLast)
+            if (endsOnHigh && priorHigh.Valid
+                && priorHigh.KnownAtEt <= knownLow.KnownAtEt
+                && knownLow.KnownAtEt <= knownHigh.KnownAtEt)
             {
-                // ... low -> high, candidate M needs an earlier high too.
-                if (Formation.Type == V4Formation.M && !Formation.SecondLegConfirmed
-                    && V4Num.Ok(Formation.FirstLegExtreme))
-                {
-                    if (knownHigh.Price <= Formation.FirstLegExtreme + tol)
-                    {
-                        Formation.SecondLegExtreme = knownHigh.Price;
-                        Formation.SecondLegConfirmed = true;
-                        Formation.SecondLegEt = knownHigh.KnownAtEt;
-                        Formation.Neckline = Formation.MiddlePivot;
-                    }
-                    else Formation.Invalidated = true;
-                }
-                else if (Formation.Type == V4Formation.NONE || Formation.Invalidated)
-                {
-                    Formation.Clear();
-                    Formation.Type = V4Formation.M;
-                    Formation.StartEt = knownHigh.KnownAtEt;
-                    Formation.FirstLegExtreme = knownHigh.Price;
-                    Formation.MiddlePivot = knownLow.Price;
-                }
+                type = V4Formation.M;
+                first = priorHigh.Price; mid = knownLow.Price; second = knownHigh.Price;
+                startEt = priorHigh.KnownAtEt; secondEt = knownHigh.KnownAtEt;
+                // the second high must not exceed the first by more than tolerance
+                secondConfirmed = second <= first + tol;
             }
-            else
+            else if (!endsOnHigh && priorLow.Valid
+                     && priorLow.KnownAtEt <= knownHigh.KnownAtEt
+                     && knownHigh.KnownAtEt <= knownLow.KnownAtEt)
             {
-                if (Formation.Type == V4Formation.W && !Formation.SecondLegConfirmed
-                    && V4Num.Ok(Formation.FirstLegExtreme))
-                {
-                    if (knownLow.Price >= Formation.FirstLegExtreme - tol)
-                    {
-                        Formation.SecondLegExtreme = knownLow.Price;
-                        Formation.SecondLegConfirmed = true;
-                        Formation.SecondLegEt = knownLow.KnownAtEt;
-                        Formation.Neckline = Formation.MiddlePivot;
-                    }
-                    else Formation.Invalidated = true;
-                }
-                else if (Formation.Type == V4Formation.NONE || Formation.Invalidated)
-                {
-                    Formation.Clear();
-                    Formation.Type = V4Formation.W;
-                    Formation.StartEt = knownLow.KnownAtEt;
-                    Formation.FirstLegExtreme = knownLow.Price;
-                    Formation.MiddlePivot = knownHigh.Price;
-                }
+                type = V4Formation.W;
+                first = priorLow.Price; mid = knownHigh.Price; second = knownLow.Price;
+                startEt = priorLow.KnownAtEt; secondEt = knownLow.KnownAtEt;
+                // the second low must not undercut the first by more than tolerance
+                secondConfirmed = second >= first - tol;
             }
 
-            if (Formation.SecondLegConfirmed && V4Num.Ok(Formation.Neckline) && !Formation.BreakConfirmed)
+            bool shapeChanged = Formation.Type != type
+                             || Formation.StartEt != startEt
+                             || Formation.SecondLegEt != secondEt;
+
+            if (shapeChanged)
             {
-                if (Formation.Type == V4Formation.W && b.Close > Formation.Neckline) Formation.BreakConfirmed = true;
-                if (Formation.Type == V4Formation.M && b.Close < Formation.Neckline) Formation.BreakConfirmed = true;
+                Formation.Clear();
+                Formation.Type = type;
+                Formation.StartEt = startEt;
+                Formation.FirstLegExtreme = first;
+                Formation.MiddlePivot = mid;
+                Formation.SecondLegExtreme = second;
+                Formation.SecondLegEt = secondEt;
+                Formation.SecondLegConfirmed = secondConfirmed;
+                Formation.Neckline = secondConfirmed ? mid : double.NaN;
+                Formation.Invalidated = (type != V4Formation.NONE) && !secondConfirmed;
             }
-            else if (Formation.BreakConfirmed && !Formation.RetestConfirmed && V4Num.Ok(Formation.Neckline))
+
+            if (Formation.Type == V4Formation.NONE) return;
+
+            // break and retest, judged from bars AFTER the shape completed
+            if (Formation.SecondLegConfirmed && V4Num.Ok(Formation.Neckline))
             {
-                if (Formation.Type == V4Formation.W && b.Low <= Formation.Neckline) Formation.RetestConfirmed = true;
-                if (Formation.Type == V4Formation.M && b.High >= Formation.Neckline) Formation.RetestConfirmed = true;
+                if (!Formation.BreakConfirmed)
+                {
+                    if (Formation.Type == V4Formation.W && b.Close > Formation.Neckline)
+                        Formation.BreakConfirmed = true;
+                    else if (Formation.Type == V4Formation.M && b.Close < Formation.Neckline)
+                        Formation.BreakConfirmed = true;
+                }
+                else if (!Formation.RetestConfirmed)
+                {
+                    if (Formation.Type == V4Formation.W && b.Low <= Formation.Neckline)
+                        Formation.RetestConfirmed = true;
+                    else if (Formation.Type == V4Formation.M && b.High >= Formation.Neckline)
+                        Formation.RetestConfirmed = true;
+                }
             }
 
             if (Formation.StartEt != DateTime.MinValue)

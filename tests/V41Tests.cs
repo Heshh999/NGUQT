@@ -66,6 +66,7 @@ namespace MnqTwoTests
             BreakTransition();
             TimestampConvention();
             AuditGuards();
+            SampleTwoFixes();
 
             Console.WriteLine("V4.1: " + passed + " passed, " + failed + " failed");
             return failed;
@@ -735,6 +736,111 @@ namespace MnqTwoTests
             b.EtClose = closeEt; b.EtOpen = closeEt.AddMinutes(-1);
             b.Open = b.High = b.Low = b.Close = 100; b.Volume = 100;
             return b;
+        }
+
+        // ---------------------------------------------------------------
+        // The six defects the 2-month sample exposed
+        // ---------------------------------------------------------------
+        private static void SampleTwoFixes()
+        {
+            Console.WriteLine(" 2-month sample fixes");
+            DateTime t0 = new DateTime(2019, 8, 15, 10, 0, 0);
+
+            // --- B: a race that reaches neither level is TIMEOUT ---------
+            V4ForwardLabels L = new V4ForwardLabels();
+            L.Stops.Freeze(1, 100, 4, 96, 92, 80);
+            L.RaceStop = V4StopKind.MEDIUM;
+            L.Open(1, 100, t0, 4, 99);
+            // 240 bars that never reach target or stop
+            for (int i = 1; i <= 240; i++)
+                L.OnBar(B(t0.AddMinutes(i - 1), 1, 100, 100.5, 99.5, 100), 100);
+            Check(L.WindowComplete, "the window completes after the last horizon");
+            Check(L.Races[0].Outcome == V4RaceOutcome.TIMEOUT,
+                  "a race reaching neither level is TIMEOUT, not UNRESOLVED");
+            bool anyUnresolved = false;
+            for (int i = 0; i < L.Races.Length; i++)
+                if (L.Races[i].Outcome == V4RaceOutcome.UNRESOLVED) anyUnresolved = true;
+            Check(!anyUnresolved, "NO race is left UNRESOLVED once the window has completed");
+
+            // --- F: the stop family must be ordered and non-degenerate ---
+            V4StopSet tiny = new V4StopSet();
+            tiny.Freeze(1, 100, 4, 99.75, 96, 80);       // tight = 0.25pt, one tick
+            Check(double.IsNaN(tiny.TightPts), "a quarter-point stop is refused, not emitted");
+            Check(tiny.BelowMinimumStop, "...and the row is flagged");
+            Check(V4Num.Ok(tiny.MediumPts), "the other family members survive");
+
+            V4StopSet unordered = new V4StopSet();
+            unordered.Freeze(1, 100, 4, 94, 92, 99);     // structural NEARER than tight
+            Check(V4Num.Ok(unordered.TightPts), "tight stop kept");
+            Check(double.IsNaN(unordered.StructuralPts),
+                  "a structural stop TIGHTER than the tight one is dropped, not reordered");
+            Check(unordered.FamilyOrderRepaired, "...and the row is flagged");
+
+            V4StopSet good = new V4StopSet();
+            good.Freeze(1, 100, 4, 96, 92, 80);
+            Check(good.TightPts <= good.MediumPts && good.MediumPts <= good.StructuralPts,
+                  "a well-formed family is left alone and stays ordered");
+            Check(!good.FamilyOrderRepaired && !good.BelowMinimumStop, "...and carries no flag");
+
+            // --- C: unrecovered count means OPEN zones -------------------
+            V4VectorEngine ve = new V4VectorEngine("MNQ", "15m", 15);
+            V4Swing none = new V4Swing();
+            // 11 quiet bars to build the volume baseline, then one climax bar
+            for (int i = 0; i < 11; i++)
+                ve.OnBar(B(t0.AddMinutes(i * 15), 15, 100, 101, 99, 100, 100), 4, none, none, none, none);
+            V4Vector made = ve.OnBar(B(t0.AddMinutes(165), 15, 100, 101, 90, 91, 500), 4, none, none, none, none);
+            Check(made != null, "a climax bar creates a vector");
+            DateTime after = t0.AddMinutes(200);
+            Check(ve.UnrecoveredCount(after) == 1,
+                  "an open zone counts as unrecovered even once price has grazed it");
+            Check(ve.UntouchedCount(after) == 1, "and as untouched while it truly is");
+
+            // one bar that grazes the zone: still OPEN, no longer untouched
+            ve.OnBar(B(t0.AddMinutes(180), 15, 91, 93, 90, 92, 100), 4, none, none, none, none);
+            Check(ve.UnrecoveredCount(t0.AddMinutes(400)) == 1,
+                  "a graze does NOT zero the unrecovered count - the old bug");
+            Check(ve.UntouchedCount(t0.AddMinutes(400)) == 0,
+                  "...but it does end the strict untouched state");
+
+            // --- A: ARCH-C must actually be able to differ from ARCH-B ---
+            int members = Enum.GetValues(typeof(V4LtfExecution)).Length;
+            Check(members == 3, "three declared executions: IMMEDIATE, PULLBACK, MICRO_BREAK");
+
+            // IMMEDIATE reproduces the collapse: ready on the very first bar
+            V4LtfExecutionGate imm = new V4LtfExecutionGate();
+            imm.Mode = V4LtfExecution.IMMEDIATE;
+            Check(imm.Ready(1, 101, 100, 4), "IMMEDIATE is ready on the first bar - the ARCH-B collapse");
+
+            // PULLBACK is NOT ready until price retraces off the best price
+            V4LtfExecutionGate pb = new V4LtfExecutionGate();
+            pb.Mode = V4LtfExecution.PULLBACK; pb.PullbackAtr = 0.5;   // 0.5 x ATR 4 = 2.0 pts
+            Check(!pb.Ready(1, 105, 104, 4), "PULLBACK is NOT ready on the first bar after confirmation");
+            Check(!pb.Ready(1, 107, 106, 4), "...nor while price keeps running away");
+            Check(!pb.Ready(1, 107, 105.5, 4), "...nor on a retrace of only 1.5 pts");
+            Check(pb.Ready(1, 106, 104.9, 4), "READY once price retraces 2.1 pts off the 107 high");
+            Check(pb.Armed, "...and the gate stays armed");
+            Check(pb.Ready(1, 106, 105.5, 4), "an armed gate stays ready on later bars");
+
+            // the short side mirrors
+            V4LtfExecutionGate pbs = new V4LtfExecutionGate();
+            pbs.Mode = V4LtfExecution.PULLBACK; pbs.PullbackAtr = 0.5;
+            Check(!pbs.Ready(-1, 100, 99, 4), "short PULLBACK not ready on the first bar");
+            Check(!pbs.Ready(-1, 98, 96, 4), "...nor while price runs down");
+            Check(pbs.Ready(-1, 98.2, 97, 4), "READY once price retraces 2.2 pts off the 96 low");
+
+            // MICRO_BREAK needs a prior bar to break
+            V4LtfExecutionGate mb = new V4LtfExecutionGate();
+            mb.Mode = V4LtfExecution.MICRO_BREAK;
+            Check(!mb.Ready(1, 101, 100, 4), "MICRO_BREAK cannot fire with no prior bar");
+            Check(!mb.Ready(1, 100.5, 99.5, 4), "...nor on a bar that fails to exceed the prior high");
+            Check(mb.Ready(1, 101.5, 100, 4), "READY on the bar that takes the prior high");
+
+            V4LtfExecutionGate r = new V4LtfExecutionGate();
+            r.Mode = V4LtfExecution.PULLBACK; r.PullbackAtr = 0.5;
+            r.Ready(1, 107, 106, 4); r.Ready(1, 106, 104, 4);
+            Check(r.Armed, "armed before reset");
+            r.Reset();
+            Check(!r.Armed, "Reset disarms - NinjaTrader reuses the instance across runs");
         }
     }
 }

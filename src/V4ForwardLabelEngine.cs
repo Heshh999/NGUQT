@@ -95,6 +95,18 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         /// P&L alone.
         public bool TargetReachedAfterTight, TargetReachedAfterMedium, TargetReachedAfterStructural;
 
+        /// Smallest stop the family will emit, in points. Below this an
+        /// R-multiple stops meaning anything: a 2-tick stop turns an ordinary
+        /// move into 20R. The first clean sample had 169 entries with a tight
+        /// stop under half a point and a maxMfeR reaching 27.9, which is the
+        /// same hazard that forced a retraction in earlier work when 1.13% of
+        /// bars carried a stop distance of exactly zero.
+        public double MinStopPts = 1.0;
+
+        /// Rows where the family came out unordered. Reported, not hidden.
+        public bool FamilyOrderRepaired;
+        public bool BelowMinimumStop;
+
         public void Freeze(int side, double entry, double atr,
                            double tightRef, double mediumRef, double structuralRef)
         {
@@ -102,6 +114,29 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             TightPts = Dist(side, entry, tightRef);
             MediumPts = Dist(side, entry, mediumRef);
             StructuralPts = Dist(side, entry, structuralRef);
+
+            // A stop nearer than MinStopPts is not a stop, it is a rounding
+            // error with an R-multiple attached.
+            if (V4Num.Ok(TightPts) && TightPts < MinStopPts) { TightPts = double.NaN; BelowMinimumStop = true; }
+            if (V4Num.Ok(MediumPts) && MediumPts < MinStopPts) { MediumPts = double.NaN; BelowMinimumStop = true; }
+            if (V4Num.Ok(StructuralPts) && StructuralPts < MinStopPts) { StructuralPts = double.NaN; BelowMinimumStop = true; }
+
+            // The family means tight <= medium <= structural. When the
+            // underlying references break that order the row is FLAGGED and
+            // the offending member dropped, never silently reordered - a
+            // "structural" stop tighter than the tight one is not a
+            // structural stop, it is a bad reference.
+            if (V4Num.Ok(TightPts) && V4Num.Ok(MediumPts) && MediumPts < TightPts)
+            { MediumPts = double.NaN; FamilyOrderRepaired = true; }
+            if (V4Num.Ok(TightPts) && V4Num.Ok(StructuralPts) && StructuralPts < TightPts)
+            { StructuralPts = double.NaN; FamilyOrderRepaired = true; }
+            if (V4Num.Ok(MediumPts) && V4Num.Ok(StructuralPts) && StructuralPts < MediumPts)
+            { StructuralPts = double.NaN; FamilyOrderRepaired = true; }
+
+            if (!V4Num.Ok(TightPts)) TightPrice = double.NaN;
+            if (!V4Num.Ok(MediumPts)) MediumPrice = double.NaN;
+            if (!V4Num.Ok(StructuralPts)) StructuralPrice = double.NaN;
+
             TightAtr = V4Num.SafeDiv(TightPts, atr, 1e-9);
             MediumAtr = V4Num.SafeDiv(MediumPts, atr, 1e-9);
             StructuralAtr = V4Num.SafeDiv(StructuralPts, atr, 1e-9);
@@ -244,10 +279,12 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
 
             if (barsSeen >= Horizons[Horizons.Length - 1])
             {
-                WindowComplete = true;
-                double denom = Stops.PtsFor(RaceStop);
-                MaxMfeR = V4Num.SafeDiv(MaxMfePts, denom, 1e-9);
-                MaxMaeR = V4Num.SafeDiv(MaxMaePts, denom, 1e-9);
+                // A race that reached neither level inside the window is a
+                // TIMEOUT - a real outcome. Leaving it UNRESOLVED reads as
+                // "the engine did not finish", which is a different claim and
+                // a false one: 55 rows in the first clean sample carried
+                // windowComplete=TRUE beside an UNRESOLVED race.
+                CloseWindow();
             }
         }
 

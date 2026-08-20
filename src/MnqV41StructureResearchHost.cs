@@ -154,6 +154,17 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int ControlSampleRate { get; set; }
 
         [NinjaScriptProperty]
+        [Display(Name = "ARCH-C 1m execution", Order = 4, GroupName = "05 Entry probes",
+                 Description = "How the 1m layer executes after the 3m layer confirms. IMMEDIATE makes ARCH-C identical to ARCH-B - it is kept only to reproduce the old behaviour.")]
+        public V4LtfExecution LtfExecution { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0.05, 3.0)]
+        [Display(Name = "ARCH-C pullback (ATR)", Order = 5, GroupName = "05 Entry probes",
+                 Description = "Retrace off the best price since confirmation that arms a PULLBACK execution.")]
+        public double PullbackAtr { get; set; }
+
+        [NinjaScriptProperty]
         [Range(1, 480)]
         [Display(Name = "Thesis cluster window (minutes)", Order = 3, GroupName = "05 Entry probes",
                  Description = "Events on one timeframe and side inside this window share a ParentEventID.")]
@@ -231,6 +242,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             public bool Triggered;
             public bool NeedsConfirm;              // ARCH-C: 3m confirm before 1m execution
             public bool Confirmed;
+            public readonly V4LtfExecutionGate Gate = new V4LtfExecutionGate();
+            public bool PullbackArmed { get { return Gate.Armed; } }
             public DateTime EntryEt = DateTime.MinValue;
             public double EntryPrice = double.NaN;
             public int MinsToEntry = -1;
@@ -284,6 +297,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MaxEntryDelayMinutes = 60;
                 ControlSampleRate = 400;
                 ThesisClusterMinutes = 60;
+                LtfExecution = V4LtfExecution.PULLBACK;
+                PullbackAtr = 0.35;
             }
             else if (State == State.Configure)
             {
@@ -520,7 +535,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             DateTime cutoff = V4ResearchEngine.SnapshotCutoff(b);
             V4Swing kh = t.SwingHighKnownAt(cutoff);
             V4Swing kl = t.SwingLowKnownAt(cutoff);
-            V4Vector v = vectors[tf].OnBar(b, atr, kh, kl);
+            V4Swing ph = t.PriorSwingHighKnownAt(cutoff);
+            V4Swing pl = t.PriorSwingLowKnownAt(cutoff);
+            V4Vector v = vectors[tf].OnBar(b, atr, kh, kl, ph, pl);
             if (tf == "15m") audit.NoteVector(v == null ? V4VectorColor.NONE : v.Color);
 
             if (bip == Bip1m) On1mBar(b, atr);
@@ -589,6 +606,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (b.EtClose <= p.EventEt) continue;
                 if (p.EntryTf != "1m") continue;
                 if (p.NeedsConfirm && !p.Confirmed) continue;
+                // ARCH-A has no 3m layer and enters immediately by definition,
+                // so only the confirm-carrying probes consult the gate.
+                if (p.NeedsConfirm && !p.Gate.Ready(p.Side, b.High, b.Low, atr1m)) continue;
                 if (TryTrigger(p, b, atr1m)) { pending.RemoveAt(i); openProbes.Add(p); }
             }
 
@@ -758,9 +778,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             p.TriggerLevel = triggerLevel; p.AtrAtEvent = atr;
             p.ParentVectorId = parentVectorId; p.EventKind = kind;
             p.NeedsConfirm = needsConfirm; p.Confirmed = !needsConfirm;
+            p.Gate.Mode = LtfExecution; p.Gate.PullbackAtr = PullbackAtr;
             p.Flags = flags;
             pending.Add(p);
         }
+
 
         /// A probe triggers on the first 1m close in the event's direction.
         /// Stops and targets are frozen HERE, at the entry instant, from
@@ -867,8 +889,16 @@ namespace NinjaTrader.NinjaScript.Strategies
              .F("tfPosInRange", t.PosInRangeKnownAt(cutoff, b.Close));
 
             V4RowBuilder.Vector(r, "15m", v, vectors["15m"], cutoff);
+            // The 3m vector is reported ONLY when it formed inside this 15m
+            // bar. LatestKnownAt returns the most recent 3m vector whenever it
+            // happened, which is never null once the run is warm - so
+            // f_isVector_3m came back TRUE on every one of the 659 rows in the
+            // first clean sample. A column that is always true is not a
+            // feature, it is a constant with a misleading name.
             V4VectorEngine ve3 = vectors.ContainsKey("3m") ? vectors["3m"] : null;
-            V4RowBuilder.Vector(r, "3m", ve3 == null ? null : ve3.LatestKnownAt(cutoff), ve3, cutoff);
+            V4Vector v3 = ve3 == null ? null : ve3.LatestKnownAt(cutoff);
+            if (v3 != null && v3.CreatedEt <= b.EtOpen) v3 = null;
+            V4RowBuilder.Vector(r, "3m", v3, ve3, cutoff);
             V4RowBuilder.VectorRecoveryLabels(r, "15m", v);
 
             // W / M formation
@@ -987,6 +1017,8 @@ namespace NinjaTrader.NinjaScript.Strategies
              .F("architecture", p.Architecture)
              .F("entryTf", p.EntryTf)
              .F("trigger", p.Trigger)
+             .F("ltfExecution", p.NeedsConfirm ? LtfExecution.ToString() : "N/A")
+             .F("pullbackArmed", p.PullbackArmed)
              .F("eventKind", p.EventKind)
              .F("side", p.Side)
              .F("eventEt", p.EventEt)

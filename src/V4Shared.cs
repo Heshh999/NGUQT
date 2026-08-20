@@ -505,4 +505,89 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             etClose = stampEt.AddMinutes(minutesPerBar);
         }
     }
+
+    // ------------------------------------------------------------------
+    // LOWER-TIMEFRAME EXECUTION FAMILY
+    // ------------------------------------------------------------------
+
+    /// How ARCH-C's 1-minute layer executes AFTER the 3-minute layer has
+    /// confirmed the setup.
+    ///
+    /// This is a declared family rather than a fixed rule because the build
+    /// prompt specifies "15m event -> 3m setup/confirmation -> 1m execution"
+    /// without saying what the 1m trigger is. Guessing one silently is
+    /// exactly what the project's standing rule forbids.
+    ///
+    /// It matters, and the first clean sample showed why. With IMMEDIATE,
+    /// the 3m confirmation and the 1m trigger are the SAME test - a close
+    /// beyond the event close - and a 3m bar closing at time T contains a 1m
+    /// bar closing at T with the identical close. So ARCH-C fired at the same
+    /// instant as ARCH-B on 99.4% of events, at the same price on 99.6%.
+    /// Three architectures, two of them one architecture.
+    public enum V4LtfExecution
+    {
+        /// Enter on the first 1m close beyond the event close. Reproduces the
+        /// collapse above - kept only so the old behaviour is reachable.
+        IMMEDIATE,
+
+        /// Wait for a retrace of at least PullbackAtr x ATR back off the best
+        /// price seen since confirmation, THEN enter on the first 1m close in
+        /// the event's direction. Gives the 1m layer a real job: a better
+        /// price, at the risk of never filling.
+        PULLBACK,
+
+        /// Enter on the first 1m bar that exceeds the PREVIOUS 1m bar's
+        /// extreme in the event's direction - a micro break of structure.
+        MICRO_BREAK
+    }
+
+    /// The ARCH-C 1m execution gate, extracted so it can be tested.
+    ///
+    /// Left inline in the host it would be exactly as unverifiable as the
+    /// bar-timestamp convention was - and that one shipped broken twice.
+    public class V4LtfExecutionGate
+    {
+        public V4LtfExecution Mode = V4LtfExecution.PULLBACK;
+        public double PullbackAtr = 0.35;
+
+        private double best = double.NaN;
+        private double prevHigh = double.NaN, prevLow = double.NaN;
+        private bool armed;
+
+        public bool Armed { get { return armed; } }
+        public double BestSinceConfirm { get { return best; } }
+
+        public void Reset() { best = prevHigh = prevLow = double.NaN; armed = false; }
+
+        /// Returns true when the 1m layer may execute on THIS bar.
+        /// Call once per completed 1m bar, in order, only after the 3m layer
+        /// has confirmed.
+        public bool Ready(int side, double barHigh, double barLow, double atr)
+        {
+            bool ok;
+            if (Mode == V4LtfExecution.IMMEDIATE) ok = true;
+            else if (Mode == V4LtfExecution.MICRO_BREAK)
+            {
+                ok = V4Num.Ok(prevHigh) && V4Num.Ok(prevLow)
+                     && (side > 0 ? barHigh > prevHigh : barLow < prevLow);
+            }
+            else
+            {
+                if (armed) ok = true;
+                else if (!V4Num.Ok(best) || !V4Num.Ok(atr) || atr <= 0) ok = false;
+                else
+                {
+                    double retrace = side > 0 ? best - barLow : barHigh - best;
+                    if (retrace >= PullbackAtr * atr) { armed = true; ok = true; }
+                    else ok = false;
+                }
+            }
+
+            prevHigh = barHigh; prevLow = barLow;
+            double b = side > 0 ? barHigh : barLow;
+            if (!V4Num.Ok(best)) best = b;
+            else if (side > 0 ? b > best : b < best) best = b;
+            return ok;
+        }
+    }
 }
