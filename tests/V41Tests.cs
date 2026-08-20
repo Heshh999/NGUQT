@@ -23,6 +23,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using NinjaTrader.NinjaScript.Strategies.MnqV4;
 
 namespace MnqTwoTests
@@ -67,6 +68,8 @@ namespace MnqTwoTests
             TimestampConvention();
             AuditGuards();
             SampleTwoFixes();
+            SampleThreeFixes();
+            SourceScan();
 
             Console.WriteLine("V4.1: " + passed + " passed, " + failed + " failed");
             return failed;
@@ -842,5 +845,320 @@ namespace MnqTwoTests
             r.Reset();
             Check(!r.Armed, "Reset disarms - NinjaTrader reuses the instance across runs");
         }
+
+        // ---------------------------------------------------------------
+        // SAMPLE THREE - the two families of DEAD LABEL the third clean
+        // 659-row structure sample exposed.
+        //
+        // A y_ column that carries the same value on every row of a sample
+        // is not a weak label, it is an absent one, and it is invisible in
+        // an audit that only counts rows and checks causality. 21 of the
+        // 117 structure labels were constant. Two mechanisms produced them.
+        // ---------------------------------------------------------------
+        private static void SampleThreeFixes()
+        {
+            Console.WriteLine(" [sample three: dead labels]");
+
+            // -----------------------------------------------------------
+            // DEFECT 1: vector recovery read at the vector's own bar.
+            //
+            // VectorRecoveryLabels was called while building the FEATURE
+            // row, i.e. on the bar the vector formed. A vector cannot have
+            // retraced into itself on the bar that created it, so the six
+            // recovery labels were pinned: UNRECOVERED on all 285 vector
+            // rows, pct 0 on all 285, firstTouchEt blank on all 659,
+            // barsTo25/50/100 all -1, both trap flags all FALSE.
+            //
+            // This test pins the DIFFERENCE between the two read points on
+            // one and the same vector object, which is what makes it a
+            // regression test rather than a restatement.
+            // -----------------------------------------------------------
+            DateTime t0 = new DateTime(2019, 7, 1, 10, 0, 0);
+            V4Vector v = new V4Vector();
+            v.VectorId = "V-1";
+            v.CreatedEt = t0;
+            v.Color = V4VectorColor.RED; v.Dir = V4VectorDir.BEARISH;
+            v.High = 112; v.Low = 100; v.BodyHigh = 111; v.BodyLow = 101;
+            v.AtrAtCreation = 4;
+
+            // read at the event, exactly as the defective call site did
+            V4Row atEvent = new V4Row(t0);
+            V4RowBuilder.VectorRecoveryLabels(atEvent, "15m", v);
+            Check(Val(atEvent, "y_vectorRecovery_15m") == "UNRECOVERED",
+                  "at the vector's own bar recovery reads UNRECOVERED - the defect");
+            Check(Val(atEvent, "y_vectorRecoveryPct_15m") == "0",
+                  "...and recoveryPct reads 0");
+            Check(Val(atEvent, "y_vectorBarsTo50_15m") == "-1",
+                  "...and barsTo50 reads -1");
+            Check(Val(atEvent, "y_vectorTrapCandidate_15m") == "FALSE",
+                  "...and trapCandidate reads FALSE");
+
+            // now let the window elapse on the SAME object
+            v.ApplyLaterBar(B(t0, 15, 101, 104, 100.5, 103), 1);
+            v.ApplyLaterBar(B(t0.AddMinutes(15), 15, 103, 107, 102, 106.5), 2);
+
+            V4Row atClose = new V4Row(t0);
+            V4RowBuilder.VectorRecoveryLabels(atClose, "15m", v);
+            Check(Val(atClose, "y_vectorRecovery_15m") != "UNRECOVERED",
+                  "read at window close the SAME vector is no longer UNRECOVERED");
+            Check(Val(atClose, "y_vectorRecoveryPct_15m") != "0",
+                  "...recoveryPct has moved off zero");
+            Check(Val(atClose, "y_vectorBarsTo50_15m") == "2",
+                  "...barsTo50 records the bar the midpoint was reached");
+            Check(Val(atClose, "y_vectorFirstTouchEt_15m") != "",
+                  "...firstTouchEt is stamped");
+            Check(Val(atEvent, "y_vectorRecovery_15m") != Val(atClose, "y_vectorRecovery_15m"),
+                  "the two read points DISAGREE - which is the whole defect");
+
+            // the column names must not change: nine labels, all y_ prefixed
+            int recCols = 0;
+            for (int i = 0; i < atClose.Count; i++)
+                if (atClose.NameAt(i).StartsWith("y_vector")) recCols++;
+            Check(recCols == 9, "VectorRecoveryLabels emits nine y_ columns");
+
+            // a null vector must still emit the full block so the header is
+            // established on the very first row, vector or not
+            V4Row none = new V4Row(t0);
+            V4RowBuilder.VectorRecoveryLabels(none, "15m", null);
+            Check(none.Count == atClose.Count,
+                  "a non-vector row emits the same nine columns, blank");
+
+            // -----------------------------------------------------------
+            // The assembly itself, driven end to end. This is the test that
+            // was MISSING: the two above exercise V4RowBuilder, and they
+            // passed just as happily while the host called the recovery
+            // block from the frozen feature half. V4OpenEvent was lifted out
+            // of the NinjaScript host precisely so the wiring is reachable.
+            // -----------------------------------------------------------
+            V4Vector ev = new V4Vector();
+            ev.VectorId = "V-2"; ev.CreatedEt = t0;
+            ev.Color = V4VectorColor.RED; ev.Dir = V4VectorDir.BEARISH;
+            ev.High = 112; ev.Low = 100; ev.BodyHigh = 111; ev.BodyLow = 101;
+            ev.AtrAtCreation = 4;
+
+            V4Row feat = new V4Row(t0);
+            feat.Key("eventId", "E-1").F("side", -1).F("isVector_15m", true);
+
+            V4OpenEvent oe = new V4OpenEvent();
+            oe.Freeze(feat, t0);
+            oe.EventVector = ev;
+            oe.VectorTfTag = "15m";
+
+            string frozen = oe.FeatureCsv;
+            Check(frozen.IndexOf("UNRECOVERED") < 0,
+                  "the FROZEN feature half contains no recovery value at all");
+
+            // the vector recovers while the window runs
+            ev.ApplyLaterBar(B(t0, 15, 101, 104, 100.5, 103), 1);
+            ev.ApplyLaterBar(B(t0.AddMinutes(15), 15, 103, 107, 102, 106.5), 2);
+
+            Check(oe.FeatureCsv == frozen,
+                  "the frozen half is BYTE-IDENTICAL after the market moved");
+
+            V4Row labelHalf = oe.BuildLabelRow();
+            Check(Val(labelHalf, "y_vectorRecovery_15m") != "UNRECOVERED",
+                  "the LABEL half picks up the recovery that happened after the event");
+            Check(labelHalf.NameAt(0) == "y_vectorRecovery_15m",
+                  "recovery is the FIRST label column, not a feature column");
+
+            // header and data must be built by the same definition
+            V4Row schema = V4OpenEvent.SchemaRow(feat, "15m", t0);
+            string[] hdr = schema.Header().Split(',');
+            string[] dat = oe.CompletedCsv().Split(',');
+            Check(hdr.Length == dat.Length,
+                  "SchemaRow and CompletedCsv agree on column COUNT (" + hdr.Length + ")");
+            int firstY = -1;
+            for (int i = 0; i < hdr.Length; i++)
+                if (hdr[i].StartsWith("y_")) { firstY = i; break; }
+            Check(firstY == feat.Count,
+                  "every label column sits after the last feature column");
+            Check(hdr[firstY] == "y_vectorRecovery_15m",
+                  "the label block starts with the recovery block");
+
+            // no duplicated column names anywhere
+            bool dup = false;
+            for (int i = 0; i < hdr.Length && !dup; i++)
+                for (int j = i + 1; j < hdr.Length; j++)
+                    if (hdr[i] == hdr[j]) { dup = true; break; }
+            Check(!dup, "no column name appears twice in the assembled header");
+
+            // a non-vector event still produces the identical column count
+            V4OpenEvent none2 = new V4OpenEvent();
+            none2.Freeze(feat, t0);
+            Check(none2.CompletedCsv().Split(',').Length == hdr.Length,
+                  "a non-vector event writes the same number of columns");
+
+            // -----------------------------------------------------------
+            // DEFECT 2: the parent event was opened with stops and no
+            // targets. Ten target columns plus the three targetAfterStop
+            // controls could not vary - 13 dead columns - because
+            // ResolveTargets skips an invalid target and ReferenceTarget
+            // returns one.
+            // -----------------------------------------------------------
+            V4ForwardLabels bare = new V4ForwardLabels();
+            bare.Stops.Freeze(1, 100, 4, 99, 98, 96);
+            bare.Open(1, 100, t0, 4, 99.5);
+            for (int i = 1; i <= 30; i++)
+                bare.OnBar(B(t0.AddMinutes(i - 1), 1, 100, 130, 99.5, 129), 99.5);
+
+            Check(!bare.HitTargetSwing && !bare.HitTargetVectorZone
+                  && !bare.HitTargetLiquidity && !bare.HitTargetHtfStruct
+                  && !bare.HitTargetSession,
+                  "with no targets assigned, price running 30 pts hits NOTHING - the defect");
+            Check(bare.MinsToTargetSwing == -1,
+                  "...and every minsToTarget stays -1");
+            Check(!bare.Stops.TargetReachedAfterTight && !bare.Stops.TargetReachedAfterMedium
+                  && !bare.Stops.TargetReachedAfterStructural,
+                  "...and the three targetAfterStop controls are dead with them");
+
+            // the same run WITH targets assigned resolves
+            V4ForwardLabels armed = new V4ForwardLabels();
+            armed.Stops.Freeze(1, 100, 4, 99, 98, 96);
+            armed.TargetSwing = V4Target.Make("SWING", "15m", 110, 100, 1, 4);
+            armed.TargetSession = V4Target.Make("SESSION", "session extreme", 125, 100, 1, 4);
+            armed.Open(1, 100, t0, 4, 99.5);
+            for (int i = 1; i <= 30; i++)
+                armed.OnBar(B(t0.AddMinutes(i - 1), 1, 100, 130, 99.5, 129), 99.5);
+
+            Check(armed.HitTargetSwing, "the identical bars DO hit a swing target once one is assigned");
+            Check(armed.MinsToTargetSwing == 1, "...on the first bar, which reached 130");
+            Check(armed.HitTargetSession, "...and the session target too");
+
+            // and a target that only arrives after the stop is flagged
+            V4ForwardLabels late = new V4ForwardLabels();
+            late.Stops.Freeze(1, 100, 4, 99, 98, 96);
+            late.TargetSwing = V4Target.Make("SWING", "15m", 110, 100, 1, 4);
+            late.Open(1, 100, t0, 4, 99.5);
+            late.OnBar(B(t0, 1, 100, 100.5, 95, 96), 99.5);          // all three stops
+            late.OnBar(B(t0.AddMinutes(1), 1, 96, 111, 96, 110), 99.5); // target after
+            Check(late.Stops.TargetReachedAfterTight && late.Stops.TargetReachedAfterMedium
+                  && late.Stops.TargetReachedAfterStructural,
+                  "a target reached only after the stop is flagged on all three families");
+        }
+
+        // ---------------------------------------------------------------
+        // SOURCE SCAN
+        //
+        // Some defects live in the NinjaScript host, which cannot be
+        // instantiated off-platform: it derives from Strategy and its state
+        // machine only runs inside NinjaTrader. The parent event being
+        // opened with stops and NO targets was one - thirteen dead label
+        // columns caused by a call that was simply absent, and no unit test
+        // could see it because the host is not a unit.
+        //
+        // A source scan is weaker than executing the code. It is stated as
+        // weaker rather than dressed up: it proves a call site exists, not
+        // that it runs. It fails LOUDLY when it cannot find the source
+        // rather than passing quietly, because a check that skips itself is
+        // worse than no check.
+        // ---------------------------------------------------------------
+        private static void SourceScan()
+        {
+            Console.WriteLine(" [source scan: host call sites]");
+
+            string host = FindSource("MnqV41StructureResearchHost.cs");
+            if (host == null)
+            {
+                Check(false, "SOURCE SCAN could not locate MnqV41StructureResearchHost.cs");
+                return;
+            }
+            string src = File.ReadAllText(host);
+
+            int assigns = Count(src, "AssignTargets(");
+            Check(assigns >= 3,
+                  "AssignTargets is declared and called from BOTH the probe and the "
+                  + "parent event (" + assigns + " occurrences, need 3+)");
+
+            int openEventAssign = src.IndexOf("AssignTargets(oe.Labels");
+            Check(openEventAssign > 0,
+                  "the PARENT EVENT assigns targets - absent, ten target columns and "
+                  + "three targetAfterStop controls are constant");
+            Check(src.IndexOf("AssignTargets(p.Labels") > 0,
+                  "the entry probe assigns targets");
+
+            // the recovery block must NOT be built into the feature row
+            int featureCall = src.IndexOf("V4RowBuilder.VectorRecoveryLabels");
+            Check(featureCall < 0,
+                  "the host never calls VectorRecoveryLabels itself - the assembly "
+                  + "belongs to V4OpenEvent, where it is tested");
+            Check(src.IndexOf("oe.CompletedCsv()") > 0,
+                  "the written structure line comes from V4OpenEvent.CompletedCsv");
+            Check(src.IndexOf("V4OpenEvent.SchemaRow(") > 0,
+                  "the structure header comes from V4OpenEvent.SchemaRow - same definition");
+
+            // The standing constraint: this strategy submits no orders.
+            // Scanned with comments stripped, because the file's own header
+            // NAMES every banned call in the sentence promising not to make
+            // one - a scan of the raw text would fail on the promise.
+            string code = StripComments(src);
+            string[] banned = new string[] {
+                "EnterLong", "EnterShort", "SubmitOrderUnmanaged",
+                "SetProfitTarget", "SetStopLoss", "ExitLong", "ExitShort" };
+            for (int i = 0; i < banned.Length; i++)
+                Check(code.IndexOf(banned[i]) < 0,
+                      "the structure host contains no " + banned[i] + " call");
+            Check(StripComments("a // EnterLong\nb").IndexOf("EnterLong") < 0,
+                  "StripComments removes a line comment");
+            Check(StripComments("a /* EnterLong */ b").IndexOf("EnterLong") < 0,
+                  "StripComments removes a block comment");
+            Check(StripComments("EnterLong(1);").IndexOf("EnterLong") >= 0,
+                  "StripComments leaves real code alone - the scan can still fail");
+        }
+
+        /// Line and block comments removed. Deliberately simple: it does not
+        /// understand string literals, which is safe here because a scan that
+        /// over-strips can only produce a FALSE PASS on a name inside a
+        /// string, and the three assertions above pin its behaviour.
+        private static string StripComments(string src)
+        {
+            System.Text.StringBuilder sb = new System.Text.StringBuilder(src.Length);
+            int i = 0;
+            while (i < src.Length)
+            {
+                if (i + 1 < src.Length && src[i] == '/' && src[i + 1] == '/')
+                {
+                    while (i < src.Length && src[i] != '\n') i++;
+                }
+                else if (i + 1 < src.Length && src[i] == '/' && src[i + 1] == '*')
+                {
+                    i += 2;
+                    while (i + 1 < src.Length && !(src[i] == '*' && src[i + 1] == '/')) i++;
+                    i += 2;
+                }
+                else { sb.Append(src[i]); i++; }
+            }
+            return sb.ToString();
+        }
+
+        private static int Count(string s, string needle)
+        {
+            int n = 0, i = 0;
+            while ((i = s.IndexOf(needle, i)) >= 0) { n++; i += needle.Length; }
+            return n;
+        }
+
+        /// Walk up from the working directory looking for src/<name>.
+        private static string FindSource(string name)
+        {
+            string d = Directory.GetCurrentDirectory();
+            for (int up = 0; up < 6 && d != null; up++)
+            {
+                string p = Path.Combine(Path.Combine(d, "src"), name);
+                if (File.Exists(p)) return p;
+                DirectoryInfo parent = Directory.GetParent(d);
+                d = parent == null ? null : parent.FullName;
+            }
+            return null;
+        }
+
+        /// Read one column out of a row by name. Returns "" when absent, so
+        /// a renamed column fails the assertion rather than throwing.
+        private static string Val(V4Row r, string name)
+        {
+            for (int i = 0; i < r.Count; i++)
+                if (r.NameAt(i) == name) return r.ValueAt(i);
+            return "<<ABSENT>>";
+        }
+
     }
 }

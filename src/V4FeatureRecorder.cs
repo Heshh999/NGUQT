@@ -97,6 +97,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         }
 
         public string NameAt(int i) { return names[i]; }
+        public string ValueAt(int i) { return values[i]; }
     }
 
     /// Holds the schema for one output file and guarantees every row
@@ -157,6 +158,76 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
     // ==================================================================
     // ROW BUILDERS
     // ==================================================================
+
+    /// A parent structure event whose FEATURES are frozen as text at
+    /// the event instant, waiting for its forward window to close so the
+    /// labels can be appended.
+    ///
+    /// This lives here rather than inside the NinjaScript host for one
+    /// reason: while it was a private class on the host, nothing
+    /// off-platform could see WHERE the label block was assembled, and
+    /// the third clean sample shipped six vector-recovery labels that had
+    /// been read on the vector's own bar - pinned at UNRECOVERED / 0 /
+    /// blank across all 659 rows. A test that only exercised
+    /// VectorRecoveryLabels passed either way. Now the assembly itself is
+    /// a unit and can be driven end to end.
+    public class V4OpenEvent
+    {
+        public string FeatureCsv = "";
+        public DateTime EventEt;
+        public readonly V4ForwardLabels Labels = new V4ForwardLabels();
+
+        /// The vector that formed ON the event bar, or null. Held by
+        /// REFERENCE: the engine keeps advancing its recovery as later
+        /// bars close, which is exactly why it must not be read here.
+        public V4Vector EventVector;
+
+        /// The timeframe tag the recovery labels are named for.
+        public string VectorTfTag = "15m";
+
+        /// Freeze the feature half. Called once, at the event.
+        public void Freeze(V4Row featureRow, DateTime eventEt)
+        {
+            FeatureCsv = featureRow.Csv();
+            EventEt = eventEt;
+        }
+
+        /// Build the label half. Called once, when the window closes.
+        /// Vector recovery is part of THIS half, never the frozen one.
+        public V4Row BuildLabelRow()
+        {
+            V4Row rl = new V4Row(EventEt);
+            AppendLabelBlock(rl, VectorTfTag, EventVector, Labels);
+            return rl;
+        }
+
+        /// The completed CSV line: frozen features, then labels.
+        public string CompletedCsv() { return FeatureCsv + "," + BuildLabelRow().Csv(); }
+
+        /// The ONE definition of the label block. Both the written row and
+        /// the schema row go through here, so the header cannot drift away
+        /// from the data - a divergence that would be invisible, because the
+        /// schema check would keep passing against its own stale definition.
+        private static void AppendLabelBlock(V4Row rl, string tfTag, V4Vector v, V4ForwardLabels L)
+        {
+            V4RowBuilder.VectorRecoveryLabels(rl, tfTag, v);
+            V4RowBuilder.Labels(rl, L);
+        }
+
+        /// Feature names followed by label names, values blank. Lets the
+        /// header be established on the first event, before any window has
+        /// closed.
+        public static V4Row SchemaRow(V4Row featureRow, string vectorTfTag, DateTime anyEt)
+        {
+            V4Row probe = new V4Row(anyEt);
+            AppendLabelBlock(probe, vectorTfTag, null, new V4ForwardLabels());
+            V4Row combined = new V4Row(anyEt);
+            for (int i = 0; i < featureRow.Count; i++) combined.Key(featureRow.NameAt(i), "");
+            for (int i = 0; i < probe.Count; i++) combined.Key(probe.NameAt(i), "");
+            return combined;
+        }
+    }
+
 
     /// Assembles the V4.1 structure/vector research row from the engine
     /// state. Kept in one place so the column order is defined exactly

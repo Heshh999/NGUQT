@@ -197,7 +197,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly HashSet<string> pathsOpenedThisRun = new HashSet<string>();
         private readonly List<PendingProbe> pending = new List<PendingProbe>();
         private readonly List<PendingProbe> openProbes = new List<PendingProbe>();
-        private readonly List<OpenEvent> openEvents = new List<OpenEvent>();
+        private readonly List<V4OpenEvent> openEvents = new List<V4OpenEvent>();
 
         /// A parent event whose FEATURES are already frozen as text, waiting
         /// for its forward window to close so the labels can be appended.
@@ -209,12 +209,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// the feature text at the event instant and appending labels later
         /// gives the parent an outcome without ever letting a later value
         /// reach a feature column.
-        private class OpenEvent
-        {
-            public string FeatureCsv = "";
-            public DateTime EventEt;
-            public V4ForwardLabels Labels = new V4ForwardLabels();
-        }
 
         private TimeZoneInfo etZone;
         private DateTime sampleStartEt = DateTime.MinValue;
@@ -626,7 +620,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // parent events advance on the same 1m clock
             for (int i = openEvents.Count - 1; i >= 0; i--)
             {
-                OpenEvent oe = openEvents[i];
+                V4OpenEvent oe = openEvents[i];
                 oe.Labels.OnBar(b, lastEma9_1m);
                 if (oe.Labels.WindowComplete)
                 {
@@ -814,39 +808,55 @@ namespace NinjaTrader.NinjaScript.Strategies
             p.Labels.Stops.Freeze(p.Side, p.EntryPrice, atr, tight, medium, structural);
             p.Labels.RaceStop = V4StopKind.MEDIUM;
 
+            AssignTargets(p.Labels, p.Side, p.EntryPrice, atr, cutoff, sh, sl);
+
+            p.Labels.Open(p.Side, p.EntryPrice, p.EntryEt, atr, lastEma9_1m);
+            return true;
+        }
+
+        /// The five reference targets, shared by the entry probes and by the
+        /// parent structure event.
+        ///
+        /// The parent event used to be opened with stops and no targets at
+        /// all, so on a 659-row structure sample every one of the ten target
+        /// columns was constant - hitTarget* FALSE on every row, minsTo* -1
+        /// on every row - and the three targetAfterStop* controls were dead
+        /// with them, because those read ReferenceTarget(). Thirteen label
+        /// columns that could not vary. The probes had the code; the parent
+        /// simply never called it.
+        private void AssignTargets(V4ForwardLabels L, int side, double refPrice,
+                                   double atr, DateTime cutoff, V4Swing sh, V4Swing sl)
+        {
             V4VectorEngine ve15 = vectors["15m"];
-            V4Vector vz = p.Side > 0
-                ? ve15.NearestUnrecoveredAbove(p.EntryPrice, cutoff)
-                : ve15.NearestUnrecoveredBelow(p.EntryPrice, cutoff);
-            p.Labels.TargetVectorZone = vz == null
+            V4Vector vz = side > 0
+                ? ve15.NearestUnrecoveredAbove(refPrice, cutoff)
+                : ve15.NearestUnrecoveredBelow(refPrice, cutoff);
+            L.TargetVectorZone = vz == null
                 ? V4Target.None()
-                : V4Target.Make("VECTOR_ZONE", vz.VectorId, vz.FarEdge, p.EntryPrice, p.Side, atr);
+                : V4Target.Make("VECTOR_ZONE", vz.VectorId, vz.FarEdge, refPrice, side, atr);
 
-            V4LevelRef liq = p.Side > 0
-                ? levels.NearestAbove(p.EntryPrice, cutoff)
-                : levels.NearestBelow(p.EntryPrice, cutoff);
-            p.Labels.TargetLiquidity = liq == null
+            V4LevelRef liq = side > 0
+                ? levels.NearestAbove(refPrice, cutoff)
+                : levels.NearestBelow(refPrice, cutoff);
+            L.TargetLiquidity = liq == null
                 ? V4Target.None()
-                : V4Target.Make("LIQUIDITY", liq.Name, liq.Price, p.EntryPrice, p.Side, atr);
+                : V4Target.Make("LIQUIDITY", liq.Name, liq.Price, refPrice, side, atr);
 
-            double swing = p.Side > 0 ? (sh.Valid ? sh.Price : double.NaN)
-                                      : (sl.Valid ? sl.Price : double.NaN);
-            p.Labels.TargetSwing = V4Target.Make("SWING", "15m", swing, p.EntryPrice, p.Side, atr);
+            double swing = side > 0 ? (sh.Valid ? sh.Price : double.NaN)
+                                    : (sl.Valid ? sl.Price : double.NaN);
+            L.TargetSwing = V4Target.Make("SWING", "15m", swing, refPrice, side, atr);
 
             V4StructureTracker t60;
             double htf = double.NaN;
             if (trackers.TryGetValue("60m", out t60))
             {
-                V4Swing h = p.Side > 0 ? t60.SwingHighKnownAt(cutoff) : t60.SwingLowKnownAt(cutoff);
+                V4Swing h = side > 0 ? t60.SwingHighKnownAt(cutoff) : t60.SwingLowKnownAt(cutoff);
                 if (h.Valid) htf = h.Price;
             }
-            p.Labels.TargetHtfStruct = V4Target.Make("HTF_STRUCT", "60m", htf, p.EntryPrice, p.Side, atr);
+            L.TargetHtfStruct = V4Target.Make("HTF_STRUCT", "60m", htf, refPrice, side, atr);
 
-            double sess = p.Side > 0 ? location.SessionHigh : location.SessionLow;
-            p.Labels.TargetSession = V4Target.Make("SESSION", "session extreme", sess, p.EntryPrice, p.Side, atr);
-
-            p.Labels.Open(p.Side, p.EntryPrice, p.EntryEt, atr, lastEma9_1m);
-            return true;
+            double sess = side > 0 ? location.SessionHigh : location.SessionLow;
+            L.TargetSession = V4Target.Make("SESSION", "session extreme", sess, refPrice, side, atr);
         }
 
         // ==============================================================
@@ -899,7 +909,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             V4Vector v3 = ve3 == null ? null : ve3.LatestKnownAt(cutoff);
             if (v3 != null && v3.CreatedEt <= b.EtOpen) v3 = null;
             V4RowBuilder.Vector(r, "3m", v3, ve3, cutoff);
-            V4RowBuilder.VectorRecoveryLabels(r, "15m", v);
+            // VectorRecoveryLabels is NOT called here. It used to be, and the
+            // result was six dead columns: on the bar a vector forms it has
+            // by definition recovered 0%, been touched never and reached no
+            // threshold - so vectorRecovery_15m read UNRECOVERED on all 285
+            // vector rows, recoveryPct 0 on all 285, firstTouchEt blank on
+            // all 659, barsTo25/50/100 all -1 and both trap flags all FALSE.
+            // The labels are appended in WriteCompletedEvent instead, where
+            // the forward window has actually elapsed. H5-UNRECOVERED-VECTOR-
+            // DESTINATION is measured entirely from these columns and could
+            // not have been tested against the previous output.
 
             // W / M formation
             V4FormationState fm = vectors["15m"].Formation;
@@ -967,40 +986,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!structSchema.Established) structSchema.Establish(BuildStructureSchemaRow(r, b));
             structSchema.Verify(BuildStructureSchemaRow(r, b));
 
-            OpenEvent oe = new OpenEvent();
-            oe.FeatureCsv = r.Csv();
-            oe.EventEt = b.EtClose;
+            V4OpenEvent oe = new V4OpenEvent();
+            oe.Freeze(r, b.EtClose);
+            oe.EventVector = v;
+            oe.VectorTfTag = "15m";
             oe.Labels.Stops.Freeze(side, b.Close, atr,
                 side > 0 ? b.Low - 0.25 : b.High + 0.25,
                 side > 0 ? b.Low - 0.5 * atr : b.High + 0.5 * atr,
                 side > 0 ? (kl.Valid ? kl.Price - 0.25 : b.Low - atr)
                          : (kh.Valid ? kh.Price + 0.25 : b.High + atr));
             oe.Labels.RaceStop = V4StopKind.MEDIUM;
+            AssignTargets(oe.Labels, side, b.Close, atr, cutoff, kh, kl);
             oe.Labels.Open(side, b.Close, b.EtClose, atr, lastEma9_1m);
             openEvents.Add(oe);
         }
 
-        /// The structure schema is feature columns followed by label columns.
-        /// Built from one throwaway row so the header can be established
-        /// before any window has closed.
+        /// The structure schema is feature columns followed by label
+        /// columns, both produced by V4OpenEvent so the header and the
+        /// written row can never come from two different definitions.
         private V4Row BuildStructureSchemaRow(V4Row featureRow, V4Bar b)
         {
-            V4Row probe = new V4Row(b.EtClose);
-            V4ForwardLabels empty = new V4ForwardLabels();
-            V4RowBuilder.Labels(probe, empty);
-            V4Row combined = new V4Row(b.EtClose);
-            // names only matter for the schema check; values are irrelevant
-            for (int i = 0; i < featureRow.Count; i++) combined.Key(featureRow.NameAt(i), "");
-            for (int i = 0; i < probe.Count; i++) combined.Key(probe.NameAt(i), "");
-            return combined;
+            return V4OpenEvent.SchemaRow(featureRow, "15m", b.EtClose);
         }
 
-        private void WriteCompletedEvent(OpenEvent oe)
+        private void WriteCompletedEvent(V4OpenEvent oe)
         {
-            V4Row rl = new V4Row(oe.EventEt);
-            V4RowBuilder.Labels(rl, oe.Labels);
             for (int i = 0; i < oe.Labels.Races.Length; i++) audit.NoteRace(oe.Labels.Races[i].Outcome);
-            Append("structure", oe.EventEt, structSchema.Header, oe.FeatureCsv + "," + rl.Csv());
+            // Recovery state as of window close - the same 240-minute horizon
+            // every other label on this row is measured over.
+            Append("structure", oe.EventEt, structSchema.Header, oe.CompletedCsv());
             structRows++;
         }
 
