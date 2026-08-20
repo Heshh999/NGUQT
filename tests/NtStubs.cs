@@ -42,6 +42,9 @@ namespace NinjaTrader.Core
 namespace NinjaTrader.NinjaScript
 {
     public enum State { SetDefaults, Configure, Active, DataLoaded, Historical, Transition, Realtime, Terminated, Finalized }
+    // V4.1 sets this to Infinite: the engines index back through their own
+    // history and a truncated series would silently shorten it.
+    public enum MaximumBarsLookBack { TwoHundredFiftySix, Infinite }
     public enum Calculate { OnBarClose, OnPriceChange, OnEachTick }
     public enum EntryHandling { AllEntries, UniqueEntries }
     public enum StartBehavior { WaitUntilFlat, WaitUntilFlatSynchronizeAccount, ImmediatelySubmit, ImmediatelySubmitSynchronizeAccount, AdoptAccountPosition }
@@ -67,7 +70,7 @@ namespace NinjaTrader.NinjaScript
         public bool IsOverlay { get; set; }
         public int BarsRequiredToTrade { get; set; }
         public int BarsRequiredToPlot { get; set; }
-        public int MaximumBarsLookBack { get; set; }
+        public MaximumBarsLookBack MaximumBarsLookBack { get; set; }
         public bool IsInstantiatedOnEachOptimizationIteration { get; set; }
         public NinjaTrader.Cbi.Instrument Instrument { get; set; }
         public Series<double> Open, High, Low, Close, Volume;
