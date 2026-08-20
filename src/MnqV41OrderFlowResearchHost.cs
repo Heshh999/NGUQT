@@ -325,6 +325,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!ok) { aborted = true; Print("V4.1 ORDER FLOW: RUN ABORTED."); }
         }
 
+        /// Why every number below is zero, stated once, most likely cause
+        /// first. The audits that follow fail on "bars >= 20000", which is
+        /// true but is a symptom.
+        private string NoBarsExplanation()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("======================================================================");
+            sb.AppendLine("WHY EVERY NUMBER BELOW IS ZERO");
+            sb.AppendLine("======================================================================");
+            sb.AppendLine("The primary series loaded NO BARS, so not one bar reached the");
+            sb.AppendLine("engine. Probable causes, most likely first:");
+            sb.AppendLine("  1. NO TICK DATA for this instrument over the requested range.");
+            sb.AppendLine("     Volumetric bars are built from tick data. Minute history goes");
+            sb.AppendLine("     back years; most providers keep tick history for only a");
+            sb.AppendLine("     limited recent window.");
+            sb.AppendLine("  2. The date range does not overlap the contract's life. A single");
+            sb.AppendLine("     expiry trades for months, not years, with real volume only in");
+            sb.AppendLine("     its final quarter.");
+            sb.AppendLine("  3. Not connected to the data provider while the Analyzer loaded.");
+            sb.AppendLine("What to do:");
+            sb.AppendLine("  - connect to the data feed, then check TICK coverage for this");
+            sb.AppendLine("    contract in Tools > Historical Data Manager");
+            sb.AppendLine("  - set the range to a recent 2-4 weeks inside the contract's life");
+            sb.AppendLine("  - re-run: the startup diagnostic must show a NON-ZERO bar count");
+            sb.AppendLine("    before any longer window is worth attempting");
+            sb.AppendLine("======================================================================");
+            return sb.ToString();
+        }
+
         private void PrintLines(string s)
         {
             if (string.IsNullOrEmpty(s)) return;
@@ -423,6 +452,30 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void Finish()
         {
+            string noBars = "";
+            if (!diagPrinted)
+            {
+                // OnBarUpdate never fired: the primary series loaded ZERO
+                // bars, so the startup gate never got the chance to run.
+                // Before this block existed, Finish() wrote an UNPOPULATED
+                // diagnostic whose empty checklist printed PASS above four
+                // FAILED audit blocks - and the one fact explaining all of
+                // them went unstated. Populate what is knowable, let the
+                // diagnostic fail loudly, and say the cause once.
+                diag.Instrument = SymbolName();
+                diag.FileTag = FileTag;
+                diag.PrimarySeries = "PRIMARY SERIES LOADED ZERO BARS";
+                diag.VolumetricPrimary = true;
+                diag.OrderFlowAvailable = false;
+                diag.ProfileAvailable = false;
+                diag.AddSeries("1m-vol", 0, 0, DateTime.MinValue, DateTime.MinValue, true,
+                               "Volumetric 1 Minute");
+                diag.Validate();
+                noBars = NoBarsExplanation();
+                PrintLines(diag.Text());
+                PrintLines(noBars);
+            }
+
             string ofReport = ofAudit.Report();
             PrintLines(ofReport);
             validity.OrderFlowAuditPassed = ofAudit.Passed;
@@ -444,6 +497,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 using (StreamWriter w = new StreamWriter(p, false))
                 {
                     w.Write(diag.Text());
+                    if (noBars.Length > 0) w.Write(noBars);
                     w.Write(validity.Summary());
                     w.Write(ofReport);
                     w.WriteLine(summarySchema.Describe());

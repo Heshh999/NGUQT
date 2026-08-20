@@ -69,6 +69,7 @@ namespace MnqTwoTests
             AuditGuards();
             SampleTwoFixes();
             SampleThreeFixes();
+            ZeroBarRun();
             SourceScan();
 
             Console.WriteLine("V4.1: " + passed + " passed, " + failed + " failed");
@@ -1037,6 +1038,64 @@ namespace MnqTwoTests
         }
 
         // ---------------------------------------------------------------
+        // SAMPLE FOUR - the order-flow run that loaded zero bars.
+        //
+        // The primary series loaded nothing, OnBarUpdate never fired, and
+        // Finish() wrote an UNPOPULATED startup diagnostic: no instrument,
+        // no series map - and the verdict line read PASS, because Validate
+        // iterated an empty list and found nothing to object to. Four
+        // FAILED audit blocks followed it with the actual cause stated
+        // nowhere. The doc comment on Validate says FAIL FAST; the empty
+        // map is the fastest possible failure and it sailed through.
+        // ---------------------------------------------------------------
+        private static void ZeroBarRun()
+        {
+            Console.WriteLine(" [sample four: the zero-bar run]");
+
+            // the defect: an empty diagnostic must FAIL, not pass vacuously
+            V4StartupDiagnostic empty = new V4StartupDiagnostic();
+            Check(!empty.Validate(),
+                  "an EMPTY series map fails validation - the zero-bar run defect");
+            Check(empty.Failures.Count == 1
+                  && empty.Failures[0].IndexOf("NO SERIES WAS EVER REGISTERED") >= 0,
+                  "...and the failure names the actual cause");
+            Check(empty.Text().IndexOf("STARTUP DIAGNOSTIC: FAIL") >= 0,
+                  "...and the printed verdict is FAIL");
+            Check(empty.Text().IndexOf("PASS") < 0,
+                  "...with no PASS anywhere in the text");
+
+            // a required series with zero bars still fails
+            V4StartupDiagnostic zero = new V4StartupDiagnostic();
+            zero.AddSeries("1m-vol", 0, 0, DateTime.MinValue, DateTime.MinValue, true,
+                           "Volumetric 1 Minute");
+            Check(!zero.Validate(), "a required series with zero bars fails");
+            Check(zero.Text().IndexOf("REQUIRED SERIES HAS ZERO BARS") >= 0,
+                  "...and is named in the text");
+
+            // a populated diagnostic still passes - the fix must not make
+            // every healthy run fail
+            V4StartupDiagnostic ok = new V4StartupDiagnostic();
+            ok.AddSeries("1m-vol", 0, 12345, DateTime.MinValue, DateTime.MinValue, true,
+                         "Volumetric 1 Minute");
+            ok.VolumetricPrimary = true; ok.OrderFlowAvailable = true;
+            Check(ok.Validate(), "a series with bars still validates");
+            Check(ok.Text().IndexOf("STARTUP DIAGNOSTIC: PASS") >= 0,
+                  "...and prints PASS");
+
+            // an optional series with zero bars does not fail the run
+            V4StartupDiagnostic opt = new V4StartupDiagnostic();
+            opt.AddSeries("1m-vol", 0, 500, DateTime.MinValue, DateTime.MinValue, true, "Volumetric 1 Minute");
+            opt.AddSeries("extra", 1, 0, DateTime.MinValue, DateTime.MinValue, false, "optional");
+            opt.VolumetricPrimary = true; opt.OrderFlowAvailable = true;
+            Check(opt.Validate(), "an OPTIONAL series with zero bars does not fail the run");
+
+            // the verdict text must not claim files were not written - it is
+            // itself written into audit files on the zero-bar path
+            Check(empty.Text().IndexOf("NO FILES WRITTEN") < 0,
+                  "the shared verdict text makes no claim about files");
+        }
+
+        // ---------------------------------------------------------------
         // SOURCE SCAN
         //
         // Some defects live in the NinjaScript host, which cannot be
@@ -1123,6 +1182,10 @@ namespace MnqTwoTests
                 Check(of.IndexOf("MaximumBarsLookBack.Infinite") > 0,
                       "the order-flow host forces Infinite lookback - the reader "
                       + "indexes the Volumes array directly");
+                Check(of.IndexOf("PRIMARY SERIES LOADED ZERO BARS") > 0
+                      && of.IndexOf("NoBarsExplanation") > 0,
+                      "Finish() populates the diagnostic and states the cause when "
+                      + "no bar ever arrived - the zero-bar run wrote PASS without this");
             }
             Check(StripComments("a // EnterLong\nb").IndexOf("EnterLong") < 0,
                   "StripComments removes a line comment");

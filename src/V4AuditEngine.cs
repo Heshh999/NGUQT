@@ -78,6 +78,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         public bool Validate()
         {
             Failures.Clear();
+            // An EMPTY series map must fail, not pass vacuously. A run whose
+            // primary series loads zero bars never fires OnBarUpdate, so
+            // nothing ever registers a series - and the loop below then has
+            // nothing to object to. That exact state printed
+            // "STARTUP DIAGNOSTIC: PASS" above four FAILED audit blocks.
+            if (Series.Count == 0)
+                Failures.Add("NO SERIES WAS EVER REGISTERED - the run never processed a single bar.");
             for (int i = 0; i < Series.Count; i++)
             {
                 V4SeriesInfo s = Series[i];
@@ -140,7 +147,11 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             }
             else
             {
-                sb.AppendLine("STARTUP DIAGNOSTIC: FAIL - RUN ABORTED, NO FILES WRITTEN");
+                // The consequence line ("run aborted", "audit only") belongs
+                // to the HOST, which knows what it will do next. This text is
+                // also written into audit files, where a claim of "NO FILES
+                // WRITTEN" would sit inside a written file.
+                sb.AppendLine("STARTUP DIAGNOSTIC: FAIL");
                 for (int i = 0; i < Failures.Count; i++) sb.AppendLine("  " + Failures[i]);
             }
             sb.AppendLine("======================================================================");
