@@ -1086,17 +1086,44 @@ namespace MnqTwoTests
             Check(src.IndexOf("V4OpenEvent.SchemaRow(") > 0,
                   "the structure header comes from V4OpenEvent.SchemaRow - same definition");
 
-            // The standing constraint: this strategy submits no orders.
-            // Scanned with comments stripped, because the file's own header
+            // The standing constraint: these strategies submit no orders.
+            // Scanned with comments stripped, because each file's header
             // NAMES every banned call in the sentence promising not to make
             // one - a scan of the raw text would fail on the promise.
-            string code = StripComments(src);
+            //
+            // BOTH hosts are scanned. Checking only the structure host left
+            // the order-flow host carrying the same promise with nothing
+            // enforcing it.
+            string[] hosts = new string[] {
+                "MnqV41StructureResearchHost.cs",
+                "MnqV41OrderFlowResearchHost.cs" };
             string[] banned = new string[] {
                 "EnterLong", "EnterShort", "SubmitOrderUnmanaged",
                 "SetProfitTarget", "SetStopLoss", "ExitLong", "ExitShort" };
-            for (int i = 0; i < banned.Length; i++)
-                Check(code.IndexOf(banned[i]) < 0,
-                      "the structure host contains no " + banned[i] + " call");
+            for (int h = 0; h < hosts.Length; h++)
+            {
+                string hp = FindSource(hosts[h]);
+                if (hp == null) { Check(false, "SOURCE SCAN could not locate " + hosts[h]); continue; }
+                string code = StripComments(File.ReadAllText(hp));
+                for (int i = 0; i < banned.Length; i++)
+                    Check(code.IndexOf(banned[i]) < 0,
+                          hosts[h] + " contains no " + banned[i] + " call");
+            }
+
+            // The order-flow host must ABORT rather than write a
+            // plausible-looking empty file when the primary series is not
+            // Volumetric. A run that quietly produces zero rows looks like
+            // "no signal" instead of "wrong bars type".
+            string ofp = FindSource("MnqV41OrderFlowResearchHost.cs");
+            if (ofp != null)
+            {
+                string of = File.ReadAllText(ofp);
+                Check(of.IndexOf("aborted = true") > 0,
+                      "the order-flow host aborts on a failed startup gate");
+                Check(of.IndexOf("MaximumBarsLookBack.Infinite") > 0,
+                      "the order-flow host forces Infinite lookback - the reader "
+                      + "indexes the Volumes array directly");
+            }
             Check(StripComments("a // EnterLong\nb").IndexOf("EnterLong") < 0,
                   "StripComments removes a line comment");
             Check(StripComments("a /* EnterLong */ b").IndexOf("EnterLong") < 0,
