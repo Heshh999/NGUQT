@@ -64,6 +64,8 @@ namespace MnqTwoTests
             OrderFlowFeatures();
             SchemaAndValidity();
             BreakTransition();
+            TimestampConvention();
+            AuditGuards();
 
             Console.WriteLine("V4.1: " + passed + " passed, " + failed + " failed");
             return failed;
@@ -558,6 +560,181 @@ namespace MnqTwoTests
             r.Reset();
             Check(r.Update(102, 100.5, 101.5, true, 100, false, double.NaN) == 1,
                   "Reset clears the gate so a re-run starts clean");
+        }
+
+        // ---------------------------------------------------------------
+        // TIMESTAMP CONVENTION - reproduces the field-observed -12 median
+        // ---------------------------------------------------------------
+        private static void TimestampConvention()
+        {
+            Console.WriteLine(" bar timestamp convention");
+
+            // NinjaTrader hands us ONE stamp for a completed bar, and that
+            // stamp is the bar's CLOSE.
+            DateTime stamp = new DateTime(2019, 8, 15, 10, 15, 0);
+            DateTime o, c;
+
+            V4BarStamp.FromNtStamp(stamp, 15, out o, out c);
+            Check(c == stamp, "the NT stamp IS the close");
+            Check(o == stamp.AddMinutes(-15), "the open is derived backwards by the bar period");
+            Check(c > o, "close is after open");
+
+            V4BarStamp.FromNtStamp(stamp, 1, out o, out c);
+            Check(c == stamp && o == stamp.AddMinutes(-1), "same on the 1m series");
+
+            // Now reproduce the actual defect and the number it produced.
+            //
+            // Field observation: ARCH-A median minsToEntry was -12 minutes.
+            // A 15m bar closes at C. Under the defect it was stamped C+15.
+            // The 1m bar two minutes later closes at C+2, stamped C+3.
+            // minsToEntry = (C+3) - (C+15) = -12. Exactly what the sample said.
+            DateTime c15 = new DateTime(2019, 8, 15, 10, 15, 0);
+            DateTime bo, bc, eo, ec;
+
+            V4BarStamp.FromNtStampAsOpen_DEFECT(c15, 15, out bo, out bc);
+            V4BarStamp.FromNtStampAsOpen_DEFECT(c15.AddMinutes(2), 1, out eo, out ec);
+            int defectDelay = (int)(ec - bc).TotalMinutes;
+            Check(defectDelay == -12,
+                  "the DEFECT reproduces the field-observed -12 minute entry delay");
+            Check(defectDelay < 0, "...which is an entry preceding its own event");
+
+            // The fix, on the identical bars.
+            V4BarStamp.FromNtStamp(c15, 15, out bo, out bc);
+            V4BarStamp.FromNtStamp(c15.AddMinutes(2), 1, out eo, out ec);
+            int fixedDelay = (int)(ec - bc).TotalMinutes;
+            Check(fixedDelay == 2, "the FIX gives a +2 minute delay on the same bars");
+            Check(fixedDelay > 0, "...an entry strictly after its event");
+
+            // And the reason it mattered more than the visible symptom: the
+            // cutoff must refuse a swing confirmed at the event instant.
+            V4Bar ev = new V4Bar(); ev.EtClose = bc;
+            DateTime cut = V4ResearchEngine.SnapshotCutoff(ev);
+            Check(cut < bc, "the cutoff sits strictly before the event close");
+            Check(cut > bc.AddMinutes(-1), "...but admits everything up to the prior minute");
+
+            // under the defect the cutoff was 15 minutes PAST the real close
+            V4Bar bad = new V4Bar(); bad.EtClose = c15.AddMinutes(15);
+            Check(V4ResearchEngine.SnapshotCutoff(bad) > c15.AddMinutes(14),
+                  "the DEFECT pushed the cutoff ~15 minutes past the real bar close");
+        }
+
+        // ---------------------------------------------------------------
+        // AUDIT GUARDS
+        // ---------------------------------------------------------------
+        private static void AuditGuards()
+        {
+            Console.WriteLine(" audit guards");
+
+            // A negative entry delay must FAIL the capture, not pass quietly.
+            V4StructureAudit a = new V4StructureAudit();
+            a.MinRowsRequired = 1;
+            for (int i = 0; i < 5; i++) a.NoteRow(new DateTime(2019, 8, 15, 10, 0, 0), DateTime.MinValue, false);
+            a.NoteEntryDelay(3);
+            Check(a.Verdict() != V4Verdict.FAILED, "a positive entry delay does not fail the capture");
+            a.NoteEntryDelay(-12);
+            Check(a.NegativeEntryDelays == 1, "a negative entry delay is counted");
+            Check(a.WorstNegativeEntryDelay == -12, "the worst is recorded");
+            Check(a.Verdict() == V4Verdict.FAILED,
+                  "ANY entry preceding its event FAILS the capture");
+            Check(a.VerdictReason.IndexOf("timestamps are wrong") >= 0,
+                  "...and the reason names the cause rather than blaming the market");
+
+            // Unexplained gaps are scored against BAR TRANSITIONS, not gaps.
+            V4StructureAudit g = new V4StructureAudit();
+            g.MinRowsRequired = 1;
+            g.NoteRow(new DateTime(2019, 8, 15, 10, 0, 0), DateTime.MinValue, false);
+            DateTime t0 = new DateTime(2019, 8, 15, 10, 0, 0);
+            // 999 ordinary consecutive bars, then 4 bars each an hour apart
+            // so every one of them opens a genuine unexplained gap
+            for (int i = 0; i < 999; i++) g.NoteBar(Bar(t0.AddMinutes(i)), 20190815);
+            for (int i = 1; i <= 4; i++) g.NoteBar(Bar(t0.AddMinutes(998 + i * 60)), 20190815);
+            Check(g.BarsObserved == 1003, "bar transitions are counted");
+            Check(g.UnexplainedGaps == 4, "the four gaps are unexplained");
+            Check(g.UnexplainedGapPctOfBars < 0.5,
+                  "4 gaps in 1003 bars is 0.40% - inside the 0.5% limit");
+            Check(g.Verdict() == V4Verdict.PASSED,
+                  "a clean sample PASSES instead of tripping on the wrong denominator");
+
+            // The OLD metric divided by GAP COUNT. On this same clean sample
+            // that is 4 of 4 = 100%, two hundred times the limit - which is
+            // why a genuinely clean capture came back NEEDS REVIEW.
+            long allGaps = g.UnexplainedGaps + g.ScheduledHaltGaps + g.WeekendGaps;
+            double oldMetric = allGaps > 0 ? 100.0 * g.UnexplainedGaps / allGaps : 0.0;
+            Check(oldMetric > g.MaxUnexplainedGapPct,
+                  "the OLD gap-share denominator scored this same clean sample as a failure");
+            Check(oldMetric / Math.Max(1e-9, g.UnexplainedGapPctOfBars) > 100,
+                  "...it was overstating the problem by more than 100x");
+
+            // sample-size NEEDS REVIEW must name itself as such
+            V4StructureAudit small = new V4StructureAudit();
+            small.NoteRow(new DateTime(2019, 8, 15, 10, 0, 0), DateTime.MinValue, false);
+            Check(small.Verdict() == V4Verdict.NEEDS_REVIEW, "a tiny sample is NEEDS REVIEW");
+            Check(small.VerdictReason.IndexOf("SAMPLE SIZE ONLY") >= 0,
+                  "...and says SAMPLE SIZE ONLY so it is not read as a data problem");
+
+            // END-TO-END: the guard must catch the timestamp defect in REAL
+            // data even though no unit test can drive the host's OnBarUpdate.
+            //
+            // This is the protection that actually matters. A unit test proves
+            // V4BarStamp is correct; it cannot prove the HOST calls the right
+            // one. The audit can, on the first run, from the data itself.
+            DateTime c15 = new DateTime(2019, 8, 15, 10, 15, 0);
+            for (int useDefect = 0; useDefect <= 1; useDefect++)
+            {
+                V4StructureAudit sim = new V4StructureAudit();
+                sim.MinRowsRequired = 1;
+                sim.NoteRow(c15, DateTime.MinValue, false);
+
+                // 30 parent events, each entered by a 1m bar 1-3 minutes later
+                for (int e = 0; e < 30; e++)
+                {
+                    DateTime evStamp = c15.AddMinutes(e * 60);
+                    int k = 1 + (e % 3);
+                    DateTime enStamp = evStamp.AddMinutes(k);
+                    DateTime eo, ec, no, nc;
+                    if (useDefect == 1)
+                    {
+                        V4BarStamp.FromNtStampAsOpen_DEFECT(evStamp, 15, out eo, out ec);
+                        V4BarStamp.FromNtStampAsOpen_DEFECT(enStamp, 1, out no, out nc);
+                    }
+                    else
+                    {
+                        V4BarStamp.FromNtStamp(evStamp, 15, out eo, out ec);
+                        V4BarStamp.FromNtStamp(enStamp, 1, out no, out nc);
+                    }
+                    sim.NoteEntryDelay((int)(nc - ec).TotalMinutes);
+                }
+
+                if (useDefect == 1)
+                {
+                    Check(sim.NegativeEntryDelays == 30,
+                          "SIMULATED HOST with the timestamp defect: every entry precedes its event");
+                    Check(sim.Verdict() == V4Verdict.FAILED,
+                          "...and the audit FAILS the capture on the first run");
+                }
+                else
+                {
+                    Check(sim.NegativeEntryDelays == 0,
+                          "SIMULATED HOST with the fix: no entry precedes its event");
+                    Check(sim.Verdict() != V4Verdict.FAILED,
+                          "...and the capture is not failed for it");
+                }
+            }
+
+            // lookahead still outranks everything
+            V4StructureAudit la = new V4StructureAudit();
+            la.MinRowsRequired = 1;
+            la.NoteRow(new DateTime(2019, 8, 15, 10, 0, 0), new DateTime(2019, 8, 15, 11, 0, 0), false);
+            Check(la.LookaheadViolations == 1, "a feature timestamped after its event is a violation");
+            Check(la.Verdict() == V4Verdict.FAILED, "lookahead FAILS the capture outright");
+        }
+
+        private static V4Bar Bar(DateTime closeEt)
+        {
+            V4Bar b = new V4Bar();
+            b.EtClose = closeEt; b.EtOpen = closeEt.AddMinutes(-1);
+            b.Open = b.High = b.Low = b.Close = 100; b.Volume = 100;
+            return b;
         }
     }
 }

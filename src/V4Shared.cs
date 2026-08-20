@@ -472,4 +472,37 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             return fired;
         }
     }
+
+    // ------------------------------------------------------------------
+    // BAR TIMESTAMP CONVENTION
+    // ------------------------------------------------------------------
+
+    /// Builds a bar's open/close pair from the single timestamp NinjaTrader
+    /// gives for a completed bar.
+    ///
+    /// This is a two-line function that lives in its own class for one
+    /// reason: when it was inline in the host, it was WRONG for two builds
+    /// and no test could see it. NinjaTrader stamps a completed bar at its
+    /// CLOSE. Reading that stamp as the OPEN and adding the bar period put
+    /// every timestamp in every output file one whole bar-period into the
+    /// future.
+    public static class V4BarStamp
+    {
+        /// CORRECT: the stamp IS the close; the open is derived backwards.
+        public static void FromNtStamp(DateTime stampEt, int minutesPerBar,
+                                       out DateTime etOpen, out DateTime etClose)
+        {
+            etClose = stampEt;
+            etOpen = stampEt.AddMinutes(-minutesPerBar);
+        }
+
+        /// The defect, kept ONLY so a regression test can demonstrate it
+        /// still reproduces the field-observed symptom. Never call this.
+        public static void FromNtStampAsOpen_DEFECT(DateTime stampEt, int minutesPerBar,
+                                                    out DateTime etOpen, out DateTime etClose)
+        {
+            etOpen = stampEt;
+            etClose = stampEt.AddMinutes(minutesPerBar);
+        }
+    }
 }

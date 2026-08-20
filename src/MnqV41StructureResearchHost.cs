@@ -506,8 +506,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // in. That is precisely the dependency SnapshotCutoff was written
             // to eliminate. Reading the stamp correctly puts the guard back
             // where it belongs.
-            b.EtClose = ToEt(Times[bip][0]);
-            b.EtOpen = b.EtClose.AddMinutes(-MinutesOf(tf));
+            V4BarStamp.FromNtStamp(ToEt(Times[bip][0]), MinutesOf(tf), out b.EtOpen, out b.EtClose);
             b.Open = Opens[bip][0]; b.High = Highs[bip][0];
             b.Low = Lows[bip][0]; b.Close = Closes[bip][0];
             b.Volume = Volumes[bip][0];
