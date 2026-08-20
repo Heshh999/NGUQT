@@ -408,4 +408,68 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             return v[idxFromOldest];
         }
     }
+
+    // ------------------------------------------------------------------
+    // BREAK TRANSITION GATE
+    // ------------------------------------------------------------------
+
+    /// Turns "price is beyond the level" into "price just BROKE the level".
+    ///
+    /// This exists because the difference is not cosmetic. Testing the state
+    /// rather than the transition makes a single trend leg emit one event per
+    /// bar: on the first V4.1 sample, 84% of confirmed swing levels were
+    /// "broken" more than once - mean 4.5 times, up to 16 - 78% of events
+    /// landed exactly one bar after the previous one, and 1,705 rows came
+    /// from 306 actual theses.
+    ///
+    /// The rule: a level fires ONCE per excursion. It can fire again only
+    /// after price has closed back inside it, or once the confirmed level
+    /// itself has moved to a different price.
+    public class V4BreakGate
+    {
+        private double lastBrokeHigh = double.NaN, lastBrokeLow = double.NaN;
+        private bool highReentered = true, lowReentered = true;
+
+        public void Reset()
+        {
+            lastBrokeHigh = lastBrokeLow = double.NaN;
+            highReentered = lowReentered = true;
+        }
+
+        /// Fold one completed bar in. Returns +1 for a fresh high break, -1
+        /// for a fresh low break, 0 for neither. Call once per bar and in
+        /// order - it carries state by design.
+        public int Update(double barHigh, double barLow, double barClose,
+                          bool haveHigh, double swingHigh,
+                          bool haveLow, double swingLow)
+        {
+            // Decide using the state as it stood ENTERING this bar, then
+            // update re-entry from this bar's close for the NEXT one.
+            //
+            // The other order looks equivalent and is not: a bar that pokes
+            // above the level and closes back below would re-arm the gate and
+            // then immediately fire on itself, so one bar counts as both the
+            // re-entry and the next break.
+            bool newHighLevel = haveHigh
+                && (!V4Num.Ok(lastBrokeHigh) || Math.Abs(swingHigh - lastBrokeHigh) > 1e-9);
+            bool newLowLevel = haveLow
+                && (!V4Num.Ok(lastBrokeLow) || Math.Abs(swingLow - lastBrokeLow) > 1e-9);
+
+            int fired = 0;
+            if (haveHigh && barHigh > swingHigh && (newHighLevel || highReentered))
+            {
+                lastBrokeHigh = swingHigh; highReentered = false;
+                fired = 1;
+            }
+            else if (haveLow && barLow < swingLow && (newLowLevel || lowReentered))
+            {
+                lastBrokeLow = swingLow; lowReentered = false;
+                fired = -1;
+            }
+
+            if (haveHigh && barClose < swingHigh && fired != 1) highReentered = true;
+            if (haveLow && barClose > swingLow && fired != -1) lowReentered = true;
+            return fired;
+        }
+    }
 }

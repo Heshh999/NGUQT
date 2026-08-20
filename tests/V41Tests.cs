@@ -63,6 +63,7 @@ namespace MnqTwoTests
             NoLookahead();
             OrderFlowFeatures();
             SchemaAndValidity();
+            BreakTransition();
 
             Console.WriteLine("V4.1: " + passed + " passed, " + failed + " failed");
             return failed;
@@ -500,6 +501,63 @@ namespace MnqTwoTests
             Check(double.IsNaN(V4Num.SafeDiv(10, 0.0000001, 1e-3)),
                   "a near-zero denominator returns NaN rather than an exploded number");
             Check(Math.Abs(V4Num.SafeDiv(10, 2, 1e-9) - 5) < 1e-9, "an ordinary divide still works");
+        }
+
+        // ---------------------------------------------------------------
+        // BREAK TRANSITION - the defect the first live sample exposed
+        // ---------------------------------------------------------------
+        private static void BreakTransition()
+        {
+            Console.WriteLine(" break transition gate");
+            V4BreakGate g = new V4BreakGate();
+
+            // price breaks a confirmed swing high, then STAYS above it for
+            // four more bars. The old state test fired on all five.
+            Check(g.Update(101, 99, 100.5, true, 100, false, double.NaN) == 1,
+                  "first bar beyond the level fires");
+            Check(g.Update(102, 100.5, 101.5, true, 100, false, double.NaN) == 0,
+                  "second bar still beyond does NOT fire again");
+            Check(g.Update(103, 101, 102.5, true, 100, false, double.NaN) == 0,
+                  "third bar still beyond does not fire");
+            Check(g.Update(104, 102, 103.5, true, 100, false, double.NaN) == 0,
+                  "fourth bar still beyond does not fire");
+
+            // price closes back INSIDE, then breaks the same level again
+            Check(g.Update(100.5, 98, 99, true, 100, false, double.NaN) == 0,
+                  "closing back inside is not itself a break");
+            Check(g.Update(101, 99.5, 100.5, true, 100, false, double.NaN) == 1,
+                  "breaking the SAME level again after re-entry fires once more");
+
+            // a NEW confirmed level higher up is a genuinely new break
+            Check(g.Update(106, 104, 105.5, true, 105, false, double.NaN) == 1,
+                  "a break of a DIFFERENT confirmed level fires");
+            Check(g.Update(107, 105.5, 106.5, true, 105, false, double.NaN) == 0,
+                  "...and then stops firing while price stays beyond it");
+
+            // the low side is independent and mirrors
+            V4BreakGate d = new V4BreakGate();
+            Check(d.Update(101, 99, 99.5, false, double.NaN, true, 100) == -1,
+                  "first bar below the level fires a low break");
+            Check(d.Update(100, 98, 98.5, false, double.NaN, true, 100) == 0,
+                  "second bar still below does not fire");
+            Check(d.Update(101.5, 100.5, 101, false, double.NaN, true, 100) == 0,
+                  "closing back above is not a break");
+            Check(d.Update(101, 99, 99.5, false, double.NaN, true, 100) == -1,
+                  "re-breaking the low after re-entry fires again");
+
+            // a bar that never reaches the level cannot fire
+            V4BreakGate q = new V4BreakGate();
+            Check(q.Update(99.5, 98, 99, true, 100, false, double.NaN) == 0,
+                  "a bar that never reaches the level never fires");
+
+            // Reset clears carried state, which matters because NinjaTrader
+            // reuses the strategy instance across runs
+            V4BreakGate r = new V4BreakGate();
+            r.Update(101, 99, 100.5, true, 100, false, double.NaN);
+            Check(r.Update(102, 100.5, 101.5, true, 100, false, double.NaN) == 0, "state carries within a run");
+            r.Reset();
+            Check(r.Update(102, 100.5, 101.5, true, 100, false, double.NaN) == 1,
+                  "Reset clears the gate so a re-run starts clean");
         }
     }
 }

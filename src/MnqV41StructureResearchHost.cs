@@ -186,6 +186,24 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly HashSet<string> pathsOpenedThisRun = new HashSet<string>();
         private readonly List<PendingProbe> pending = new List<PendingProbe>();
         private readonly List<PendingProbe> openProbes = new List<PendingProbe>();
+        private readonly List<OpenEvent> openEvents = new List<OpenEvent>();
+
+        /// A parent event whose FEATURES are already frozen as text, waiting
+        /// for its forward window to close so the labels can be appended.
+        ///
+        /// The first sample shipped a structure file with 9 label columns,
+        /// all of them vector recovery - so the parent event had no forward
+        /// outcome of its own and the B1/B3/B4 ablations (structure vs
+        /// vector, vs level, vs EMA fan) had nothing to compare. Freezing
+        /// the feature text at the event instant and appending labels later
+        /// gives the parent an outcome without ever letting a later value
+        /// reach a feature column.
+        private class OpenEvent
+        {
+            public string FeatureCsv = "";
+            public DateTime EventEt;
+            public V4ForwardLabels Labels = new V4ForwardLabels();
+        }
 
         private TimeZoneInfo etZone;
         private DateTime sampleStartEt = DateTime.MinValue;
@@ -193,6 +211,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int fifteenBarCount;
         private long structRows, entryRows;
         private string outDir = "";
+
+        // Fires once per excursion rather than on every bar price spends
+        // beyond a level. See V4BreakGate for what that distinction cost.
+        private readonly V4BreakGate breakGate = new V4BreakGate();
 
         /// One entry probe awaiting a trigger, then awaiting its labels.
         private class PendingProbe
@@ -292,6 +314,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 structRows = entryRows = 0;
                 fifteenBarCount = 0;
                 aborted = false; diagPrinted = false;
+                breakGate.Reset();
+                openEvents.Clear();
 
                 try { etZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); }
                 catch (Exception)
@@ -487,7 +511,40 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (tf == "15m") audit.NoteVector(v == null ? V4VectorColor.NONE : v.Color);
 
             if (bip == Bip1m) On1mBar(b, atr);
+            else if (tf == "3m") On3mBar(b, atr);
             else if (tf == "15m") On15mBar(b, atr, t, v, kh, kl);
+        }
+
+        // ---- the 3m layer: ARCH-B entries and the ARCH-C confirmation --
+        //
+        // Without this the whole architecture comparison is dead. The first
+        // sample returned 1533 of 1533 entry rows as ARCH-A, because 3m
+        // probes were skipped in the 1m loop and nothing ever set the
+        // ARCH-C confirmation flag - so two of the three declared
+        // architectures could never produce a single row.
+        private void On3mBar(V4Bar b, double atr3m)
+        {
+            for (int i = pending.Count - 1; i >= 0; i--)
+            {
+                PendingProbe p = pending[i];
+                if ((b.EtClose - p.EventEt).TotalMinutes > MaxEntryDelayMinutes)
+                { pending.RemoveAt(i); continue; }
+                if (b.EtClose <= p.EventEt) continue;
+
+                // ARCH-C: the 3m bar is the SETUP layer. It confirms, and the
+                // 1m layer then executes. Confirmation is a close in the
+                // event's direction - the same test ARCH-B uses to enter, so
+                // the two architectures are separated by execution only.
+                if (p.NeedsConfirm && !p.Confirmed)
+                {
+                    bool go3 = p.Side > 0 ? b.Close > p.EventClose : b.Close < p.EventClose;
+                    if (go3) p.Confirmed = true;
+                    continue;
+                }
+
+                if (p.EntryTf != "3m") continue;
+                if (TryTrigger(p, b, atr3m)) { pending.RemoveAt(i); openProbes.Add(p); }
+            }
         }
 
         // ---- the 1m clock: levels, labels, probes ---------------------
@@ -525,6 +582,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     WriteEntryRow(p);
                     openProbes.RemoveAt(i);
+                }
+            }
+
+            // parent events advance on the same 1m clock
+            for (int i = openEvents.Count - 1; i >= 0; i--)
+            {
+                OpenEvent oe = openEvents[i];
+                oe.Labels.OnBar(b, lastEma9_1m);
+                if (oe.Labels.WindowComplete)
+                {
+                    WriteCompletedEvent(oe);
+                    openEvents.RemoveAt(i);
                 }
             }
         }
@@ -588,14 +657,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // A parent event is a break of a CONFIRMED swing. Direction comes
             // from which extreme was taken - never from vector colour.
-            if (kh.Valid && b.High > kh.Price)
-            {
-                side = 1; kind = "BREAK_HIGH"; triggerLevel = kh.Price;
-            }
-            else if (kl.Valid && b.Low < kl.Price)
-            {
-                side = -1; kind = "BREAK_LOW"; triggerLevel = kl.Price;
-            }
+            //
+            // The test is on the TRANSITION, not the state. Asking only
+            // "is the high above the last confirmed swing high" is true on
+            // EVERY bar until a new swing confirms above, so a single trend
+            // leg emits an event per bar. Measured on the first sample: 84%
+            // of levels were "broken" more than once, mean 4.5 rows each and
+            // up to 16, 78% of events landed exactly 15 minutes after the
+            // previous one, and 1705 rows came from 306 real theses.
+            //
+            // So a level fires once per excursion. It can fire again only
+            // after price has closed back inside it, or when the confirmed
+            // level itself has moved.
+            int gated = breakGate.Update(b.High, b.Low, b.Close,
+                                        kh.Valid, kh.Valid ? kh.Price : double.NaN,
+                                        kl.Valid, kl.Valid ? kl.Price : double.NaN);
+            if (gated > 0) { side = 1; kind = "BREAK_HIGH"; triggerLevel = kh.Price; }
+            else if (gated < 0) { side = -1; kind = "BREAK_LOW"; triggerLevel = kl.Price; }
 
             bool isControl = false;
             if (side == 0)
@@ -833,8 +911,48 @@ namespace NinjaTrader.NinjaScript.Strategies
             V4RowBuilder.Validity(r, validity);
 
             audit.NoteRow(b.EtClose, cutoff, warm);
-            structSchema.Verify(r);
-            Append("structure", b.EtClose, structSchema.Header, r.Csv());
+
+            // Features are frozen HERE as text. The row is not written until
+            // its forward window closes and the labels are appended, so the
+            // parent event carries its own outcome without any later value
+            // ever touching a feature column.
+            if (!structSchema.Established) structSchema.Establish(BuildStructureSchemaRow(r, b));
+            structSchema.Verify(BuildStructureSchemaRow(r, b));
+
+            OpenEvent oe = new OpenEvent();
+            oe.FeatureCsv = r.Csv();
+            oe.EventEt = b.EtClose;
+            oe.Labels.Stops.Freeze(side, b.Close, atr,
+                side > 0 ? b.Low - 0.25 : b.High + 0.25,
+                side > 0 ? b.Low - 0.5 * atr : b.High + 0.5 * atr,
+                side > 0 ? (kl.Valid ? kl.Price - 0.25 : b.Low - atr)
+                         : (kh.Valid ? kh.Price + 0.25 : b.High + atr));
+            oe.Labels.RaceStop = V4StopKind.MEDIUM;
+            oe.Labels.Open(side, b.Close, b.EtClose, atr, lastEma9_1m);
+            openEvents.Add(oe);
+        }
+
+        /// The structure schema is feature columns followed by label columns.
+        /// Built from one throwaway row so the header can be established
+        /// before any window has closed.
+        private V4Row BuildStructureSchemaRow(V4Row featureRow, V4Bar b)
+        {
+            V4Row probe = new V4Row(b.EtClose);
+            V4ForwardLabels empty = new V4ForwardLabels();
+            V4RowBuilder.Labels(probe, empty);
+            V4Row combined = new V4Row(b.EtClose);
+            // names only matter for the schema check; values are irrelevant
+            for (int i = 0; i < featureRow.Count; i++) combined.Key(featureRow.NameAt(i), "");
+            for (int i = 0; i < probe.Count; i++) combined.Key(probe.NameAt(i), "");
+            return combined;
+        }
+
+        private void WriteCompletedEvent(OpenEvent oe)
+        {
+            V4Row rl = new V4Row(oe.EventEt);
+            V4RowBuilder.Labels(rl, oe.Labels);
+            for (int i = 0; i < oe.Labels.Races.Length; i++) audit.NoteRace(oe.Labels.Races[i].Outcome);
+            Append("structure", oe.EventEt, structSchema.Header, oe.FeatureCsv + "," + rl.Csv());
             structRows++;
         }
 
@@ -917,6 +1035,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 WriteEntryRow(openProbes[i]);
             }
             openProbes.Clear();
+
+            for (int i = 0; i < openEvents.Count; i++)
+            {
+                openEvents[i].Labels.CloseWindow();
+                WriteCompletedEvent(openEvents[i]);
+            }
+            openEvents.Clear();
 
             PrintLines(audit.Text());
             Print("  " + structSchema.Describe());

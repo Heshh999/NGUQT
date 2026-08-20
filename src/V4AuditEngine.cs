@@ -191,7 +191,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         private readonly HashSet<int> days = new HashSet<int>();
         private DateTime prevBarEt = DateTime.MinValue;
         public int ShortGapMinutes = 5;
-        public int GraceMinutes = 5;
+        /// How late the first print after a reopen may be and still count as
+        /// a quiet session rather than missing data. Thin early-MNQ overnight
+        /// sessions routinely take this long to trade.
+        public int ReopenGraceMinutes = 30;
 
         public void NoteBar(V4Bar b, int dayKey)
         {
@@ -206,8 +209,21 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                 if (gap > 1.0 && gap < ShortGapMinutes) QuietMinutes++;
                 else if (gap >= ShortGapMinutes)
                 {
-                    if (V4SessionMap.IsScheduledHaltBoundary(b.EtClose, GraceMinutes)) ScheduledHaltGaps++;
-                    else if (b.EtClose.DayOfWeek == DayOfWeek.Sunday) WeekendGaps++;
+                    // Order matters. Weekend is tested FIRST because a Sunday
+                    // reopen also lands in the 18:00 halt window, and testing
+                    // the halt first swallowed every weekend into the halt
+                    // count - the first sample reported 68 halts and ONE
+                    // weekend across 36 session days.
+                    //
+                    // The grace is wide because NinjaTrader prints no bar when
+                    // nothing trades. Early MNQ overnight sessions are thin
+                    // enough that the first print can be a quarter of an hour
+                    // after the reopen, which is a quiet market, not a hole in
+                    // the data. That same confusion once made this project
+                    // report 436 of 463 scheduled halts as data loss.
+                    if (b.EtClose.DayOfWeek == DayOfWeek.Sunday) WeekendGaps++;
+                    else if (V4SessionMap.IsScheduledHaltBoundary(b.EtClose, ReopenGraceMinutes))
+                        ScheduledHaltGaps++;
                     else
                     {
                         UnexplainedGaps++;
@@ -280,6 +296,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                     + " min at " + V4Num.T(WorstGapAtEt));
             sb.AppendLine("  quiet minutes           " + V4Num.I((int)QuietMinutes)
                         + "  (< " + V4Num.I(ShortGapMinutes) + "m; NinjaTrader prints no bar when nothing trades)");
+            sb.AppendLine("  reopen grace            " + V4Num.I(ReopenGraceMinutes) + " min after a scheduled reopen");
             sb.AppendLine("Causality");
             sb.AppendLine("  lookahead violations    " + V4Num.I((int)LookaheadViolations)
                         + "   (any value above zero INVALIDATES this capture)");
