@@ -174,7 +174,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             Bars++;
             if (FirstEt == DateTime.MinValue) FirstEt = b.EtClose;
             LastEt = b.EtClose;
-            days[b.EtClose.Year * 10000 + b.EtClose.Month * 100 + b.EtClose.Day] = true;
+            // EXCHANGE days, not calendar dates. A Sunday 18:00-midnight bar
+            // belongs to Monday's exchange day; keying on the calendar date
+            // counted every Sunday as its own session day, and the 9.5-month
+            // capture reported 250 "session days" beside the profile audit's
+            // correct 206 sessions over the identical bars.
+            DateTime xd = b.EtClose.Hour >= 18 ? b.EtClose.Date.AddDays(1) : b.EtClose.Date;
+            days[xd.Year * 10000 + xd.Month * 100 + xd.Day] = true;
 
             if (prevClose != DateTime.MinValue)
             {

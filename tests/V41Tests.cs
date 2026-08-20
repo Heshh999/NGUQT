@@ -1093,6 +1093,38 @@ namespace MnqTwoTests
             // itself written into audit files on the zero-bar path
             Check(empty.Text().IndexOf("NO FILES WRITTEN") < 0,
                   "the shared verdict text makes no claim about files");
+
+            // -----------------------------------------------------------
+            // SESSION DAYS must count EXCHANGE days, not calendar dates.
+            // The 9.5-month capture reported "session days 250" beside the
+            // profile audit's correct 206 sessions over the identical bars:
+            // the order-flow audit keyed on the calendar date, so every
+            // Sunday-evening session (18:00-midnight, which belongs to
+            // MONDAY's exchange day) counted as its own day.
+            // -----------------------------------------------------------
+            V4OrderFlowAudit ofa = new V4OrderFlowAudit();
+            V4FootprintBar sun = new V4FootprintBar();
+            sun.EtClose = new DateTime(2026, 8, 16, 19, 0, 0);   // Sunday 19:00 ET
+            sun.Open = sun.High = sun.Low = sun.Close = 100; sun.Volume = 10;
+            V4FootprintBar mon = new V4FootprintBar();
+            mon.EtClose = new DateTime(2026, 8, 17, 10, 0, 0);   // Monday 10:00 ET
+            mon.Open = mon.High = mon.Low = mon.Close = 100; mon.Volume = 10;
+            ofa.Observe(sun, 0.25);
+            ofa.Observe(mon, 0.25);
+            Check(ofa.SessionDays == 1,
+                  "Sunday 19:00 and Monday 10:00 are ONE exchange day, not two");
+            V4FootprintBar tue = new V4FootprintBar();
+            tue.EtClose = new DateTime(2026, 8, 17, 18, 30, 0);  // Monday 18:30 = Tuesday's day
+            tue.Open = tue.High = tue.Low = tue.Close = 100; tue.Volume = 10;
+            ofa.Observe(tue, 0.25);
+            Check(ofa.SessionDays == 2,
+                  "Monday 18:30 opens TUESDAY's exchange day");
+            V4FootprintBar cut = new V4FootprintBar();
+            cut.EtClose = new DateTime(2026, 8, 17, 17, 0, 0);   // Monday 17:00 = still Monday
+            cut.Open = cut.High = cut.Low = cut.Close = 100; cut.Volume = 10;
+            ofa.Observe(cut, 0.25);
+            Check(ofa.SessionDays == 2,
+                  "Monday 17:00 still belongs to Monday - the boundary is 18:00 ET");
         }
 
         // ---------------------------------------------------------------
