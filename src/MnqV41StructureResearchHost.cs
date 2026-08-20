@@ -492,8 +492,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBars[bip] < 1) return;
 
             V4Bar b = new V4Bar();
-            b.EtOpen = ToEt(Times[bip][0]);
-            b.EtClose = b.EtOpen.AddMinutes(MinutesOf(tf));
+            // NinjaTrader stamps a COMPLETED bar at its CLOSE, not its open.
+            // Reading that stamp as the open put every timestamp in every
+            // output file one whole bar-period into the future, and the
+            // symptom was unmissable once the data existed: ARCH-A reported a
+            // median minsToEntry of MINUS TWELVE, an entry preceding its own
+            // event by 12 minutes.
+            //
+            // The quieter half of the damage mattered more. With 15m events
+            // stamped +15 and 1m bars stamped +1, the SnapshotCutoff was
+            // wildly permissive, and the only thing still preventing
+            // lookahead was the order NinjaTrader happens to deliver series
+            // in. That is precisely the dependency SnapshotCutoff was written
+            // to eliminate. Reading the stamp correctly puts the guard back
+            // where it belongs.
+            b.EtClose = ToEt(Times[bip][0]);
+            b.EtOpen = b.EtClose.AddMinutes(-MinutesOf(tf));
             b.Open = Opens[bip][0]; b.High = Highs[bip][0];
             b.Low = Lows[bip][0]; b.Close = Closes[bip][0];
             b.Volume = Volumes[bip][0];
@@ -569,6 +583,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 PendingProbe p = pending[i];
                 double mins = (b.EtClose - p.EventEt).TotalMinutes;
                 if (mins > MaxEntryDelayMinutes) { pending.RemoveAt(i); continue; }
+                // A bar closing at or before the event instant cannot trigger
+                // it. The 3m path already had this guard; the 1m path did
+                // not, which is why ARCH-A was the architecture that showed
+                // the negative delay while ARCH-B and ARCH-C did not.
+                if (b.EtClose <= p.EventEt) continue;
                 if (p.EntryTf != "1m") continue;
                 if (p.NeedsConfirm && !p.Confirmed) continue;
                 if (TryTrigger(p, b, atr1m)) { pending.RemoveAt(i); openProbes.Add(p); }
@@ -993,6 +1012,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             V4RowBuilder.Validity(r, validity);
 
+            audit.NoteEntryDelay(p.MinsToEntry);
             for (int i = 0; i < p.Labels.Races.Length; i++) audit.NoteRace(p.Labels.Races[i].Outcome);
 
             entrySchema.Verify(r);

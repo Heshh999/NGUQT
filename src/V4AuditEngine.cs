@@ -166,6 +166,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
     {
         public long Rows;
         public long WarmupRows;
+        public long BarsObserved;
         public DateTime FirstEt = DateTime.MaxValue, LastEt = DateTime.MinValue;
         public int SessionDays;
 
@@ -181,6 +182,15 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         public long LookaheadViolations;
         public long AmbiguousRaces;
         public long ResolvedRaces;
+
+        /// An entry can never precede its own event. Counting this is what
+        /// turns a whole class of timestamp bug from invisible into obvious:
+        /// reading NinjaTrader's bar stamp as the OPEN rather than the CLOSE
+        /// put every timestamp one bar-period late and produced a median
+        /// entry delay of MINUS TWELVE MINUTES, which nothing in the engine
+        /// objected to at the time.
+        public long NegativeEntryDelays;
+        public int WorstNegativeEntryDelay;
 
         public long VectorsGreen, VectorsRed, VectorsBlue, VectorsViolet, NonVectorBars;
         public long Ema800UnavailableRows;
@@ -198,6 +208,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
 
         public void NoteBar(V4Bar b, int dayKey)
         {
+            BarsObserved++;
             if (b.EtClose < FirstEt) FirstEt = b.EtClose;
             if (b.EtClose > LastEt) LastEt = b.EtClose;
             days.Add(dayKey);
@@ -255,19 +266,68 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             if (featureAsOfEt != DateTime.MinValue && featureAsOfEt > eventEt) LookaheadViolations++;
         }
 
+        public void NoteEntryDelay(int minsToEntry)
+        {
+            if (minsToEntry >= 0) return;
+            NegativeEntryDelays++;
+            if (minsToEntry < WorstNegativeEntryDelay) WorstNegativeEntryDelay = minsToEntry;
+        }
+
         public void NoteRace(V4RaceOutcome o)
         {
             if (o == V4RaceOutcome.AMBIGUOUS) AmbiguousRaces++;
             else if (o == V4RaceOutcome.TARGET || o == V4RaceOutcome.STOP) ResolvedRaces++;
         }
 
+        /// Unexplained gaps as a share of BAR TRANSITIONS - how much of the
+        /// series is actually suspect.
+        ///
+        /// This used to divide by the gap count instead, which measures
+        /// something else entirely and made the threshold unreachable: a
+        /// clean 45-day sample with 4 short unexplained gaps scored 4.4%
+        /// against a 0.5% limit, and the full seven-year capture would have
+        /// scored 11.7%. The same four gaps against bar transitions are
+        /// 0.0066%, which is the number the threshold was written for.
+        public double UnexplainedGapPctOfBars
+        {
+            get { return BarsObserved > 0 ? 100.0 * UnexplainedGaps / BarsObserved : 0.0; }
+        }
+
+        /// Why the verdict came out the way it did, so a NEEDS REVIEW on a
+        /// deliberately short sample is not mistaken for a data problem.
+        public string VerdictReason = "";
+
         public V4Verdict Verdict()
         {
-            if (LookaheadViolations > 0) return V4Verdict.FAILED;
-            if (Rows < MinRowsRequired) return V4Verdict.NEEDS_REVIEW;
-            long bigGaps = UnexplainedGaps + ScheduledHaltGaps + WeekendGaps;
-            double pct = bigGaps > 0 ? 100.0 * UnexplainedGaps / bigGaps : 0.0;
-            if (pct > MaxUnexplainedGapPct) return V4Verdict.NEEDS_REVIEW;
+            if (LookaheadViolations > 0)
+            {
+                VerdictReason = "lookahead violations present - the capture is invalid";
+                return V4Verdict.FAILED;
+            }
+            if (NegativeEntryDelays > 0)
+            {
+                VerdictReason = V4Num.I((int)NegativeEntryDelays)
+                    + " entries precede their own event, worst by "
+                    + V4Num.I(-WorstNegativeEntryDelay)
+                    + " minutes - the timestamps are wrong, not the market";
+                return V4Verdict.FAILED;
+            }
+            if (UnexplainedGapPctOfBars > MaxUnexplainedGapPct)
+            {
+                VerdictReason = "unexplained gaps are "
+                    + UnexplainedGapPctOfBars.ToString("0.####", CultureInfo.InvariantCulture)
+                    + "% of bar transitions, above the "
+                    + MaxUnexplainedGapPct.ToString("0.##", CultureInfo.InvariantCulture) + "% limit";
+                return V4Verdict.NEEDS_REVIEW;
+            }
+            if (Rows < MinRowsRequired)
+            {
+                VerdictReason = "SAMPLE SIZE ONLY - " + V4Num.I((int)Rows) + " rows is below the "
+                    + V4Num.I(MinRowsRequired) + " a full capture needs. Data quality itself is clean. "
+                    + "Expected on a short test run.";
+                return V4Verdict.NEEDS_REVIEW;
+            }
+            VerdictReason = "";
             return V4Verdict.PASSED;
         }
 
@@ -289,7 +349,9 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             sb.AppendLine("  scheduled halts         " + V4Num.I((int)ScheduledHaltGaps)
                         + "  (16:15-16:30 and 17:00-18:00 ET - NOT data loss)");
             sb.AppendLine("  weekend                 " + V4Num.I((int)WeekendGaps));
-            sb.AppendLine("  UNEXPLAINED             " + V4Num.I((int)UnexplainedGaps));
+            sb.AppendLine("  UNEXPLAINED             " + V4Num.I((int)UnexplainedGaps)
+                        + "   (" + UnexplainedGapPctOfBars.ToString("0.####", CultureInfo.InvariantCulture)
+                        + "% of " + V4Num.I((int)BarsObserved) + " bar transitions)");
             if (UnexplainedGaps > 0)
                 sb.AppendLine("  worst unexplained       "
                     + WorstUnexplainedGapMinutes.ToString("0", CultureInfo.InvariantCulture)
@@ -300,6 +362,11 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             sb.AppendLine("Causality");
             sb.AppendLine("  lookahead violations    " + V4Num.I((int)LookaheadViolations)
                         + "   (any value above zero INVALIDATES this capture)");
+            sb.AppendLine("  negative entry delays   " + V4Num.I((int)NegativeEntryDelays)
+                        + (NegativeEntryDelays > 0
+                            ? "   WORST " + V4Num.I(WorstNegativeEntryDelay)
+                              + " min - AN ENTRY CANNOT PRECEDE ITS EVENT"
+                            : "   (an entry can never precede its event)"));
             sb.AppendLine("  every feature timestamp is checked against its own event timestamp.");
             sb.AppendLine("Stop/target race resolution");
             sb.AppendLine("  resolved                " + V4Num.I((int)ResolvedRaces));
@@ -320,15 +387,22 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             sb.AppendLine("Thresholds");
             sb.AppendLine("  require rows >= " + V4Num.I(MinRowsRequired)
                         + ", lookahead violations = 0, unexplained gaps <= "
-                        + MaxUnexplainedGapPct.ToString("0.#", CultureInfo.InvariantCulture) + "% of all gaps");
+                        + MaxUnexplainedGapPct.ToString("0.##", CultureInfo.InvariantCulture)
+                        + "% of BAR TRANSITIONS");
             sb.AppendLine("======================================================================");
             V4Verdict v = Verdict();
             if (v == V4Verdict.PASSED)
                 sb.AppendLine("VERDICT: PASSED - structure/vector history is complete enough to research.");
             else if (v == V4Verdict.NEEDS_REVIEW)
-                sb.AppendLine("VERDICT: NEEDS REVIEW - usable, but read the gap and row counts above first.");
+            {
+                sb.AppendLine("VERDICT: NEEDS REVIEW");
+                sb.AppendLine("  reason: " + VerdictReason);
+            }
             else
-                sb.AppendLine("VERDICT: FAILED - DO NOT USE THIS CAPTURE. See lookahead violations above.");
+            {
+                sb.AppendLine("VERDICT: FAILED - DO NOT USE THIS CAPTURE.");
+                sb.AppendLine("  reason: " + VerdictReason);
+            }
             sb.AppendLine("======================================================================");
             return sb.ToString();
         }
