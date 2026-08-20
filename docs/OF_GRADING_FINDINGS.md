@@ -108,3 +108,80 @@ to keep capturing volumetric data.
    untouched) — as a genuinely new preregistration, not a rescue.
 3. Fix the engine's alias column (`f_ofCumDeltaSlope`) so no future
    analysis double-counts it.
+
+---
+
+# ADDENDUM — $1,000 Account Feasibility (2026-08-20)
+
+**LEDGER: OF-OOS IS SPENT.** June–July 2026 were opened at the user's
+explicit direction, after the cost was stated, to illustrate P&L. They
+may never again be described as untouched or used as confirmatory
+evidence. Script: analysis/v41/acct1000.py.
+
+Not a strategy backtest. Nothing survived validation; the A+ rule below
+is a searched cell reported WEAK/INCONCLUSIVE above. The point of this
+addendum is that the account-size conclusion holds **whether or not the
+edge is real**.
+
+## The asked-for window looks excellent
+
+A+ events, 2R exit, 1 MNQ contract, $2/pt, 0.87 pt round-turn cost:
+
+| period | n | end equity | peak | max DD |
+|---|---|---|---|---|
+| May–Jul 2026 | 124 | **$4,977** | $5,572 | $2,375 |
+| Nov 2025–Apr 2026 (prior) | 209 | $3,022 | $4,003 | $2,623 |
+| Nov 2025–Jul 2026 | 333 | $5,999 | $6,594 | $2,623 |
+
+May–Jul returns +298% on $1,000. Taken alone it is the best three-month
+stretch in the window.
+
+## Month by month, $1,000 reset each month, 2R
+
+| month | n | end | month | n | end |
+|---|---|---|---|---|---|
+| 2025-11 | 18 | −45% | 2026-04 | 48 | −63% |
+| 2025-12 | 34 | +115% | 2026-05 | 37 | +105% |
+| 2026-01 | 35 | +230% | 2026-06 | 41 | +141% |
+| **2026-02** | **37** | **−219%** | 2026-07 | 46 | +51% |
+| 2026-03 | 37 | +84% | | | |
+
+**February 2026 ends at −$1,189 — the account is destroyed and left in
+debit.** The continuous Nov→Jul run "survives" February only because it
+entered with ~$4,000 of prior profit. Start date decides everything,
+which is the signature of a luck-dependent curve, not an edge.
+
+## Monte Carlo — 5,000 random orderings of the same 333 trades
+
+| account | probability of ruin | median end |
+|---|---|---|
+| **$1,000** | **50.7%** | **$0** |
+| $2,500 | 12.6% | $6,499 |
+| $5,000 | 0.4% | $8,999 |
+| $10,000 | 0.0% | $13,999 |
+| $25,000 | 0.0% | $28,999 |
+
+Same trades, same edge, only the order changed: **a $1,000 account is a
+coin flip to be wiped out.** The median outcome is zero.
+
+## Why — the arithmetic
+
+- Median A+ stop over May–Jul: **97 pt = $193 = 19.3% of $1,000** per
+  trade, on the smallest position that exists (1 MNQ; there is no
+  fraction of a contract).
+- Prudent risk of 1–2% on $1,000 is $10–20 = **5–10 MNQ points**. The
+  setups need 10–20× that.
+- Single worst trade in the pool: **−$650 (65% of the account).**
+  Ten worst: −650, −606, −590, −517, −500, −472, −404, −400, −389, −387.
+- Longest consecutive stop run: 6 = $1,158 = 116% of the account.
+- Account required for 1 contract at these stops: **$9,650 at 2% risk,
+  $19,300 at 1%.**
+
+## Verdict
+
+$1,000 cannot trade this. The binding constraint is **account size, not
+strategy** — and it would still bind if the edge were fully validated,
+because one MNQ contract at a 97-point stop is an irreducible ~$193 of
+risk. The honest minimum for this event class is roughly **$10,000**,
+and that buys the right to trade an edge that has not been shown to
+exist.
