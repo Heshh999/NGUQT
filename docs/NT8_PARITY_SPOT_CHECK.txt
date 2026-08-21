@@ -1,0 +1,276 @@
+NT8 <-> PYTHON MANUAL SPOT CHECK  (30 events, stratified by candidate/direction/month)
+full-population check: analysis/v41/compare_nt8_parity.py (ALL events, ALL fields)
+====================================================================================================
+
+OFH13  OFH13-20250819104100--1  dir -1
+   entryPx  py 24616.000000   nt 24616.000000   OK
+   R        py 13.250000      nt 13.250000      OK
+   atr      py 17.962500      nt 17.962500      OK
+   zLo      py 24618.250000   nt 24618.250000   OK
+   zHi      py 24629.000000   nt 24629.000000   OK
+   mid      py 24623.625000   nt 24623.625000   OK
+   depth    py 0.093023       nt 0.093023       OK
+   flow     py 1.000000       nt 1.000000       OK
+   A.net    py 38.880000      nt 38.880000      OK   exit py=TIME nt=TIME
+   A.exitPx py 24576.250000   nt 24576.250000   OK
+   A.held   py 60.000000      nt 60.000000      OK
+   A.mfe    py 101.500000     nt 101.500000     OK
+   A.mae    py 6.250000       nt 6.250000       OK
+
+OFH13  OFH13-20251009103800--1  dir -1
+   entryPx  py 25986.000000   nt 25986.000000   OK
+   R        py 12.750000      nt 12.750000      OK
+   atr      py 13.237500      nt 13.237500      OK
+   zLo      py 25992.500000   nt 25992.500000   OK
+   zHi      py 25998.500000   nt 25998.500000   OK
+   mid      py 25995.500000   nt 25995.500000   OK
+   depth    py 0.708333       nt 0.708333       OK
+   flow     py 1.000000       nt 1.000000       OK
+   A.net    py -20.726250     nt -20.726250     OK   exit py=STOP nt=STOP
+   A.exitPx py 26005.856250   nt 26005.856250   OK
+   A.held   py 15.000000      nt 15.000000      OK
+   A.mfe    py 29.250000      nt 29.250000      OK
+   A.mae    py 20.500000      nt 20.500000      OK
+
+OFH13  OFH13-20251202110900--1  dir -1
+   entryPx  py 26380.750000   nt 26380.750000   OK
+   R        py 28.750000      nt 28.750000      OK
+   atr      py 15.462500      nt 15.462500      OK
+   zLo      py 26389.250000   nt 26389.250000   OK
+   zHi      py 26409.250000   nt 26409.250000   OK
+   mid      py 26399.250000   nt 26399.250000   OK
+   depth    py 0.112500       nt 0.112500       OK
+   flow     py 1.000000       nt 1.000000       OK
+   A.net    py 91.880000      nt 91.880000      OK   exit py=TIME nt=TIME
+   A.exitPx py 26288.000000   nt 26288.000000   OK
+   A.held   py 60.000000      nt 60.000000      OK
+   A.mfe    py 203.750000     nt 203.750000     OK
+   A.mae    py 0.500000       nt 0.500000       OK
+
+OFH13  OFH13-20260203100900--1  dir -1
+   entryPx  py 26092.250000   nt 26092.250000   OK
+   R        py 24.750000      nt 24.750000      OK
+   atr      py 35.125000      nt 35.125000      OK
+   zLo      py 26095.750000   nt 26095.750000   OK
+   zHi      py 26116.750000   nt 26116.750000   OK
+   mid      py 26106.250000   nt 26106.250000   OK
+   depth    py 0.107143       nt 0.107143       OK
+   flow     py 1.000000       nt 1.000000       OK
+   A.net    py 9.130000       nt 9.130000       OK   exit py=TIME nt=TIME
+   A.exitPx py 26082.250000   nt 26082.250000   OK
+   A.held   py 60.000000      nt 60.000000      OK
+   A.mfe    py 112.000000     nt 112.000000     OK
+   A.mae    py 49.500000      nt 49.500000      OK
+
+OFH13  OFH13-20260407110800--1  dir -1
+   entryPx  py 24257.500000   nt 24257.500000   OK
+   R        py 9.000000       nt 9.000000       OK
+   atr      py 21.862500      nt 21.862500      OK
+   zLo      py 24255.500000   nt 24255.500000   OK
+   zHi      py 24266.250000   nt 24266.250000   OK
+   mid      py 24260.875000   nt 24260.875000   OK
+   depth    py 0.813953       nt 0.813953       OK
+   flow     py 1.000000       nt 1.000000       OK
+   A.net    py -33.663750     nt -33.663750     OK   exit py=STOP nt=STOP
+   A.exitPx py 24290.293750   nt 24290.293750   OK
+   A.held   py 3.000000       nt 3.000000       OK
+   A.mfe    py 10.750000      nt 10.750000      OK
+   A.mae    py 37.250000      nt 37.250000      OK
+
+OFH13  OFH13-20260601132500-+1  dir +1
+   entryPx  py 30852.750000   nt 30852.750000   OK
+   R        py 11.750000      nt 11.750000      OK
+   atr      py 10.462500      nt 10.462500      OK
+   zLo      py 30841.250000   nt 30841.250000   OK
+   zHi      py 30847.750000   nt 30847.750000   OK
+   mid      py 30844.500000   nt 30844.500000   OK
+   depth    py 0.884615       nt 0.884615       OK
+   flow     py 1.000000       nt 1.000000       OK
+   A.net    py 89.130000      nt 89.130000      OK   exit py=TIME nt=TIME
+   A.exitPx py 30942.750000   nt 30942.750000   OK
+   A.held   py 60.000000      nt 60.000000      OK
+   A.mfe    py 135.000000     nt 135.000000     OK
+   A.mae    py 9.750000       nt 9.750000       OK
+
+OFH14  OFH14-20250819100900-+1  dir +1
+   entryPx  py 24708.250000   nt 24708.250000   OK
+   R        py 15.250000      nt 15.250000      OK
+   atr      py 16.912500      nt 16.912500      OK
+   zLo      py 24693.250000   nt 24693.250000   OK
+   zHi      py 24711.250000   nt 24711.250000   OK
+   mid      py 24702.250000   nt 24702.250000   OK
+   depth    py 0.222222       nt 0.222222       OK
+   flow     py 0.000000       nt 0.000000       OK
+   A.net    py -16.120000     nt -16.120000     OK   exit py=STOP nt=STOP
+   A.exitPx py 24693.000000   nt 24693.000000   OK
+   A.held   py 8.000000       nt 8.000000       OK
+   A.mfe    py 20.250000      nt 20.250000      OK
+   A.mae    py 23.500000      nt 23.500000      OK
+
+OFH14  OFH14-20251001104000-+1  dir +1
+   entryPx  py 25658.500000   nt 25658.500000   OK
+   R        py 10.000000      nt 10.000000      OK
+   atr      py 10.987500      nt 10.987500      OK
+   zLo      py 25648.750000   nt 25648.750000   OK
+   zHi      py 25659.000000   nt 25659.000000   OK
+   mid      py 25653.875000   nt 25653.875000   OK
+   depth    py 0.195122       nt 0.195122       OK
+   flow     py 0.000000       nt 0.000000       OK
+   A.net    py -10.870000     nt -10.870000     OK   exit py=STOP nt=STOP
+   A.exitPx py 25648.500000   nt 25648.500000   OK
+   A.held   py 1.000000       nt 1.000000       OK
+   A.mfe    py 1.500000       nt 1.500000       OK
+   A.mae    py 14.500000      nt 14.500000      OK
+
+OFH14  OFH14-20251202100400-+1  dir +1
+   entryPx  py 26394.500000   nt 26394.500000   OK
+   R        py 4.000000       nt 4.000000       OK
+   atr      py 21.975000      nt 21.975000      OK
+   zLo      py 26390.750000   nt 26390.750000   OK
+   zHi      py 26396.000000   nt 26396.000000   OK
+   mid      py 26393.375000   nt 26393.375000   OK
+   depth    py 0.619048       nt 0.619048       OK
+   flow     py 0.000000       nt 0.000000       OK
+   A.net    py -4.870000      nt -4.870000      OK   exit py=STOP nt=STOP
+   A.exitPx py 26390.500000   nt 26390.500000   OK
+   A.held   py 1.000000       nt 1.000000       OK
+   A.mfe    py 6.500000       nt 6.500000       OK
+   A.mae    py 8.250000       nt 8.250000       OK
+
+OFH14  OFH14-20260202102200-+1  dir +1
+   entryPx  py 26403.250000   nt 26403.250000   OK
+   R        py 9.750000       nt 9.750000       OK
+   atr      py 18.325000      nt 18.325000      OK
+   zLo      py 26393.750000   nt 26393.750000   OK
+   zHi      py 26400.250000   nt 26400.250000   OK
+   mid      py 26397.000000   nt 26397.000000   OK
+   depth    py 0.115385       nt 0.115385       OK
+   flow     py 0.000000       nt 0.000000       OK
+   A.net    py -10.620000     nt -10.620000     OK   exit py=STOP nt=STOP
+   A.exitPx py 26393.500000   nt 26393.500000   OK
+   A.held   py 6.000000       nt 6.000000       OK
+   A.mfe    py 13.000000      nt 13.000000      OK
+   A.mae    py 22.750000      nt 22.750000      OK
+
+OFH14  OFH14-20260401120100-+1  dir +1
+   entryPx  py 24607.750000   nt 24607.750000   OK
+   R        py 8.500000       nt 8.500000       OK
+   atr      py 11.212500      nt 11.212500      OK
+   zLo      py 24599.500000   nt 24599.500000   OK
+   zHi      py 24606.250000   nt 24606.250000   OK
+   mid      py 24602.875000   nt 24602.875000   OK
+   depth    py 0.185185       nt 0.185185       OK
+   flow     py 0.000000       nt 0.000000       OK
+   A.net    py -9.370000      nt -9.370000      OK   exit py=STOP nt=STOP
+   A.exitPx py 24599.250000   nt 24599.250000   OK
+   A.held   py 12.000000      nt 12.000000      OK
+   A.mfe    py 14.250000      nt 14.250000      OK
+   A.mae    py 13.500000      nt 13.500000      OK
+
+OFH14  OFH14-20260601114900-+1  dir +1
+   entryPx  py 30815.250000   nt 30815.250000   OK
+   R        py 32.250000      nt 32.250000      OK
+   atr      py 15.375000      nt 15.375000      OK
+   zLo      py 30783.250000   nt 30783.250000   OK
+   zHi      py 30808.750000   nt 30808.750000   OK
+   mid      py 30796.000000   nt 30796.000000   OK
+   depth    py 0.019608       nt 0.019608       OK
+   flow     py 0.000000       nt 0.000000       OK
+   A.net    py -33.120000     nt -33.120000     OK   exit py=STOP nt=STOP
+   A.exitPx py 30783.000000   nt 30783.000000   OK
+   A.held   py 22.000000      nt 22.000000      OK
+   A.mfe    py 15.500000      nt 15.500000      OK
+   A.mae    py 38.000000      nt 38.000000      OK
+
+G4  G4-20250820113200-+1  dir +1
+   entryPx  py 24230.500000   nt 24230.500000   OK
+   R        py 16.250000      nt 16.250000      OK
+   atr      py 13.850000      nt 13.850000      OK
+
+G4  G4-20251002105100--1  dir -1
+   entryPx  py 25796.750000   nt 25796.750000   OK
+   R        py 23.750000      nt 23.750000      OK
+   atr      py 14.800000      nt 14.800000      OK
+
+G4  G4-20251202111000--1  dir -1
+   entryPx  py 26356.250000   nt 26356.250000   OK
+   R        py 35.500000      nt 35.500000      OK
+   atr      py 16.550000      nt 16.550000      OK
+
+G4  G4-20260202101800-+1  dir +1
+   entryPx  py 26393.250000   nt 26393.250000   OK
+   R        py 26.750000      nt 26.750000      OK
+   atr      py 24.037500      nt 24.037500      OK
+
+G4  G4-20260401100600-+1  dir +1
+   entryPx  py 24451.750000   nt 24451.750000   OK
+   R        py 24.250000      nt 24.250000      OK
+   atr      py 26.400000      nt 26.400000      OK
+
+G4  G4-20260601113300-+1  dir +1
+   entryPx  py 30832.250000   nt 30832.250000   OK
+   R        py 23.750000      nt 23.750000      OK
+   atr      py 16.137500      nt 16.137500      OK
+
+G3  G3-20250819102500-+1  dir +1
+   entryPx  py 24692.500000   nt 24692.500000   OK
+   R        py 13.512500      nt 13.512500      OK
+   atr      py 13.512500      nt 13.512500      OK
+
+G3  G3-20251001102000--1  dir -1
+   entryPx  py 25621.000000   nt 25621.000000   OK
+   R        py 14.475000      nt 14.475000      OK
+   atr      py 14.475000      nt 14.475000      OK
+
+G3  G3-20251201105500--1  dir -1
+   entryPx  py 26172.250000   nt 26172.250000   OK
+   R        py 22.387500      nt 22.387500      OK
+   atr      py 22.387500      nt 22.387500      OK
+
+G3  G3-20260202122200-+1  dir +1
+   entryPx  py 26417.000000   nt 26417.000000   OK
+   R        py 9.075000       nt 9.075000       OK
+   atr      py 9.075000       nt 9.075000       OK
+
+G3  G3-20260401105800--1  dir -1
+   entryPx  py 24552.250000   nt 24552.250000   OK
+   R        py 25.812500      nt 25.812500      OK
+   atr      py 25.812500      nt 25.812500      OK
+
+G3  G3-20260601102000--1  dir -1
+   entryPx  py 30661.250000   nt 30661.250000   OK
+   R        py 32.275000      nt 32.275000      OK
+   atr      py 32.275000      nt 32.275000      OK
+
+G1  G1-20250819100600-+1  dir +1
+   entryPx  py 24712.562500   nt 24712.562500   OK
+   R        py 18.875000      nt 18.875000      OK
+   atr      py 18.287500      nt 18.287500      OK
+
+G1  G1-20251001100100--1  dir -1
+   entryPx  py 25557.218750   nt 25557.218750   OK
+   R        py 22.437500      nt 22.437500      OK
+   atr      py 23.637500      nt 23.637500      OK
+
+G1  G1-20251201100400-+1  dir +1
+   entryPx  py 26109.606250   nt 26109.606250   OK
+   R        py 28.287500      nt 28.287500      OK
+   atr      py 25.762500      nt 25.762500      OK
+
+G1  G1-20260202112800-+1  dir +1
+   entryPx  py 26379.412500   nt 26379.412500   OK
+   R        py 16.175000      nt 16.175000      OK
+   atr      py 12.575000      nt 12.575000      OK
+
+G1  G1-20260401100500-+1  dir +1
+   entryPx  py 24433.812500   nt 24433.812500   OK
+   R        py 28.375000      nt 28.375000      OK
+   atr      py 27.487500      nt 27.487500      OK
+
+G1  G1-20260601100100--1  dir -1
+   entryPx  py 30626.681250   nt 30626.681250   OK
+   R        py 29.862500      nt 29.862500      OK
+   atr      py 30.275000      nt 30.275000      OK
+
+====================================================================================================
+SPOT CHECK RESULT: PASS  (0 fields mismatched)

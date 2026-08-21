@@ -76,6 +76,7 @@ min from the signal, filled on first touch, no chase. R = ATR of the
 | **D5** | G1's R is the ATR of the **signal** bar, not the fill bar. |
 | **D6** | G3's R is 1.0 × ATR, so its "structural" and "1.0 ATR" stops are the same object. |
 | **D7** | G1 historical fills assumed TOUCH. Fill realism measured separately; not part of the frozen rule. |
+| **D8** | The frozen `tmin` index (`cand_spec.py` line 130) treats every month as 44,640 min (31 days) but a year as 527,040 min (366 days), so it is **non-monotonic across the year boundary**: Jan 1–5 of a new year index *below* late December of the old year (Jan 6 00:00 == Dec 31 00:00). Consequence: the OFH6 30-min cooldown after a late-December signal suppresses all early-January signals. Verified: 2025-12-30 10:59 suppresses five would-be signals on 2026-01-02/05 (diffs −4379…−14 min). Discovered during NT8 parity (a true-minute clock fired exactly those 5); the NT8 engine replicates the frozen arithmetic verbatim (`V41InBar.TminOf`). See docs/NT8_PROSPECTIVE_ENGINE.md. |
 
 **Enforcing any of these creates a NEW VERSION that cannot inherit the
 existing validation evidence.**
