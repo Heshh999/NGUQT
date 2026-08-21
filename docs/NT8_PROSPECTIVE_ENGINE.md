@@ -1,8 +1,9 @@
 # NT8 PROSPECTIVE RESEARCH ENGINE — frozen candidates in NinjaTrader 8
 
-**Status: PARITY PASS — READY FOR PLAYBACK** (off-platform logic parity;
-the in-platform HISTORICAL_PARITY run on a real Volumetric feed is the
-next gate and has NOT been run yet — see §15).
+**Status: PARITY PASS — READY FOR PLAYBACK.** Both halves are now
+evidenced: off-platform logic parity (§10–§12) **and** the in-platform
+HISTORICAL_PARITY run on a real NinjaTrader Volumetric feed (§10a),
+which reproduced the research capture with zero feature mismatches.
 
 **THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING. The host submits no
 orders in this version; every order path is DRY-RUN. It must NEVER be
@@ -10,12 +11,13 @@ labeled ready for live trading.**
 
 Final question — *did the NinjaTrader implementation reproduce the
 canonical frozen Python candidates without changing their rules?* —
-**YES**, at the level this environment can prove it: the exact C# classes
-the NT8 host runs (`V41FrozenCandidateEngine`, `V41Management`) were fed
-the full 355,455-bar merged history off-platform and reproduced the
-canonical Python event-for-event and field-for-field (§10–§12). What
-remains unproven is only the platform feed (NT8's Volumetric bars vs the
-capture files), which is exactly what the Playback/parity gate tests.
+**YES.** The exact C# classes the NT8 host runs
+(`V41FrozenCandidateEngine`, `V41Management`) reproduced the canonical
+Python event-for-event and field-for-field off-platform (§10–§12), and
+NinjaTrader 8 itself — reading its own Volumetric bars, on the user's
+machine, over 356,874 bars — then emitted the identical event stream
+(§10a). Streaming behaviour under a live-style feed remains to be shown;
+that is the Playback gate.
 
 ---
 
@@ -185,6 +187,57 @@ direction tolerance is otherwise **zero** and met. Fields compared at
 **PARITY VERDICT: PASS** (`compare_nt8_parity.py`, report archived in the
 scratch `parity_out/parity_report.txt`).
 
+## 10a. IN-PLATFORM parity run (NinjaTrader 8, real Volumetric feed)
+
+Run by the user in NT8, `Mode = HISTORICAL_PARITY`, MNQ Volumetric
+1-minute, engine `V41-PROSPECTIVE-ENGINE-1.0`. Startup diagnostic
+`PASS` (volumetric read TRUE, bid/ask TRUE, **0 no-level bars** across
+356,874 bars), window 2025-08-18 18:02 → 2026-08-20 16:59 — one session
+and 19 minutes wider than the research capture.
+
+Compared with `analysis/v41/compare_nt8_host.py` (host export schema),
+scoped to the overlapping capture window:
+
+**Diff A — NT8 platform run vs canonical frozen Python**
+
+| candidate | python | nt8 | MATCHED | MISSING | EXTRA | FIELD_BAD |
+|---|---|---|---|---|---|---|
+| OFH13 (**PRIMARY**) | 133 | 133 | **133** | 0 | 0 | 0 |
+| OFH14 | 462 | 462 | **462** | 0 | 0 | 0 |
+| G4 | 218 | 218 | **218** | 0 | 0 | 0 |
+| G3 | 477 | 477 | **477** | 0 | 0 | 0 |
+| G1 | 845 | 846 | **845** | 0 | 1* | 0 |
+
+*the same single `PARENT_FWD90_GAP` event as the off-platform run.
+Management: **1,190 rows, 0 mismatches**. Four further events fall on
+2026-08-20, outside the capture window — expected, NT8 had a newer bar.
+
+**Diff B — NT8 platform run vs off-platform driver** (same engine, one
+fed by NT8's Volumetric reconstruction, one by the capture CSVs):
+
+```
+emitted events: driver 2143   nt8 (in-window) 2143   shared 2143
+driver-only 0    nt8-only 0    feature mismatches 0
+```
+
+Entry prices and ATR agree to the export precision on all 2,143 events.
+NinjaTrader's own Volumetric feed reproduces the research capture's
+features exactly; no feed-side divergence exists to explain away.
+
+### Recorder defect found and fixed by this run
+
+The host writes each event row at **emit** time, so `fwdEligible` was
+`PENDING` on all 2,147 rows and `parentSignalDivergent` `FALSE` on all
+of them — both resolve 60/90 bars later. Harmless for the parity diff
+(eligibility was recomputed), but it would have shipped an unusable
+population column into the prospective ledger. Fixed in engine
+**1.0.1**: `V41Event.SigEt` provenance field plus a
+`V41_PARITY_RESOLUTION_MNQ.csv` / `V41_PROSPECTIVE_RESOLUTION_*.csv`
+written at run end carrying the finalized flags keyed by `eventId`.
+1.0.1 is a **recording-only** change — no rule, threshold, gate or
+management behaviour differs — and the full off-platform parity gate was
+re-run after it with byte-identical results.
+
 ## 11. Management parity
 
 For every eligible OFH13/OFH14 event, the driver scored the A-arm
@@ -204,7 +257,7 @@ side plus the full managed A-arm outcome where applicable:
 
 ## 13. Hash / version audit
 
-`V41Frozen` carries `EngineVersion = "V41-PROSPECTIVE-ENGINE-1.0"` and
+`V41Frozen` carries `EngineVersion = "V41-PROSPECTIVE-ENGINE-1.0.1"` and
 the four frozen hashes (`cand_spec 9bea8f1cafc2b6ea`,
 `ofh6_spec e8145b7c493029de`, `ofht_spec 272d7bca6402b6d2`,
 `ofht_cache 376ce829086b5224`), all printed at startup and stamped into
@@ -227,6 +280,11 @@ writes monthly files under the output folder:
   eventId, arm, timestampET, direction, entryPrice, stopPts, exitReason,
   exitPrice, heldMin, netPts, netUsd, R, mfe, mae, ratio, ff05, ff1,
   ff2, fillAssumption, noFillReason, month, isoWeek, engineVersion`
+- `V41_PROSPECTIVE_RESOLUTION_*.csv` — `eventId, candidateId,
+  timestampET, sigEt, fwdEligible, parentSignalDivergent, engineVersion`.
+  Written at run end. **This is the column the population filter joins
+  on** — the event rows themselves say `PENDING` because they are written
+  the moment the event fires (see §10a).
 - `V41_PROSPECTIVE_DIAG_*.txt` / `V41_PROSPECTIVE_AUDIT_*.txt` —
   startup diagnostic, bar counts, first/last ET, no-levels bars, Q-FWD
   divergence counters.
@@ -305,6 +363,7 @@ Allowed labels: PARITY PASS — READY FOR PLAYBACK · PARITY FAIL ·
 PLAYBACK PASS · SIM101 PASS. (READY FOR LIVE TRADING is not an allowed
 label for this project.)
 
-Current: **PARITY PASS — READY FOR PLAYBACK** — scoped to off-platform
-logic parity of the exact C# classes NT8 runs; the user's next action is
-§15-B (the in-platform HISTORICAL_PARITY run), then §15-C.
+Current: **PARITY PASS — READY FOR PLAYBACK** — evidenced both
+off-platform (§10–§12) and in-platform on a real NT8 Volumetric feed
+(§10a). Next action is §15-C, the Playback gate. Not ready for live
+trading; this project does not authorize live trading.

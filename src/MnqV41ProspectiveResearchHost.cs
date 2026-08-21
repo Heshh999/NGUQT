@@ -397,9 +397,55 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             catch (Exception) { }
         }
 
+        /// Event rows are written at EMIT time, so their fwdEligible column
+        /// is necessarily PENDING (the 60/90-minute forward window has not
+        /// happened yet) and parentSignalDivergent is necessarily FALSE.
+        /// This file carries the FINALIZED values, keyed by eventId, and is
+        /// the column the Python population filter must join on. Written
+        /// once at the end of the run, in both modes.
+        public const string ResolutionHeader =
+            "eventId,candidateId,timestampET,sigEt,fwdEligible,parentSignalDivergent,engineVersion";
+
+        private void WriteResolution(V41FrozenCandidateEngine eng)
+        {
+            Dictionary<string, bool> sigDiv = new Dictionary<string, bool>();
+            for (int i = 0; i < eng.Signals.Count; i++)
+            {
+                V41Signal s = eng.Signals[i];
+                sigDiv[s.Et.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)] =
+                    s.FwdResolved && !s.Eligible;
+            }
+            string path = Path.Combine(dir, (mode.StartsWith("PROSPECTIVE")
+                ? "V41_PROSPECTIVE_RESOLUTION_" : "V41_PARITY_RESOLUTION_") + tag + ".csv");
+            try
+            {
+                using (StreamWriter w = new StreamWriter(path, false))
+                {
+                    w.WriteLine(ResolutionHeader);
+                    for (int i = 0; i < eng.Events.Count; i++)
+                    {
+                        V41Event e = eng.Events[i];
+                        string sig = e.SigEt == DateTime.MinValue ? ""
+                            : e.SigEt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                        bool div;
+                        if (!sigDiv.TryGetValue(sig, out div)) div = false;
+                        w.WriteLine(string.Join(",", new string[] {
+                            e.Id, e.Cand,
+                            e.Et.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                            sig,
+                            e.FwdResolved ? (e.Eligible ? "TRUE" : "FALSE") : "PENDING",
+                            div ? "TRUE" : "FALSE",
+                            V41Frozen.EngineVersion }));
+                    }
+                }
+            }
+            catch (Exception) { }
+        }
+
         public void Close(V41FrozenCandidateEngine eng, DateTime firstEt, DateTime lastEt,
                           long bars, long noLevels)
         {
+            WriteResolution(eng);
             StringBuilder sb = new StringBuilder();
             sb.AppendLine("======================================================================");
             sb.AppendLine("V4.1 PROSPECTIVE HOST - RUN AUDIT");

@@ -68,7 +68,10 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         public const double G4TrendAtr = 0.5;
         public const int G4WindowBars = 3;
         public const string FreezeDataEnd = "2026-08-19";
-        public const string EngineVersion = "V41-PROSPECTIVE-ENGINE-1.0";
+        // 1.0.1 = RECORDING-ONLY change (V41Event.SigEt provenance field +
+        // the resolution export). No rule, threshold, gate or management
+        // behaviour differs from 1.0; parity re-verified after the change.
+        public const string EngineVersion = "V41-PROSPECTIVE-ENGINE-1.0.1";
         // sha256[:16] of the frozen Python sources (FROZEN_HASHES.txt)
         public const string HashCandSpec = "9bea8f1cafc2b6ea";
         public const string HashOfh6Spec = "e8145b7c493029de";
@@ -120,6 +123,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         public double R;                // frozen structural R of the lineage
         public double Atr;              // ATR at entry bar
         public DateTime ParentEt;       // OFH6 signal ET (G4: attack bar ET)
+        public DateTime SigEt;          // originating OFH6 signal ET (always) - provenance only
         public double ZLo = double.NaN, ZHi = double.NaN, Mid = double.NaN;
         public double Depth = double.NaN;   // OFH13/14 penetration at trigger
         public bool Flow;                   // OFH13/14 opposing-flow flag
@@ -240,6 +244,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             e.Cand = cand; e.Et = b.EtClose; e.Tmin = b.Tmin; e.EntryIdx = j;
             e.Dir = dir; e.EntryPx = px; e.R = R; e.Atr = b.Atr;
             e.ParentEt = parentEt; e.Reason = reason;
+            e.SigEt = parent != null ? parent.Et : DateTime.MinValue;
             e.ZLo = zLo; e.ZHi = zHi; e.Mid = mid; e.Depth = depth; e.Flow = flow;
             e.Id = cand + "-" + CleanEt(b.EtClose) + "-" + (dir > 0 ? "+1" : "-1");
             if (parent != null && parent.FwdResolved && !parent.Eligible)

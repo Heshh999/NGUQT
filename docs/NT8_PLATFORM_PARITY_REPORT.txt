@@ -1,0 +1,34 @@
+loading canonical Python (cand_spec)...
+canonical capture window 2025-08-18 18:21:00 .. 2026-08-19 16:59:00 (355455 bars)
+NT8 host export: 2147 event rows, 1417 trade rows
+  outside capture window (expected extras, NT8 loaded more data): 4
+     G1     2026-08-20 10:01:00 G1-20260820100100--1
+     G4     2026-08-20 10:03:00 G4-20260820100300--1
+     OFH14  2026-08-20 11:36:00 OFH14-20260820113600--1
+     G4     2026-08-20 11:39:00 G4-20260820113900--1
+  no resolution file (engine 1.0) - recomputing eligibility from canonical bars
+  in-window rows 2143 -> eligible 2136, on-bars-the-capture-lacks 0
+
+==========================================================================
+DIFF A - NT8 PLATFORM RUN vs CANONICAL FROZEN PYTHON
+==========================================================================
+  OFH13  py  133  nt8  133  MATCHED  133  MISSING 0  EXTRA 0  FIELD_BAD 0
+  OFH14  py  462  nt8  462  MATCHED  462  MISSING 0  EXTRA 0  FIELD_BAD 0
+  G4     py  218  nt8  218  MATCHED  218  MISSING 0  EXTRA 0  FIELD_BAD 0
+  G3     py  477  nt8  477  MATCHED  477  MISSING 0  EXTRA 0  FIELD_BAD 0
+  G1     py  845  nt8  846  MATCHED  845  MISSING 0  EXTRA 1  FIELD_BAD 0
+    EXTRA_IN_NT8 G1-20260320100400--1 parent=2026-03-20 10:00:00  PARENT_FWD90_GAP
+
+MANAGEMENT PARITY (A-arm OFH13/OFH14 managed, B-arm G1 diagnostic):
+  management rows compared 1190, mismatches 0
+
+==========================================================================
+DIFF B - NT8 PLATFORM RUN vs OFF-PLATFORM DRIVER (same engine, capture data)
+==========================================================================
+  emitted events: driver 2143  nt8(in-window) 2143  shared 2143
+  driver-only 0   nt8-only 0
+  feature mismatches on shared events: 0
+
+==========================================================================
+NT8 PLATFORM PARITY VERDICT: PASS - every difference empty or attributed to the documented Q-FWD / window effects
+==========================================================================
