@@ -93,7 +93,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double lastEma9_1m = double.NaN;
         private V4Ema ema9;
 
-        private long armA, armB, armC, parents, lookahead;
+        private long armA, armB, armC, parents, lookahead, boundary;
 
         protected override void OnStateChange()
         {
@@ -242,6 +242,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             List<V4VecH1Signal> sigs = engine.On1mBar(b, v1);
             for (int i = 0; i < sigs.Count; i++) OpenSignal(sigs[i], b);
             lookahead = engine.LookaheadRejected;
+            boundary = engine.BoundaryExcluded;
         }
 
         private void OpenSignal(V4VecH1Signal s, V4Bar b)
@@ -416,10 +417,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             sb.AppendLine("  ARM A  location, no vec   " + armA);
             sb.AppendLine("  rows written              " + rows);
             sb.AppendLine("  windows dropped unclosed  " + open.Count);
-            sb.AppendLine("  LOOKAHEAD REJECTED        " + lookahead
-                        + "   (triggers at or before the parent close; must be 0 in a");
-            sb.AppendLine("                              clean run - any value above zero means the");
-            sb.AppendLine("                              1m clock is not strictly after the 15m close)");
+            sb.AppendLine("  boundary bars excluded    " + boundary
+                        + "   (the 1m bar closing AT the parent close - the last");
+            sb.AppendLine("                              minute INSIDE the parent candle. EXPECTED,");
+            sb.AppendLine("                              about one per parent. Not a violation.)");
+            sb.AppendLine("  LOOKAHEAD VIOLATIONS      " + lookahead
+                        + "   (a 1m bar closing STRICTLY BEFORE the parent close.");
+            sb.AppendLine("                              MUST be 0 - anything else invalidates the run.)");
             sb.AppendLine("  frozen rule: wick >= " + MinWickPct.ToString("0.#", CultureInfo.InvariantCulture)
                         + "% of parent range, proximity "
                         + ProximityAtr.ToString("0.##", CultureInfo.InvariantCulture)

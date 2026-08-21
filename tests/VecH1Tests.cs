@@ -125,20 +125,25 @@ namespace MnqTwoTests
             V4Vector p = Parent(pc, V4VectorColor.GREEN, 110, 120, 100, 118, 118, 110);
             e.On15mBar(B(pc.AddMinutes(-15), 15, 110, 120, 100, 118), p, 40);
 
-            // a 1m bar closing exactly AT the parent close is inside the parent
+            // a 1m bar closing exactly AT the parent close is the last
+            // minute INSIDE the parent candle - the BOUNDARY bar. Expected
+            // once per parent (the field run showed 430 of these against
+            // 431 parents and zero actual violations in the CSV).
             List<V4VecH1Signal> s = e.On1mBar(B(pc.AddMinutes(-1), 1, 105, 106, 100, 105),
                                               Trigger(V4VectorColor.GREEN));
             Check(s.Count == 0, "a 1m bar closing AT the parent close cannot trigger");
-            Check(e.LookaheadRejected == 1, "...and the attempt is COUNTED, not hidden");
+            Check(e.BoundaryExcluded == 1 && e.LookaheadRejected == 0,
+                  "...and is counted as a BOUNDARY exclusion, NOT a violation");
 
             s = e.On1mBar(B(pc.AddMinutes(-5), 1, 105, 106, 100, 105), Trigger(V4VectorColor.GREEN));
-            Check(s.Count == 0 && e.LookaheadRejected == 2,
-                  "a 1m bar closing BEFORE the parent close is rejected and counted");
+            Check(s.Count == 0 && e.LookaheadRejected == 1 && e.BoundaryExcluded == 1,
+                  "a 1m bar closing STRICTLY BEFORE the close is a VIOLATION and counted apart");
 
             // the first legal bar closes one minute after the parent
             s = e.On1mBar(B(pc, 1, 118, 118, 100, 112), Trigger(V4VectorColor.GREEN));
             Check(s.Count == 1, "the first bar closing AFTER the parent close may trigger");
-            Check(e.LookaheadRejected == 2, "...and does not add to the rejection count");
+            Check(e.LookaheadRejected == 1 && e.BoundaryExcluded == 1,
+                  "...and adds to neither counter");
         }
 
         // ------------------------------------------------------------------

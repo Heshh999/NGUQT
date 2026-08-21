@@ -30,7 +30,10 @@
 //   "No 1m trigger may occur before the parent 15m candle has CLOSED.
 //    If entryTime < parent15mCloseTime, that row is a LOOKAHEAD
 //    VIOLATION and must be rejected."
-// LookaheadRejected counts every such attempt rather than hiding it.
+// The equality case (a 1m bar closing AT the parent close - the last
+// minute INSIDE the parent candle) is EXPECTED once per parent and is
+// counted as BoundaryExcluded; only strictly-before counts as a
+// violation. Both are visible in the audit rather than hidden.
 //
 // MATCHED ARMS - all three are emitted against the SAME parent so that
 // none can be chosen after the outcomes are known:
@@ -121,7 +124,18 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         public int WindowMinutes = 15;
 
         public V4VecH1Parent Active;
-        public long ParentsCreated, ParentsExpired, LookaheadRejected;
+        public long ParentsCreated, ParentsExpired;
+        /// A 1m bar closing at EXACTLY the parent's close - the last minute
+        /// INSIDE the parent candle, delivered at the same stamp. Correctly
+        /// excluded, EXPECTED once per parent. The field-observed count was
+        /// 430 exclusions against 431 parents, which is this artifact, not
+        /// leakage: the CSV itself showed 0 of 546 entries at or before
+        /// their parent close.
+        public long BoundaryExcluded;
+        /// A 1m bar closing STRICTLY BEFORE the parent's close while the
+        /// window is active. Bars arrive in time order, so this can only
+        /// happen if the 1m clock is genuinely out of order. MUST be 0.
+        public long LookaheadRejected;
         public long FiredA, FiredB, FiredC;
 
         private int seq;
@@ -132,7 +146,8 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         public void Clear()
         {
             Active = null; seq = 0;
-            ParentsCreated = ParentsExpired = LookaheadRejected = 0;
+            ParentsCreated = ParentsExpired = 0;
+            BoundaryExcluded = LookaheadRejected = 0;
             FiredA = FiredB = FiredC = 0;
         }
 
@@ -193,9 +208,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             V4VecH1Parent p = Active;
             if (p == null) return outp;
 
-            // Hard causality gate. A trigger at or before the parent's
-            // close would be the lookahead the prompt names explicitly.
-            if (b.EtClose <= p.CloseEt) { LookaheadRejected++; return outp; }
+            // Hard causality gate. The prompt's rejection rule: no trigger
+            // at or before the parent's close. The two cases are counted
+            // apart because they mean opposite things - equality is the
+            // boundary bar (expected, once per parent), strictly-before is
+            // a broken clock (never acceptable).
+            if (b.EtClose == p.CloseEt) { BoundaryExcluded++; return outp; }
+            if (b.EtClose < p.CloseEt) { LookaheadRejected++; return outp; }
             if (b.EtClose > p.WindowEndEt) { ParentsExpired++; Active = null; return outp; }
 
             p.BarsSeen++;
