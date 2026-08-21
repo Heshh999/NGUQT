@@ -77,7 +77,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int Bip15m = 1, Bip1m = 2;
         private TimeZoneInfo etZone;
         private DateTime sampleStartEt = DateTime.MinValue;
-        private bool configured, diagPrinted;
+        private bool configured, diagPrinted, dataWasLoaded;
         private string outDir = "";
         private long rows;
 
@@ -125,6 +125,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.DataLoaded)
             {
+                dataWasLoaded = true;
                 pathsOpenedThisRun.Clear();
                 open.Clear();
                 rows = armA = armB = armC = parents = lookahead = 0;
@@ -165,7 +166,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Terminated)
             {
-                if (configured) Finish();
+                // Same ghost-instance rule as every other host: only an
+                // instance that actually LOADED DATA may write anything.
+                if (configured && dataWasLoaded) Finish();
             }
         }
 
@@ -391,6 +394,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void Finish()
         {
+            if (!diagPrinted)
+            {
+                diag.Instrument = SymbolName();
+                diag.FileTag = FileTag;
+                diag.PrimarySeries = "SERIES LOADED ZERO BARS";
+                diag.AddSeries("15m", Bip15m, 0, DateTime.MinValue, DateTime.MinValue, true, "15m bars");
+                diag.Validate();
+                PrintLines(diag.Text());
+                Print("NO BARS ARRIVED: check instrument, date range and strategy selection.");
+            }
             // windows still open at the end of the run never completed;
             // they are dropped rather than written with partial labels
             StringBuilder sb = new StringBuilder();

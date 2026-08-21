@@ -1238,6 +1238,25 @@ namespace MnqTwoTests
                       "Terminated only writes from an instance that LOADED DATA - "
                       + "NT8's ghost defaults-probe instances wrote three zero-bar "
                       + "FAILED audits after the real PASSED run without this");
+
+            // EVERY host must gate Terminated on dataWasLoaded. The structure
+            // host guarded on `configured` instead - set in State.Configure,
+            // which UI probe instances also reach - and a ghost instance
+            // OVERWROTE the real 7-year structure audit with a zero-row file
+            // headed PASS. Configure is not evidence that data ever loaded.
+            string[] gated = new string[] {
+                "MnqV41StructureResearchHost.cs",
+                "MnqV41VecH1ResearchHost.cs" };
+            for (int g = 0; g < gated.Length; g++)
+            {
+                string gp = FindSource(gated[g]);
+                if (gp == null) { Check(false, "SOURCE SCAN could not locate " + gated[g]); continue; }
+                string gs = File.ReadAllText(gp);
+                Check(gs.IndexOf("dataWasLoaded) Finish();") > 0,
+                      gated[g] + " gates Terminated on dataWasLoaded, not just configured");
+                Check(gs.IndexOf("dataWasLoaded = true;") > 0,
+                      gated[g] + " sets dataWasLoaded in State.DataLoaded");
+            }
             }
             Check(StripComments("a // EnterLong\nb").IndexOf("EnterLong") < 0,
                   "StripComments removes a line comment");

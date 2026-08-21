@@ -212,7 +212,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private TimeZoneInfo etZone;
         private DateTime sampleStartEt = DateTime.MinValue;
-        private bool configured, aborted, diagPrinted;
+        private bool configured, aborted, diagPrinted, dataWasLoaded;
         private int fifteenBarCount;
         private long structRows, entryRows;
         private string outDir = "";
@@ -310,6 +310,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.DataLoaded)
             {
+                dataWasLoaded = true;
                 // A reused instance must not remember which files the PREVIOUS
                 // run opened. IsInstantiatedOnEachOptimizationIteration is
                 // false, so NinjaTrader may hand this object a second run - and
@@ -388,7 +389,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Terminated)
             {
-                if (!aborted && configured) Finish();
+                // dataWasLoaded, not configured. NinjaTrader creates extra
+                // instances that pass through Configure without ever loading
+                // data - a user's one-month VEC-H1 attempt produced a ghost
+                // STRUCTURE audit full of zeros, headed PASS, that overwrote
+                // the real 7-year audit file on disk. Configure is reached by
+                // UI probes; DataLoaded is not.
+                if (!aborted && configured && dataWasLoaded) Finish();
             }
         }
 
@@ -1116,6 +1123,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void Finish()
         {
+            if (!diagPrinted)
+            {
+                // Data loaded but not one bar arrived. Populate what is
+                // knowable and let the diagnostic FAIL loudly instead of
+                // writing an empty checklist headed PASS.
+                diag.Instrument = SymbolName();
+                diag.FileTag = FileTag;
+                diag.PrimarySeries = "SERIES LOADED ZERO BARS";
+                diag.AddSeries("1m", 0, 0, DateTime.MinValue, DateTime.MinValue, true, "1m bars");
+                diag.Validate();
+                PrintLines(diag.Text());
+                Print("NO BARS ARRIVED: check instrument, date range and that the");
+                Print("selected STRATEGY is the one you meant to run.");
+            }
             // close every probe still running so its window is honestly
             // marked TIMEOUT rather than left looking unfinished
             for (int i = 0; i < openProbes.Count; i++)
