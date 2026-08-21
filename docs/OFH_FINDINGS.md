@@ -1,5 +1,17 @@
 # OF-H Series: Twelve Directional Order-Flow Hypotheses
 
+> **SUPERSEDED IN PART - read `TEN_MONTH_PROTOCOL.md` alongside this.**
+> The within-day-shuffle null used below is the WRONG null for a
+> directional claim: it preserves each day's own direction and hands it
+> to the control for free, which is why its "noise" median came out at
+> +11.6 pt. Under the correct sign-flip null, OFH6's family-wise p is
+> **0.129, not 0.688**. The outlier objection raised below was also
+> over-applied - OFH6 has a positive median trade and a 52% win rate.
+> The overall verdict (0 of 12 proven) is unchanged, but the reasons in
+> the OFH6 section below are not the right ones. OFH6 actually fails
+> because its edge disappears the moment a stop is added, and because
+> family-wise p = 0.129 still does not clear 0.05.
+
 **Date:** 2026-08-21
 **Scripts:** `analysis/v41/ofh.py`, `analysis/v41/ofh2.py`
 **Data:** volumetric capture, 281,195 one-minute bars, 2025-11-02 ->
