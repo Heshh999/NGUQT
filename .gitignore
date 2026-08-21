@@ -1,2 +1,7 @@
 tests/run_tests.exe
 *.exe
+
+# Python bytecode from the analysis scripts (ofh6_destruct.py imports
+# the frozen ofh6_spec.py module, which generates these).
+__pycache__/
+*.pyc
