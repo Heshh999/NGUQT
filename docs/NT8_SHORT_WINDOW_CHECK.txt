@@ -1,0 +1,49 @@
+======================================================================
+NT8 SHORT-WINDOW RUN CHECK  (engine V41-PROSPECTIVE-ENGINE-1.0.1)
+======================================================================
+Run: HISTORICAL_PARITY, MNQ SEP26 1-min Volumetric, 4,138 bars,
+     2026-08-18 18:02 .. 2026-08-21 16:59, 0 no-level bars,
+     13 OFH6 signals, 24 events, 0 Q-FWD divergent.
+
+Note: the events/trades CSVs contained every row twice (the output
+folder was not cleared between two runs, and the recorder appends).
+Deduplicated before comparison; the audit and resolution files reflect
+a single run (24 events) and were used as the authority.
+
+THREE-WAY EVENT COMPARISON
+--------------------------------------------------------------------
+day          short run   full NT8 run   canonical Python   result
+2026-08-19      12            12              12           all matched, 0 field diffs
+2026-08-20       4             4          (beyond capture)  all matched, 0 field diffs
+2026-08-21       8             -               -           new data, no reference
+
+Fields compared vs the full run: timestamp, direction, entryPrice, atr,
+stopPrice, parentEt, fvgHigh/Low/Mid, depth, flow, reasonQualified.
+Fields compared vs Python: direction, entryPrice, atr, zone hi/lo/mid,
+depth (tolerance 1e-4, host formats to 4dp).
+
+MANAGEMENT (2026-08-19, the only day with a Python reference)
+--------------------------------------------------------------------
+OFH13-20260819101600--1  net py  -52.995  nt  -52.995  STOP
+OFH14-20260819101600--1  net py  -13.370  nt  -13.370  STOP
+OFH14-20260819105600-+1  net py  -26.870  nt  -26.870  STOP
+OFH14-20260819122100-+1  net py   -5.620  nt   -5.620  STOP
+A-arm trades compared 4, mismatches 0.
+
+WHAT THIS ESTABLISHES
+--------------------------------------------------------------------
+A 3-day loaded window reproduces the full-year run bit-for-bit on the
+overlapping days, and matches the canonical Python where the capture
+reaches. The engine therefore carries no hidden dependence on deep
+history: a short warm-start is sufficient, which is what a live or
+replay session provides.
+
+WHAT THIS DOES NOT ESTABLISH
+--------------------------------------------------------------------
+The Playback (streaming) gate is NOT closed by this run. The days that
+were validated (08-19, 08-20) are days the chart loaded as HISTORY. If
+a replay streamed 2026-08-21, that day has no independent reference to
+compare against. To close the streaming gate the replayed day must be
+one already covered by the capture or the full historical run - i.e.
+replay 2026-08-19 or 2026-08-20 with days-to-load 2.
+======================================================================
