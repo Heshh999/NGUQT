@@ -99,7 +99,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 dataWasLoaded = true;
                 rec = new V41ProspectiveRecorder(ResolveDir(), Instrument == null
-                    ? "MNQ" : Instrument.MasterInstrument.Name, Mode);
+                    ? "MNQ" : Instrument.MasterInstrument.Name, Mode,
+                    delegate(string m) { Print(m); });
             }
             else if (State == State.Terminated)
             {
@@ -238,6 +239,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             sb.AppendLine("  bid/ask available  " + (volumetricOk ? "TRUE" : "FALSE"));
             sb.AppendLine("  time zone          Eastern (" + (etZone == null ? "FALLBACK-LOCAL" : etZone.Id) + ")");
             sb.AppendLine("  mode               " + Mode);
+            sb.AppendLine("  output folder      " + (rec == null ? ResolveDir() : rec.Dir));
             sb.AppendLine("  orders enabled     " + EnableSim101Orders + "  (DRY-RUN only in this version)");
             sb.AppendLine("  engine version     " + V41Frozen.EngineVersion);
             sb.AppendLine("  frozen hashes      cand_spec " + V41Frozen.HashCandSpec
@@ -290,18 +292,45 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
 
         private readonly string dir, tag, mode;
         private readonly Dictionary<string, bool> touched = new Dictionary<string, bool>();
+        private readonly Action<string> log;
+        private int writeFailures;
 
-        public V41ProspectiveRecorder(string baseDir, string instrument, string mode)
+        public int WriteFailures { get { return writeFailures; } }
+        public string Dir { get { return dir; } }
+
+        public V41ProspectiveRecorder(string baseDir, string instrument, string mode,
+                                      Action<string> log)
         {
             this.mode = mode ?? "HISTORICAL_PARITY";
+            this.log = log;
             tag = instrument;
             dir = Path.Combine(baseDir, this.mode.StartsWith("PROSPECTIVE")
                 ? "V41_prospective" : "V41_parity");
-            try { Directory.CreateDirectory(dir); } catch (Exception) { }
+            EnsureDir();
+        }
+
+        /// The output folder can vanish mid-run (a user clearing it between
+        /// runs while the strategy is still loaded). Re-create it before
+        /// every write rather than only at construction, and NEVER swallow a
+        /// write failure silently - a missing file with no error was the
+        /// single most confusing failure mode in the field.
+        private bool EnsureDir()
+        {
+            try { Directory.CreateDirectory(dir); return true; }
+            catch (Exception ex) { Fail(dir, ex); return false; }
+        }
+
+        private void Fail(string path, Exception ex)
+        {
+            writeFailures++;
+            if (log != null)
+                log("V41 RECORDER WRITE FAILED (" + writeFailures + "): " + path
+                    + " : " + ex.Message);
         }
 
         private void Append(string file, string header, string line)
         {
+            if (!EnsureDir()) return;
             string path = Path.Combine(dir, file);
             bool first = !touched.ContainsKey(path) && !File.Exists(path);
             touched[path] = true;
@@ -313,7 +342,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                     w.WriteLine(line);
                 }
             }
-            catch (Exception) { }
+            catch (Exception ex) { Fail(path, ex); }
         }
 
         private static string F(double v)
@@ -388,13 +417,14 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
 
         public void WriteDiag(string text)
         {
+            if (!EnsureDir()) return;
+            string path = Path.Combine(dir, "V41_PROSPECTIVE_DIAG_" + tag + ".txt");
             try
             {
-                using (StreamWriter w = new StreamWriter(
-                    Path.Combine(dir, "V41_PROSPECTIVE_DIAG_" + tag + ".txt"), false))
+                using (StreamWriter w = new StreamWriter(path, false))
                     w.Write(text);
             }
-            catch (Exception) { }
+            catch (Exception ex) { Fail(path, ex); }
         }
 
         /// Event rows are written at EMIT time, so their fwdEligible column
@@ -417,6 +447,7 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             }
             string path = Path.Combine(dir, (mode.StartsWith("PROSPECTIVE")
                 ? "V41_PROSPECTIVE_RESOLUTION_" : "V41_PARITY_RESOLUTION_") + tag + ".csv");
+            if (!EnsureDir()) return;
             try
             {
                 using (StreamWriter w = new StreamWriter(path, false))
@@ -471,14 +502,21 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                           + " ofh6 " + V41Frozen.HashOfh6Spec
                           + " ofht " + V41Frozen.HashOfhtSpec
                           + " cache " + V41Frozen.HashOfhtCache);
+            if (writeFailures > 0)
+                sb.AppendLine("  WARNING  " + writeFailures + " file write(s) FAILED this run"
+                              + " - output is incomplete. See the Output window.");
             sb.AppendLine("======================================================================");
+            EnsureDir();
+            string apath = Path.Combine(dir, "V41_PROSPECTIVE_AUDIT_" + tag + ".txt");
             try
             {
-                using (StreamWriter w = new StreamWriter(
-                    Path.Combine(dir, "V41_PROSPECTIVE_AUDIT_" + tag + ".txt"), false))
+                using (StreamWriter w = new StreamWriter(apath, false))
                     w.Write(sb.ToString());
             }
-            catch (Exception) { }
+            catch (Exception ex) { Fail(apath, ex); }
+            if (log != null)
+                log("V41 recorder: output folder " + dir + "  (write failures: "
+                    + writeFailures + ")");
         }
     }
 }

@@ -68,10 +68,13 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
         public const double G4TrendAtr = 0.5;
         public const int G4WindowBars = 3;
         public const string FreezeDataEnd = "2026-08-19";
+        // 1.0.2 = RECORDING-ONLY: recorder re-creates its output folder before
+        // every write and reports write failures instead of swallowing them;
+        // the startup diagnostic now prints the resolved output folder.
         // 1.0.1 = RECORDING-ONLY change (V41Event.SigEt provenance field +
         // the resolution export). No rule, threshold, gate or management
         // behaviour differs from 1.0; parity re-verified after the change.
-        public const string EngineVersion = "V41-PROSPECTIVE-ENGINE-1.0.1";
+        public const string EngineVersion = "V41-PROSPECTIVE-ENGINE-1.0.2";
         // sha256[:16] of the frozen Python sources (FROZEN_HASHES.txt)
         public const string HashCandSpec = "9bea8f1cafc2b6ea";
         public const string HashOfh6Spec = "e8145b7c493029de";
