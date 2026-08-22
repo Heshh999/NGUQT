@@ -238,6 +238,24 @@ written at run end carrying the finalized flags keyed by `eventId`.
 management behaviour differs — and the full off-platform parity gate was
 re-run after it with byte-identical results.
 
+**Verified on-platform.** The user re-ran HISTORICAL_PARITY on 1.0.1
+(diagnostic PASS, same 356,874 bars). Every event and trade row is
+identical to the 1.0 run apart from the `engineVersion` stamp, and the
+comparator returns the same PASS with the resolution file supplying
+eligibility instead of the recompute fallback. The resolution file
+carries 2,147 rows: 2,140 `fwdEligible=TRUE`, **7 FALSE** — exactly the
+audit's Q-FWD divergent-event count — and eligible-by-candidate
+(G1 847, G3 477, OFH14 463, G4 220, OFH13 133) matches the audit
+line-for-line.
+
+`sigEt` is blank on all 221 G4 rows, and that is **correct**: G4
+qualifies against the signal *context* (`CtxOkAt` — any same-direction
+signal live within 30 min), not against one identified parent, so no
+single originating signal exists to name. A blank `sigEt` on G4 is
+therefore expected and must not be read as a missing value; a
+consequence is that G4 rows always report
+`parentSignalDivergent=FALSE`.
+
 ## 11. Management parity
 
 For every eligible OFH13/OFH14 event, the driver scored the A-arm

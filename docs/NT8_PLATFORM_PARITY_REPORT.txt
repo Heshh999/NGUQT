@@ -6,7 +6,7 @@ NT8 host export: 2147 event rows, 1417 trade rows
      G4     2026-08-20 10:03:00 G4-20260820100300--1
      OFH14  2026-08-20 11:36:00 OFH14-20260820113600--1
      G4     2026-08-20 11:39:00 G4-20260820113900--1
-  no resolution file (engine 1.0) - recomputing eligibility from canonical bars
+  resolution file found (2147 rows) - using FINALIZED eligibility
   in-window rows 2143 -> eligible 2136, on-bars-the-capture-lacks 0
 
 ==========================================================================
