@@ -34,8 +34,11 @@ Timestamp convention: **CLOSE-STAMPED** (a 1m bar at t aggregates the
 
 `src/MnqV41LtfCaptureHost.cs` — new NT8 strategy, submits no orders:
 
-- primary series = **1m Volumetric** (HARD FAIL otherwise); runs the
-  frozen `V41FrozenCandidateEngine` so parent state is exact
+- primary series = 1m; when it is **Volumetric** the frozen
+  `V41FrozenCandidateEngine` runs and every row carries exact parent
+  state. A non-Volumetric primary no longer aborts the run — capturing
+  5s/15s bars needs no order-flow data at all, so the strategy prints a
+  diagnostic, leaves the parent columns EMPTY and keeps capturing.
 - `AddDataSeries(Second,30/15/5)` — NinjaTrader closes genuine bars;
   each is written as it closes
 - row schema: `timestampET, instrument, contract, timeframe, OHLCV,
@@ -48,7 +51,15 @@ Timestamp convention: **CLOSE-STAMPED** (a 1m bar at t aggregates the
   engineVersion`
 - parent = latest eligible canonical OFH13 event; validity = ≤30 min
   from entry and no 1m far-side close
-- one file per capture day: `V41_ltf/V41_LTF_MNQ_YYYYMMDD.csv`
+- one file per **ET calendar day**: `V41_ltf/V41_LTF_MNQ_YYYYMMDD.csv`.
+  The writer rolls on the date, so a multi-day replay produces one file
+  per day rather than piling every day into the first day's file;
+  re-replaying a day appends to that day's file.
+- progress print every 30 minutes of replayed time with running
+  per-timeframe counts, and a shutdown summary (`1m / 30s / 15s / 5s`
+  bar counts, day files, output folder, and a warning if a Second
+  series produced 0 bars — which means the feed had no tick data for
+  that period)
 
 **To capture:** paste `MnqV41LtfCaptureHost.cs` in (keep everything
 already installed), F5, then on a Playback connection put it on an MNQ

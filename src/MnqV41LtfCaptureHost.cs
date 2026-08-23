@@ -39,10 +39,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly V4VolumetricReader reader = new V4VolumetricReader();
         private readonly V4Atr atr = new V4Atr(20);
         private TimeZoneInfo etZone;
-        private bool configured, dataWasLoaded, aborted, diagPrinted;
+        private bool configured, dataWasLoaded, diagPrinted, hasVol;
+        private DateTime lastProgress = DateTime.MinValue;
         private StreamWriter wtr;
+        private string wtrDay = "";
         private string dir;
-        private long rows5, rows15, rows30, rows1m;
+        private long rows5, rows15, rows30, rows1m, days;
         // current parent state (latest eligible OFH13 event, frozen rules)
         private V41Event parent;
         private DateTime parentAvail = DateTime.MinValue;
@@ -89,9 +91,23 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (State == State.Terminated)
             {
                 if (wtr != null) { try { wtr.Flush(); wtr.Close(); } catch (Exception) { } }
-                if (configured && dataWasLoaded && !aborted)
-                    Print("V41 LTF capture: 1m " + rows1m + "  30s " + rows30
-                          + "  15s " + rows15 + "  5s " + rows5 + "  -> " + dir);
+                if (configured && dataWasLoaded)
+                {
+                    Print("======================================================");
+                    Print("LTF CAPTURE COMPLETE");
+                    Print("  1m  bars " + rows1m);
+                    Print("  30s bars " + rows30);
+                    Print("  15s bars " + rows15);
+                    Print("  5s  bars " + rows5);
+                    Print("  day files " + days);
+                    Print("  parent state " + (hasVol ? "RECORDED (volumetric primary)"
+                                                      : "EMPTY (primary not volumetric)"));
+                    Print("  files in " + dir);
+                    if (rows5 == 0 || rows15 == 0)
+                        Print("  WARNING: a second-series produced 0 bars - the data feed"
+                              + " may not have tick data for this period.");
+                    Print("======================================================");
+                }
             }
         }
 
@@ -118,13 +134,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (!diagPrinted)
                 {
                     diagPrinted = true;
-                    Print("V41 LTF CAPTURE - volumetric read " + read
-                          + "  engine " + V41Frozen.EngineVersion
-                          + "  output " + dir
-                          + (read ? "" : "  HARD FAIL: primary must be Volumetric 1m"));
-                    if (!read) aborted = true;
+                    Print("======================================================");
+                    Print("MNQ V4.1 LOWER-TIMEFRAME CAPTURE - SUBMITS NO ORDERS");
+                    Print("  output folder   " + dir);
+                    Print("  series captured 1m + 30s + 15s + 5s (genuine bars only)");
+                    Print("  volumetric read " + read
+                          + (read ? "  -> parent state WILL be recorded"
+                                  : "  -> LTF bars still captured; parent columns EMPTY"));
+                    Print("  engine          " + V41Frozen.EngineVersion);
+                    Print("  NOTE: 5s/15s/30s series carry NO bid/ask in NinjaTrader,");
+                    Print("        so their delta columns are written EMPTY by design.");
+                    Print("======================================================");
                 }
-                if (aborted) return;
+                hasVol = read;
 
                 V4Bar vb = new V4Bar();
                 vb.EtOpen = fb.EtClose.AddMinutes(-1); vb.EtClose = fb.EtClose;
@@ -164,12 +186,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 rows1m++;
                 return;
             }
-            if (aborted) return;
             string tf = BarsInProgress == 1 ? "30s" : (BarsInProgress == 2 ? "15s" : "5s");
             int bip = BarsInProgress;
             Write(tf, Times[bip][0], Opens[bip][0], Highs[bip][0], Lows[bip][0],
                   Closes[bip][0], Volumes[bip][0], 0, 0, false);
             if (bip == 1) rows30++; else if (bip == 2) rows15++; else rows5++;
+            DateTime nowEt = ToEt(Times[bip][0]);
+            if ((nowEt - lastProgress).TotalMinutes >= 30)
+            {
+                lastProgress = nowEt;
+                Print("  capture " + nowEt.ToString("yyyy-MM-dd HH:mm")
+                      + "   1m " + rows1m + "  30s " + rows30
+                      + "  15s " + rows15 + "  5s " + rows5);
+            }
         }
 
         private void Write(string tf, DateTime t, double o, double h, double l,
@@ -179,14 +208,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             DateTime et = ToEt(t);
             try
             {
-                if (wtr == null)
+                // one file per ET calendar day: a multi-day replay rolls the
+                // writer instead of piling every day into the first day's file
+                string day = et.ToString("yyyyMMdd", ci);
+                if (wtr == null || day != wtrDay)
                 {
+                    if (wtr != null) { wtr.Flush(); wtr.Close(); wtr = null; }
+                    try { Directory.CreateDirectory(dir); } catch (Exception) { }
                     string p = Path.Combine(dir, "V41_LTF_" +
                         (Instrument == null ? "MNQ" : Instrument.MasterInstrument.Name)
-                        + "_" + et.ToString("yyyyMMdd", ci) + ".csv");
+                        + "_" + day + ".csv");
                     bool fresh = !File.Exists(p);
                     wtr = new StreamWriter(p, true);
                     if (fresh) wtr.WriteLine(Header);
+                    wtrDay = day;
+                    days++;
                 }
                 string pc = "", pid = "", pd = "", pav = "", pet = "", ppx = "",
                        patr = "", flo = "", fhi = "", inv = "", valid = "FALSE";
