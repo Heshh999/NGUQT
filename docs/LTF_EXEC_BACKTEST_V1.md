@@ -112,3 +112,68 @@ Sample-size rule stands: Replay capture of N days yields roughly
 N×(parents/day ≈ 0.5) OFH13 parents in-window — several weeks of
 replayed days are needed before any 5s/15s claim can exceed the
 "very low sample" label. That expectation is set now, before data.
+
+---
+
+# ADDENDUM — ENGINE COMPLETED AND RUN ON GENUINE 30s DATA
+
+`analysis/ltf_exec/ltf_engine.py` is now the complete, one-command
+engine; `ph2_to_ltf.py` converts the already-validated genuine 30s
+history into its input format (pure reformatting — no bar created,
+merged, split or interpolated).
+
+## Correction to a previously reported check
+
+The earlier Phase-2 report stated "0 duplicate 30s keys". **That check
+was wrong** — it counted a Counter over dict keys, which is always 1.
+The genuine ph2 export actually contains **45,587 duplicate rows**
+across its monthly files. They were verified to be **identical
+re-exports (0 conflicting values)** and are now dropped first-wins,
+the same rule `cand_spec.load_merged` uses. The corrected dataset is
+34,944 unique 30s bars + 17,381 1m bars over 192 days.
+
+The engine's own integrity gate caught this (33 aggregation mismatches
+→ refused to backtest). After the dedupe: **30s→1m matched 17,190,
+exact 17,190, mismatch 0 — PASS.**
+
+## Result on genuine 30s (133 canonical parents, per-parent EV)
+
+| arm | trig | trig% | per-parent EV | vs baseline | avg entry improvement | med MAE | ff 0.25 | top-10 kept |
+|---|---|---|---|---|---|---|---|---|
+| **BASELINE 1m** | 133 | 100% | **+17.26** | — | — | 32.8 | — | 10/10 |
+| ARM1 reclaim | 21 | 15.8% | +4.19 | **−13.07** | −32.14 | 29.8 | 40.0% | 4/10 |
+| ARM2 pullback/re-expand | 36 | 27.1% | +5.25 | **−12.01** | −8.49 | 27.9 | 33.3% | 4/10 |
+| ARM3 sweep+reclaim | 18 | 13.5% | −0.49 | −17.75 | −37.64 | 34.5 | 18.2% | 2/10 |
+| ARM4 detect→confirm | 0 | 0% | — | — | — | — | — | 0/10 |
+| ARM5 second push | 9 | 6.8% | −0.75 | −18.01 | −4.86 | 36.2 | 16.7% | 0/10 |
+| ARM6 V-recovery | 28 | 21.1% | +5.75 | **−11.51** | −18.47 | 35.6 | 21.4% | 4/10 |
+| ARM7 compression release | 0 | 0% | — | — | — | — | — | 0/10 |
+| ARM8 FVG breakdown | 0 | 0% | — | — | — | — | — | 0/10 |
+
+**Every 30s arm is worse than simply taking the canonical 1m entry.**
+Trigger rates are 0–27%, so the arms sit out most parents — and the
+parents they sit out include **6–10 of the ten largest winners** in
+every case. Entry "improvement" is negative throughout (waiting costs
+price, it doesn't save it: −4.86 to −37.64 pt on average). Two arms
+lowered median MAE (ARM1 29.8, ARM2 27.9 vs 32.8 baseline) — a real
+risk improvement that is nowhere near paying for the missed tail.
+ARM4/7/8 never fired at 30s resolution.
+
+This is the third independent confirmation, now with full per-parent
+accounting across eight execution rules: **waiting for a lower-timeframe
+trigger on an OFH13 parent destroys the edge by missing the winners.**
+
+## Running it
+
+```
+python3 ph2_to_ltf.py                    # genuine 30s -> engine format
+python3 ltf_engine.py inventory data     # what real data exists
+python3 ltf_engine.py validate data      # aggregation gates
+python3 ltf_engine.py run data           # full study, all arms
+```
+
+When Market Replay 5s/15s files arrive, drop them in the same folder
+(or point the engine at the capture folder) and rerun `run` — the 15s
+and 5s columns populate automatically, ARM4/ARM7 become testable, and
+the aggregation gate re-verifies 5s→15s→30s→1m before any result is
+produced.
