@@ -71,6 +71,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private DateTime firstEt = DateTime.MaxValue, lastEt = DateTime.MinValue;
         private long barsSeen, barsNoLevels;
         private readonly List<V41Event> pendingTrades = new List<V41Event>();
+        // provenance: was the bar that produced each event loaded as chart
+        // history or received from the real-time stream? (audit only)
+        private string curSource = "HISTORICAL_LOAD";
+        private readonly Dictionary<string, string> evSource = new Dictionary<string, string>();
 
         protected override void OnStateChange()
         {
@@ -134,6 +138,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (!diagPrinted) PrintStartupDiagnostic(read);
             if (aborted) return;
+            curSource = State == State.Realtime ? "REALTIME" : "HISTORICAL_LOAD";
 
             barsSeen++;
             if (fb.EtClose < firstEt) firstEt = fb.EtClose;
@@ -176,13 +181,23 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (ProspectiveOnly &&
                 string.CompareOrdinal(e.Et.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                                       V41Frozen.FreezeDataEnd) <= 0)
+            {
+                rec.NotePreCutoff(e.Id);       // warmup/initialization - counted, never recorded
                 return;                        // spent history is never re-logged
-            rec.WriteEvent(e);
+            }
+            evSource[e.Id] = curSource;
+            rec.WriteEvent(e, curSource);
             if (e.Cand == "OFH13" || e.Cand == "OFH14" || e.Cand == "G4")
                 pendingTrades.Add(e);          // OFH13/14 managed; G4/OFH13/OFH14 get G1 B-arm
             if (EnableSim101Orders && IsSimAccount() && !ProspectiveOnly)
                 Print("DRY-RUN (no order submitted): " + e.Cand + " " +
                       (e.Dir > 0 ? "LONG" : "SHORT") + " @ " + e.EntryPx + " id=" + e.Id);
+        }
+
+        private string SourceOf(string id)
+        {
+            string src;
+            return evSource.TryGetValue(id, out src) ? src : "";
         }
 
         private bool IsSimAccount()
@@ -204,7 +219,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     string ver = e.Cand + "_PROSPECTIVE_V1";
                     double stop = V41Management.StopFor(ver, e);
                     V41ManagedOutcome o = V41Management.Score(engine.Bars, e, stop);
-                    rec.WriteTrade(ver, e, "A_ORIGINAL", e.EntryPx, o, "MARKET_AT_CLOSE", "");
+                    rec.WriteTrade(ver, e, "A_ORIGINAL", e.EntryPx, o, "MARKET_AT_CLOSE", "",
+                                   SourceOf(e.Id));
                 }
                 // G1 diagnostic B-arm per registry - logged only, never primary
                 int fj; double fpx; string nofill;
@@ -217,10 +233,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     string ver2 = e.Cand + "_PROSPECTIVE_V1";
                     double stop2 = V41Management.StopFor(ver2, e);
                     V41ManagedOutcome ob = V41Management.Score(engine.Bars, be, stop2);
-                    rec.WriteTrade(ver2, be, "B_G1_DISCOUNT", fpx, ob, "LIMIT_TOUCH_0.5ATR", "");
+                    rec.WriteTrade(ver2, be, "B_G1_DISCOUNT", fpx, ob, "LIMIT_TOUCH_0.5ATR", "",
+                                   SourceOf(e.Id));
                 }
                 else
-                    rec.WriteNoFill(e, nofill);
+                    rec.WriteNoFill(e, nofill, SourceOf(e.Id));
                 pendingTrades.RemoveAt(i);
             }
         }
@@ -247,6 +264,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             sb.AppendLine("                     ofht_spec " + V41Frozen.HashOfhtSpec
                           + "  cache " + V41Frozen.HashOfhtCache);
             sb.AppendLine("  prospective cutoff day > " + V41Frozen.FreezeDataEnd);
+            if (Mode != null && Mode.StartsWith("PROSPECTIVE") && rec != null)
+                sb.AppendLine("  ledger preload     " + rec.PreloadSummary
+                              + "  (duplicate protection active)");
             sb.AppendLine("  candidates         OFH13_PROSPECTIVE_V1 (PRIMARY, 1.5 ATR stop, 60m)");
             sb.AppendLine("                     OFH14_PROSPECTIVE_V1 (STRUCT stop, 60m)");
             sb.AppendLine("                     G4 / G3 SIGNAL-ONLY;  G1 = diagnostic B-arm only");
@@ -284,16 +304,25 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             "candidateId,version,eventId,timestampET,direction,entryTime,entryPrice,atr,"
             + "stopPrice,targetPrice,timeExitMin,parentEt,fvgHigh,fvgLow,fvgMid,depth,flow,"
             + "reasonQualified,fwdEligible,parentSignalDivergent,engineVersion,"
-            + "candSpecHash,ofh6Hash";
+            + "candSpecHash,ofh6Hash,barSource";
         public const string TradeHeader =
             "candidateId,version,eventId,arm,timestampET,direction,entryPrice,stopPts,"
             + "exitReason,exitPrice,heldMin,netPts,netUsd,R,mfe,mae,ratio,ff05,ff1,ff2,"
-            + "fillAssumption,noFillReason,month,isoWeek,engineVersion";
+            + "fillAssumption,noFillReason,month,isoWeek,engineVersion,barSource";
 
         private readonly string dir, tag, mode;
         private readonly Dictionary<string, bool> touched = new Dictionary<string, bool>();
         private readonly Action<string> log;
         private int writeFailures;
+        // ---- prospective ledger protection (recording-only; no rule logic) --
+        // Existing event/trade keys are preloaded from the output folder at
+        // startup so a strategy reload, chart refresh, reconnect or workspace
+        // reopen can never append the same EventID twice. Duplicates are
+        // logged as DUPLICATE_SUPPRESSED, never silently dropped.
+        private readonly HashSet<string> knownEvents = new HashSet<string>();
+        private readonly HashSet<string> knownTrades = new HashSet<string>();
+        private int dupEvents, dupTrades, preCutoffSkipped, preloadEvents, preloadTrades;
+        public int EventsWritten, TradesWritten;
 
         public int WriteFailures { get { return writeFailures; } }
         public string Dir { get { return dir; } }
@@ -307,6 +336,56 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             dir = Path.Combine(baseDir, this.mode.StartsWith("PROSPECTIVE")
                 ? "V41_prospective" : "V41_parity");
             EnsureDir();
+            if (this.mode.StartsWith("PROSPECTIVE")) PreloadLedger();
+        }
+
+        /// Read every existing prospective file once so this session knows
+        /// which EventIDs the ledger already holds. Deterministic: the key is
+        /// the frozen EventID (candidate + entry-bar ET + direction), so the
+        /// same market event always maps to the same key across restarts.
+        private void PreloadLedger()
+        {
+            try
+            {
+                foreach (string f in Directory.GetFiles(dir, "V41_PROSPECTIVE_EVENTS_*.csv"))
+                    foreach (string id in ReadCol(f, 2, -1))
+                    { if (knownEvents.Add(id)) preloadEvents++; }
+                foreach (string f in Directory.GetFiles(dir, "V41_PROSPECTIVE_TRADES_*.csv"))
+                    foreach (string k in ReadCol(f, 2, 3))
+                    { if (knownTrades.Add(k)) preloadTrades++; }
+            }
+            catch (Exception ex) { Fail(dir, ex); }
+        }
+
+        private static List<string> ReadCol(string path, int ix, int ix2)
+        {
+            List<string> outp = new List<string>();
+            using (StreamReader r = new StreamReader(path))
+            {
+                string line = r.ReadLine();          // header
+                while ((line = r.ReadLine()) != null)
+                {
+                    string[] p = line.Split(',');
+                    if (p.Length <= ix) continue;
+                    outp.Add(ix2 < 0 ? p[ix] : p[ix] + "|" + (p.Length > ix2 ? p[ix2] : ""));
+                }
+            }
+            return outp;
+        }
+
+        public string PreloadSummary
+        {
+            get { return preloadEvents + " events / " + preloadTrades + " trade rows"; }
+        }
+
+        /// A frozen-rule event on a bar at or before the prospective cutoff
+        /// (warm-up / historical initialization). Counted and logged, never
+        /// recorded - and never silently invisible.
+        public void NotePreCutoff(string id)
+        {
+            preCutoffSkipped++;
+            if (log != null && preCutoffSkipped <= 20)
+                log("PRE-CUTOFF (warmup) event skipped, not prospective: " + id);
         }
 
         /// The output folder can vanish mid-run (a user clearing it between
@@ -364,8 +443,16 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                 : "V41_PARITY_TRADES_" + tag + ".csv";
         }
 
-        public void WriteEvent(V41Event e)
+        public void WriteEvent(V41Event e, string barSource)
         {
+            if (mode.StartsWith("PROSPECTIVE") && !knownEvents.Add(e.Id))
+            {
+                dupEvents++;
+                if (log != null)
+                    log("DUPLICATE_SUPPRESSED event " + e.Id
+                        + " (already in the prospective ledger)");
+                return;
+            }
             string ver = e.Cand == "OFH13" || e.Cand == "OFH14"
                 ? e.Cand + "_PROSPECTIVE_V1"
                 : e.Cand + "_PROSPECTIVE_V1_SIGNAL_ONLY";
@@ -385,12 +472,22 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                 (e.Reason ?? "").Replace(',', ';'),
                 e.FwdResolved ? (e.Eligible ? "TRUE" : "FALSE") : "PENDING",
                 e.ParentSignalDivergent ? "TRUE" : "FALSE",
-                V41Frozen.EngineVersion, V41Frozen.HashCandSpec, V41Frozen.HashOfh6Spec }));
+                V41Frozen.EngineVersion, V41Frozen.HashCandSpec, V41Frozen.HashOfh6Spec,
+                barSource ?? "" }));
+            EventsWritten++;
         }
 
         public void WriteTrade(string version, V41Event e, string arm, double entryPx,
-                               V41ManagedOutcome o, string fillAssumption, string noFill)
+                               V41ManagedOutcome o, string fillAssumption, string noFill,
+                               string barSource)
         {
+            if (mode.StartsWith("PROSPECTIVE") && !knownTrades.Add(e.Id + "|" + arm))
+            {
+                dupTrades++;
+                if (log != null)
+                    log("DUPLICATE_SUPPRESSED trade " + e.Id + " " + arm);
+                return;
+            }
             System.Globalization.Calendar cal = CultureInfo.InvariantCulture.Calendar;
             int week = cal.GetWeekOfYear(e.Et, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
             Append(TradesFile(e.Et), TradeHeader, string.Join(",", new string[] {
@@ -404,15 +501,16 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                 fillAssumption, noFill,
                 e.Et.ToString("yyyy-MM", CultureInfo.InvariantCulture),
                 e.Et.Year + "-W" + week.ToString("00"),
-                V41Frozen.EngineVersion }));
+                V41Frozen.EngineVersion, barSource ?? "" }));
+            TradesWritten++;
         }
 
-        public void WriteNoFill(V41Event e, string reason)
+        public void WriteNoFill(V41Event e, string reason, string barSource)
         {
             V41ManagedOutcome o = new V41ManagedOutcome();
             o.ExitReason = "NO_FILL"; o.NetPts = 0; o.HeldMin = 0;
             WriteTrade(e.Cand + "_PROSPECTIVE_V1", e, "B_G1_DISCOUNT",
-                       double.NaN, o, "LIMIT_TOUCH_0.5ATR", reason);
+                       double.NaN, o, "LIMIT_TOUCH_0.5ATR", reason, barSource);
         }
 
         public void WriteDiag(string text)
@@ -445,32 +543,85 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
                 sigDiv[s.Et.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)] =
                     s.FwdResolved && !s.Eligible;
             }
-            string path = Path.Combine(dir, (mode.StartsWith("PROSPECTIVE")
-                ? "V41_PROSPECTIVE_RESOLUTION_" : "V41_PARITY_RESOLUTION_") + tag + ".csv");
             if (!EnsureDir()) return;
-            try
+            bool prospective = mode.StartsWith("PROSPECTIVE");
+            // rows produced by THIS session, keyed by eventId
+            Dictionary<string, string> rows = new Dictionary<string, string>();
+            Dictionary<string, string> monthOf = new Dictionary<string, string>();
+            for (int i = 0; i < eng.Events.Count; i++)
             {
-                using (StreamWriter w = new StreamWriter(path, false))
+                V41Event e = eng.Events[i];
+                string day = e.Et.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                // no historical contamination: warm-up / pre-cutoff events
+                // never enter a prospective output file
+                if (prospective && string.CompareOrdinal(day, V41Frozen.FreezeDataEnd) <= 0)
+                    continue;
+                string sig = e.SigEt == DateTime.MinValue ? ""
+                    : e.SigEt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                bool div;
+                if (!sigDiv.TryGetValue(sig, out div)) div = false;
+                rows[e.Id] = string.Join(",", new string[] {
+                    e.Id, e.Cand,
+                    e.Et.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                    sig,
+                    e.FwdResolved ? (e.Eligible ? "TRUE" : "FALSE") : "PENDING",
+                    div ? "TRUE" : "FALSE",
+                    V41Frozen.EngineVersion });
+                monthOf[e.Id] = e.Et.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+            }
+            if (!prospective)
+            {
+                string path = Path.Combine(dir, "V41_PARITY_RESOLUTION_" + tag + ".csv");
+                try
                 {
-                    w.WriteLine(ResolutionHeader);
-                    for (int i = 0; i < eng.Events.Count; i++)
+                    using (StreamWriter w = new StreamWriter(path, false))
                     {
-                        V41Event e = eng.Events[i];
-                        string sig = e.SigEt == DateTime.MinValue ? ""
-                            : e.SigEt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-                        bool div;
-                        if (!sigDiv.TryGetValue(sig, out div)) div = false;
-                        w.WriteLine(string.Join(",", new string[] {
-                            e.Id, e.Cand,
-                            e.Et.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
-                            sig,
-                            e.FwdResolved ? (e.Eligible ? "TRUE" : "FALSE") : "PENDING",
-                            div ? "TRUE" : "FALSE",
-                            V41Frozen.EngineVersion }));
+                        w.WriteLine(ResolutionHeader);
+                        foreach (KeyValuePair<string, string> kv in rows) w.WriteLine(kv.Value);
                     }
                 }
+                catch (Exception ex) { Fail(path, ex); }
+                return;
             }
-            catch (Exception) { }
+            // prospective: one file per month, MERGED with what earlier
+            // sessions wrote. A row from this session replaces the stored row
+            // for the same eventId (finalization only improves); rows from
+            // earlier sessions this run never saw are preserved.
+            HashSet<string> months = new HashSet<string>(monthOf.Values);
+            foreach (string mon in months)
+            {
+                string path = Path.Combine(dir, "V41_PROSPECTIVE_RESOLUTION_" + mon + ".csv");
+                Dictionary<string, string> merged = new Dictionary<string, string>();
+                List<string> order = new List<string>();
+                try
+                {
+                    if (File.Exists(path))
+                        using (StreamReader r = new StreamReader(path))
+                        {
+                            string line = r.ReadLine();      // header
+                            while ((line = r.ReadLine()) != null)
+                            {
+                                int c = line.IndexOf(',');
+                                if (c <= 0) continue;
+                                string id = line.Substring(0, c);
+                                if (!merged.ContainsKey(id)) order.Add(id);
+                                merged[id] = line;
+                            }
+                        }
+                    foreach (KeyValuePair<string, string> kv in rows)
+                    {
+                        if (monthOf[kv.Key] != mon) continue;
+                        if (!merged.ContainsKey(kv.Key)) order.Add(kv.Key);
+                        merged[kv.Key] = kv.Value;
+                    }
+                    using (StreamWriter w = new StreamWriter(path, false))
+                    {
+                        w.WriteLine(ResolutionHeader);
+                        foreach (string id in order) w.WriteLine(merged[id]);
+                    }
+                }
+                catch (Exception ex) { Fail(path, ex); }
+            }
         }
 
         public void Close(V41FrozenCandidateEngine eng, DateTime firstEt, DateTime lastEt,
@@ -495,6 +646,16 @@ namespace NinjaTrader.NinjaScript.Strategies.MnqV4
             }
             foreach (KeyValuePair<string, int> kv in n)
                 sb.AppendLine("  events " + kv.Key.PadRight(8) + kv.Value.ToString());
+            if (mode.StartsWith("PROSPECTIVE"))
+            {
+                sb.AppendLine("  ledger preloaded  " + preloadEvents + " events / "
+                              + preloadTrades + " trade rows");
+                sb.AppendLine("  written this run  " + EventsWritten + " events / "
+                              + TradesWritten + " trade rows");
+                sb.AppendLine("  DUPLICATE_SUPPRESSED  " + dupEvents + " events / "
+                              + dupTrades + " trade rows");
+                sb.AppendLine("  pre-cutoff warmup events skipped  " + preCutoffSkipped);
+            }
             sb.AppendLine("  Q-FWD divergent events   " + eng.FwdDivergentEvents);
             sb.AppendLine("  Q-FWD divergent signals  " + eng.FwdDivergentSignals);
             sb.AppendLine("  engine  " + V41Frozen.EngineVersion);
