@@ -1,10 +1,11 @@
 # LTF-EXEC-BACKTEST-V1 — 5s/15s execution research
 
-**Status: CAPTURE REQUIRED.** Genuine 5-second and 15-second history
-does not exist anywhere in this project. Nothing was interpolated. The
-capture module, the deterministic backtester, and all nine execution
-arms are built, frozen and pipeline-verified — awaiting genuine Market
-Replay capture data. OFH13_PROSPECTIVE_V1 untouched.
+**Status: CAPTURED, UNDER-SAMPLED.** Genuine 5s/15s/30s bars now exist
+for 2026-08-02 → 2026-08-21 (see ADDENDUM 2 at the end — that section
+supersedes the "NOT AVAILABLE" verdicts below, which were true when
+written). Nothing was ever interpolated. Coverage is 9 of 133 canonical
+parents, far too few to conclude anything. OFH13_PROSPECTIVE_V1
+untouched.
 
 ## Phase 1 — data inventory (final)
 
