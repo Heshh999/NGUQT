@@ -45,6 +45,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private string wtrDay = "";
         private string dir;
         private long rows5, rows15, rows30, rows1m, days;
+        private const int FlushEvery = 500;
+        private int sinceFlush;
         // current parent state (latest eligible OFH13 event, frozen rules)
         private V41Event parent;
         private DateTime parentAvail = DateTime.MinValue;
@@ -330,6 +332,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     days++;
                 }
                 wtr.WriteLine(line);
+                // A long capture that is cancelled, crashes or runs out of
+                // memory otherwise loses everything still sitting in the
+                // StreamWriter buffer - about 4 KB, i.e. the last ~30 rows.
+                // Flush periodically so an interrupted run keeps its data and
+                // so the files are readable while the run is still going.
+                if (++sinceFlush >= FlushEvery) { sinceFlush = 0; wtr.Flush(); }
             }
             catch (Exception ex) { Print("LTF capture write failed: " + ex.Message); }
         }
