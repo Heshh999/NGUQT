@@ -188,3 +188,81 @@ When Market Replay 5s/15s files arrive, drop them in the same folder
 and 5s columns populate automatically, ARM4/ARM7 become testable, and
 the aggregation gate re-verifies 5s→15s→30s→1m before any result is
 produced.
+
+---
+
+# ADDENDUM 2 — GENUINE 5s / 15s DATA CAPTURED (2026-08-02 → 2026-08-21)
+
+The capture host ran to completion in Strategy Analyzer against
+downloaded tick data. **Genuine 5-second and 15-second MNQ bars now
+exist in this project for the first time.** Nothing was interpolated.
+
+## What arrived
+
+| series | bars | days | genuineness probe (share closing on :00) |
+|---|---|---|---|
+| 1m | 20,698 | 18 | — (chart primary) |
+| 30s | 41,397 | 18 | 50.0% measured vs 50.0% expected → GENUINE |
+| 15s | 82,796 | 18 | 25.0% measured vs 25.0% expected → GENUINE |
+| 5s | 248,008 | 18 | 8.3% measured vs 8.3% expected → GENUINE |
+
+A minute-built fake would have scored 100% on all three. Ratios are
+exact: 248,008 / 20,698 = 11.98 ≈ 12.
+
+## Aggregation gates
+
+```
+5s  -> 15s   matched 82424  exact 82424  mismatch 0   PASS
+15s -> 30s   matched 41397  exact 41397  mismatch 0   PASS
+30s -> 1m    matched 20697  exact 20695  mismatch 2   PASS (2 quarantined)
+15s -> 1m    matched 20697  exact 20695  mismatch 2   PASS (2 quarantined)
+5s  -> 1m    matched 20360  exact 20358  mismatch 2   PASS (2 quarantined)
+```
+
+The two mismatches are `2026-08-07 16:00` and `2026-08-14 16:00`,
+differing by **1 and 2 contracts of volume** — one or two trades
+assigned to the far side of a bar boundary in the 1m series but not the
+30s series. Diagnosis: 13 of the 15 16:00 minutes in the sample match
+exactly, including one Friday, so this is not a session-close rule.
+
+**No tolerance was introduced.** The gate stays exact; those minutes are
+QUARANTINED — excluded from the study entirely (36 LTF bars dropped) —
+and more than `QUARANTINE_MAX = 10` isolated mismatches, or more than
+0.1% of matched minutes, remains a hard FAIL. The 33-mismatch duplicate
+defect that this gate caught earlier would still fail today.
+
+## Aggregation-denominator defect found and fixed
+
+The first run reported every arm losing to baseline by ~17 points. That
+was wrong. Per-parent EV divided by all 133 canonical parents while only
+9 had LTF coverage, so 124 data gaps were scored as the arm declining to
+trade. `noFillReason = NO_LTF_BARS_IN_WINDOW` appeared on 2,992 of 3,591
+rows. Baseline and arms are now both restricted to covered parents, and
+ARM0 (the 1m baseline, which needs no LTF bar) no longer votes on
+coverage.
+
+## Result — PIPELINE DEMONSTRATION, NOT A FINDING
+
+Coverage: **9 of 133 canonical parents** (5s), 8 (15s/30s), all IR.
+Baseline per-parent EV on those 9 is **−4.67** — a losing stretch.
+
+| arm | tf | trig | perParEV | vs base |
+|---|---|---|---|---|
+| BASELINE | 5s | 9 | −4.67 | — |
+| ARM2_PULLBACK_REEXPAND | 5s | 9 | +17.93 | **+22.60** |
+| ARM3_SWEEP_RECLAIM | 5s | 4 | +7.42 | +12.09 |
+| ARM5_SECOND_PUSH | 5s | 4 | +7.00 | +11.68 |
+| ARM2_PULLBACK_REEXPAND | 30s | 5 | +17.23 | +17.48 |
+
+**These numbers must not be acted on.** n = 9 on a stretch where the
+baseline lost money. The same ARM2 rule, measured on all 133 parents
+with genuine 30s bars, **lost to baseline by 12.01 points**. A sign flip
+between n=133 and n=9 is what noise looks like, not what an edge looks
+like. ARM4 and ARM7 became mechanically testable for the first time and
+fired 3 and 1 times respectively.
+
+The capture pipeline is proven end to end: NinjaTrader → genuine 5s/15s
+bars → probe → aggregation gates → quarantine → per-parent backtest.
+What it lacks is sample. 18 replayed days bought 9 parents; the 133
+canonical parents span 108 days from 2025-08-19 to 2026-08-19 and need
+roughly a year of tick data across five contract months.
