@@ -19,8 +19,10 @@ canonical frozen Python candidates without changing their rules?* —
 Python event-for-event and field-for-field off-platform (§10–§12), and
 NinjaTrader 8 itself — reading its own Volumetric bars, on the user's
 machine, over 356,874 bars — then emitted the identical event stream
-(§10a). Streaming behaviour under a live-style feed remains to be shown;
-that is the Playback gate.
+(§10a). Market Replay then delivered three of those days tick by tick
+through the streaming path and produced the same events and the same
+managed outcomes again (§10b). The remaining untested surface is a live
+feed and order execution — and this build submits no orders.
 
 ---
 
