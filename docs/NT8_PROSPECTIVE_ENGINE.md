@@ -1,9 +1,12 @@
 # NT8 PROSPECTIVE RESEARCH ENGINE — frozen candidates in NinjaTrader 8
 
-**Status: PARITY PASS — READY FOR PLAYBACK.** Both halves are now
-evidenced: off-platform logic parity (§10–§12) **and** the in-platform
-HISTORICAL_PARITY run on a real NinjaTrader Volumetric feed (§10a),
-which reproduced the research capture with zero feature mismatches.
+**Status: PLAYBACK PASS.** All three gates are now evidenced:
+off-platform logic parity (§10–§12), the in-platform HISTORICAL_PARITY
+run on a real NinjaTrader Volumetric feed (§10a), and the Playback
+(streaming) gate — three days delivered tick by tick through Market
+Replay reproduced the historical run and the canonical Python exactly
+(§10b, docs/NT8_PLAYBACK_GATE.txt). Not ready for live trading; this
+project does not authorize live trading.
 
 **THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING. The host submits no
 orders in this version; every order path is DRY-RUN. It must NEVER be
@@ -256,6 +259,28 @@ therefore expected and must not be read as a missing value; a
 consequence is that G4 rows always report
 `parentSignalDivergent=FALSE`.
 
+## 10b. Playback (streaming) gate — PASS
+
+Market Replay of 2026-08-18 → 2026-08-21 on engine 1.0.2 (5,518 bars,
+0 no-level bars, 39 events, 0 Q-FWD divergence). Aug 18/19/20 all
+arrived through the replay **stream** and all have independent
+references:
+
+| day | events | vs full-year NT8 | vs canonical Python |
+|---|---|---|---|
+| 2026-08-18 | 15 | 15 matched, 0 diffs | 15 matched, 0 diffs |
+| 2026-08-19 | 12 | 12 matched, 0 diffs | 12 matched, 0 diffs |
+| 2026-08-20 | 4 | 4 matched, 0 diffs | beyond capture |
+| 2026-08-21 | 8 | beyond run | beyond capture |
+
+Management on the capture-covered days: **16 rows, 0 mismatches**
+(A-arm net/exit/held/MFE/MAE/reason and G1 B-arm fills). Full report:
+`docs/NT8_PLAYBACK_GATE.txt`.
+
+Streaming introduces no divergence. What this does NOT establish: live
+feed latency, connection-loss behaviour, or order execution — this
+build submits no orders.
+
 ## 11. Management parity
 
 For every eligible OFH13/OFH14 event, the driver scored the A-arm
@@ -381,7 +406,8 @@ Allowed labels: PARITY PASS — READY FOR PLAYBACK · PARITY FAIL ·
 PLAYBACK PASS · SIM101 PASS. (READY FOR LIVE TRADING is not an allowed
 label for this project.)
 
-Current: **PARITY PASS — READY FOR PLAYBACK** — evidenced both
-off-platform (§10–§12) and in-platform on a real NT8 Volumetric feed
-(§10a). Next action is §15-C, the Playback gate. Not ready for live
-trading; this project does not authorize live trading.
+Current: **PLAYBACK PASS** — off-platform parity (§10–§12),
+in-platform historical parity (§10a) and the streaming gate (§10b) all
+evidenced. The remaining gate is Sim101, which requires order wiring
+that is deliberately not written. Not ready for live trading; this
+project does not authorize live trading.

@@ -1,0 +1,56 @@
+======================================================================
+NT8 PLAYBACK (STREAMING) GATE  -  engine V41-PROSPECTIVE-ENGINE-1.0.2
+======================================================================
+Run by the user in NinjaTrader 8.
+  connection      Playback / Market Replay (account Playback101,
+                  UI.xml IsDataSourceHistorical=False)
+  replay range    2026-08-18 .. 2026-08-21 (all four days downloaded)
+  series          MNQ SEP26, Order Flow Volumetric, 1 Minute, BidAsk
+  diagnostic      volumetric read TRUE, bid/ask TRUE, PASS
+  bars observed   5,518   (no-level bars 0)
+  window          2026-08-17 18:02 .. 2026-08-21 16:59
+  OFH6 signals    18
+  events          39  (G1 13, OFH14 10, G3 7, G4 7, OFH13 2)
+  Q-FWD divergent 0 events, 0 signals
+  resolution      39 rows, all fwdEligible TRUE
+  duplicates      none (output folder cleared with the strategy stopped)
+
+Aug 17 evening was loaded as chart history; 2026-08-18 through
+2026-08-21 arrived through the Market Replay STREAM.
+
+EVENT COMPARISON  (0 differences anywhere)
+--------------------------------------------------------------------
+day          events   vs full-year NT8   vs earlier run   vs Python
+2026-08-18     15      15 matched, 0      -                15 matched, 0
+2026-08-19     12      12 matched, 0      12 matched, 0    12 matched, 0
+2026-08-20      4       4 matched, 0       4 matched, 0    (beyond capture)
+2026-08-21      8      (beyond run)        8 matched, 0    (beyond capture)
+
+No missing events, no extra events, no field differences on any
+comparison. Fields checked: timestamp, direction, entryPrice, atr,
+stopPrice, parentEt, fvgHigh/Low/Mid, depth, flow, reasonQualified.
+
+MANAGEMENT vs CANONICAL PYTHON (the two days the capture covers)
+--------------------------------------------------------------------
+OFH13-20260818101900-+1   net  -46.676  STOP   exact
+OFH13-20260819101600--1   net  -52.995  STOP   exact
+OFH14-20260818101900-+1   net  -42.870  STOP   exact
+OFH14-20260818113100-+1   net  -23.120  STOP   exact
+OFH14-20260818125100-+1   net  -13.870  STOP   exact
+OFH14-20260819101600--1   net  -13.370  STOP   exact
+OFH14-20260819105600-+1   net  -26.870  STOP   exact
+OFH14-20260819122100-+1   net   -5.620  STOP   exact
+16 rows compared (A-arm + G1 B-arm fills), 0 mismatches.
+
+VERDICT: PLAYBACK PASS
+--------------------------------------------------------------------
+Three days that arrived tick by tick through the Market Replay stream
+(2026-08-18, 08-19, 08-20) produced event streams and managed outcomes
+identical to the same days processed as history, and - where the
+research capture reaches - identical to the canonical frozen Python.
+The streaming path introduces no divergence.
+
+NOT ESTABLISHED BY THIS RUN: live-feed behaviour with real latency,
+partial bars at connection loss, or order execution of any kind. This
+build submits no orders. THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
+======================================================================
