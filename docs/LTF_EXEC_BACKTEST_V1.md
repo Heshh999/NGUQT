@@ -1,11 +1,11 @@
 # LTF-EXEC-BACKTEST-V1 — 5s/15s execution research
 
 **Status: CAPTURED, UNDER-SAMPLED.** Genuine 5s/15s/30s bars now exist
-for 2026-08-02 → 2026-08-21 (see ADDENDUM 2 at the end — that section
-supersedes the "NOT AVAILABLE" verdicts below, which were true when
-written). Nothing was ever interpolated. Coverage is 9 of 133 canonical
-parents, far too few to conclude anything. OFH13_PROSPECTIVE_V1
-untouched.
+for 2026-06-02 → 2026-08-21, 70 days (see ADDENDUM 3 at the end — the
+addenda supersede the "NOT AVAILABLE" verdicts below, which were true
+when written). Nothing was ever interpolated. Coverage is **28 of 132
+canonical parents**; no arm survives family correction (best BH q =
+1.000). OFH13_PROSPECTIVE_V1 untouched.
 
 ## Phase 1 — data inventory (final)
 
