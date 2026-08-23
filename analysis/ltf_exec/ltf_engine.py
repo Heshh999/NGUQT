@@ -30,9 +30,13 @@ import prospective as P
 
 COST = 0.87
 TICK = 0.25
-# Isolated aggregation mismatches are quarantined, not tolerated; more than
-# this many means the defect is systematic and the gate fails outright.
-QUARANTINE_MAX = 10
+# Isolated aggregation mismatches are quarantined, not tolerated. The cap is
+# a RATE so it scales with the sample: an absolute cap would fail a clean
+# capture simply for being large. The floor keeps small samples workable.
+# The 33-mismatch/17,190-minute duplicate defect this gate caught earlier is
+# 0.19% and still fails; a clean capture runs around 0.013%.
+QUARANTINE_RATE = 0.0005
+QUARANTINE_FLOOR = 10
 SEC = {'30s': 30, '15s': 15, '5s': 5}
 
 # arms and the timeframes each needs
@@ -50,22 +54,48 @@ ARMS = {
 
 
 # ------------------------------------------------------------------ data
-def load_ltf(d):
-    """All genuine LTF bars, grouped by timeframe."""
-    out = {}
+def load_ltf(d, report=False):
+    """All genuine LTF bars, grouped by timeframe.
+
+    The capture host APPENDS, so re-running an overlapping date range
+    writes that day's bars twice. Duplicates are dropped FIRST-WINS on
+    (timeframe, timestamp) - the same rule cand_spec.load_merged uses -
+    and any duplicate whose values CONFLICT is reported, because that
+    would mean two runs disagreed about the same bar rather than simply
+    re-exporting it.
+    """
+    out, seen, dup, conflict = {}, {}, 0, []
     for f in sorted(glob.glob(os.path.join(d, 'V41_LTF_*.csv'))):
         for r in csv.DictReader(open(f)):
             tf = r['timeframe']
             if tf not in SEC:
                 continue
-            out.setdefault(tf, []).append({
-                'et': r['timestampET'],
-                'o': float(r['open']), 'h': float(r['high']),
-                'l': float(r['low']), 'c': float(r['close']),
-                'v': float(r['volume']) if r['volume'] else 0.0,
-                'delta': float(r['delta']) if r.get('delta') else None})
+            b = {'et': r['timestampET'],
+                 'o': float(r['open']), 'h': float(r['high']),
+                 'l': float(r['low']), 'c': float(r['close']),
+                 'v': float(r['volume']) if r['volume'] else 0.0,
+                 'delta': float(r['delta']) if r.get('delta') else None}
+            k = (tf, b['et'])
+            if k in seen:
+                dup += 1
+                p = seen[k]
+                if (p['o'], p['h'], p['l'], p['c'], p['v']) != \
+                   (b['o'], b['h'], b['l'], b['c'], b['v']):
+                    conflict.append(k)
+                continue
+            seen[k] = b
+            out.setdefault(tf, []).append(b)
     for tf in out:
         out[tf].sort(key=lambda x: x['et'])
+    if report and dup:
+        print('  duplicate rows dropped (first-wins): %d   conflicting: %d'
+              % (dup, len(conflict)))
+        for k in conflict[:5]:
+            print('    CONFLICT %s %s' % k)
+    if conflict:
+        raise SystemExit('ABORT: %d duplicated bars have CONFLICTING values. '
+                         'Two captures disagree about the same bar - resolve '
+                         'before any backtest.' % len(conflict))
     return out
 
 
@@ -87,11 +117,11 @@ def inventory(d=None):
 def validate(d, want_q=False):
     """Exact upward-aggregation gates. No backtest until these pass."""
     quarantine = set()
-    got = load_ltf(d)
-    one = {}
+    got = load_ltf(d, report=True)
+    one = {}          # 1m is also first-wins: never let a re-run overwrite
     for f in sorted(glob.glob(os.path.join(d, 'V41_LTF_*.csv'))):
         for r in csv.DictReader(open(f)):
-            if r['timeframe'] == '1m':
+            if r['timeframe'] == '1m' and r['timestampET'] not in one:
                 one[r['timestampET']] = {'o': float(r['open']), 'h': float(r['high']),
                                          'l': float(r['low']), 'c': float(r['close'])}
     ok = True
@@ -134,14 +164,16 @@ def validate(d, want_q=False):
         # but not the other. Those minutes are QUARANTINED (excluded from
         # the study), never accepted. Anything beyond a handful is
         # systematic - a real data defect - and remains a hard FAIL.
-        tolerable = bad <= QUARANTINE_MAX and (not m or bad / float(m) <= 0.001)
+        cap = max(QUARANTINE_FLOOR, int(QUARANTINE_RATE * m))
+        tolerable = bad <= cap
         verdict = ('PASS' if not bad else
-                   ('PASS (%d quarantined)' % bad if tolerable else 'FAIL')) \
+                   ('PASS (%d quarantined, cap %d)' % (bad, cap) if tolerable
+                    else 'FAIL (%d > cap %d)' % (bad, cap))) \
             if m else 'NO OVERLAP'
         print('  %-8s -> %-3s  matched %6d  exact %6d  mismatch %4d   %s'
               % (src, dst, m, ex, bad, verdict))
         if bad:
-            for k in sorted(bads)[:QUARANTINE_MAX]:
+            for k in sorted(bads)[:20]:
                 print('        quarantined minute %s' % k)
             quarantine.update(bads)
             if not tolerable:
@@ -371,6 +403,8 @@ def run(d, tfs):
         print('\nCAPTURE INTEGRITY FAILED - no backtesting performed')
         return
     got = load_ltf(d)
+    B, bidx, P_ = parents()
+    print('\ncanonical parents: %d' % len(P_))
     if quarantine:
         # drop every LTF bar inside a quarantined minute, all timeframes
         dropped = 0
@@ -380,8 +414,24 @@ def run(d, tfs):
             got[tf] = keep
         print('\nquarantine: %d minute(s) excluded, %d LTF bars dropped'
               % (len(quarantine), dropped))
-    B, bidx, P_ = parents()
-    print('\ncanonical parents: %d' % len(P_))
+        # A quarantined minute inside a parent's window means the LTF price
+        # path and the 1m path the BASELINE is scored on disagree for that
+        # parent. Dropping two bars would leave arm and baseline measured on
+        # different data, so the whole parent leaves the study.
+        qt = sorted(datetime.datetime.strptime(k, '%Y-%m-%d %H:%M:%S')
+                    for k in quarantine)
+        drop_p = []
+        for p in P_:
+            t0 = datetime.datetime.strptime(p['avail'], '%Y-%m-%d %H:%M:%S')
+            t1 = t0 + datetime.timedelta(minutes=60)
+            if any(t0 <= q <= t1 for q in qt):
+                drop_p.append(p['pid'])
+        if drop_p:
+            print('quarantine: %d parent(s) excluded - a quarantined minute '
+                  'falls inside their window:' % len(drop_p))
+            for pid in drop_p:
+                print('    %s' % pid)
+            P_ = [p for p in P_ if p['pid'] not in drop_p]
     order = [t for t in ('30s', '15s', '5s') if t in tfs and got.get(t)]
     if not order:
         print('no genuine bars for requested timeframes -> INSUFFICIENT DATA')

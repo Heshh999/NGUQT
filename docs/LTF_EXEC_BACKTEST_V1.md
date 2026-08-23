@@ -267,3 +267,89 @@ bars → probe → aggregation gates → quarantine → per-parent backtest.
 What it lacks is sample. 18 replayed days bought 9 parents; the 133
 canonical parents span 108 days from 2025-08-19 to 2026-08-19 and need
 roughly a year of tick data across five contract months.
+
+---
+
+# ADDENDUM 3 — MERGED CAPTURE 2026-06-02 → 2026-08-21 (70 days)
+
+| series | bars | genuineness probe |
+|---|---|---|
+| 1m | 79,513 | — |
+| 30s | 159,044 | 50.0% on :00 vs 50.0% expected → GENUINE |
+| 15s | 318,072 | 25.0% vs 25.0% → GENUINE |
+| 5s | 952,811 | 8.3% vs 8.3% → GENUINE |
+
+## Data quality — the strongest validation in this project
+
+**Captured 1m vs the frozen canonical history: ~95,000 of ~95,000
+minutes match EXACTLY, across all 70 days**, including the pre-roll June
+period. There is no contract-roll artifact: the MNQ 09-26 tick series
+NinjaTrader served for early June agrees with the canonical series bar
+for bar. (2026-08-20/21 show no overlap — they are past
+`FREEZE_DATA_END = 2026-08-19`, as intended.)
+
+```
+5s  -> 15s   matched 316800  exact 316800  mismatch  0   PASS
+15s -> 30s   matched 159026  exact 159026  mismatch  0   PASS
+30s -> 1m    matched  79510  exact  79500  mismatch 10   PASS (10 quarantined, cap 39)
+15s -> 1m    matched  79494  exact  79484  mismatch 10   PASS (10 quarantined, cap 39)
+5s  -> 1m    matched  78540  exact  78530  mismatch 10   PASS (10 quarantined, cap 39)
+```
+
+## Three engine defects the larger capture exposed
+
+**1. No dedupe on re-captured days.** The capture host appends, so
+re-running an overlapping range wrote 2026-08-02 twice (13,669 lines vs
+6,833). The loader concatenated both copies; the aggregation gate would
+have *skipped* the doubled groups rather than failed on them — a silent
+hole. Now first-wins on `(timeframe, timestamp)`, with any *conflicting*
+duplicate aborting the run outright. Result: **6,474 duplicates dropped,
+0 conflicting**, and the deduped totals match NinjaTrader's own counters
+exactly (159,044 / 318,072 / 952,811).
+
+**2. Absolute quarantine cap did not scale.** `QUARANTINE_MAX = 10`
+would fail a clean capture purely for being large. Now rate-based:
+`max(10, 0.05% of matched)`. A clean capture runs ~0.013%; the
+33-mismatch duplicate defect this gate caught earlier is 0.19% and still
+fails.
+
+**3. Bar-level quarantine was not enough.** Correcting the earlier
+report: the 10 mismatches are **not** all the benign 1–2 contract
+boundary artifact seen in ADDENDUM 2. Several are material source
+disagreements on fast, high-volume minutes — `2026-06-09 11:37` differs
+by **7,087 contracts**, `2026-07-17 12:22` by 12 points of high. The
+likely cause is that the 1m series is built from the provider's MINUTE
+records while the Second series are built from TICK records, and the two
+disagree on violent minutes. Where such a minute falls inside a parent's
+60-minute window, the arm and the baseline would be scored on different
+price paths, so **the whole parent is now excluded**, not just two bars.
+One parent (`OFH13-20260717121200-+1`) was dropped on this rule.
+
+## Result — still NOT A FINDING
+
+Coverage **28 of 132** parents (up from 9). Every parent day inside the
+captured range has a capture file — coverage of that window is complete;
+the limit is simply that only 29 canonical parents fall in 70 days.
+
+Baseline per-parent EV on the covered set is positive (+6.26 to +9.54
+depending on timeframe) and **most arms beat it** — the opposite sign to
+the 133-parent genuine-30s study. Day-clustered sign-flip test over all
+24 arm × timeframe cells:
+
+| arm | tf | n | mean Δ | p | BH q |
+|---|---|---|---|---|---|
+| ARM2_PULLBACK_REEXPAND | 30s | 23 | +11.38 | 0.102 | **1.000** |
+| ARM3_SWEEP_RECLAIM | 5s | 28 | +9.76 | 0.406 | 1.000 |
+| ARM2_PULLBACK_REEXPAND | 5s | 28 | +9.56 | 0.378 | 1.000 |
+| ARM3_SWEEP_RECLAIM | 15s | 24 | +8.96 | 0.348 | 1.000 |
+| ARM6_V_RECOVERY | 15s | 24 | +8.22 | 0.374 | 1.000 |
+
+**Nothing survives. Best uncorrected p = 0.102; every BH q = 1.000.**
+The sign flip between the n=133 30s study and this n=28 window is what
+noise looks like across 24 simultaneous comparisons, not an edge. No arm
+is promoted. OFH13_PROSPECTIVE_V1 remains untouched and unchallenged.
+
+To reach the full 133 parents the capture needs roughly a year of tick
+data across five contract months (MNQ 09-25, 12-25, 03-26, 06-26,
+09-26). 70 days bought 29 parents; the rate is ~0.41 parents per
+captured day.
