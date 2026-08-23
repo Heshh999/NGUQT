@@ -49,6 +49,23 @@ namespace NinjaTrader.NinjaScript.Strategies
         private V41Event parent;
         private DateTime parentAvail = DateTime.MinValue;
 
+        // ---------------- GENUINENESS PROBE (see Decide) -------------------
+        // NinjaTrader builds a Second series from the finest data it holds.
+        // With tick data it produces real 5s/15s/30s bars. WITHOUT tick data
+        // it falls back to the minute records and hands back one bar per
+        // MINUTE, still labelled 5s. Those are not genuine lower-timeframe
+        // bars and must never reach disk. A genuine 5s bar closes on the 5s
+        // grid, so only 1 in 12 lands on :00 (15s: 1 in 4; 30s: 1 in 2). A
+        // minute-built fake lands on :00 every single time. Each Second
+        // series is therefore buffered until ProbeBars bars have closed and
+        // is written only if it passes.
+        private const int ProbeBars = 24;
+        private class Pending { public string Day; public string Line; }
+        private readonly List<Pending>[] probe = new List<Pending>[4];
+        private readonly int[] probeN = new int[4];
+        private readonly int[] probeZero = new int[4];
+        private readonly int[] verdict = new int[4];   // 0 undecided 1 real -1 fake
+
         private const string Header =
             "timestampET,instrument,contract,timeframe,open,high,low,close,volume,"
             + "bidVolume,askVolume,delta,deltaPercent,"
@@ -90,25 +107,36 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Terminated)
             {
-                if (wtr != null) { try { wtr.Flush(); wtr.Close(); } catch (Exception) { } }
                 if (configured && dataWasLoaded)
                 {
                     Print("======================================================");
                     Print("LTF CAPTURE COMPLETE");
+                    // a short run may end before a series proved itself
+                    for (int i = 1; i <= 3; i++)
+                        if (verdict[i] == 0 && probeN[i] > 0)
+                            Decide(i, i == 1 ? "30s" : (i == 2 ? "15s" : "5s"));
                     Print("  1m  bars " + rows1m);
-                    Print("  30s bars " + rows30);
-                    Print("  15s bars " + rows15);
-                    Print("  5s  bars " + rows5);
+                    Print("  30s bars " + rows30 + Verdict(1));
+                    Print("  15s bars " + rows15 + Verdict(2));
+                    Print("  5s  bars " + rows5 + Verdict(3));
                     Print("  day files " + days);
                     Print("  parent state " + (hasVol ? "RECORDED (volumetric primary)"
                                                       : "EMPTY (primary not volumetric)"));
                     Print("  files in " + dir);
                     if (rows5 == 0 || rows15 == 0)
-                        Print("  WARNING: a second-series produced 0 bars - the data feed"
-                              + " may not have tick data for this period.");
+                        Print("  WARNING: a second-series produced 0 bars - there is no"
+                              + " tick / Market Replay data loaded for this period.");
                     Print("======================================================");
                 }
+                if (wtr != null) { try { wtr.Flush(); wtr.Close(); } catch (Exception) { } }
             }
+        }
+
+        private string Verdict(int bip)
+        {
+            if (verdict[bip] < 0) return "  seen, 0 WRITTEN - REJECTED AS NOT GENUINE";
+            if (verdict[bip] > 0) return "  (genuine)";
+            return "";
         }
 
         private DateTime ToEt(DateTime t)
@@ -181,14 +209,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                                                  : fb.Close > parent.ZHi;
                     if (expired || broken) parent = null;
                 }
-                Write("1m", Times[0][0], Opens[0][0], Highs[0][0], Lows[0][0],
+                Write("1m", 0, Times[0][0], Opens[0][0], Highs[0][0], Lows[0][0],
                       Closes[0][0], Volumes[0][0], bidS, askS, fb.HasLevels);
                 rows1m++;
                 return;
             }
             string tf = BarsInProgress == 1 ? "30s" : (BarsInProgress == 2 ? "15s" : "5s");
             int bip = BarsInProgress;
-            Write(tf, Times[bip][0], Opens[bip][0], Highs[bip][0], Lows[bip][0],
+            Write(tf, bip, Times[bip][0], Opens[bip][0], Highs[bip][0], Lows[bip][0],
                   Closes[bip][0], Volumes[bip][0], 0, 0, false);
             if (bip == 1) rows30++; else if (bip == 2) rows15++; else rows5++;
             DateTime nowEt = ToEt(Times[bip][0]);
@@ -201,29 +229,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void Write(string tf, DateTime t, double o, double h, double l,
+        private void Write(string tf, int bip, DateTime t, double o, double h, double l,
                            double c, double v, double bidS, double askS, bool hasOf)
         {
             CultureInfo ci = CultureInfo.InvariantCulture;
             DateTime et = ToEt(t);
             try
             {
-                // one file per ET calendar day: a multi-day replay rolls the
-                // writer instead of piling every day into the first day's file
-                string day = et.ToString("yyyyMMdd", ci);
-                if (wtr == null || day != wtrDay)
-                {
-                    if (wtr != null) { wtr.Flush(); wtr.Close(); wtr = null; }
-                    try { Directory.CreateDirectory(dir); } catch (Exception) { }
-                    string p = Path.Combine(dir, "V41_LTF_" +
-                        (Instrument == null ? "MNQ" : Instrument.MasterInstrument.Name)
-                        + "_" + day + ".csv");
-                    bool fresh = !File.Exists(p);
-                    wtr = new StreamWriter(p, true);
-                    if (fresh) wtr.WriteLine(Header);
-                    wtrDay = day;
-                    days++;
-                }
                 string pc = "", pid = "", pd = "", pav = "", pet = "", ppx = "",
                        patr = "", flo = "", fhi = "", inv = "", valid = "FALSE";
                 if (parent != null)
@@ -245,7 +257,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string dl = hasOf ? (askS - bidS).ToString("R", ci) : "";
                 string dp = (hasOf && (askS + bidS) > 0)
                     ? (100.0 * (askS - bidS) / (askS + bidS)).ToString("0.####", ci) : "";
-                wtr.WriteLine(string.Join(",", new string[] {
+                string line = string.Join(",", new string[] {
                     et.ToString("yyyy-MM-dd HH:mm:ss", ci),
                     Instrument == null ? "MNQ" : Instrument.MasterInstrument.Name,
                     Instrument == null ? "" : Instrument.FullName,
@@ -253,7 +265,71 @@ namespace NinjaTrader.NinjaScript.Strategies
                     c.ToString("R", ci), v.ToString("R", ci),
                     bidv, askv, dl, dp,
                     pc, pid, pd, pav, pet, ppx, patr, flo, fhi, inv, valid,
-                    V41Frozen.EngineVersion }));
+                    V41Frozen.EngineVersion });
+                string day = et.ToString("yyyyMMdd", ci);
+
+                if (bip == 0) { Sink(day, line); return; }   // 1m primary, always real
+                if (verdict[bip] > 0) { Sink(day, line); return; }
+                if (verdict[bip] < 0) return;                // fake series, never written
+
+                if (probe[bip] == null) probe[bip] = new List<Pending>();
+                Pending pn = new Pending(); pn.Day = day; pn.Line = line;
+                probe[bip].Add(pn);
+                probeN[bip]++;
+                if (et.Second == 0) probeZero[bip]++;
+                if (probeN[bip] >= ProbeBars) Decide(bip, tf);
+            }
+            catch (Exception ex) { Print("LTF capture write failed: " + ex.Message); }
+        }
+
+        /// Pass or fail one Second series on the timestamp-grid test, then
+        /// either flush its buffer to disk or discard it permanently.
+        private void Decide(int bip, string tf)
+        {
+            int n = probeN[bip], z = probeZero[bip];
+            double frac = n > 0 ? (double)z / n : 0.0;
+            double expected = bip == 1 ? 0.5 : (bip == 2 ? 0.25 : 1.0 / 12.0);
+            bool fake = n >= 8 && frac > 0.9;
+            verdict[bip] = fake ? -1 : 1;
+            Print("  " + tf + " genuineness  bars " + n + "  on :00 " + z
+                  + " (" + (100.0 * frac).ToString("0.0") + "%, real series expects ~"
+                  + (100.0 * expected).ToString("0.0") + "%)  -> "
+                  + (fake ? "FAKE" : "GENUINE"));
+            if (fake)
+            {
+                Print("  *** " + tf + " REJECTED: NinjaTrader is building this series from"
+                      + " MINUTE records, not ticks - every bar lands on :00, i.e. one bar"
+                      + " per minute mislabelled " + tf + ".");
+                Print("  *** No " + tf + " row will be written. Download tick / Market"
+                      + " Replay data for these dates and re-run.");
+                probe[bip] = null;
+                return;
+            }
+            List<Pending> buf = probe[bip];
+            probe[bip] = null;
+            if (buf != null) for (int i = 0; i < buf.Count; i++) Sink(buf[i].Day, buf[i].Line);
+        }
+
+        /// One file per ET calendar day: a multi-day run rolls the writer
+        /// instead of piling every day into the first day's file.
+        private void Sink(string day, string line)
+        {
+            try
+            {
+                if (wtr == null || day != wtrDay)
+                {
+                    if (wtr != null) { wtr.Flush(); wtr.Close(); wtr = null; }
+                    try { Directory.CreateDirectory(dir); } catch (Exception) { }
+                    string p = Path.Combine(dir, "V41_LTF_" +
+                        (Instrument == null ? "MNQ" : Instrument.MasterInstrument.Name)
+                        + "_" + day + ".csv");
+                    bool fresh = !File.Exists(p);
+                    wtr = new StreamWriter(p, true);
+                    if (fresh) wtr.WriteLine(Header);
+                    wtrDay = day;
+                    days++;
+                }
+                wtr.WriteLine(line);
             }
             catch (Exception ex) { Print("LTF capture write failed: " + ex.Message); }
         }

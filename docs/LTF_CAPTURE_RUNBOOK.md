@@ -32,6 +32,41 @@ If it is not Volumetric the capture still runs — those columns are left
 empty and the backtester regenerates parents from frozen `cand_spec`
 anyway.
 
+## The genuineness probe — why this matters before anything else
+
+NinjaTrader builds a Second series from **the finest data it holds for
+those dates**:
+
+- tick / Market Replay data present → real 5s, 15s, 30s bars
+- **only minute data present → NinjaTrader hands back one bar per
+  MINUTE, still labelled `5s`**, and says nothing
+
+The second case is exactly the fake lower-timeframe data this project
+forbids, and it is silent. So the capture host tests every Second series
+before writing a single row of it. A genuine 5s bar closes on the 5s
+grid, so only 1 bar in 12 lands on `:00` (15s: 1 in 4, 30s: 1 in 2). A
+minute-built fake lands on `:00` **every time**.
+
+Each Second series is buffered for its first 24 bars. If more than 90%
+of them close on `:00`, the series is rejected, the buffer is discarded,
+and **not one row of that timeframe is ever written**. Otherwise the
+buffer is flushed and the series streams normally. Either way the
+Output window prints what was measured:
+
+```
+  5s genuineness  bars 24  on :00 2 (8.3%, real series expects ~8.3%)  -> GENUINE
+```
+
+```
+  5s genuineness  bars 24  on :00 24 (100.0%, real series expects ~8.3%)  -> FAKE
+  *** 5s REJECTED: NinjaTrader is building this series from MINUTE
+      records, not ticks - every bar lands on :00 ...
+```
+
+Buffered rows are flushed after later rows of other series, so a file
+can be out of chronological order. That is harmless — the backtester
+sorts by timestamp.
+
 ## Install (once)
 
 1. NinjaTrader → **New → NinjaScript Editor**
@@ -81,6 +116,35 @@ data for that day has no ticks — redownload it.
    deduplicates first-wins.
 
 Send back the whole `V41_ltf` folder.
+
+## Alternative: Strategy Analyzer (faster, but only with tick data)
+
+Strategy Analyzer is much faster than real-time replay and works fine
+with this strategy — but it does **not** use the Playback connection.
+It reads the local historical database, so it produces genuine 5s/15s
+bars only for dates where **tick data** is in that database.
+
+1. **Tools → Historical Data → Download**, Type = **Tick**, instrument
+   `MNQ`, the date range you want. (Market Replay `.nrd` files are a
+   separate store and Strategy Analyzer does not read them — you need
+   the tick download as well.)
+2. **New → Strategy Analyzer → Backtest**
+3. Strategy = `MnqV41LtfCaptureHost`; set **Output folder** = `C:\V41`
+4. Data Series: instrument `MNQ`, **1 Minute** (or Volumetric 1 Minute),
+   your date range. This sets the PRIMARY series only — the 30s/15s/5s
+   series are added by the code and appear automatically.
+5. Set **Max bars look back = Infinite**, then **Run**.
+6. Read the Output window. If tick data is missing for those dates the
+   probe rejects the series and writes nothing rather than writing fakes.
+
+If the strategy is missing from the Strategy Analyzer list, it did not
+compile — go back to the NinjaScript Editor, press F5 and read the
+Errors tab. If it runs but every count is 0, there is no data in the
+database for that instrument and range.
+
+Backtest results (P&L, trade count) are meaningless here and will read
+zero: **this strategy submits no orders.** The deliverable is the CSV
+folder, not the performance report.
 
 ## Test the captured data
 
