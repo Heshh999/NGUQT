@@ -1,0 +1,5 @@
+timeframe,status,rows,days,window,fields,stamp
+5s,NOT AVAILABLE,0,0,,,
+15s,NOT AVAILABLE,0,0,,,
+tick,NOT AVAILABLE,0,0,,,
+30s,AVAILABLE,34944,192,2025-09..2026-05 ~09:30-11:00 ET,OHLCV only (no bid/ask/delta),CLOSE-stamped
