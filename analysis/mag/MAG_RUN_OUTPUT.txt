@@ -1,0 +1,330 @@
+canonical reproduction PASS  (355455 bars / 952 OFH6 / 133 OFH13)
+
+==============================================================================
+MAG-DIR-H1  HIGH magnitude + ACCEPTED breakout
+  C_ACCEPT_ANY                 n 1863  mean   -1.89  med -18.93  WR  21.8%  PF  0.91  CI [-4.91,+1.41]  p 0.2514
+      MFE 2.54 MAE 2.75  MFE/MAE 0.92 | ff.25  46.8% (amb 356)  ff1.0  46.8% (amb 12) | exTop1%  -5.35 exTop5% -12.32  maxW +577 maxL -104
+      U n378 -0.91  DEV n752 -3.23  IR n733 -1.03   |   L n969 -2.51  S n894 -1.22
+  C_ACCEPT_NOMAG               n 1765  mean   -2.23  med -18.63  WR  22.2%  PF  0.89  CI [-5.21,+1.03]  p 0.1731
+      MFE 2.51 MAE 2.69  MFE/MAE 0.93 | ff.25  47.4% (amb 341)  ff1.0  47.9% (amb 11) | exTop1%  -5.47 exTop5% -12.19  maxW +577 maxL -104
+      U n356 -0.15  DEV n712 -4.55  IR n697 -0.92   |   L n934 -2.81  S n831 -1.57
+  C_BREAKOUT_ONLY              n 2112  mean   -2.13  med -19.04  WR  21.4%  PF  0.89  CI [-5.03,+1.13]  p 0.1752
+      MFE 2.55 MAE 2.74  MFE/MAE 0.93 | ff.25  45.8% (amb 397)  ff1.0  47.8% (amb 21) | exTop1%  -5.79 exTop5% -12.58  maxW +592 maxL -101
+      U n445 -0.65  DEV n848 -3.18  IR n819 -1.86   |   L n1083 -2.26  S n1029 -2.00
+  C_MAG_ALONE                  n 2443  mean   -2.22  med -19.09  WR  23.9%  PF  0.89  CI [-4.29,-0.05]  p 0.0414
+      MFE 2.50 MAE 2.70  MFE/MAE 0.93 | ff.25  50.2% (amb 476)  ff1.0  49.2% (amb 38) | exTop1%  -5.09 exTop5% -11.69  maxW +519 maxL -150
+      U n519 -1.55  DEV n986 -3.07  IR n938 -1.69   |   L n1202 -1.73  S n1241 -2.69
+  C_MAG_x_BREAKOUT             n 1773  mean   -0.58  med -19.64  WR  22.7%  PF  0.97  CI [-3.84,+3.11]  p 0.7529
+      MFE 2.59 MAE 2.63  MFE/MAE 0.98 | ff.25  47.8% (amb 339)  ff1.0  49.5% (amb 11) | exTop1%  -4.28 exTop5% -11.55  maxW +577 maxL -101
+      U n385 -1.78  DEV n714 +0.69  IR n674 -1.24   |   L n917 -2.51  S n856 +1.48
+  FULL_MAG_ACCEPT              n 1511  mean   -0.34  med -19.98  WR  23.5%  PF  0.98  CI [-3.92,+3.62]  p 0.8635
+      MFE 2.51 MAE 2.59  MFE/MAE 0.97 | ff.25  46.4% (amb 272)  ff1.0  49.2% (amb 4) | exTop1%  -4.02 exTop5% -11.60  maxW +542 maxL -104
+      U n316 -2.02  DEV n607 -0.71  IR n588 +0.94   |   L n781 -1.22  S n730 +0.60
+    CONTROL AUDIT FULL_MAG_ACCEPT vs C_ACCEPT_NOMAG
+      set          n  hour     atr    volume  range    mag  long%
+      signal    1511    11   16.59      4809  16.75   2.18  51.7%
+      control   1765    12   15.00      4053  14.75   1.99  52.9%
+      -> MATCHED (no field differs by >25%)
+  PROMOTION GATE  FULL_MAG_ACCEPT
+    1 expectancy positive          FAIL
+    2 signal profitable itself     FAIL
+    3 U/DEV/IR sign stable         FAIL
+    4 not top-5% dominated         FAIL
+    5 matched-control advantage    PASS
+    6 raw geometry credible        FAIL
+    7 sample adequate              PASS
+    8 no control artifact          FAIL
+    ==> NOT PROMOTED
+
+==============================================================================
+MAG-DIR-H2  HIGH magnitude + REJECTED breakout
+  C_REENTRY_ANY                n 2005  mean   -1.11  med -19.08  WR  24.0%  PF  0.95  CI [-3.40,+1.27]  p 0.3519
+      MFE 2.48 MAE 2.64  MFE/MAE 0.94 | ff.25  49.3% (amb 410)  ff1.0  50.0% (amb 11) | exTop1%  -4.52 exTop5% -11.43  maxW +577 maxL -94
+      U n419 -1.90  DEV n813 -1.32  IR n773 -0.45   |   L n982 +0.95  S n1023 -3.08
+  C_REJECT_NOMAG               n 1792  mean   -1.05  med -18.46  WR  24.1%  PF  0.95  CI [-3.70,+1.67]  p 0.4379
+      MFE 2.47 MAE 2.51  MFE/MAE 0.98 | ff.25  50.1% (amb 352)  ff1.0  50.0% (amb 8) | exTop1%  -4.29 exTop5% -11.26  maxW +681 maxL -94
+      U n372 -1.89  DEV n722 -1.08  IR n698 -0.57   |   L n846 +0.82  S n946 -2.72
+  FULL_MAG_REJECT              n 1630  mean   -1.95  med -20.25  WR  23.6%  PF  0.91  CI [-4.64,+0.82]  p 0.1603
+      MFE 2.36 MAE 2.69  MFE/MAE 0.88 | ff.25  48.3% (amb 353)  ff1.0  48.3% (amb 7) | exTop1%  -5.50 exTop5% -12.63  maxW +577 maxL -94
+      U n362 -2.40  DEV n666 -3.74  IR n602 +0.28   |   L n816 +0.58  S n814 -4.49
+    CONTROL AUDIT FULL_MAG_REJECT vs C_REJECT_NOMAG
+      set          n  hour     atr    volume  range    mag  long%
+      signal    1630    11   16.84      4190  19.25   2.45  50.1%
+      control   1792    12   15.26      3390  17.00   2.06  47.2%
+      -> MATCHED (no field differs by >25%)
+  PROMOTION GATE  FULL_MAG_REJECT
+    1 expectancy positive          FAIL
+    2 signal profitable itself     FAIL
+    3 U/DEV/IR sign stable         FAIL
+    4 not top-5% dominated         FAIL
+    5 matched-control advantage    FAIL
+    6 raw geometry credible        FAIL
+    7 sample adequate              PASS
+    8 no control artifact          FAIL
+    ==> NOT PROMOTED
+
+==============================================================================
+BAL-H1  QUIET balance + activity shock + ACCEPTED breakout
+  C_QUIET_NO_SHOCK             n  506  mean   -5.49  med -14.97  WR  20.8%  PF  0.66  CI [-8.53,-2.37]  p 0.0006
+      MFE 2.38 MAE 2.49  MFE/MAE 0.96 | ff.25  43.1% (amb 100)  ff1.0  46.0% (amb 0) | exTop1%  -7.64 exTop5% -12.01  maxW +259 maxL -100
+      U n101 -4.66  DEV n181 -10.57  IR n224 -1.77   |   L n264 -6.49  S n242 -4.41
+  C_SHOCK_BREAKOUT             n 1209  mean   -3.35  med -19.53  WR  21.2%  PF  0.84  CI [-6.54,+0.02]  p 0.0484
+      MFE 2.45 MAE 2.73  MFE/MAE 0.90 | ff.25  46.1% (amb 211)  ff1.0  47.7% (amb 5) | exTop1%  -6.51 exTop5% -13.24  maxW +479 maxL -95
+      U n270 -2.21  DEV n479 -4.79  IR n460 -2.51   |   L n605 -3.25  S n604 -3.45
+  FULL_BAL_ACCEPT              n 1082  mean   -2.20  med -19.35  WR  22.6%  PF  0.89  CI [-5.59,+1.32]  p 0.2171
+      MFE 2.43 MAE 2.71  MFE/MAE 0.90 | ff.25  44.7% (amb 184)  ff1.0  47.8% (amb 0) | exTop1%  -4.93 exTop5% -12.06  maxW +387 maxL -95
+      U n233 +0.83  DEV n435 -3.73  IR n414 -2.29   |   L n547 -1.48  S n535 -2.93
+    CONTROL AUDIT FULL_BAL_ACCEPT vs C_SHOCK_BREAKOUT
+      set          n  hour     atr    volume  range    mag  long%
+      signal    1082    12   15.87      4162  15.50   2.02  50.6%
+      control   1209    12   15.35      4284  18.50   2.64  50.0%
+      -> MATCHED (no field differs by >25%)
+  PROMOTION GATE  FULL_BAL_ACCEPT
+    1 expectancy positive          FAIL
+    2 signal profitable itself     FAIL
+    3 U/DEV/IR sign stable         FAIL
+    4 not top-5% dominated         FAIL
+    5 matched-control advantage    PASS
+    6 raw geometry credible        FAIL
+    7 sample adequate              PASS
+    8 no control artifact          FAIL
+    ==> NOT PROMOTED
+
+==============================================================================
+BAL-H2  QUIET balance + activity shock + FALSE break
+  FULL_BAL_FALSEBREAK          n  830  mean   -0.15  med -17.81  WR  25.8%  PF  0.99  CI [-4.02,+3.92]  p 0.9432
+      MFE 2.55 MAE 2.39  MFE/MAE 1.07 | ff.25  52.5% (amb 161)  ff1.0  49.4% (amb 1) | exTop1%  -3.09 exTop5% -10.47  maxW +340 maxL -99
+      U n200 -4.57  DEV n321 +3.13  IR n309 -0.71   |   L n429 +0.54  S n401 -0.89
+  PROMOTION GATE  FULL_BAL_FALSEBREAK
+    1 expectancy positive          FAIL
+    2 signal profitable itself     FAIL
+    3 U/DEV/IR sign stable         FAIL
+    4 not top-5% dominated         FAIL
+    5 matched-control advantage    FAIL
+    6 raw geometry credible        PASS
+    7 sample adequate              PASS
+    8 no control artifact          PASS
+    ==> NOT PROMOTED
+
+==============================================================================
+OVN-H2  overnight extension -> RTH reversion
+  C_EXTENSION_ONLY             n  228  mean   -2.86  med -16.02  WR  10.5%  PF  0.82  CI [-9.48,+4.72]  p 0.4481
+      MFE 6.72 MAE 7.12  MFE/MAE 0.94 | ff.25  46.9% (amb 68)  ff1.0  46.5% (amb 41) | exTop1%  -6.01 exTop5% -13.50  maxW +362 maxL -44
+      U n46 +5.49  DEV n89 -5.96  IR n93 -4.02   |   L n98 -10.34  S n130 +2.78
+  C_REENTRY_ONLY               n  152  mean   +3.41  med -21.64  WR  20.4%  PF  1.14  CI [-8.93,+17.69]  p 0.6263
+      MFE 3.90 MAE 3.66  MFE/MAE 1.07 | ff.25  47.7% (amb 43)  ff1.0  51.4% (amb 6) | exTop1%  +0.73 exTop5% -10.55  maxW +408 maxL -85
+      U n35 -5.32  DEV n61 +11.09  IR n56 +0.49   |   L n68 -3.58  S n84 +9.06
+  FULL_EXT_REENTRY             n  125  mean   +2.60  med -22.58  WR  20.8%  PF  1.11  CI [-10.72,+17.38]  p 0.7229
+      MFE 3.44 MAE 3.52  MFE/MAE 0.98 | ff.25  44.2% (amb 30)  ff1.0  48.0% (amb 2) | exTop1%  -0.13 exTop5% -11.05  maxW +341 maxL -85
+      U n28 -2.89  DEV n47 +5.24  IR n50 +3.19   |   L n54 +1.68  S n71 +3.30
+    CONTROL AUDIT FULL_EXT_REENTRY vs C_REENTRY_ONLY
+      set          n  hour     atr    volume  range    mag  long%
+      signal     125     9   19.62     10265  36.25   5.48  43.2%
+      control    152     9   17.77     10113  35.38   5.44  44.7%
+      -> MATCHED (no field differs by >25%)
+  PROMOTION GATE  FULL_EXT_REENTRY
+    1 expectancy positive          PASS
+    2 signal profitable itself     PASS
+    3 U/DEV/IR sign stable         FAIL
+    4 not top-5% dominated         FAIL
+    5 matched-control advantage    FAIL
+    6 raw geometry credible        FAIL
+    7 sample adequate              PASS
+    8 no control artifact          PASS
+    ==> NOT PROMOTED
+
+==============================================================================
+OVN-H3  overnight imbalance -> RTH continuation if accepted
+  C_ONMOVE_ONLY                n  246  mean   +0.38  med -16.01  WR   8.9%  PF  1.02  CI [-7.18,+9.06]  p 0.9294
+      MFE 6.87 MAE 6.57  MFE/MAE 1.04 | ff.25  54.5% (amb 114)  ff1.0  53.6% (amb 67) | exTop1%  -2.78 exTop5% -12.26  maxW +408 maxL -44
+      U n53 +8.20  DEV n98 +8.51  IR n95 -12.38   |   L n139 +2.90  S n107 -2.91
+
+==============================================================================
+OVN-H4  overnight high/low sweep + reclaim
+  C_SWEEP_ONLY                 n  256  mean   +5.72  med -20.77  WR  25.8%  PF  1.25  CI [-3.58,+15.64]  p 0.2488
+      MFE 3.25 MAE 2.66  MFE/MAE 1.22 | ff.25  47.3% (amb 70)  ff1.0  53.7% (amb 12) | exTop1%  +2.95 exTop5%  -7.10  maxW +358 maxL -90
+      U n56 -9.91  DEV n105 +14.11  IR n95 +5.66   |   L n126 +13.06  S n130 -1.40
+  FULL_SWEEP_RECLAIM           n  187  mean  +10.42  med -21.63  WR  29.4%  PF  1.42  CI [-1.04,+22.55]  p 0.0894
+      MFE 3.05 MAE 2.36  MFE/MAE 1.29 | ff.25  50.3% (amb 44)  ff1.0  57.1% (amb 2) | exTop1%  +8.73 exTop5%  -2.47  maxW +324 maxL -99
+      U n40 +4.82  DEV n77 +20.64  IR n70 +2.37   |   L n101 +17.71  S n86 +1.85
+  FULL_SWEEP_RECLAIM_HIMAG     n  172  mean  +12.07  med -22.61  WR  29.7%  PF  1.49  CI [-0.49,+24.95]  p 0.0716
+      MFE 3.06 MAE 2.43  MFE/MAE 1.26 | ff.25  49.6% (amb 43)  ff1.0  58.6% (amb 2) | exTop1% +10.24 exTop5%  -0.45  maxW +324 maxL -99
+      U n39 +5.31  DEV n70 +22.86  IR n63 +4.27   |   L n97 +17.53  S n75 +5.01
+    CONTROL AUDIT FULL_SWEEP_RECLAIM vs C_SWEEP_ONLY
+      set          n  hour     atr    volume  range    mag  long%
+      signal     187     9   20.88      8723  30.75   4.48  54.0%
+      control    256     9   18.84     11264  35.50   6.25  49.2%
+      -> MATCHED (no field differs by >25%)
+  PROMOTION GATE  FULL_SWEEP_RECLAIM
+    1 expectancy positive          PASS
+    2 signal profitable itself     PASS
+    3 U/DEV/IR sign stable         PASS
+    4 not top-5% dominated         FAIL
+    5 matched-control advantage    PASS
+    6 raw geometry credible        PASS
+    7 sample adequate              PASS
+    8 no control artifact          PASS
+    ==> NOT PROMOTED
+
+==============================================================================
+OPEN-H1  opening drive + acceptance continuation
+  C_DRIVE_ONLY                 n  229  mean   +6.67  med -32.50  WR  29.3%  PF  1.22  CI [-4.62,+18.54]  p 0.2572
+      MFE 2.50 MAE 1.95  MFE/MAE 1.28 | ff.25  53.4% (amb 38)  ff1.0  52.6% (amb 0) | exTop1%  +3.91 exTop5%  -6.29  maxW +333 maxL -86
+      U n49 +6.17  DEV n88 +9.96  IR n92 +3.79   |   L n112 +11.01  S n117 +2.51
+  C_DRIVE_ORIGIN_RECLAIMED     n   11  mean  -41.46  med -37.04  WR   0.0%  PF  0.00  CI [-51.55,-32.65]  p 0.0008
+      MFE 0.16 MAE 5.69  MFE/MAE 0.03 | ff.25  10.0% (amb 1)  ff1.0   0.0% (amb 0) | exTop1% -43.63 exTop5% -43.63  maxW -20 maxL -76
+      U n4 -32.43  DEV n1 -55.94  IR n6 -45.08   |   L n5 -30.73  S n6 -50.41
+  FULL_OPEN_CONT               n   55  mean   +4.61  med -32.26  WR  30.9%  PF  1.16  CI [-16.09,+27.42]  p 0.6777
+      MFE 2.24 MAE 2.12  MFE/MAE 1.06 | ff.25  49.0% (amb 6)  ff1.0  52.7% (amb 0) | exTop1%  -0.19 exTop5%  -4.33  maxW +264 maxL -67
+      U n13 -2.81  DEV n24 -0.84  IR n18 +17.24   |   L n31 -0.59  S n24 +11.34
+  FULL_OPEN_CONT_HIMAG         n   54  mean   +5.29  med -32.10  WR  31.5%  PF  1.18  CI [-15.70,+28.84]  p 0.6392
+      MFE 2.21 MAE 2.06  MFE/MAE 1.07 | ff.25  50.0% (amb 6)  ff1.0  53.7% (amb 0) | exTop1%  +0.42 exTop5%  -3.80  maxW +264 maxL -67
+      U n12 -0.35  DEV n24 -0.84  IR n18 +17.24   |   L n31 -0.59  S n23 +13.23
+    CONTROL AUDIT FULL_OPEN_CONT vs C_DRIVE_ONLY
+      set          n  hour     atr    volume  range    mag  long%
+      signal      55     9   27.39     10193  30.00   5.13  56.4%
+      control    229     9   27.21      6827  26.25   3.32  48.9%
+      -> MISMATCHED on vol - treat any paired difference as suspect
+  PROMOTION GATE  FULL_OPEN_CONT
+    1 expectancy positive          PASS
+    2 signal profitable itself     PASS
+    3 U/DEV/IR sign stable         FAIL
+    4 not top-5% dominated         FAIL
+    5 matched-control advantage    FAIL
+    6 raw geometry credible        PASS
+    7 sample adequate              FAIL
+    8 no control artifact          PASS
+    ==> NOT PROMOTED
+
+==============================================================================
+OPEN-H2  opening drive exhaustion -> V recovery
+  ARM_A_50                     n   40  mean   -9.08  med -41.64  WR  25.0%  PF  0.75  CI [-32.31,+18.27]  p 0.5020
+      MFE 1.84 MAE 2.85  MFE/MAE 0.65 | ff.25  42.1% (amb 2)  ff1.0  47.5% (amb 0) | exTop1% -16.34 exTop5% -22.82  maxW +274 maxL -86
+      U n9 -4.94  DEV n9 -37.26  IR n22 +0.75   |   L n21 -15.56  S n19 -1.92
+  ARM_B_100                    n   26  mean   +8.81  med -34.49  WR  30.8%  PF  1.30  CI [-24.75,+48.99]  p 0.6569
+      MFE 1.55 MAE 2.58  MFE/MAE 0.60 | ff.25  52.2% (amb 3)  ff1.0  53.8% (amb 0) | exTop1%  -1.81 exTop5%  -1.81  maxW +274 maxL -87
+      U n7 -11.41  DEV n7 -32.68  IR n12 +44.80   |   L n12 +1.60  S n14 +14.98
+  PROMOTION GATE  ARM_A_50
+    1 expectancy positive          FAIL
+    2 signal profitable itself     FAIL
+    3 U/DEV/IR sign stable         FAIL
+    4 not top-5% dominated         FAIL
+    5 matched-control advantage    FAIL
+    6 raw geometry credible        FAIL
+    7 sample adequate              FAIL
+    8 no control artifact          PASS
+    ==> NOT PROMOTED
+
+==============================================================================
+ASYM-H1  absolute delta magnitude + price direction
+  A_FOLLOW_DELTA_SIGN          n 2609  mean   -3.44  med -19.13  WR  22.3%  PF  0.83  CI [-5.44,-1.34]  p 0.0011
+      MFE 2.40 MAE 2.83  MFE/MAE 0.85 | ff.25  49.5% (amb 492)  ff1.0  48.6% (amb 40) | exTop1%  -6.38 exTop5% -12.99  maxW +509 maxL -139
+      U n548 -2.02  DEV n1051 -3.41  IR n1010 -4.24   |   L n1286 -3.80  S n1323 -3.08
+  B_FOLLOW_PRICE               n 2609  mean   -1.94  med -18.91  WR  23.4%  PF  0.91  CI [-4.07,+0.28]  p 0.0844
+      MFE 2.47 MAE 2.75  MFE/MAE 0.90 | ff.25  49.5% (amb 487)  ff1.0  48.9% (amb 33) | exTop1%  -4.96 exTop5% -11.64  maxW +519 maxL -139
+      U n548 -0.63  DEV n1051 -1.64  IR n1010 -2.96   |   L n1297 -1.68  S n1312 -2.20
+  C_PRICE_IF_EXTREME           n 2609  mean   -1.94  med -18.91  WR  23.4%  PF  0.91  CI [-4.07,+0.28]  p 0.0844
+      MFE 2.47 MAE 2.75  MFE/MAE 0.90 | ff.25  49.5% (amb 487)  ff1.0  48.9% (amb 33) | exTop1%  -4.96 exTop5% -11.64  maxW +519 maxL -139
+      U n548 -0.63  DEV n1051 -1.64  IR n1010 -2.96   |   L n1297 -1.68  S n1312 -2.20
+  D_PRICE_UNCOND               n 2993  mean   -1.44  med -18.10  WR  22.8%  PF  0.93  CI [-3.47,+0.73]  p 0.1885
+      MFE 2.53 MAE 2.67  MFE/MAE 0.95 | ff.25  50.6% (amb 677)  ff1.0  48.6% (amb 64) | exTop1%  -4.90 exTop5% -11.67  maxW +720 maxL -150
+      U n625 -1.84  DEV n1198 -2.16  IR n1170 -0.48   |   L n1410 -2.30  S n1583 -0.66
+    CONTROL AUDIT C_PRICE_IF_EXTREME vs A_FOLLOW_DELTA_SIGN
+      set          n  hour     atr    volume  range    mag  long%
+      signal    2609    12   15.46      4161  20.25   2.89  49.7%
+      control   2609    12   15.46      4161  20.25   2.89  49.3%
+      -> MATCHED (no field differs by >25%)
+  PROMOTION GATE  C_PRICE_IF_EXTREME
+    1 expectancy positive          FAIL
+    2 signal profitable itself     FAIL
+    3 U/DEV/IR sign stable         PASS
+    4 not top-5% dominated         FAIL
+    5 matched-control advantage    PASS
+    6 raw geometry credible        FAIL
+    7 sample adequate              PASS
+    8 no control artifact          FAIL
+    ==> NOT PROMOTED
+
+==============================================================================
+ASYM-H2  activity shock x price efficiency
+  C_ACTIVITY_ONLY              n 2443  mean   -2.22  med -19.09  WR  23.9%  PF  0.89  CI [-4.29,-0.05]  p 0.0414
+      MFE 2.50 MAE 2.70  MFE/MAE 0.93 | ff.25  50.2% (amb 476)  ff1.0  49.2% (amb 38) | exTop1%  -5.09 exTop5% -11.69  maxW +519 maxL -150
+      U n519 -1.55  DEV n986 -3.07  IR n938 -1.69   |   L n1202 -1.73  S n1241 -2.69
+  C_PRICE_MOMENTUM             n 2993  mean   -1.44  med -18.10  WR  22.8%  PF  0.93  CI [-3.47,+0.73]  p 0.1885
+      MFE 2.53 MAE 2.67  MFE/MAE 0.95 | ff.25  50.6% (amb 677)  ff1.0  48.6% (amb 64) | exTop1%  -4.90 exTop5% -11.67  maxW +720 maxL -150
+      U n625 -1.84  DEV n1198 -2.16  IR n1170 -0.48   |   L n1410 -2.30  S n1583 -0.66
+  C_RAW_DELTA_SIGN             n 2990  mean   +0.25  med -17.67  WR  24.1%  PF  1.01  CI [-1.83,+2.36]  p 0.8219
+      MFE 2.63 MAE 2.63  MFE/MAE 1.00 | ff.25  50.9% (amb 713)  ff1.0  50.0% (amb 72) | exTop1%  -3.11 exTop5% -10.07  maxW +607 maxL -150
+      U n625 +1.40  DEV n1197 -0.96  IR n1168 +0.86   |   L n1461 -0.20  S n1529 +0.68
+  STATE_A_HIACT_HIEFF_CONT     n 2102  mean   -1.16  med -19.33  WR  24.3%  PF  0.94  CI [-3.96,+1.95]  p 0.4638
+      MFE 2.56 MAE 2.64  MFE/MAE 0.97 | ff.25  49.2% (amb 414)  ff1.0  49.1% (amb 22) | exTop1%  -4.63 exTop5% -11.63  maxW +656 maxL -120
+      U n440 -1.64  DEV n865 -2.56  IR n797 +0.63   |   L n1053 -0.98  S n1049 -1.34
+  STATE_B_HIACT_LOEFF_REV      n 1473  mean   -3.94  med -22.79  WR  23.6%  PF  0.83  CI [-6.87,-0.89]  p 0.0116
+      MFE 2.32 MAE 2.65  MFE/MAE 0.88 | ff.25  50.8% (amb 280)  ff1.0  50.6% (amb 5) | exTop1%  -7.05 exTop5% -14.23  maxW +579 maxL -110
+      U n329 -5.55  DEV n598 -4.93  IR n546 -1.88   |   L n774 -1.86  S n699 -6.24
+    CONTROL AUDIT STATE_A_HIACT_HIEFF_CONT vs C_PRICE_MOMENTUM
+      set          n  hour     atr    volume  range    mag  long%
+      signal    2102    11   15.98      5046  23.00   3.41  50.1%
+      control   2993    12   14.40      2505  12.50   1.38  47.1%
+      -> MISMATCHED on vol, rng - treat any paired difference as suspect
+  PROMOTION GATE  STATE_A_HIACT_HIEFF_CONT
+    1 expectancy positive          FAIL
+    2 signal profitable itself     FAIL
+    3 U/DEV/IR sign stable         FAIL
+    4 not top-5% dominated         FAIL
+    5 matched-control advantage    PASS
+    6 raw geometry credible        FAIL
+    7 sample adequate              PASS
+    8 no control artifact          FAIL
+    ==> NOT PROMOTED
+
+==============================================================================
+MAG-OFH13-H1  OFH13 performance by expected-movement state
+  DIAGNOSTIC ONLY - OFH13_PROSPECTIVE_V1 IS NOT FILTERED OR MODIFIED
+  canonical OFH13 events scored: 133
+  bucket     n    mean     med    WR%     PF    MFE    MAE  MFE/MAE   avgWin
+  LOW        4  +30.74   +8.74  50.0%   3.51   2.46   1.87     1.32    86.00
+  MEDIUM    19  -10.18  -25.66  21.1%   0.61   1.47   2.97     0.50    76.69
+  HIGH     110  +21.51  -21.80  38.2%   2.02   2.70   1.80     1.50   111.72
+
+==============================================================================
+RANGE-H1  does HIGH magnitude mark a PERSISTENT regime?
+  DIAGNOSTIC ONLY - no strategy is changed here
+  bucket       n +3  m  +5  m  +10 m  +15 m  +30 m
+  LOW      29333 11.33  11.45  11.55  11.60  11.62
+  MEDIUM   28453 15.17  15.30  15.30  15.28  15.04
+  HIGH     26140 20.67  20.65  20.45  20.20  19.50
+  (mean 1m range per minute in the window following the state)
+
+==============================================================================
+RANGE-H2  strategy type x magnitude state (interaction, no retuning)
+  family               bucket      n      mean    median
+  OFH13                LOW         4    +30.74     +8.74
+  OFH13                MEDIUM     19    -10.18    -25.66
+  OFH13                HIGH      110    +21.51    -21.80
+  ACCEPTED-BREAKOUT    LOW       435     +0.90    -14.71
+  ACCEPTED-BREAKOUT    MEDIUM    657     -7.21    -20.00
+  ACCEPTED-BREAKOUT    HIGH      771     +1.07    -21.21
+  REJECTED-BREAKOUT    LOW       409     -1.55    -13.47
+  REJECTED-BREAKOUT    MEDIUM    676     +0.89    -17.65
+  REJECTED-BREAKOUT    HIGH      920     -2.38    -23.94
+
+==============================================================================
+FAMILY ACCOUNTING  -  M = 15 (declared, never shrunk)
+  hypothesis          n     mean        p      BH q Holm
+  MAG-H3              -        -   0.0001    0.0008   0.0008
+  MAG-DIR-H1       1511    -0.34   0.8635    1.0000   1.0000
+  MAG-DIR-H2       1630    -1.95   0.1603    0.6011   1.0000
+  MAG-OFH13-H1        -        -   1.0000    1.0000   1.0000
+  OVN-H2            125    +2.60   0.7229    1.0000   1.0000
+  OVN-H3              -        -   1.0000    1.0000   1.0000
+  OVN-H4            187   +10.42   0.0894    0.4470   1.0000
+  OPEN-H1            55    +4.61   0.6777    1.0000   1.0000
+  OPEN-H2            40    -9.08   0.5020    1.0000   1.0000
+  BAL-H1           1082    -2.20   0.2171    0.6514   1.0000
+  BAL-H2            830    -0.15   0.9432    1.0000   1.0000
+  RANGE-H1            -        -   1.0000    1.0000   1.0000
+  RANGE-H2            -        -   1.0000    1.0000   1.0000
+  ASYM-H1          2609    -1.94   0.0844    0.4470   1.0000
+  ASYM-H2          2102    -1.16   0.4638    1.0000   1.0000
+==============================================================================

@@ -1,0 +1,46 @@
+canonical reproduction PASS
+
+MAG-H3 universe: 83596 eligible bars with full 60m forward window
+
+==========================================================================
+MAG_SCORE (primary)   n=83596
+  bucket       n |     5m |ret| rng exc     10m |ret| rng exc     15m |ret| rng exc     30m |ret| rng exc     60m |ret| rng exc
+  LOW      29115 |  10.0  24.8  24.8   13.8  34.8  34.8   16.8  42.5  42.5   23.2  59.2  59.2   32.8  83.5  83.5
+  MEDIUM   28393 |  13.2  33.0  33.0   18.5  46.0  46.0   22.2  56.0  56.0   30.8  78.2  78.2   43.5 107.5 107.5
+  HIGH     26088 |  18.0  44.5  44.5   24.8  61.8  61.8   30.0  74.8  74.8   40.8 100.2 100.2   56.0 133.2 133.2
+  monotone LOW<MED<HIGH in median |ret| at 5 of 5 horizons
+  Spearman(mag, |ret|@30m) = +0.2065
+  Spearman(mag,  range@30m) = +0.3501
+  mean |ret|@30m  HIGH 58.04 CI [54.17, 62.10]   LOW 35.01 CI [32.58, 37.58]
+    U    LOW 15.50  MEDIUM 20.00  HIGH 27.50
+    DEV  LOW 22.75  MEDIUM 31.75  HIGH 41.25
+    IR   LOW 29.25  MEDIUM 38.25  HIGH 50.00
+
+==========================================================================
+MAG_ALT_RNG (skeptical benchmark)   n=83596
+  bucket       n |     5m |ret| rng exc     10m |ret| rng exc     15m |ret| rng exc     30m |ret| rng exc     60m |ret| rng exc
+  LOW      37593 |   9.8  24.5  24.5   13.8  34.5  34.5   16.5  42.0  42.0   22.8  58.5  58.5   32.8  82.5  82.5
+  MEDIUM   31550 |  15.0  36.8  36.8   20.8  52.0  52.0   25.2  63.0  63.0   34.8  87.2  87.2   48.2 117.6 117.6
+  HIGH     14453 |  21.8  52.8  52.8   30.0  72.8  72.8   36.0  88.2  88.2   49.0 117.8 117.8   65.5 153.5 153.5
+  monotone LOW<MED<HIGH in median |ret| at 5 of 5 horizons
+  Spearman(alt_rng, |ret|@30m) = +0.2656
+  Spearman(alt_rng,  range@30m) = +0.4461
+  mean |ret|@30m  HIGH 67.30 CI [62.29, 72.91]   LOW 34.00 CI [31.85, 36.26]
+    U    LOW 15.00  MEDIUM 22.00  HIGH 34.00
+    DEV  LOW 22.50  MEDIUM 35.00  HIGH 50.50
+    IR   LOW 28.50  MEDIUM 44.75  HIGH 60.38
+
+==========================================================================
+MAG_ALT_VOL (diagnostic)   n=83596
+  bucket       n |     5m |ret| rng exc     10m |ret| rng exc     15m |ret| rng exc     30m |ret| rng exc     60m |ret| rng exc
+  LOW      21950 |   8.8  21.8  21.8   12.2  31.0  31.0   14.8  37.8  37.8   20.5  52.2  52.2   29.0  75.0  75.0
+  MEDIUM   28720 |  12.2  30.5  30.5   17.0  42.8  42.8   20.8  51.5  51.5   28.8  72.5  72.5   40.8 100.5 100.5
+  HIGH     32926 |  18.8  46.0  46.0   26.0  64.0  64.0   31.0  77.5  77.5   42.2 104.0 104.0   58.5 138.2 138.2
+  monotone LOW<MED<HIGH in median |ret| at 5 of 5 horizons
+  Spearman(alt_vol, |ret|@30m) = +0.2658
+  Spearman(alt_vol,  range@30m) = +0.4530
+  mean |ret|@30m  HIGH 58.95 CI [55.10, 63.07]   LOW 30.89 CI [28.32, 33.85]
+    U    LOW 14.00  MEDIUM 19.25  HIGH 28.00
+    DEV  LOW 19.75  MEDIUM 29.00  HIGH 42.75
+    IR   LOW 26.25  MEDIUM 35.75  HIGH 52.25
+

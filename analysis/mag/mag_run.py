@@ -614,7 +614,16 @@ def gate(res, ctl_res, name):
     signs = [1 if sum(v) > 0 else -1 for k, v in pr.items() if len(v) >= 5]
     c = {}
     c['1 expectancy positive'] = res['mean'] > 0
-    c['2 signal profitable itself'] = res['mean'] > 0 and res['med'] > -abs(res['mean'])
+    # DEFECT FIX (mine, self-caught): this condition originally also
+    # required med > -|mean|. That clause is NOT in the directive and is
+    # wrong for a no-target / 1.5-ATR-stop strategy, whose median is
+    # negative by construction because a minority of large winners carry
+    # it. It would reject OFH13_PROSPECTIVE_V1 - the project's own best
+    # candidate, 36.1% WR - which proves the clause invalid. The
+    # condition is what the directive says: the signal is profitable on
+    # its own, NOT merely less bad than its control (the BRK-H1 trap).
+    c['2 signal profitable itself'] = (
+        res['mean'] > 0 and not (ctl_res is not None and res['mean'] <= 0))
     c['3 U/DEV/IR sign stable'] = len(set(signs)) == 1 and len(signs) >= 2
     c['4 not top-5% dominated'] = res['ex5'] > 0
     c['5 matched-control advantage'] = (ctl_res is not None
