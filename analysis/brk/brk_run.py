@@ -542,6 +542,14 @@ if __name__ == '__main__':
     print('FAMILY ACCOUNTING  (BH at declared M = 3)')
     qs = bh(ps)
     for n, p, q in zip(names, ps, qs):
-        print('  %-8s  p %.4f   q %.4f   %s'
-              % (n, p, q, 'PROMOTE' if q <= 0.05 else 'NOT PROMOTED'))
+        print('  %-14s  p %.4f   q %.4f%s'
+              % (n, p, q, '' if q <= 0.05 else '   NOT PROMOTED (q > 0.05)'))
+    print('\n  REMINDER - the pre-registered promotion gate has FOUR')
+    print('  conditions, not one. q <= 0.05 is necessary, NOT sufficient:')
+    print('    1. BH q <= 0.05 at M = 3')
+    print('    2. day-clustered CI excludes zero')
+    print('    3. sign STABLE across U / DEV / IR')
+    print('    4. NOT tail-dominated')
+    print('  A cell that clears only (1) and (2) is NOT PROMOTED. Run')
+    print('  brk_gate.py for conditions 3 and 4.')
     print('=' * 78)
