@@ -1,0 +1,5 @@
+==============================================================================
+RVMR-V1 FIVE-YEAR BATTERY   stamp shift +0 min   window < 2025-08-18
+MULTI-YEAR HISTORICAL REPLICATION (backward out-of-sample).
+NOT prospective validation - the data PRECEDES the discovery.
+==============================================================================

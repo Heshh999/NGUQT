@@ -346,7 +346,11 @@ def gateA():
         for bk in ('LOW', 'MEDIUM', 'HIGH'):
             gn, g5 = res[bk]['n'], res[bk]['med'][5]
             wn, w5 = want[bk]
-            good = (gn == wn and abs(g5 - w5) < 0.05)
+            # The archive printed medians at ONE decimal ('%5.1f'), so a
+            # quarter-point median (9.75) appears as 9.8. Equality is
+            # therefore tested in the archive's own print format - exact
+            # string match at printed precision, no tolerance fudging.
+            good = (gn == wn and ('%.1f' % g5) == ('%.1f' % w5))
             ok &= good
             print('  %-7s n %6d (archive %6d)   med|ret|5m %6.2f (archive %6.2f)  %s'
                   % (bk, gn, wn, g5, w5, 'PASS' if good else 'FAIL'))
