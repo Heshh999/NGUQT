@@ -1,0 +1,184 @@
+==============================================================================
+RVMR-BANDS-V1  FROZEN HISTORICAL CALIBRATION - EXECUTION
+  prereg sha256 ad3e21e13e20267a81bca16bb8dd8fd5dd1181389cd63a1e674d89661d7ecc7d
+  prereg commit 9074d0cb75b782f213cdeb8942d7dc51f5a88751
+  HISTORICAL CALIBRATION EVIDENCE ONLY. SUBMITS NO ORDERS.
+==============================================================================
+
+PARITY GATE 1 - frozen NQ feature parity (rvmr_run.features):
+==============================================================================
+PARITY GATE - val_lib.features vs FROZEN rvmr_run.features (NQ)
+==============================================================================
+  universe size            510309  MATCH
+  column i      mismatches 0  MATCH
+  column day    mismatches 0  MATCH
+  column mod    mismatches 0  MATCH
+  column rb     mismatches 0  MATCH
+  column vb     mismatches 0  MATCH
+  column rr     mismatches 0  MATCH
+  column vr     mismatches 0  MATCH
+  column abs5   mismatches 0  MATCH
+  column abs10  mismatches 0  MATCH
+  column abs15  mismatches 0  MATCH
+  column abs30  mismatches 0  MATCH
+  column abs60  mismatches 0  MATCH
+  PARITY GATE: PASS
+
+eligible universe 593190 bars, 1829 days   2019-07-08 .. 2026-08-17
+
+PARITY GATE 2 - ATR quintile boundaries from calendar-2019 rule:
+  regenerated  n=40354  cuts 0.9588  1.2187  1.5612  2.0508
+  Track B record         0.9588  1.2187  1.5612  2.0508
+  match to printed record: PASS
+  bars with ATR-ratio unavailable (1440-bar warmup): 0 (training era only; excluded from tables)
+
+scored candidate bars (>= 2020-07-01): 511616 over 1578 days
+tail thresholds (realized abs_H of scored universe):
+  15m  top-1% > 122.46   top-5% > 72.00
+  30m  top-1% > 169.25   top-5% > 99.75
+  60m  top-1% > 231.75   top-5% > 136.25
+
+ROLLING-ORIGIN AUDIT
+  monthly refreshes            74
+  calibration N at first/last  81574 / 589593
+  scored forecasts             511616 over 1578 days
+  unavailable                  0
+  causality: tables for month M contain only bars with sessionDate < M-01 (append-after-forecast, intra-day maturation)
+
+==============================================================================
+PINBALL TABLE (mean loss per forecast; HISTORICAL CALIBRATION EVIDENCE)
+==============================================================================
+  model  combined |   15m-P50    15m-P80    15m-P95    30m-P50    30m-P80    30m-P95    60m-P50    60m-P80    60m-P95
+  A        9.3850 |    8.0652     7.6357     3.8130    11.2375    10.6399     5.3304    15.5541    14.7355     7.4533
+  B        9.3596 |    8.0464     7.6053     3.8067    11.2100    10.5991     5.3210    15.5185    14.6890     7.4409
+  C        9.3675 |    8.0518     7.6170     3.8044    11.2213    10.6130     5.3181    15.5348    14.7096     7.4378
+  D        9.3604 |    8.0430     7.6061     3.8099    11.2083    10.5988     5.3247    15.5169    14.6899     7.4458
+
+==============================================================================
+CALIBRATION (coverage %%; targets 50 / 80 / 95; tol +-3.0/2.5/1.5 pp)
+==============================================================================
+  A   39.64   71.67   91.62   39.60   71.78   91.60   39.44   71.74   91.71
+  B   39.72   71.74   91.57   39.65   71.81   91.54   39.49   71.79   91.68
+  C   39.65   71.65   91.60   39.57   71.76   91.55   39.45   71.76   91.67
+  D   39.73   71.66   91.47   39.67   71.75   91.47   39.51   71.74   91.60
+  cols: 15-P50  15-P80  15-P95  30-P50  30-P80  30-P95  60-P50  60-P80  60-P95
+
+==============================================================================
+SHARPNESS (median predicted band, points; cap = 110%% of A)
+==============================================================================
+  A    12.25    27.25    52.50    17.50    38.75    73.25    24.50    55.25   105.25
+  B    12.50    27.75    53.00    17.50    39.00    74.75    24.75    55.50   106.25
+  C    12.25    27.25    52.00    17.50    38.75    73.50    24.50    55.25   104.54
+  D    12.50    27.50    52.66    17.50    39.00    74.25    24.75    55.25   105.50
+
+==============================================================================
+PAIRED COMPARISONS (day-clustered bootstrap, 20000 iters, seed 20260825)
+==============================================================================
+  B - A   mean diff -0.02533   95% CI [-0.03284, -0.01779]   => B over A: +0.270%   CI excl 0: YES
+  C - A   mean diff -0.01743   95% CI [-0.02314, -0.01205]   => C over A: +0.186%   CI excl 0: YES
+  D - A   mean diff -0.02458   95% CI [-0.03348, -0.01585]   => D over A: +0.262%   CI excl 0: YES
+  D - B   mean diff +0.00075   95% CI [-0.00246, +0.00384]   => D over B: -0.008%   CI excl 0: NO
+  C - B   mean diff +0.00790   95% CI [+0.00050, +0.01537]   => C over B: -0.084%   CI excl 0: YES
+
+==============================================================================
+YEAR DESTRUCTION (per-forecast combined pinball; delta%% vs A)
+==============================================================================
+  year   days       N     A-comb    B d%%     C d%%     D d%%   cov80@30 B  sharp80@30 B
+  2020    130   41980     6.9799   -0.239   +0.051   -0.391    69.68%       30.50
+  2021    258   83973     6.4626   -0.079   +0.145   -0.115    76.95%       34.00
+  2022    258   83829    10.7808   +0.228   +0.329   +0.219    63.72%       40.25
+  2023    257   83477     6.2751   +0.206   +0.209   +0.255    84.71%       43.00
+  2024    259   83673     8.0656   +0.308   +0.307   +0.351    75.88%       41.00
+  2025    256   82889    12.6189   +0.447   +0.070   +0.439    68.50%       41.00
+  2026    160   51795    15.7813   +0.513   +0.135   +0.497    56.21%       41.25
+  B: 5 of 7 qualifying years positive (need >=70%: PASS); best-year(2026)-removed delta +0.220% (>0: PASS)
+  C: 7 of 7 qualifying years positive (need >=70%: PASS); best-year(2022)-removed delta +0.152% (>0: PASS)
+  D: 5 of 7 qualifying years positive (need >=70%: PASS); best-year(2026)-removed delta +0.214% (>0: PASS)
+
+==============================================================================
+REGIME DESTRUCTION (frozen eras; diagnostics only)
+==============================================================================
+  COVID 2020H2   n   41980   A   6.9799   B -0.239%   C +0.051%   D -0.391%
+  2021           n   83973   A   6.4626   B -0.079%   C +0.145%   D -0.115%
+  2022 bear      n   83829   A  10.7808   B +0.228%   C +0.329%   D +0.219%
+  2023-24        n  167150   A   7.1714   B +0.263%   C +0.264%   D +0.309%
+  2025-26        n  134684   A  13.8351   B +0.476%   C +0.099%   D +0.465%
+
+==============================================================================
+TIME-OF-DAY DESTRUCTION (frozen buckets; no bucket removed)
+==============================================================================
+  OPEN       n   94322   A  13.0301   B +0.577%   C +0.323%   D +0.520%
+  MIDMORN    n  141685   A   9.2636   B +0.208%   C +0.016%   D +0.157%
+  MIDDAY     n  137167   A   8.1870   B +0.063%   C +0.059%   D +0.037%
+  AFTERNOON  n  138442   A   8.2126   B +0.214%   C +0.358%   D +0.326%
+
+ATR-STATE DIAGNOSTIC (B vs A delta%% per quintile):
+  q0  n   42817   B +1.171%
+  q1  n   85207   B +0.204%
+  q2  n  136359   B +0.156%
+  q3  n  125395   B +0.241%
+  q4  n  121838   B +0.233%
+VOLUME-STATE DIAGNOSTIC (B vs A delta%% per state):
+  LOW     n  124241   B -1.548%
+  MEDIUM  n  183360   B +0.241%
+  HIGH    n  204015   B +0.980%
+
+==============================================================================
+TAIL DESTRUCTION (per-horizon top-1%% / top-5%% removed; gate: delta > 0)
+==============================================================================
+  drop top 1%  B vs A: +0.200%
+  drop top 1%  C vs A: +0.110%
+  drop top 1%  D vs A: +0.149%
+  drop top 5%  B vs A: +0.058%
+  drop top 5%  C vs A: +0.049%
+  drop top 5%  D vs A: -0.014%
+
+NON-OVERLAPPING DIAGNOSTIC (mod = 570 (mod H); secondary only):
+  15m  n  35578   A   6.7466   B vs A -0.715%
+  30m  n  18571   A   9.5875   B vs A -1.167%
+  60m  n   9286   A  13.9202   B vs A -1.707%
+
+==============================================================================
+FALLBACK AUDIT (gate: candidate level-0 >= 70%%)
+==============================================================================
+  A  L0 100.00%   (reasons: none)
+  B  L0 99.21%  L1  0.79%   (reasons: {'L0_n': 4019})
+  C  L0 99.29%  L1  0.71%   (reasons: {'L0_n': 3658})
+  D  L0 96.30%  L1  2.92%  L2  0.79%   (reasons: {'L0_n': 18941, 'L1_n': 4019})
+
+==============================================================================
+PROMOTION GATE - sixteen frozen conditions
+==============================================================================
+  condition                       B                         C                         D                         
+  1 causal implementation         PASS append-after-forecast; auditedPASS append-after-forecast; auditedPASS append-after-forecast; audited
+  2 valid rolling evaluation      PASS 74 monthly refreshes PASS 74 monthly refreshes PASS 74 monthly refreshes 
+  3 P50 calibration               FAIL worst err -10.51 pp (tol 3.0)FAIL worst err -10.55 pp (tol 3.0)FAIL worst err -10.49 pp (tol 3.0)
+  4 P80 calibration               FAIL worst err -8.26 pp (tol 2.5)FAIL worst err -8.35 pp (tol 2.5)FAIL worst err -8.34 pp (tol 2.5)
+  5 P95 calibration               FAIL worst err -3.46 pp (tol 1.5)FAIL worst err -3.45 pp (tol 1.5)FAIL worst err -3.53 pp (tol 1.5)
+  6 beats ATR-only                PASS combined +0.02533    PASS combined +0.01743    PASS combined +0.02458    
+  7 material improvement          FAIL +0.270% CI[-0.03284,-0.01779]FAIL +0.186% CI[-0.02314,-0.01205]FAIL +0.262% CI[-0.03348,-0.01585]
+  8 sharpness <= 110% of A        PASS worst ratio 1.020    PASS worst ratio 1.003    PASS worst ratio 1.020    
+  9 day-cluster CI supports       PASS CI upper -0.01779    PASS CI upper -0.01205    PASS CI upper -0.01585    
+  10 year stability >=70%         PASS 5 of 7 positive      PASS 7 of 7 positive      PASS 5 of 7 positive      
+  11 not episode-dependent        PASS best-year-removed +0.220%PASS best-year-removed +0.152%PASS best-year-removed +0.214%
+  12 survives top-1% removal      PASS +0.200%              PASS +0.110%              PASS +0.149%              
+  13 survives top-5% removal      PASS +0.058%              PASS +0.049%              FAIL -0.014%              
+  14 fallback level-0 >=70%       PASS 99.21%               PASS 99.29%               PASS 96.30%               
+  15 no leakage                   PASS monthly-refresh audit cleanPASS monthly-refresh audit cleanPASS monthly-refresh audit clean
+  16 no post-result changes       PASS engine == prereg     PASS engine == prereg     PASS engine == prereg     
+
+  ALL SIXTEEN: B FAIL   C FAIL   D FAIL
+
+==============================================================================
+DETERMINISTIC MODEL SELECTION (frozen section 30)
+==============================================================================
+  D over B: -0.008% CI[-0.00246,+0.00384] -> materially beats B: NO
+  WINNER: NONE
+  Model A calibrated within frozen tolerances: NO
+
+==============================================================================
+HISTORICAL VERDICT: BAND CALIBRATION ITSELF IS NOT RELIABLE
+==============================================================================
+ALL RESULTS ABOVE ARE HISTORICAL CALIBRATION EVIDENCE.
+NO FORWARD LOGGER WAS CREATED. NOTHING FROZEN WAS MODIFIED.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
