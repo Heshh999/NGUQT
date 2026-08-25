@@ -1,0 +1,119 @@
+==============================================================================
+ANOMALY-CONFIRM-V1   DISCOVERY-SIDE FREEZE CONSTANTS
+  discovery window  <= 2023-12-31   (the ONLY window read here)
+  holdout           >= 2024-01-01   NOT READ FOR ANY OUTCOME
+  seed 20260825   bootstrap 20000
+==============================================================================
+
+total bars 2503622   discovery bars 1577173   (holdout bars 926449)
+discovery span 2019-07-04 18:25:00 .. 2023-12-29 17:00:00
+
+------------------------------------------------------------------------------
+RVMR PARITY AUDIT
+------------------------------------------------------------------------------
+  trailing_ratio(W=1440, excludes own bar) parity at 5 probes: EXACT
+  first index with a score: 1440 (expected 1440)
+  bucket thresholds  LOW < 1.270 <= MEDIUM <= 2.335 < HIGH
+  atr20 array implementation vs frozen rvmr_spec.atr20 on bars 100..4999: 0 mismatches
+
+contiguous 1m log returns (discovery) 1572786
+non-overlapping 15m blocks (discovery)  102706
+
+------------------------------------------------------------------------------
+15m BLOCK GRID ANCHORING (this is a FACT about the frozen code,
+not a choice: blocks are anchored to each calendar day's FIRST
+contiguous return, not to a :00/:15/:30/:45 clock grid)
+------------------------------------------------------------------------------
+  day 2019-07-04  block1 bars 19:59 .. 20:13   (return spans close 19:58 -> 20:13)
+  day 2019-07-05  block1 bars 01:01 .. 01:15   (return spans close 01:00 -> 01:15)
+  day 2019-07-07  block1 bars 18:02 .. 18:16   (return spans close 18:01 -> 18:16)
+  day 2019-07-08  block1 bars 00:00 .. 00:14   (return spans close 23:59 -> 00:14)
+
+shock/forward pairs (discovery) 99308
+  pairs whose shock block and forward block sit on DIFFERENT calendar dates: 7
+  (minute-adjacency j0-i1==1 is enforced; a true midnight-contiguous pair therefore crosses the date label)
+
+==============================================================================
+FROZEN DECILE CUTPOINTS  (global, static, in-sample over the
+ENTIRE discovery pair set - not trailing, not annual). These
+nine numbers TRANSPORT UNCHANGED to the holdout.
+==============================================================================
+  cut 1 (dec0|dec1)   -0.0011017009  log-return   ( -11.017 bp)
+  cut 2 (dec1|dec2)   -0.0005520548  log-return   (  -5.521 bp)
+  cut 3 (dec2|dec3)   -0.0002889478  log-return   (  -2.889 bp)
+  cut 4 (dec3|dec4)   -0.0001179931  log-return   (  -1.180 bp)
+  cut 5 (dec4|dec5)   +0.0000168159  log-return   (  +0.168 bp)
+  cut 6 (dec5|dec6)   +0.0001601759  log-return   (  +1.602 bp)
+  cut 7 (dec6|dec7)   +0.0003325537  log-return   (  +3.326 bp)
+  cut 8 (dec7|dec8)   +0.0005951824  log-return   (  +5.952 bp)
+  cut 9 (dec8|dec9)   +0.0011091640  log-return   ( +11.092 bp)
+  decile counts: 0:9930 1:9931 2:9931 3:9931 4:9931 5:9930 6:9931 7:9931 8:9931 9:9931
+
+==============================================================================
+SHOCK-CONT DISCOVERY ANCHORS  (extreme set = dec0 U dec9,
+cont = sign(shock) x forward15, state = RB[j0] = RVMR RANGE
+state of the FIRST BAR OF THE FORWARD BLOCK)
+==============================================================================
+  extreme events 19861   (dec0 9930, dec9 9931)
+
+  state           n      cont bp                  95% CI (bp)
+  LOW         10530      +0.0710   [    -0.2441,     +0.3980]
+  MEDIUM       6737      +0.8423   [    +0.3598,     +1.3253]   <-- PRIMARY ANCHOR
+  HIGH         2590      +0.5354   [    -0.4720,     +1.5376]
+  None            4  (bars with no RVMR score - excluded)
+
+  UP / DOWN decomposition inside each state:
+  state    side         n      cont bp
+  LOW      UP        5729      +0.0417
+  LOW      DOWN      4801      +0.1059
+  MEDIUM   UP        3198      +0.9750
+  MEDIUM   DOWN      3539      +0.7224
+  HIGH     UP        1003      +1.1182
+  HIGH     DOWN      1587      +0.1670
+
+  MEDIUM UP   +0.9750 bp   MEDIUM DOWN +0.7224 bp   both positive: YES
+
+  dec7 SECONDARY:  MEDIUM n 1393  fwd15 +0.7274 bp   |  all-states n 9931  fwd15 +0.2420 bp
+
+==============================================================================
+CONTROL CUTPOINTS - frozen on the discovery extreme-event set
+==============================================================================
+  C1 ATR  atrRel = atr20(i1)/close(i1)   n scored 19861
+     tercile cuts  0.0004875675   0.0007651141   (ATR-LOW < c1 <= ATR-MID <= c2 < ATR-HIGH)
+  C2 TIME-OF-DAY of forward-block start j0 (frozen buckets: OVERNIGHT mod>=1081 or mod<=569; RTH_AM 570..750; RTH_PM 751..960)
+     discovery counts  OVERNIGHT 8147  RTH_AM 6374  RTH_PM 5340
+  C3 |shock| median split   UP 0.0017210529 (17.211 bp)   DOWN 0.0017934863 (17.935 bp)
+
+==============================================================================
+MONDAY-RTH DISCOVERY ANCHOR (verbatim S22 segmentation)
+==============================================================================
+  SUN 18:00-24:00  n  231   mean  +1.0323 bp   CI [ -5.0204,  +6.9167]
+  MON 00:00-09:29  n  231   mean  -1.0632 bp   CI [ -8.0767,  +5.5052]
+  MON RTH          n  231   mean +16.6296 bp   CI [ +5.9804, +27.0853]   <-- PRIMARY ANCHOR
+  NON-MONDAY RTH   n  927   mean  +0.3694 bp
+  DIFFERENTIAL  Monday RTH - non-Monday RTH = +16.2602 bp
+  (the differential is NOT in the frozen S22 source; it is declared here as a required SIGN gate, not the primary)
+
+==============================================================================
+NON-PROMOTABLE SECONDARY DIAGNOSTIC ANCHORS (discovery)
+==============================================================================
+  AC-FLIP  (scan_run.py ac(), applied to the STATE-FILTERED list)
+    1m  LOW     n  1187450   AC1 -0.028036
+    1m  MEDIUM  n   288214   AC1 +0.016644
+    1m  HIGH    n    95744   AC1 +0.023863
+    15m LOW     n    78734   AC1 +0.002265
+    15m MEDIUM  n    18570   AC1 -0.005023
+    15m HIGH    n     5326   AC1 -0.032083
+  CLV-FLIP  (scan2_run.py:180-202)
+    LOW     n  1178256   corr(CLV_t, r_t+1) -0.007007
+    MEDIUM  n   287853   corr(CLV_t, r_t+1) +0.008840
+    HIGH    n    95624   corr(CLV_t, r_t+1) +0.014121
+  LEVERAGE-V  (scan2_run.py:326-334)
+    d0 0.6402  d1 0.4257  d2 0.3228  d3 0.2608  d4 0.2374  d5 0.2469  d6 0.2741  d7 0.3174  d8 0.3870  d9 0.5562
+    LINEAGE NOTE: blocks whose 30-bar forward scan could reach past the last discovery bar: 2
+
+==============================================================================
+FREEZE CONSTANTS COMPLETE - DISCOVERY WINDOW ONLY.
+NO 2024+ CANDIDATE OUTCOME WAS COMPUTED IN THIS FILE.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
+==============================================================================
