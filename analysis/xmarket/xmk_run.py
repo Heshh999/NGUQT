@@ -63,11 +63,8 @@ def es_accepted(j, d):
     i = U.ei[j]
     if i is None or i < 2:
         return None
-    ets, es = U.es_ets, U.es
-    import datetime as _dt
-    t2 = _dt.datetime.strptime(ets[i], '%Y-%m-%d %H:%M:%S')
-    t0 = _dt.datetime.strptime(ets[i - 2], '%Y-%m-%d %H:%M:%S')
-    if (t2 - t0).total_seconds() != 120:
+    ets, es, em = U.es_ets, U.es, U.es_em
+    if em[i] - em[i - 2] != 2:
         return None
     hi_, lo_ = bal
     c0, c1, c2 = es[ets[i - 2]][3], es[ets[i - 1]][3], es[ets[i]][3]

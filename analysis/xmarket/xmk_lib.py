@@ -127,6 +127,12 @@ class Universe(object):
         eatr = RS.atr20(eb)
         eidx = {e: i for i, e in enumerate(ets)}
         self.es_ets, self.es = ets, es
+        # epoch-minute stamp for every ES bar, so consecutiveness is an
+        # integer comparison instead of a strptime (identical semantics,
+        # ~50x faster over 2.5M bars)
+        _ep = datetime.datetime(2019, 1, 1)
+        self.es_em = [int((datetime.datetime.strptime(e, '%Y-%m-%d %H:%M:%S')
+                           - _ep).total_seconds() // 60) for e in ets]
 
         # ---- project onto the NQ spine
         self.eo = [None] * N; self.eh = [None] * N
@@ -202,7 +208,7 @@ class Universe(object):
         """ES momentum measured on the ES timeline, then read at the NQ
         bar. Requires w genuinely consecutive ES minutes - an ES gap
         makes Z_ES undefined rather than bridged."""
-        ets, es, out = self.es_ets, self.es, [None] * self.N
+        ets, es, em, out = self.es_ets, self.es, self.es_em, [None] * self.N
         for j in range(self.N):
             i = self.ei[j]
             if i is None or i < w:
@@ -210,12 +216,9 @@ class Universe(object):
             a = self.ea[j]
             if not a or a <= 0:
                 continue
-            p = ets[i - w]
-            d = (datetime.datetime.strptime(ets[i], '%Y-%m-%d %H:%M:%S')
-                 - datetime.datetime.strptime(p, '%Y-%m-%d %H:%M:%S'))
-            if d.total_seconds() != 60 * w:
+            if em[i] - em[i - w] != w:
                 continue
-            out[j] = (es[ets[i]][3] - es[p][3]) / a
+            out[j] = (es[ets[i]][3] - es[ets[i - w]][3]) / a
         return out
 
     def matched(self, j):
@@ -255,10 +258,8 @@ class Universe(object):
         i = self.ei[j]
         if i is None or i < n:
             return None
-        ets, es = self.es_ets, self.es
-        a = datetime.datetime.strptime(ets[i], '%Y-%m-%d %H:%M:%S')
-        b = datetime.datetime.strptime(ets[i - n + 1], '%Y-%m-%d %H:%M:%S')
-        if (a - b).total_seconds() != 60 * (n - 1):
+        ets, es, em = self.es_ets, self.es, self.es_em
+        if em[i] - em[i - n + 1] != n - 1:
             return None
         win = [es[e] for e in ets[i - n + 1:i + 1]]
         return (max(x[1] for x in win), min(x[2] for x in win))
