@@ -1,0 +1,157 @@
+==============================================================================
+4H-DVT-V1  FROZEN HISTORICAL EXECUTION
+  prereg sha256 c6526a09f1c13c34961c470ed3ff2d4ba17cc36dfc001870827d577fb1adcad0
+  spec   sha256 2adf8b37d88d0676d22cb014768d8a996a6415ea2a59608c4af14718d06928d6
+  commit 19c60b917f5655c9ba51804116e4f29de5218249    M = 2
+  HISTORICAL DISCOVERY. SUBMITS NO ORDERS.
+==============================================================================
+
+1m bars 2503622   2019-07-04 18:25:00 .. 2026-08-17 15:16:00
+PARITY: 15m intervals 169639   4H bars 10956   ATR-quintile cuts 0.5312 0.7289 0.9450 1.3480
+  vector classes: RED 13043  VIOLET 5672  REG_BEAR 64576  REG_BULL 69010  BLUE 5699  GREEN 11629
+
+PARENT RECONCILIATION vs frozen feasibility (250 short / 515 long / 765):
+  rebuilt parents  SHORT 463   LONG 952   TOTAL 1415
+  primary entries 617   losses: {'outside_entry_window_or_horizon': 2108, 'no_trigger': 798}
+
+==============================================================================
+PRIMARY 4H-DVT-V1  (developing second vector + 1m EMA9)
+==============================================================================
+  PRIMARY all                  n  617 d 453  fwd5  +4.041  fwd15  +2.956  fwd30  +1.878  fwd60  -0.740
+                               MFE 3.471 MAE 3.393 MFE/MAE 1.023  risk 2.465 ATR  net  +0.395 (med -18.620) R +0.013
+  PRIMARY LONG                 n  415 d 302  fwd5  +2.532  fwd15  +3.784  fwd30  +1.297  fwd60  -2.340
+                               MFE 3.453 MAE 3.827 MFE/MAE 0.902  risk 2.485 ATR  net  -0.337 (med -16.120) R -0.031
+  PRIMARY SHORT                n  202 d 151  fwd5  +7.140  fwd15  +1.255  fwd30  +3.071  fwd60  +2.548
+                               MFE 3.508 MAE 2.500 MFE/MAE 1.403  risk 2.425 ATR  net  +1.899 (med -25.120) R +0.104
+  favourable-first PRIMARY
+      0.25/0.25 FAV  255 ADV  202 AMBIGUOUS  160 NEITHER    0  fav% of decided 55.80
+      0.5/0.5   FAV  325 ADV  252 AMBIGUOUS   40 NEITHER    0  fav% of decided 56.33
+      1/1       FAV  335 ADV  276 AMBIGUOUS    6 NEITHER    0  fav% of decided 54.83
+      1.5/1     FAV  274 ADV  339 AMBIGUOUS    2 NEITHER    2  fav% of decided 44.70
+      2/1       FAV  229 ADV  385 AMBIGUOUS    0 NEITHER    3  fav% of decided 37.30
+  economic reference: net +0.395  day-clustered 95% CI [-4.937, +5.826]
+
+==============================================================================
+CONTROLS (identical measurement frame)
+==============================================================================
+  A ordinary double wick       n 2097 d 985  fwd5  +4.616  fwd15  +6.575  fwd30  +4.415  fwd60  +2.605
+                               MFE 3.694 MAE 3.236 MFE/MAE 1.141  risk 1.811 ATR  net  +1.139 (med -11.120) R +0.118
+  B single vector              n 1683 d1047  fwd5  +5.810  fwd15  +6.957  fwd30  +5.910  fwd60  +3.817
+                               MFE 3.894 MAE 3.283 MFE/MAE 1.186  risk 2.929 ATR  net  +2.725 (med -15.370) R +0.077
+  C no EMA9 entry              n  699 d 499  fwd5  +6.446  fwd15  +6.955  fwd30  +5.182  fwd60  +2.719
+                               MFE 3.709 MAE 3.235 MFE/MAE 1.147  risk 2.002 ATR  net  +1.635 (med -12.370) R -0.014
+  D no 4H alignment            n 1200 d 783  fwd5  +4.500  fwd15  +4.352  fwd30  +2.924  fwd60  +2.579
+                               MFE 3.579 MAE 3.160 MFE/MAE 1.133  risk 2.459 ATR  net  +2.600 (med -18.370) R +0.083
+  SECONDARY completed-15m      n  708 d 499  fwd5  -3.113  fwd15  -2.750  fwd30  -4.400  fwd60  -6.597
+                               MFE 2.875 MAE 3.602 MFE/MAE 0.798  risk 2.815 ATR  net  -4.907 (med -18.870) R -0.116
+
+==============================================================================
+COMPONENT DECOMPOSITION (raw and MATCHED; fwd15 = primary metric)
+==============================================================================
+  A VECTOR value (vs ordinary wick)
+      RAW fwd15   -3.620  CI [ -6.444, -0.741]  p 0.0120
+      MATCHED     -4.102  CI [ -7.927, -0.248]  p 0.0357  (matched n 368)
+      net (econ)  -0.745  p 0.7376
+      MFE/MAE 1.023 vs 1.141      ff0.5 56.33% vs 59.69%
+  B DOUBLE-TEST value (vs single)
+      RAW fwd15   -4.001  CI [ -6.747, -1.259]  p 0.0040
+      MATCHED       +nan  CI [   +nan,   +nan]  p nan  (matched n 0)
+      net (econ)  -2.330  p 0.2448
+      MFE/MAE 1.023 vs 1.186      ff0.5 56.33% vs 57.71%
+  C EMA9 value (vs no-EMA9)
+      RAW fwd15   -3.999  CI [ -5.959, -1.971]  p 0.0003
+      MATCHED     -0.688  CI [ -5.091, +3.798]  p 0.7580  (matched n 293)
+      net (econ)  -1.240  p 0.2302
+      MFE/MAE 1.023 vs 1.147      ff0.5 56.33% vs 57.98%
+  D 4H value (vs no-4H)
+      RAW fwd15   -1.396  CI [ -3.873, +1.147]  p 0.2714
+      MATCHED     +0.725  CI [ -3.030, +4.397]  p 0.6984  (matched n 423)
+      net (econ)  -2.205  p 0.2866
+      MFE/MAE 1.023 vs 1.133      ff0.5 56.33% vs 56.40%
+
+  EMA9 EXECUTION DETAIL (primary vs Control C, per parent):
+      parents in both arms 617
+      entry price diff (signed favourable) -4.6159 pts
+      risk (ATR)  primary 2.465  no-EMA9 2.132
+      delay (1m bars)  0.99
+      fwd15  primary  +2.956  no-EMA9  +8.552
+
+==============================================================================
+YEAR DESTRUCTION (primary; delta vs Control A on fwd15)
+==============================================================================
+  2019 n  36  fwd15  +3.694  med  +3.000  MFE/MAE 1.935  ff0.5 58.82%  net  +2.179  vsA  +0.896
+  2020 n  81  fwd15  +3.318  med  +3.250  MFE/MAE 0.959  ff0.5 54.93%  net  +2.411  vsA  -4.833
+  2021 n  88  fwd15  +3.895  med  +3.750  MFE/MAE 0.909  ff0.5 66.27%  net  -6.995  vsA  -4.198
+  2022 n  76  fwd15  +0.293  med  +8.750  MFE/MAE 1.165  ff0.5 48.65%  net  +2.327  vsA  -8.824
+  2023 n 105  fwd15  +6.338  med  +5.000  MFE/MAE 0.953  ff0.5 51.02%  net  -2.206  vsA  -1.853
+  2024 n  89  fwd15  +0.022  med  +5.750  MFE/MAE 1.065  ff0.5 59.26%  net  +9.681  vsA  -3.148
+  2025 n  91  fwd15 +10.755  med +10.000  MFE/MAE 1.007  ff0.5 58.82%  net +10.201  vsA  +2.751
+  2026 n  51  fwd15 -11.554  med -15.250  MFE/MAE 0.790  ff0.5 52.94%  net -22.546  vsA -12.228
+  -> 2 of 8 qualifying years positive vs Control A (gate >=70%)
+     best-year(2025)-removed delta -4.723
+
+TIME-OF-DAY DESTRUCTION
+  OPEN       n 537  fwd15  +3.988  MFE/MAE 1.055  net  +1.432  vsA  -4.608
+  MIDMORN    n  56  fwd15  -7.040  MFE/MAE 0.737  net -11.205  vsA -13.732
+  AFTERNOON  n  20  fwd15  +3.562  MFE/MAE 1.016  net +14.167  vsA  -0.589
+
+RVMR RANGE DIAGNOSTIC (context only, never a filter)
+  LOW     n  23  fwd15  +9.554  MFE/MAE 1.265  net +18.043
+  MEDIUM  n 188  fwd15  +0.711  MFE/MAE 0.953  net  -1.067
+  HIGH    n 406  fwd15  +3.621  MFE/MAE 1.041  net  +0.072
+
+VECTOR-COLOUR DIAGNOSTIC (lead only, never a rule)
+  GREEN    -> RED      n 112  fwd15  -4.201  net  +0.826
+  RED      -> GREEN    n 112  fwd15  +2.047  net  +6.322
+  RED      -> RED      n 106  fwd15  +5.578  net  -4.769
+  GREEN    -> GREEN    n 102  fwd15 +18.809  net +11.640
+  GREEN    -> VIOLET   n  29  fwd15  -2.052  net  -8.672
+  GREEN    -> BLUE     n  28  fwd15  -7.402  net -17.674
+  BLUE     -> RED      n  26  fwd15  +3.058  net -13.812
+  RED      -> BLUE     n  22  fwd15  -4.091  net  -0.484
+
+SECOND-TEST EXTREME DIAGNOSTIC (never a filter)
+  FAILED_SHORT_OF  n 354  fwd15  +1.303  net  +2.379
+  SWEPT            n 256  fwd15  +5.104  net  -1.866
+  EQUAL            n   7  fwd15  +8.000  net -17.299
+
+TAIL DESTRUCTION
+  largest winner  +360.88   largest loser  -188.62
+  top-1% share  6.306  top-5% share 21.282
+  mean  +0.395  ex-top1%  -2.114  ex-top5%  -8.412  med-ex5% -20.620
+  after top-1% |move| removal: n 611 fwd15  +2.403  vsA  -4.150  ff0.5 56.22%
+  after top-5% |move| removal: n 587 fwd15  +2.521  vsA  -3.533  ff0.5 56.75%
+
+==============================================================================
+MULTIPLICITY - M = 2 (frozen, never changed)
+==============================================================================
+  promotable test                p (vs A)       BH q
+  PRIMARY developing               0.0120     0.0120
+  SECONDARY completed-15m          0.0000     0.0001
+
+==============================================================================
+PROMOTION GATE - fifteen frozen conditions
+==============================================================================
+  1  sufficient N                  PASS  n617 d453 L415 S202
+  2  useful raw geometry           PASS  fwd15 +2.956 net +0.395
+  3  MFE/MAE > control             FAIL  1.023 vs 1.141
+  4  favourable-first > control    FAIL  56.33 vs 59.69
+  5  beats ordinary wick (CI)      FAIL  raw -3.620 CI[-6.444,-0.741]
+  6  2nd test adds (vs single)     FAIL  raw -4.001
+  7  EMA9 improves or no harm      FAIL  raw -3.999
+  8  long/short transparency       PASS  both reported
+  9  year stability >=70%          FAIL  2/8, ex-best -4.723
+  10 time-of-day stability         FAIL  all populated buckets positive
+  11 tail robustness               FAIL  ex-top5% net -8.412
+  12 corrected support             PASS  BH q 0.0120
+  13 no lookahead                  PASS  causal audit YES
+  14 no data artifact              PASS  contiguity enforced
+  15 no control artifact           PASS  symmetric cell dropping
+
+  ALL FIFTEEN: FAIL
+
+==============================================================================
+4H-DVT-V1 FAILED PROMOTION
+==============================================================================
+NO ORDERS PLACED. OFH13_PROSPECTIVE_V1 UNTOUCHED.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
