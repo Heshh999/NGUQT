@@ -378,3 +378,93 @@ identical to the LTF files, so the loader reads it unchanged.
 The exact minimal action is step 1–4 above. XMARKET-V1 remains not
 started; its pre-registration remains frozen at `36aaa28`, written
 before any ES bar existed.
+
+---
+
+# ADDENDUM 2 — ES FULL-HISTORY EXPORTS RECEIVED (wrong artifact, right data)
+
+Two archives covering **2019-06 → 2026-08** plus the engine's own
+`v4_1_STRUCTURE_AUDIT_v41.txt`.
+
+## The decisive good news, from the engine's startup diagnostic
+
+```
+instrument         ES
+merge policy       back-adjusted continuous (assumed)
+session template   CME US Index Futures ETH (full 24h)
+time zone          Eastern Standard Time
+  7    1m        1m bars        2,542,426
+```
+
+**NinjaTrader now holds 2,542,426 ES 1-minute bars over the full
+range** — against NQ's 2,503,622. The download is done and it covers the
+whole NQ history. That was the hard part and it is finished.
+
+## But these two exports contain zero 1-minute bars
+
+| export | rows | timeframe | OHLC columns | per month |
+|---|---|---|---|---|
+| `v4_1_entries_ES_v41_*` | 66,344 | **all 15m** | **none** | ~763 events |
+| `v4_1_structure_ES_v41_*` | 26,487 | **all 15m** | present, at 15m | ~305 events |
+
+A 1-minute bar series is ~30,000 rows per month. These are **event
+exports from the V4.1 research engine**, not a bar series — the engine
+was run instead of a bar capture. Event span 2019-06-02 → 2026-08-17.
+
+**They cannot serve as the ES bar series**, and not only because they are
+sparse: the bars they *do* embed are selected by ES's own structure
+logic, so using them would mean observing ES only at moments ES's engine
+flagged — a biased subset that would contaminate every cross-market
+comparison.
+
+## Independent ES source cross-check — PASS (directive Step 9)
+
+The full-history structure export overlaps the earlier LTF pilot in
+Jun–Aug 2026, giving two genuinely independent ES sources. Pilot 1m bars
+aggregated to 15m against the structure export's 15m bars:
+
+| | |
+|---|---|
+| comparable 15m bars | 542 |
+| **exact OHLC match** | **542 / 542 — 100.0%** |
+| close difference | median **+0.0000**, mean **+0.0000**, min/max **+0.00 / +0.00** |
+
+Zero difference on every bar. This confirms three things at once: the two
+ES sources agree exactly; the 15m export's `f_barCloseEt` is
+close-stamped consistently with the pilot's 1m stamps; and
+back-adjustment introduces **no offset in the recent window**, exactly as
+expected since back-adjustment anchors on the front contract.
+
+## Flag carried forward — merge-policy parity
+
+The ES engine reports **"back-adjusted continuous (assumed)"** and
+`psyLevelPriceIntegrityPass FALSE (back-adjusted series)`. The NQ roll
+audit (§3) found **no roll discontinuity**, which is consistent with NQ
+being back-adjusted or seamlessly merged.
+
+The directive forbids silently comparing back-adjusted NQ against
+unadjusted ES. On present evidence the two constructions **appear to
+match**, which is what cross-market normalized-return work needs — but
+ES's is *assumed by the engine*, not verified. **When the ES 1m bars
+arrive the identical roll-gap test run on NQ will be run on ES**, and
+merge-policy parity will be verified rather than assumed. Roll windows
+remain quarantined for both markets regardless.
+
+## Remaining action — one export run, no new download
+
+The data is already loaded in NinjaTrader; only the bar export is
+missing.
+
+1. **Strategy Analyzer → Backtest**, Instrument **ES**, **1 Minute**,
+   range `07/04/2019 → present`, `Max bars look back = Infinite`.
+2. Strategy **`V41Bar1mCaptureHost`** (not the V4.1 research engine —
+   that one writes 15m events). Output folder `C:\V41`, File tag `ES`.
+3. Send the `V41_bar1m` folder.
+
+No Historical Data download is needed — the audit proves 2.54M ES
+1-minute bars are already there.
+
+**Verdict unchanged: ES-NQ-DATA-V1 NOT READY — INSUFFICIENT ES
+COVERAGE**, now for a purely mechanical reason: the bars exist but have
+not been exported as bars. Expected on completion: ~2.5M ES 1m bars and
+an overlap approaching the full 7.1-year NQ history.
