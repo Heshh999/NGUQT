@@ -57,3 +57,27 @@ most TWO candidates for a pre-registered confirmation study on the
 holdout.
 
 THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
+
+---
+
+# WAVE 2 ADDENDUM (frozen BEFORE any Wave-2 statistic is computed)
+
+Same discovery window (≤ 2023-12-31), same holdout rule, same
+day-clustered machinery, seed 20260825. Eight further statistics, fixed
+now — no post-hoc additions:
+
+| # | statistic | mathematical object | RVMR interaction asked |
+|---|---|---|---|
+| S9 | Shock-response curve: forward 15m/30m return by decile of the prior non-overlapping 15m return | conditional drift after large deviations | response curve by RANGE state |
+| S10 | Asymmetric price impact: mean \|r\|/volume for up-bars vs down-bars | Amihud/Kyle-lambda direction asymmetry | by state and ToD |
+| S11 | Parkinson vs close-close variance ratio per day; close-location value CLV = (2c−h−l)/(h−l) and corr(CLV_t, r_{t+1}) | range-interior geometry | CLV predictivity by state |
+| S12 | Open-gap response: ln(09:30 open / prior 16:00 close) deciles → same-day RTH open-to-close return (lineage note: gap *strategies* tested before; the response *curve* was never mapped) | overnight-inventory response function | — |
+| S13 | ACF of \|r\| at lags 1..1440; log-log decay slope; memory length where ACF < 0.05 | long-memory of volatility; checks RVMR's 1440-bar window against the market's actual memory | direct RVMR-design diagnostic |
+| S14 | Minute-of-day \|r\| seasonal curve; minutes deviating > 30% from the ±10-minute local median | vol-seasonality spikes (news minutes, MOC) | — |
+| S19 | RVMR state transition matrix, dwell-time distribution and hazard; P(→HIGH within 30m) by signed prior 15m return decile (leverage asymmetry) | the state process ITSELF as the object | native |
+| S22 | DFT periodogram of the mean-signed-return-by-minute-of-day vector (top-5 periods); MONDAY decomposition into Sunday-overnight / Monday-overnight / Monday-RTH accrual | clock harmonics; sharpening the Wave-1 Monday lead before its confirmation is registered | — |
+
+Outputs remain EXPLORATORY. The two-candidate cap for holdout
+confirmation applies to the COMBINED waves: the final recommendation
+after Wave 2 may still name at most TWO hypotheses (which may replace
+Wave-1 picks only by being declared before any holdout contact).
