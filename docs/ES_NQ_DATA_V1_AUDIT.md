@@ -1,6 +1,12 @@
 # ES-NQ-DATA-V1 — CROSS-MARKET DATA AUDIT
 
-# **ES-NQ-DATA-V1 NOT READY — reason: NO ES DATA**
+# **ES-NQ-DATA-V1 NOT READY — reason: INSUFFICIENT ES COVERAGE**
+
+> **Superseded 2026-08-26 by the ES pilot.** The original verdict was
+> NO ES DATA. Genuine ES history has now arrived and is **certified
+> clean** — the pilot passed every technical gate. The blocker is no
+> longer quality; it is **span**: 42 session days against 7.1 years of
+> NQ (**1.86%** of the history). See ADDENDUM at the end.
 
 No hypothesis was run. Nothing was fabricated, substituted, or
 forward-filled. What *could* be built without ES was built and verified:
@@ -248,3 +254,127 @@ to match NQ.
 **XMARKET-V1 remains not started.** OFH13_PROSPECTIVE_V1, RVMR-V1 and
 all frozen infrastructure are untouched.
 **THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.**
+
+---
+
+# ADDENDUM — ES PILOT RECEIVED AND CERTIFIED (2026-06-30 → 2026-08-17)
+
+**Genuine ES history now exists in this project for the first time.**
+Instrument `ES`, contract `ES SEP26`, 43 day files, closes **7,324.50 –
+7,837.75** — unambiguously ES, against NQ's ~30–31k in the same era.
+
+## Quality — flawless
+
+| check | ES pilot |
+|---|---|
+| 1m bars | **46,612** over 42 session days |
+| duplicate rows | **0** |
+| **conflicting** duplicates | **0** |
+| OHLC invalid | **0** |
+| negative / zero volume | **0 / 0** |
+| span | 2026-06-30 18:02 → 2026-08-17 16:59 ET |
+
+## Bar-stamp proof on ES — identical convention to NQ
+
+Same maintenance-break test used on NQ:
+
+| stamp | ES days | NQ days |
+|---|---|---|
+| 17:00 | **32** | 1,769 |
+| 17:01 | 0 | 0 |
+| 17:59 | 0 | 0 |
+| 18:00 | 0 | 0 |
+| 18:01 | **33** | 1,831 |
+
+**ES is CLOSE-STAMPED, exactly like NQ.** No timestamp transformation is
+required — the two series are directly comparable as delivered. This was
+the single largest risk to the whole cross-market programme and it is
+now retired.
+
+## Synchronization — within the pilot window
+
+| | |
+|---|---|
+| NQ bars in window | 46,575 |
+| ES bars in window | 46,612 |
+| **MATCHED** | **46,509** |
+| match % of NQ in window | **99.86%** |
+| match % of ES | **99.78%** |
+| ES_ONLY | 103 — **all after 2026-08-17 15:16**, where the NQ research history simply ends |
+| NQ_ONLY | 66 — scattered minutes ES did not trade; correctly left absent, never filled |
+| ROLL_QUARANTINED | 0 (no quarterly roll window inside the pilot span) |
+
+## Descriptive correlation sanity — PASS
+
+| horizon | corr |
+|---|---|
+| normalized 1m return | **+0.8672** (n 46,455) |
+| normalized 3m return | **+0.8835** |
+| normalized 5m return | **+0.8888** |
+| daily return | **+0.8783** (42 days) |
+
+Strongly positive at every horizon, no sign flip, rising with horizon
+exactly as two indices of the same economy should. **No synchronization
+failure.** (Descriptive only — not an edge test, and no signal was
+derived from it.)
+
+## Loader defect found by the real pilot — fixed
+
+The LTF capture schema packs **1m / 30s / 15s / 5s rows into one file
+under identical column names**. The loader read them all as bars, so a
+5-second row landing on a minute boundary *conflicted* with the 1-minute
+bar and the loader **failed closed on perfectly good data**. A
+`timeframe == '1m'` filter now applies wherever that column exists.
+Fail-closed behaved correctly; the bug was that it was reading rows it
+should never have considered. Self-test re-run: **PASS**.
+
+## Coverage — the one thing still missing
+
+| | |
+|---|---|
+| NQ research history | 2019-07-04 → 2026-08-17, **2,503,622 bars, ~7.1 years** |
+| ES overlap | 2026-06-30 → 2026-08-17, **46,509 matched bars, 42 session days** |
+| **overlap as a fraction of NQ history** | **1.86%** |
+
+**Classification: LIMITED.** Per the directive's own standard —
+"do not declare XMARKET data ready merely because *one year* overlaps" —
+42 session days does not qualify, and no pass threshold is invented
+after the fact. Gate 3 (*sufficient overlap*) fails; **11 of 12 gates
+now pass.**
+
+## What the pilot achieved
+
+Everything it was designed to. Stamp convention, session alignment,
+duplicate behaviour, OHLC validity, synchronization mechanics and
+correlation sanity are all now **proven on real data** rather than
+assumed. The full-history download is de-risked: we know it will
+synchronize.
+
+## Remaining action — the full pull, 1-minute only
+
+The pilot captured 30s/15s/5s as well, which means it required an ES
+**tick** download and produced 94 MB for seven weeks. At that rate seven
+years is roughly 5 GB, and provider tick history rarely reaches 2019.
+
+**`src/V41Bar1mCaptureHost.cs` (new, compile-verified) removes that
+blocker:** it adds **no** secondary series, so it runs on **Minute data
+alone** — no tick download at any point. Its output schema is byte-
+identical to the LTF files, so the loader reads it unchanged.
+
+1. **Tools → Historical Data → Download** — Instrument `ES`, Interval
+   **Minute**, Value **1**, range `07/04/2019 → present`. **Do not tick
+   Tick.**
+2. **Check the Loaded panel's Begin date for ES before running.** How
+   far back the provider actually serves is a provider question; if it
+   stops at, say, 2022, we report the reduced overlap honestly.
+3. **Strategy Analyzer → Backtest**, ES **1 Minute**, same range,
+   `Max bars look back = Infinite`, strategy `V41Bar1mCaptureHost`,
+   Output folder `C:\V41`, File tag `ES`.
+4. Send the `V41_bar1m` folder. Then re-run
+   `es_nq_data_spec.py build --es <folder>`; every gate above re-runs
+   automatically on the longer span.
+
+**Verdict: ES-NQ-DATA-V1 NOT READY — INSUFFICIENT ES COVERAGE.**
+The exact minimal action is step 1–4 above. XMARKET-V1 remains not
+started; its pre-registration remains frozen at `36aaa28`, written
+before any ES bar existed.

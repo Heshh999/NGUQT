@@ -88,8 +88,17 @@ def load_market(spec, label):
             ti = col('et', 'timestampet', 'f_barcloseet', 'timestamp')
             if ti is None or any(v is None for v in ci.values()):
                 continue
+            # DEFECT FIX (found on the first real ES pilot): the LTF capture
+            # schema packs 1m/30s/15s/5s rows into ONE file under identical
+            # column names. Without this filter the sub-minute rows are read
+            # as bars and a 5s row landing on a minute boundary CONFLICTS
+            # with the 1m bar - the loader would (correctly) fail closed on
+            # perfectly good data. Only 1m rows are bars for this study.
+            tfi = col('timeframe')
             for row in rd:
                 if len(row) != len(h):
+                    continue
+                if tfi is not None and row[tfi] != '1m':
                     continue
                 try:
                     et = row[ti]
