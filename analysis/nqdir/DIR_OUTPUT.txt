@@ -1,0 +1,392 @@
+==============================================================================
+NQ-DIRECTION-V1  FROZEN HISTORICAL EXECUTION
+  prereg sha256 c8c22db1927802df4c475ef4a80f3e0bfc6ef1e7148035d06dd6816b9096080b
+  prereg commit 01984973083e8d9c2b291c5ffea8b1fd2f115581
+  M = 5 (NEVER shrunk)   HISTORICAL DISCOVERY / INTERNAL REPLICATION
+  SUBMITS NO ORDERS. NO LIVE TRADING IS AUTHORIZED.
+==============================================================================
+
+PARITY GATE 1 - canonical feature parity (rvmr_run.features)
+==============================================================================
+PARITY GATE - val_lib.features vs FROZEN rvmr_run.features (NQ)
+==============================================================================
+  universe size            510309  MATCH
+  column i      mismatches 0  MATCH
+  column day    mismatches 0  MATCH
+  column mod    mismatches 0  MATCH
+  column rb     mismatches 0  MATCH
+  column vb     mismatches 0  MATCH
+  column rr     mismatches 0  MATCH
+  column vr     mismatches 0  MATCH
+  column abs5   mismatches 0  MATCH
+  column abs10  mismatches 0  MATCH
+  column abs15  mismatches 0  MATCH
+  column abs30  mismatches 0  MATCH
+  column abs60  mismatches 0  MATCH
+  PARITY GATE: PASS
+
+bars 2503622   2019-07-04 18:25:00 .. 2026-08-17 15:16:00
+PARITY GATE 2 - ATR quintile cuts from frozen calendar-2019 rule:
+  n=44081  cuts 0.9491  1.1992  1.5304  2.0184
+  usable decision bars 648473
+
+LOGICAL DEFECT RE-AUDIT
+  DIR-H1        events  19633   non-zero event space: YES
+  DIR-H2        events  22719   non-zero event space: YES
+  DIR-H3        events   1745   non-zero event space: YES
+  DIR-H3-FAIL   events   1340   non-zero event space: YES
+  DIR-H4        events   1411   non-zero event space: YES
+  DIR-H4-FAIL   events   1067   non-zero event space: YES
+  reference windows exclude decision bars: verified in builders
+  outcomes never participate in signal construction: verified
+
+building baseline / control pools (one pass over the universe)...
+  control cells 1896   BASELINE-A buckets 4   BASELINE-B cells 40
+  BASELINE A (ToD P(up)):  OPEN 0.5246  MIDMORN 0.5226  MIDDAY 0.5275  AFTERNOON 0.5163
+
+==============================================================================
+DIR-H1  SWEEP -> FAILED ACCEPTANCE -> RECLAIM
+==============================================================================
+  events 19633 (matched 19381)  days 1829  years 8  LONG 10316  SHORT 9065  ties15 121
+  15m accuracy  50.59%   matched control  50.20%   SEPARATION  +0.39 pp
+      day-clustered 95% CI [ -0.26,  +1.05]  p 0.2392
+  30m accuracy  50.79%
+  signed ret15 mean   +0.334  median   +0.250   ret30 mean   +0.500
+  favourable-first  FAV 8817  ADV 8753  AMBIGUOUS 1391  NEITHER 420   fav% of decided 50.18%
+      FAV-rate vs matched control  +0.07 pp  CI [ -0.63,  +0.77]
+  MFE/MAE (ATR units)  signal 1.889/1.935 = 0.976   control 1.773/1.852 = 0.957
+  LONG   n 10316  acc15  52.79%  ret15  +0.558  MFE/MAE 0.954
+  SHORT  n  9065  acc15  48.09%  ret15  +0.080  MFE/MAE 1.025
+  ABSTENTION  scored 16688  active 16688 (coverage 100.00%)  neutral 0
+  accuracy when active  50.44%
+  BRIER  model 0.24948   A 0.24945   B 0.24939   C 0.50647   best(B) 0.24939
+  BRIER IMPROVEMENT vs best baseline -0.00009  (gate >= 0.005)
+  LOG LOSS model 0.69210   best baseline 0.69192
+  CALIBRATION (predicted vs observed, frozen bins):
+      [0.50,0.55) n  8924  predicted 0.529  observed 0.527  err -0.22 pp
+  YEAR DESTRUCTION:
+      2019 n  1408  sep  +1.04 pp  acc  51.56%  ret15  +0.093  MFE/MAE 0.997  ff  51.0%
+      2020 n  2627  sep  +0.80 pp  acc  51.08%  ret15  +0.554  MFE/MAE 0.990  ff  49.9%
+      2021 n  2729  sep  +1.22 pp  acc  51.63%  ret15  +1.145  MFE/MAE 1.034  ff  51.7%
+      2022 n  2626  sep  +0.44 pp  acc  50.15%  ret15  +0.927  MFE/MAE 0.996  ff  51.3%
+      2023 n  2906  sep  -0.23 pp  acc  49.76%  ret15  -0.588  MFE/MAE 0.965  ff  49.3%
+      2024 n  2879  sep  -1.30 pp  acc  48.87%  ret15  -1.041  MFE/MAE 0.895  ff  48.1%
+      2025 n  2673  sep  +1.20 pp  acc  51.48%  ret15  +0.915  MFE/MAE 0.963  ff  50.0%
+      2026 n  1533  sep  +0.51 pp  acc  51.01%  ret15  +1.041  MFE/MAE 0.988  ff  51.1%
+      -> 6 of 8 qualifying years positive (need >=70%)   best-year(2021)-removed sep  +0.26 pp
+  ERA DESTRUCTION:
+      COVID/extreme 2020   n  2627  sep  +0.80 pp
+      2021                 n  2729  sep  +1.22 pp
+      2022 bear/rates      n  2626  sep  +0.44 pp
+      2023-24              n  5785  sep  -0.76 pp
+      2025-26              n  4206  sep  +0.95 pp
+  TIME-OF-DAY DESTRUCTION:
+      OPEN       n  4274  sep  +0.34 pp  acc  49.98%
+      MIDMORN    n  4154  sep  +2.60 pp  acc  52.79%
+      MIDDAY     n  4577  sep  -0.09 pp  acc  50.29%
+      AFTERNOON  n  6376  sep  -0.66 pp  acc  49.78%
+  RVMR RANGE DIAGNOSTIC (never a filter):
+      LOW     n  4101  sep  +0.49 pp
+      MEDIUM  n  8468  sep  +0.33 pp
+      HIGH    n  6812  sep  +0.41 pp
+  TAIL DESTRUCTION:
+      largest winner  +765.75  largest loser  -257.00
+      top-1% share  4.366  top-5% share 12.723  mean  +0.334  ex-top1%  -1.137  ex-top5%  -4.128
+      separation after top-1% |move| removal  +0.37 pp   top-5%  +0.50 pp
+
+==============================================================================
+DIR-H2  IMPULSE -> CONTROLLED PULLBACK -> RE-EXPANSION
+==============================================================================
+  events 22719 (matched 22530)  days 1829  years 8  LONG 11602  SHORT 10928  ties15 127
+  15m accuracy  50.27%   matched control  50.12%   SEPARATION  +0.15 pp
+      day-clustered 95% CI [ -0.47,  +0.76]  p 0.6199
+  30m accuracy  50.48%
+  signed ret15 mean   -0.097  median   +0.250   ret30 mean   -0.028
+  favourable-first  FAV 10372  ADV 10826  AMBIGUOUS 891  NEITHER 441   fav% of decided 48.93%
+      FAV-rate vs matched control  -0.02 pp  CI [ -0.66,  +0.62]
+  MFE/MAE (ATR units)  signal 1.603/1.673 = 0.958   control 1.609/1.659 = 0.970
+  LONG   n 11602  acc15  52.56%  ret15  +0.028  MFE/MAE 0.947
+  SHORT  n 10928  acc15  47.84%  ret15  -0.230  MFE/MAE 0.977
+  ABSTENTION  scored 19410  active 19410 (coverage 100.00%)  neutral 0
+  accuracy when active  50.22%
+  BRIER  model 0.24948   A 0.24942   B 0.24944   C 0.49593   best(A) 0.24942
+  BRIER IMPROVEMENT vs best baseline -0.00007  (gate >= 0.005)
+  LOG LOSS model 0.69211   best baseline 0.69198
+  CALIBRATION (predicted vs observed, frozen bins):
+      [0.50,0.55) n  9991  predicted 0.530  observed 0.525  err -0.52 pp
+  YEAR DESTRUCTION:
+      2019 n  1526  sep  +1.53 pp  acc  51.38%  ret15  +0.161  MFE/MAE 1.022  ff  49.2%
+      2020 n  3226  sep  +0.15 pp  acc  50.46%  ret15  -0.101  MFE/MAE 0.923  ff  50.4%
+      2021 n  3217  sep  +0.43 pp  acc  50.36%  ret15  -0.178  MFE/MAE 0.956  ff  50.0%
+      2022 n  3218  sep  -0.24 pp  acc  50.22%  ret15  -0.160  MFE/MAE 0.979  ff  50.7%
+      2023 n  3133  sep  +1.26 pp  acc  51.52%  ret15  +0.288  MFE/MAE 1.013  ff  49.3%
+      2024 n  3175  sep  +0.04 pp  acc  50.14%  ret15  +0.446  MFE/MAE 0.949  ff  46.9%
+      2025 n  3092  sep  -1.26 pp  acc  48.74%  ret15  +0.104  MFE/MAE 0.932  ff  47.8%
+      2026 n  1943  sep  -0.11 pp  acc  49.67%  ret15  -1.888  MFE/MAE 0.905  ff  46.2%
+      -> 5 of 8 qualifying years positive (need >=70%)   best-year(2019)-removed sep  +0.05 pp
+  ERA DESTRUCTION:
+      COVID/extreme 2020   n  3226  sep  +0.15 pp
+      2021                 n  3217  sep  +0.43 pp
+      2022 bear/rates      n  3218  sep  -0.24 pp
+      2023-24              n  6308  sep  +0.65 pp
+      2025-26              n  5035  sep  -0.81 pp
+  TIME-OF-DAY DESTRUCTION:
+      OPEN       n  4431  sep  +0.25 pp  acc  51.00%
+      MIDMORN    n  5493  sep  +0.18 pp  acc  50.37%
+      MIDDAY     n  5417  sep  +0.57 pp  acc  50.56%
+      AFTERNOON  n  7189  sep  -0.25 pp  acc  49.52%
+  RVMR RANGE DIAGNOSTIC (never a filter):
+      LOW     n  6494  sep  -0.02 pp
+      MEDIUM  n  9862  sep  +0.33 pp
+      HIGH    n  6174  sep  +0.04 pp
+  TAIL DESTRUCTION:
+      largest winner  +751.50  largest loser -1128.00
+      top-1% share -13.522  top-5% share -41.603  mean  -0.097  ex-top1%  -1.430  ex-top5%  -4.370
+      separation after top-1% |move| removal  +0.20 pp   top-5%  +0.28 pp
+
+==============================================================================
+DIR-H3  OPENING-DRIVE RESOLUTION (acceptance arm)
+==============================================================================
+  events 1745 (matched 1739)  days 1739  years 8  LONG 916  SHORT 823  ties15 6
+  15m accuracy  51.41%   matched control  50.82%   SEPARATION  +0.59 pp
+      day-clustered 95% CI [ -1.74,  +2.87]  p 0.6171
+  30m accuracy  50.78%
+  signed ret15 mean   +0.734  median   +1.000   ret30 mean   -0.459
+  favourable-first  FAV 794  ADV 878  AMBIGUOUS 19  NEITHER 48   fav% of decided 47.49%
+      FAV-rate vs matched control  -0.97 pp  CI [ -3.29,  +1.39]
+  MFE/MAE (ATR units)  signal 1.355/1.370 = 0.989   control 1.488/1.528 = 0.973
+  LONG   n   916  acc15  55.02%  ret15  +1.836  MFE/MAE 0.982
+  SHORT  n   823  acc15  47.39%  ret15  -0.492  MFE/MAE 0.999
+  ABSTENTION  scored 1515  active 1515 (coverage 100.00%)  neutral 0
+  accuracy when active  51.22%
+  BRIER  model 0.24890   A 0.24850   B 0.24860   C 0.48647   best(A) 0.24850
+  BRIER IMPROVEMENT vs best baseline -0.00040  (gate >= 0.005)
+  LOG LOSS model 0.69094   best baseline 0.69014
+  CALIBRATION (predicted vs observed, frozen bins):
+      [0.50,0.55) n   513  predicted 0.542  observed 0.561  err +1.98 pp
+      [0.55,0.60) n   298  predicted 0.557  observed 0.527  err -3.06 pp
+  YEAR DESTRUCTION:
+      2019 n   111  sep  -4.52 pp  acc  45.95%  ret15  +0.597  MFE/MAE 1.010  ff  48.6%
+      2020 n   237  sep  +3.75 pp  acc  55.70%  ret15  +2.494  MFE/MAE 1.097  ff  45.3%
+      2021 n   244  sep  -0.44 pp  acc  50.41%  ret15  +0.393  MFE/MAE 1.093  ff  50.2%
+      2022 n   251  sep  -1.02 pp  acc  49.80%  ret15  -2.532  MFE/MAE 0.937  ff  51.3%
+      2023 n   247  sep  +1.92 pp  acc  51.82%  ret15  +0.041  MFE/MAE 0.960  ff  47.9%
+      2024 n   250  sep  +2.49 pp  acc  52.80%  ret15  +1.776  MFE/MAE 0.985  ff  44.7%
+      2025 n   245  sep  -1.05 pp  acc  50.61%  ret15  +2.229  MFE/MAE 0.960  ff  48.5%
+      2026 n   154  sep  +1.08 pp  acc  51.30%  ret15  +1.031  MFE/MAE 0.847  ff  41.9%
+      -> 4 of 8 qualifying years positive (need >=70%)   best-year(2020)-removed sep  +0.09 pp
+  ERA DESTRUCTION:
+      COVID/extreme 2020   n   237  sep  +3.75 pp
+      2021                 n   244  sep  -0.44 pp
+      2022 bear/rates      n   251  sep  -1.02 pp
+      2023-24              n   497  sep  +2.21 pp
+      2025-26              n   399  sep  -0.23 pp
+  TIME-OF-DAY DESTRUCTION:
+      OPEN       n  1644  sep  +0.19 pp  acc  51.03%
+      MIDMORN    n    95  sep  +7.53 pp  acc  57.89%
+  RVMR RANGE DIAGNOSTIC (never a filter):
+      LOW     n   157  sep  +5.58 pp
+      MEDIUM  n   774  sep  +0.49 pp
+      HIGH    n   808  sep  -0.28 pp
+  TAIL DESTRUCTION:
+      largest winner  +206.00  largest loser  -240.50
+      top-1% share  2.092  top-5% share  7.044  mean  +0.734  ex-top1%  -0.810  ex-top5%  -4.668
+      separation after top-1% |move| removal  +0.69 pp   top-5%  +0.76 pp
+
+==============================================================================
+DIR-H3  OPENING-DRIVE RESOLUTION (failure arm)
+==============================================================================
+  events 1340 (matched 1332)  days 1332  years 8  LONG 653  SHORT 679  ties15 6
+  15m accuracy  49.10%   matched control  49.90%   SEPARATION  -0.81 pp
+      day-clustered 95% CI [ -3.50,  +1.83]  p 0.5446
+  30m accuracy  48.76%
+  signed ret15 mean   +0.434  median   -0.500   ret30 mean   +1.392
+  favourable-first  FAV 651  ADV 621  AMBIGUOUS 26  NEITHER 34   fav% of decided 51.18%
+      FAV-rate vs matched control  +2.53 pp  CI [ -0.16,  +5.22]
+  MFE/MAE (ATR units)  signal 1.361/1.410 = 0.965   control 1.490/1.557 = 0.957
+  LONG   n   653  acc15  51.76%  ret15  +0.571  MFE/MAE 0.895
+  SHORT  n   679  acc15  46.54%  ret15  +0.302  MFE/MAE 1.091
+  ABSTENTION  scored 1160  active 1127 (coverage 97.16%)  neutral 33
+  accuracy when active  49.87%
+  BRIER  model 0.25073   A 0.24949   B 0.24963   C 0.50222   best(A) 0.24949
+  BRIER IMPROVEMENT vs best baseline -0.00124  (gate >= 0.005)
+  LOG LOSS model 0.69464   best baseline 0.69212
+  CALIBRATION (predicted vs observed, frozen bins):
+      [0.50,0.55) n   535  predicted 0.523  observed 0.521  err -0.16 pp
+      [0.55,0.60) n     5  predicted 0.552  observed 0.400  err -15.17 pp
+  YEAR DESTRUCTION:
+      2019 n    82  sep  -5.27 pp  acc  45.12%  ret15  +2.040  MFE/MAE 1.207  ff  48.7%
+      2020 n   187  sep  -5.34 pp  acc  44.92%  ret15  -1.904  MFE/MAE 0.778  ff  50.0%
+      2021 n   181  sep  +1.78 pp  acc  51.38%  ret15  +6.323  MFE/MAE 1.220  ff  51.7%
+      2022 n   186  sep  +2.48 pp  acc  52.69%  ret15  +3.289  MFE/MAE 1.115  ff  58.5%
+      2023 n   197  sep  -0.79 pp  acc  48.73%  ret15  +1.841  MFE/MAE 1.042  ff  50.0%
+      2024 n   194  sep  +0.75 pp  acc  51.03%  ret15  -3.591  MFE/MAE 0.791  ff  50.0%
+      2025 n   182  sep  +3.56 pp  acc  53.30%  ret15  +1.348  MFE/MAE 0.944  ff  50.9%
+      2026 n   123  sep  -8.64 pp  acc  40.65%  ret15  -7.321  MFE/MAE 0.786  ff  46.5%
+      -> 4 of 8 qualifying years positive (need >=70%)   best-year(2025)-removed sep  -1.50 pp
+  ERA DESTRUCTION:
+      COVID/extreme 2020   n   187  sep  -5.34 pp
+      2021                 n   181  sep  +1.78 pp
+      2022 bear/rates      n   186  sep  +2.48 pp
+      2023-24              n   391  sep  -0.03 pp
+      2025-26              n   305  sep  -1.36 pp
+  TIME-OF-DAY DESTRUCTION:
+      OPEN       n  1153  sep  -0.92 pp  acc  49.00%
+      MIDMORN    n   179  sep  -0.08 pp  acc  49.72%
+  RVMR RANGE DIAGNOSTIC (never a filter):
+      LOW     n    73  sep  +3.10 pp
+      MEDIUM  n   440  sep  -3.53 pp
+      HIGH    n   819  sep  +0.31 pp
+  TAIL DESTRUCTION:
+      largest winner  +224.00  largest loser  -185.00
+      top-1% share  3.115  top-5% share 11.496  mean  +0.434  ex-top1%  -0.927  ex-top5%  -4.794
+      separation after top-1% |move| removal  -0.62 pp   top-5%  -1.00 pp
+
+==============================================================================
+DIR-H4  OVERNIGHT INVENTORY RESOLUTION (acceptance arm)
+==============================================================================
+  events 1411 (matched 1403)  days 1403  years 8  LONG 762  SHORT 641  ties15 5
+  15m accuracy  52.96%   matched control  51.23%   SEPARATION  +1.72 pp
+      day-clustered 95% CI [ -0.86,  +4.33]  p 0.1957
+  30m accuracy  51.04%
+  signed ret15 mean   -0.294  median   +3.000   ret30 mean   -0.308
+  favourable-first  FAV 632  ADV 612  AMBIGUOUS 141  NEITHER 18   fav% of decided 50.80%
+      FAV-rate vs matched control  +0.46 pp  CI [ -2.14,  +3.07]
+  MFE/MAE (ATR units)  signal 2.073/2.049 = 1.012   control 1.917/1.933 = 0.992
+  LONG   n   762  acc15  55.51%  ret15  -0.002  MFE/MAE 0.989
+  SHORT  n   641  acc15  49.92%  ret15  -0.640  MFE/MAE 1.060
+  ABSTENTION  scored 1235  active 1201 (coverage 97.25%)  neutral 34
+  accuracy when active  53.12%
+  BRIER  model 0.24932   A 0.24926   B 0.24785   C 0.46878   best(B) 0.24785
+  BRIER IMPROVEMENT vs best baseline -0.00147  (gate >= 0.005)
+  LOG LOSS model 0.69179   best baseline 0.68883
+  CALIBRATION (predicted vs observed, frozen bins):
+      [0.50,0.55) n   443  predicted 0.527  observed 0.544  err +1.69 pp
+      [0.55,0.60) n   397  predicted 0.557  observed 0.516  err -4.01 pp
+  YEAR DESTRUCTION:
+      2019 n    90  sep  +2.65 pp  acc  54.44%  ret15  +3.758  MFE/MAE 1.562  ff  51.9%
+      2020 n   165  sep  -1.84 pp  acc  50.30%  ret15  -6.409  MFE/MAE 0.876  ff  50.3%
+      2021 n   205  sep  +0.94 pp  acc  51.71%  ret15  -2.876  MFE/MAE 0.908  ff  54.6%
+      2022 n   205  sep  +3.73 pp  acc  55.12%  ret15  -2.115  MFE/MAE 0.936  ff  46.3%
+      2023 n   211  sep  +2.05 pp  acc  53.08%  ret15  +1.583  MFE/MAE 1.174  ff  54.3%
+      2024 n   209  sep  +0.08 pp  acc  50.72%  ret15  +1.140  MFE/MAE 1.061  ff  51.1%
+      2025 n   197  sep  +5.08 pp  acc  56.85%  ret15  +5.846  MFE/MAE 1.045  ff  53.4%
+      2026 n   121  sep  +0.66 pp  acc  51.24%  ret15  -3.254  MFE/MAE 0.829  ff  41.7%
+      -> 7 of 8 qualifying years positive (need >=70%)   best-year(2025)-removed sep  +1.18 pp
+  ERA DESTRUCTION:
+      COVID/extreme 2020   n   165  sep  -1.84 pp
+      2021                 n   205  sep  +0.94 pp
+      2022 bear/rates      n   205  sep  +3.73 pp
+      2023-24              n   420  sep  +1.07 pp
+      2025-26              n   318  sep  +3.40 pp
+  TIME-OF-DAY DESTRUCTION:
+      OPEN       n  1256  sep  +1.65 pp  acc  53.03%
+      MIDMORN    n   147  sep  +2.32 pp  acc  52.38%
+  RVMR RANGE DIAGNOSTIC (never a filter):
+      LOW     n    86  sep  -2.74 pp
+      MEDIUM  n   519  sep  +2.53 pp
+      HIGH    n   798  sep  +1.68 pp
+  TAIL DESTRUCTION:
+      largest winner  +510.25  largest loser  -336.50
+      top-1% share -5.891  top-5% share -17.907  mean  -0.294  ex-top1%  -2.044  ex-top5%  -5.844
+      separation after top-1% |move| removal  +1.95 pp   top-5%  +2.55 pp
+
+==============================================================================
+DIR-H4  OVERNIGHT INVENTORY RESOLUTION (fail-back arm)
+==============================================================================
+  events 1067 (matched 1064)  days 1064  years 8  LONG 492  SHORT 572  ties15 3
+  15m accuracy  51.79%   matched control  49.69%   SEPARATION  +2.09 pp
+      day-clustered 95% CI [ -0.95,  +5.09]  p 0.1824
+  30m accuracy  49.72%
+  signed ret15 mean   +1.504  median   +1.500   ret30 mean   +0.907
+  favourable-first  FAV 495  ADV 511  AMBIGUOUS 47  NEITHER 11   fav% of decided 49.20%
+      FAV-rate vs matched control  +0.42 pp  CI [ -2.56,  +3.41]
+  MFE/MAE (ATR units)  signal 1.665/1.591 = 1.047   control 1.545/1.613 = 0.957
+  LONG   n   492  acc15  54.27%  ret15  +1.135  MFE/MAE 1.003
+  SHORT  n   572  acc15  49.65%  ret15  +1.822  MFE/MAE 1.105
+  ABSTENTION  scored 935  active 860 (coverage 91.98%)  neutral 75
+  accuracy when active  50.58%
+  BRIER  model 0.25229   A 0.25011   B 0.24997   C 0.50814   best(B) 0.24997
+  BRIER IMPROVEMENT vs best baseline -0.00232  (gate >= 0.005)
+  LOG LOSS model 0.69782   best baseline 0.69309
+  CALIBRATION (predicted vs observed, frozen bins):
+      [0.50,0.55) n   288  predicted 0.527  observed 0.493  err -3.40 pp
+      [0.55,0.60) n   162  predicted 0.563  observed 0.475  err -8.78 pp
+      [0.60,0.65) n    43  predicted 0.625  observed 0.488  err -13.63 pp
+  YEAR DESTRUCTION:
+      2019 n    65  sep  -3.90 pp  acc  46.15%  ret15  -0.504  MFE/MAE 0.901  ff  50.9%
+      2020 n   134  sep +11.01 pp  acc  60.45%  ret15  +7.028  MFE/MAE 1.203  ff  41.2%
+      2021 n   156  sep  -1.77 pp  acc  47.44%  ret15  +0.120  MFE/MAE 0.956  ff  46.3%
+      2022 n   157  sep  +2.15 pp  acc  52.23%  ret15  +1.118  MFE/MAE 1.127  ff  51.7%
+      2023 n   159  sep  +1.76 pp  acc  50.94%  ret15  +2.544  MFE/MAE 1.093  ff  52.0%
+      2024 n   153  sep  +0.92 pp  acc  50.98%  ret15  -2.699  MFE/MAE 0.941  ff  49.0%
+      2025 n   147  sep  +2.21 pp  acc  52.38%  ret15  -1.810  MFE/MAE 1.024  ff  53.6%
+      2026 n    93  sep  +2.12 pp  acc  51.61%  ret15  +8.298  MFE/MAE 1.125  ff  49.4%
+      -> 6 of 8 qualifying years positive (need >=70%)   best-year(2020)-removed sep  +0.81 pp
+  ERA DESTRUCTION:
+      COVID/extreme 2020   n   134  sep +11.01 pp
+      2021                 n   156  sep  -1.77 pp
+      2022 bear/rates      n   157  sep  +2.15 pp
+      2023-24              n   312  sep  +1.35 pp
+      2025-26              n   240  sep  +2.17 pp
+  TIME-OF-DAY DESTRUCTION:
+      OPEN       n   886  sep  +3.37 pp  acc  53.05%
+      MIDMORN    n   178  sep  -4.27 pp  acc  45.51%
+  RVMR RANGE DIAGNOSTIC (never a filter):
+      LOW     n    32  sep  -6.77 pp
+      MEDIUM  n   285  sep  -0.54 pp
+      HIGH    n   747  sep  +3.47 pp
+  TAIL DESTRUCTION:
+      largest winner  +284.00  largest loser  -469.50
+      top-1% share  1.172  top-5% share  3.850  mean  +1.504  ex-top1%  -0.262  ex-top5%  -4.512
+      separation after top-1% |move| removal  +2.01 pp   top-5%  +1.96 pp
+
+==============================================================================
+DIR-H5  ORDER-FLOW INCREMENT AFTER PRICE SIGNAL
+==============================================================================
+  archive audit: scanned 1611115 genuine 1m archive rows; 1611115 had an EMPTY delta field; 0 carried populated delta
+  DIAGNOSIS: no genuine delta-populated 1m bars exist in this
+  container. Every available row is NO_LEVELS with an empty
+  delta field, so the order-flow increment CANNOT be tested.
+  NOTHING IS FABRICATED. -> DIR-H5 = INSUFFICIENT DATA
+  M REMAINS 5; the frozen sample threshold is NOT loosened.
+
+==============================================================================
+MULTIPLE TESTING - BH and Holm at the FROZEN M = 5
+==============================================================================
+  family          n     sep pp          p       BH q       Holm
+  DIR-H1      19381      +0.39     0.2392     0.5981     0.9787
+  DIR-H2      22530      +0.15     0.6199     0.7749     1.0000
+  DIR-H3       1739      +0.59     0.6171     0.7749     1.0000
+  DIR-H4       1403      +1.72     0.1957     0.5981     0.9787
+  DIR-H5          -          -          -     1.0000     1.0000
+
+  M frozen at 5 before results; NOT shrunk for INSUFFICIENT or failing members.
+
+==============================================================================
+PROMOTION GATE - fourteen frozen conditions
+==============================================================================
+  condition                     DIR-H1                DIR-H2                DIR-H3                DIR-H4                DIR-H5                
+  1  sufficient N               PASS n19381 d1829 L10 PASS n22530 d1829 L11 PASS n1739 d1739 L916 PASS n1403 d1403 L762 N/A                   
+  2  separation >= 3.0pp, CI>0  FAIL +0.39 pp CI[-0.2 FAIL +0.15 pp CI[-0.4 FAIL +0.59 pp CI[-1.7 FAIL +1.72 pp CI[-0.8 N/A                   
+  3  Brier gain >= 0.005        FAIL -0.00009         FAIL -0.00007         FAIL -0.00040         FAIL -0.00147         N/A                   
+  4  calibration                PASS all bins within  PASS all bins within  PASS all bins within  PASS all bins within  N/A                   
+  5  favourable-first improves  PASS +0.07 pp         FAIL -0.02 pp         FAIL -0.97 pp         PASS +0.46 pp         N/A                   
+  6  MFE/MAE > control          PASS 0.976 vs 0.957   FAIL 0.958 vs 0.970   PASS 0.989 vs 0.973   PASS 1.012 vs 0.992   N/A                   
+  7  long/short transparency    PASS both reported    PASS both reported    PASS both reported    PASS both reported    N/A                   
+  8  year stability             PASS 6/8 pos, ex-best FAIL 5/8 pos, ex-best FAIL 4/8 pos, ex-best PASS 7/8 pos, ex-best N/A                   
+  9  era robustness (>=3 of 5)  PASS 4 of 5           PASS 3 of 5           FAIL 2 of 5           PASS 4 of 5           N/A                   
+  10 tail robustness            PASS top1 +0.37 top5  PASS top1 +0.20 top5  PASS top1 +0.69 top5  PASS top1 +1.95 top5  N/A                   
+  11 BH q < 0.05                FAIL q 0.5981         FAIL q 0.7749         FAIL q 0.7749         FAIL q 0.5981         N/A                   
+  12 no leakage                 PASS windows exclude  PASS windows exclude  PASS windows exclude  PASS windows exclude  N/A                   
+  13 no data artifact           PASS contiguity enfor PASS contiguity enfor PASS contiguity enfor PASS contiguity enfor N/A                   
+  14 no control artifact        PASS symmetric cell d PASS symmetric cell d PASS symmetric cell d PASS symmetric cell d N/A                   
+
+  ALL FOURTEEN: DIR-H1 FAIL  DIR-H2 FAIL  DIR-H3 FAIL  DIR-H4 FAIL  DIR-H5 N/A
+
+==============================================================================
+NQ-DIRECTION-V1 FAILED TO IDENTIFY A ROBUST INCREMENTAL
+DIRECTIONAL MECHANISM.
+==============================================================================
+OFH13_PROSPECTIVE_V1 UNTOUCHED. NO ORDERS. NO COMBINATION WITH RVMR.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
