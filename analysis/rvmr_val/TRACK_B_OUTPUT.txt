@@ -1,0 +1,167 @@
+==============================================================================
+RVMR-VALIDATION-V1   TRACK B - RVMR-INCR-V1
+  DOES RVMR ADD INFORMATION BEYOND ATR AND TIME OF DAY?
+  PRIMARY ATR  = ATR20 (SMA of true range, 20 bars ending at j)
+  ATR STATE    = trailing_ratio(ATR20), W=1440, current bar
+                 excluded from the normaliser - the IDENTICAL
+                 construction RVMR itself uses
+  STRATA       = quintiles, cutpoints from the FIRST FULL YEAR
+  NO ATR-period sweep. NO ML. NO interactions or splines.
+  HISTORICAL RESEARCH - never relabelled prospective.
+==============================================================================
+NQ bars 2503622   2019-07-04 18:25:00 .. 2026-08-17 15:16:00
+eligible universe 593190 bars, 1829 days
+
+ATR-ratio quintile cutpoints (from 2019, n=40354, applied unchanged):
+  0.9588  1.2187  1.5612  2.0508
+
+==============================================================================
+REFERENCE - UNCONDITIONAL HIGH-LOW (the number to beat)
+==============================================================================
+  RANGE-REGIME-V1    HIGH n 107003 vs LOW+MED n 486187   delta +14.099  CI [+13.073,+15.219]
+  VOLUME-REGIME-V1   HIGH n 230267 vs LOW+MED n 362923   delta +13.135  CI [+12.370,+13.987]
+
+==============================================================================
+B1 - ATR QUINTILE x RVMR STATE SURFACE (median |ret|@30m)
+==============================================================================
+RANGE-REGIME-V1
+  ATR q                 LOW           MEDIUM             HIGH    monotone
+  q0          52819   10.50     5210   12.00      542   28.75   Y
+  q1          74228   15.25    26450   16.00     2802   23.00   Y
+  q2          74359   18.50    69861   19.25    10323   24.25   Y
+  q3          32580   21.50    83780   23.75    25257   25.50   Y
+  q4           6104   25.50    60796   29.00    68079   32.25   Y
+  monotone in 5 of 5 populated ATR quintiles
+
+VOLUME-REGIME-V1
+  ATR q                 LOW           MEDIUM             HIGH    monotone
+  q0          43162   10.00    12929   12.75     2480   15.75   Y
+  q1          51697   14.50    40599   16.50    11184   18.50   Y
+  q2          42804   17.50    76689   19.25    35050   21.25   Y
+  q3          13120   19.50    61104   22.75    67393   25.25   Y
+  q4           1787   26.00    19032   26.00   114160   31.25   n
+  monotone in 4 of 5 populated ATR quintiles
+
+==============================================================================
+B2 - ATR QUINTILE x TIME-OF-DAY x RVMR  (median |ret|@30m)
+  similar ATR + similar time of day + different RVMR
+==============================================================================
+RANGE-REGIME-V1
+  q0   Y   --  n   n  
+  q1   Y   n   n   n  
+  q2   Y   Y   Y   Y  
+  q3   Y   n   Y   Y  
+  q4   Y   Y   Y   Y  
+  ToD columns: OPEN / MIDMORN / MIDDAY / AFTERNOON
+  monotone in 13 of 19 populated (ATR x ToD) cells
+
+VOLUME-REGIME-V1
+  q0   Y   Y   Y   n  
+  q1   Y   Y   n   n  
+  q2   Y   Y   Y   n  
+  q3   Y   Y   Y   Y  
+  q4   n   n   Y   Y  
+  ToD columns: OPEN / MIDMORN / MIDDAY / AFTERNOON
+  monotone in 14 of 20 populated (ATR x ToD) cells
+
+==============================================================================
+B4 - MATCHED INCREMENTAL TEST
+  cells = (ATR quintile x ToD bucket x year), dropped SYMMETRICALLY
+==============================================================================
+  RANGE-REGIME-V1    matched n 106948   HIGH-control +4.6052
+      day-clustered 95% CI [+3.4566, +5.8210]   p 0.0000
+      unconditional delta +14.0993  ->  RETENTION 32.7%
+
+  VOLUME-REGIME-V1   matched n 230178   HIGH-control +3.4503
+      day-clustered 95% CI [+2.5077, +4.4125]   p 0.0000
+      unconditional delta +13.1354  ->  RETENTION 26.3%
+
+==============================================================================
+B3 - CONTINUOUS MODEL (frozen form, no mining)
+==============================================================================
+  PRIMARY - standardized rank OLS, ToD fixed effects
+  rank(|ret|@30) ~ ATR + RANGE + VOLUME + ToD
+  bootstrapping day-clustered CIs (20,000 day resamples) ...
+    beta_ATR     +0.1817   day-clustered 95% CI [+0.1634, +0.1995]   CI excludes 0
+    beta_RANGE   +0.0052   day-clustered 95% CI [-0.0094, +0.0197]   CI INCLUDES 0
+    beta_VOLUME  +0.0844   day-clustered 95% CI [+0.0620, +0.1072]   CI excludes 0
+
+  RANGE after ATR only:
+    beta_ATR +0.2100   beta_RANGE +0.0680
+  VOLUME after ATR only:
+    beta_ATR +0.1895   beta_VOLUME +0.0987
+  ATR alone:
+    beta_ATR +0.2575
+  RANGE alone / VOLUME alone:
+    beta_RANGE +0.2148   beta_VOLUME +0.2293
+
+  SECONDARY - raw units
+    beta_ATR +9.0927  beta_RANGE +1.7706  beta_VOLUME +0.5383  (pts)
+
+==============================================================================
+YEAR STABILITY OF THE INCREMENTAL EFFECT
+  consistent sign matters more than per-year significance
+==============================================================================
+RANGE-REGIME-V1
+    2019  matched n   6805   HIGH-control +1.9477   POS
+    2020  matched n  11433   HIGH-control +2.3468   POS
+    2021  matched n  16275   HIGH-control +3.1109   POS
+    2022  matched n  15301   HIGH-control +6.0126   POS
+    2023  matched n  17558   HIGH-control +3.5521   POS
+    2024  matched n  16499   HIGH-control +3.7900   POS
+    2025  matched n  14847   HIGH-control +6.2981   POS
+    2026  matched n   8230   HIGH-control +11.1055   POS
+    -> 8 of 8 years positive
+
+VOLUME-REGIME-V1
+    2019  matched n  13919   HIGH-control +1.5569   POS
+    2020  matched n  27350   HIGH-control +0.6218   POS
+    2021  matched n  32898   HIGH-control +4.7061   POS
+    2022  matched n  33389   HIGH-control +3.5195   POS
+    2023  matched n  34454   HIGH-control +2.5286   POS
+    2024  matched n  34817   HIGH-control +3.5275   POS
+    2025  matched n  33588   HIGH-control +5.7046   POS
+    2026  matched n  19763   HIGH-control +4.1304   POS
+    -> 8 of 8 years positive
+
+==============================================================================
+TAIL DESTRUCTION (robustness only)
+==============================================================================
+  drop top 1%  RANGE-REGIME-V1    matched n 104450  HIGH-control +3.1323
+  drop top 1%  VOLUME-REGIME-V1   matched n 226175  HIGH-control +2.8784
+  drop top 5%  RANGE-REGIME-V1    matched n  96430  HIGH-control +1.8213
+  drop top 5%  VOLUME-REGIME-V1   matched n 211288  HIGH-control +1.6780
+
+==============================================================================
+SLOW REGIME vs LOCAL STATE (certified TEST 15 lag methodology)
+==============================================================================
+  RANGE-REGIME-V1    live label +4.6052   3-day-lagged label +1.9252   slow share 42%
+  VOLUME-REGIME-V1   live label +3.4503   3-day-lagged label +2.4754   slow share 72%
+  (a large lagged effect = multi-day volatility clustering;
+   a small one = the information is LOCAL to the current state)
+
+==============================================================================
+TRACK B - DECLARED VERDICT RULES
+==============================================================================
+
+  RANGE-REGIME-V1
+    matched delta            +4.6052
+    CI excludes 0            YES
+    retention                32.7%
+    monotone ATR quintiles   5 of 5
+    ---> MODEST INCREMENTAL VALUE BEYOND ATR
+
+  VOLUME-REGIME-V1
+    matched delta            +3.4503
+    CI excludes 0            YES
+    retention                26.3%
+    monotone ATR quintiles   4 of 5
+    ---> MODEST INCREMENTAL VALUE BEYOND ATR
+
+==============================================================================
+TRACK B VERDICTS
+  RANGE-REGIME-V1      MODEST INCREMENTAL VALUE BEYOND ATR
+  VOLUME-REGIME-V1     MODEST INCREMENTAL VALUE BEYOND ATR
+==============================================================================
+HISTORICAL RESEARCH ONLY. NOTHING FROZEN WAS MODIFIED.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.

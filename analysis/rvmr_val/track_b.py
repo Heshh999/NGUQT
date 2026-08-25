@@ -59,24 +59,81 @@ def ols(y, X, names):
     return {names[i]: M[i][k] / M[i][i] for i in range(k)}
 
 
-def day_boot_ols(days, y, X, names, iters=2000, seed=L.SEED):
-    """Day-clustered block bootstrap of every coefficient."""
+def solve(A, bvec):
+    k = len(bvec)
+    M = [A[r][:] + [bvec[r]] for r in range(k)]
+    for c in range(k):
+        piv = max(range(c, k), key=lambda r: abs(M[r][c]))
+        M[c], M[piv] = M[piv], M[c]
+        if abs(M[c][c]) < 1e-12:
+            return None
+        for r in range(k):
+            if r == c:
+                continue
+            f = M[r][c] / M[c][c]
+            for cc in range(c, k + 1):
+                M[r][cc] -= f * M[c][cc]
+    return [M[i][k] / M[i][i] for i in range(k)]
+
+
+def day_boot_ols(days, y, X, names, iters=20000, seed=L.SEED):
+    """Day-clustered block bootstrap of every coefficient.
+
+    IMPLEMENTATION NOTE - identical estimator, tractable computation.
+    The OLS normal equations are ADDITIVE over observations:
+        X'X = sum_i x_i x_i'      X'y = sum_i x_i y_i
+    so a bootstrap that resamples WHOLE DAYS can accumulate precomputed
+    per-day blocks instead of rebuilding a 593k-row design matrix on
+    every iteration:
+        X'X(sample) = sum over sampled days of (X'X)_day
+    Same day-clustered block bootstrap, same resampling unit, same
+    coefficients - only the arithmetic is restructured. Cost per
+    iteration drops from O(rows * k^2) to O(days * k^2), which is what
+    makes the pre-registered 20,000 iterations feasible at all.
+    """
+    k = len(X)
     byday = collections.defaultdict(list)
     for i, d in enumerate(days):
         byday[d].append(i)
     ds = sorted(byday)
+    # per-day sufficient statistics
+    blocks = []
+    for d in ds:
+        idx = byday[d]
+        A = [[0.0] * k for _ in range(k)]
+        b = [0.0] * k
+        for i in idx:
+            xi = [X[a][i] for a in range(k)]
+            yi = y[i]
+            for a in range(k):
+                xa = xi[a]
+                if xa == 0.0:
+                    continue
+                Aa = A[a]
+                for c in range(a, k):
+                    Aa[c] += xa * xi[c]
+                b[a] += xa * yi
+        for a in range(k):
+            for c in range(a):
+                A[a][c] = A[c][a]
+        blocks.append((A, b))
     rnd = random.Random(seed)
     acc = collections.defaultdict(list)
+    nd = len(ds)
     for _ in range(iters):
-        idx = []
-        for _ in ds:
-            idx.extend(byday[ds[rnd.randrange(len(ds))]])
-        yy = [y[i] for i in idx]
-        XX = [[x[i] for i in idx] for x in X]
-        b = ols(yy, XX, names)
-        if b:
-            for k2, v in b.items():
-                acc[k2].append(v)
+        A = [[0.0] * k for _ in range(k)]
+        bb = [0.0] * k
+        for _ in range(nd):
+            Ad, bd = blocks[rnd.randrange(nd)]
+            for a in range(k):
+                Aa, Ada = A[a], Ad[a]
+                for c in range(k):
+                    Aa[c] += Ada[c]
+                bb[a] += bd[a]
+        sol = solve(A, bb)
+        if sol:
+            for i2, nm2 in enumerate(names):
+                acc[nm2].append(sol[i2])
     out = {}
     for k2, v in acc.items():
         v.sort()
@@ -247,8 +304,8 @@ def run():
     b = ols(zy, Xc, names)
     print('  PRIMARY - standardized rank OLS, ToD fixed effects')
     print('  rank(|ret|@30) ~ ATR + RANGE + VOLUME + ToD')
-    print('  bootstrapping day-clustered CIs (2,000 day resamples) ...')
-    ci = day_boot_ols(U['day'], zy, Xc, names, iters=2000)
+    print('  bootstrapping day-clustered CIs (20,000 day resamples) ...')
+    ci = day_boot_ols(U["day"], zy, Xc, names, iters=20000)
     for k in ('ATR', 'RANGE', 'VOLUME'):
         lo, hi = ci.get(k, (float('nan'), float('nan')))
         sig = 'CI excludes 0' if (lo > 0 or hi < 0) else 'CI INCLUDES 0'
