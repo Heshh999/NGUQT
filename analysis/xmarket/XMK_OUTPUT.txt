@@ -1,0 +1,563 @@
+==============================================================================
+XMARKET-V1 EXECUTION - frozen pre-registration, M = 8
+  spec  docs/XMARKET_V1_PREREGISTRATION.md
+  commit 36aaa28378dbaa359e011579ae3dc96f5e2418e7
+  sha256 314262cbfe3782f07ac81c795f01dc553382fa5d11ef1f6cf14cfd3bebb8c786
+  frame  1.5 ATR_NQ stop, no target, 60m time exit, 0.87 pt cost
+  THIS MODULE SUBMITS NO ORDERS. NO LIVE TRADING IS AUTHORIZED.
+==============================================================================
+NQ bars 2503622   ES bars 2542424
+matched on NQ spine 2502267   usable decision bars 529629
+DIVERGENCE terciles calibrated on 2019-07-04 .. 2020-07-04 ONLY  (n 303178): LOW < 0.2142 <= MID <= 0.5154 < HIGH
+
+==============================================================================
+XMK-H1  NQ BREAKOUT + ES CONFIRMATION
+==============================================================================
+  RAW GEOMETRY FIRST
+  NQ_ALONE               n  11065  mean  -0.909  med -12.120  MFE  24.75 MAE  25.00  MFE/MAE 0.990  win% 23.4  stop% 75.1
+      fwd  5m -0.849  10m -0.571  15m -0.343  30m -0.094  60m +0.709  |move60|  44.70
+  CONFIRMING             n  10137  mean  -1.028  med -12.364  MFE  24.75 MAE  25.25  MFE/MAE 0.980  win% 23.3  stop% 75.2
+      fwd  5m -0.901  10m -0.686  15m -0.490  30m -0.274  60m +0.553  |move60|  45.08
+  NEUTRAL                n    772  mean  +1.038  med -10.179  MFE  24.50 MAE  20.50  MFE/MAE 1.195  win% 26.7  stop% 71.9
+      fwd  5m -0.029  10m +0.945  15m +1.341  30m +1.208  60m +1.929  |move60|  38.75
+  OPPOSING               n    156  mean  -2.825  med  -9.814  MFE  29.88 MAE  25.12  MFE/MAE 1.189  win% 16.0  stop% 83.3
+      fwd  5m -1.513  10m -0.566  15m +0.931  30m +5.120  60m +4.862  |move60|  49.26
+  favourable-first CONFIRMING
+      0.25/0.25  FAV  3814  ADV  4326  AMBIGUOUS  1997  NEITHER     0   fav% of decided  46.9
+      0.5/0.5    FAV  4571  ADV  5100  AMBIGUOUS   466  NEITHER     0   fav% of decided  47.3
+      1/1        FAV  4915  ADV  5135  AMBIGUOUS    83  NEITHER     4   fav% of decided  48.9
+      1.5/1      FAV  4115  ADV  5958  AMBIGUOUS    43  NEITHER    21   fav% of decided  40.9
+      2/1        FAV  3544  ADV  6505  AMBIGUOUS    26  NEITHER    62   fav% of decided  35.3
+  favourable-first NQ_ALONE
+      0.25/0.25  FAV  4184  ADV  4672  AMBIGUOUS  2209  NEITHER     0   fav% of decided  47.2
+      0.5/0.5    FAV  5018  ADV  5514  AMBIGUOUS   533  NEITHER     0   fav% of decided  47.6
+      1/1        FAV  5384  ADV  5575  AMBIGUOUS   102  NEITHER     4   fav% of decided  49.1
+      1.5/1      FAV  4505  ADV  6488  AMBIGUOUS    51  NEITHER    21   fav% of decided  41.0
+      2/1        FAV  3873  ADV  7093  AMBIGUOUS    30  NEITHER    69   fav% of decided  35.3
+
+  PRIMARY COMPARISON: NQ breakout + ES CONFIRMING  vs  NQ breakout alone
+    raw delta         -0.119 pts/trade   95% CI [-0.320, +0.074]   p 0.2306
+    MATCHED-CONTROL   +0.021 pts/trade   (n matched 10137)  sig -1.028  ctrl -1.049
+    signal alone: mean -1.028  day-clustered CI [-1.823, -0.249]  sign-flip p 0.0110
+  H1 CONFIRMING LONG     n   5429  mean  -0.564  med -11.539  MFE  27.75 MAE  26.50  MFE/MAE 1.047  win% 25.5  stop% 72.8
+      fwd  5m -0.360  10m -0.280  15m -0.196  30m +0.258  60m +1.384  |move60|  41.78
+  H1 CONFIRMING SHORT    n   4708  mean  -1.563  med -13.545  MFE  20.38 MAE  23.75  MFE/MAE 0.858  win% 20.7  stop% 78.0
+      fwd  5m -1.525  10m -1.155  15m -0.830  30m -0.887  60m -0.406  |move60|  48.89
+  by year:
+      2019 n   673  mean  -1.472  med -4.808  MFE/MAE 1.000  ff 48.2%  NEG
+      2020 n  1457  mean  -2.468  med-10.264  MFE/MAE 0.931  ff 43.9%  NEG
+      2021 n  1380  mean  -0.289  med -9.936  MFE/MAE 0.964  ff 47.9%  NEG
+      2022 n  1524  mean  -0.654  med-16.770  MFE/MAE 1.000  ff 48.0%  NEG
+      2023 n  1404  mean  +0.333  med-11.492  MFE/MAE 1.088  ff 48.8%  POS
+      2024 n  1395  mean  -0.162  med-13.714  MFE/MAE 0.896  ff 45.5%  NEG
+      2025 n  1397  mean  -2.491  med-16.133  MFE/MAE 0.907  ff 47.0%  NEG
+      2026 n   907  mean  -1.327  med-20.595  MFE/MAE 0.989  ff 46.0%  NEG
+  volatility era:
+      COVID 2020     n  1457  mean  -2.468  med-10.264  MFE/MAE 0.931
+      2021 melt-up   n  1380  mean  -0.289  med -9.936  MFE/MAE 0.964
+      2022 bear      n  1524  mean  -0.654  med-16.770  MFE/MAE 1.000
+      2023-24        n  2799  mean  +0.086  med-12.551  MFE/MAE 1.000
+      2025-26        n  2304  mean  -2.033  med-17.698  MFE/MAE 0.931
+  time of day (broad windows only):
+      09:30-11:00  n  3178  mean  -0.602  med-15.195  MFE/MAE 1.030
+      11:00-13:30  n  4329  mean  -0.523  med-11.970  MFE/MAE 0.978
+      13:30-15:00  n  2630  mean  -2.376  med-10.967  MFE/MAE 0.933
+  RVMR diagnostic (predeclared: reported AFTER the primary, never a promoter):
+      RANGE-LOW     n  3672  mean  -0.436  med-10.583  MFE/MAE 1.024
+      RANGE-MEDIUM  n  4111  mean  -1.246  med-13.282  MFE/MAE 0.954
+      RANGE-HIGH    n  2347  mean  -1.577  med-14.707  MFE/MAE 0.967
+  tails: max  +541.88  min  -226.49  top1%share -2.108  mean  -1.028  ex-top1%  -3.228  ex-top5%  -7.983
+
+==============================================================================
+XMK-H2  NQ BREAKOUT + ES REFUSAL + NQ FAILED ACCEPTANCE
+==============================================================================
+  NQ_FAILED_ALONE        n   5005  mean  -0.797  med -12.420  MFE  23.50 MAE  25.75  MFE/MAE 0.913  win% 23.3  stop% 75.2
+      fwd  5m +0.478  10m -0.290  15m -0.476  30m -0.531  60m -0.719  |move60|  45.00
+  FAIL_ES_REFUSED        n    514  mean  -3.883  med -11.764  MFE  19.62 MAE  26.12  MFE/MAE 0.751  win% 18.5  stop% 80.2
+      fwd  5m -0.788  10m -2.350  15m -2.240  30m -2.264  60m -2.966  |move60|  41.25
+  FAIL_ES_CONFIRMED      n   4491  mean  -0.444  med -12.533  MFE  24.00 MAE  25.75  MFE/MAE 0.932  win% 23.8  stop% 74.7
+      fwd  5m +0.623  10m -0.055  15m -0.274  30m -0.332  60m -0.461  |move60|  45.42
+  FAIL_ES_NEUTRAL        n    432  mean  -3.164  med -11.689  MFE  18.12 MAE  26.00  MFE/MAE 0.697  win% 19.7  stop% 78.7
+      fwd  5m -0.768  10m -2.545  15m -2.391  30m -2.005  60m -3.424  |move60|  38.19
+  FAIL_ES_OPPOSING       n     82  mean  -7.669  med -12.636  MFE  29.75 MAE  27.88  MFE/MAE 1.067  win% 12.2  stop% 87.8
+      fwd  5m -0.896  10m -1.320  15m -1.445  30m -3.631  60m -0.558  |move60|  57.36
+  favourable-first FAIL_ES_REFUSED
+      0.25/0.25  FAV   190  ADV   228  AMBIGUOUS    96  NEITHER     0   fav% of decided  45.5
+      0.5/0.5    FAV   223  ADV   260  AMBIGUOUS    31  NEITHER     0   fav% of decided  46.2
+      1/1        FAV   233  ADV   279  AMBIGUOUS     2  NEITHER     0   fav% of decided  45.5
+      1.5/1      FAV   196  ADV   317  AMBIGUOUS     1  NEITHER     0   fav% of decided  38.2
+      2/1        FAV   175  ADV   334  AMBIGUOUS     0  NEITHER     5   fav% of decided  34.4
+
+  PRIMARY COMPARISON: NQ failed breakout + ES refusal  vs  NQ failed breakout alone
+    raw delta         -3.086 pts/trade   95% CI [-6.279, +0.492]   p 0.0916
+    MATCHED-CONTROL   -2.293 pts/trade   (n matched 514)  sig -3.883  ctrl -1.589
+    signal alone: mean -3.883  day-clustered CI [-7.097, -0.189]  sign-flip p 0.0245
+  H2 REFUSED LONG        n    217  mean  -5.998  med -12.964  MFE  25.50 MAE  31.50  MFE/MAE 0.810  win% 19.8  stop% 77.9
+      fwd  5m -0.611  10m -1.287  15m -3.641  30m -3.450  60m -5.974  |move60|  41.66
+  H2 REFUSED SHORT       n    297  mean  -2.337  med -11.051  MFE  13.25 MAE  22.00  MFE/MAE 0.602  win% 17.5  stop% 81.8
+      fwd  5m -0.918  10m -3.126  15m -1.217  30m -1.397  60m -0.769  |move60|  40.94
+  by year:
+      2019 n    30  mean  -3.461  med -4.704  MFE/MAE 0.857  ff 44.4%  NEG
+      2020 n    83  mean  -5.789  med -9.701  MFE/MAE 0.567  ff 36.5%  NEG
+      2021 n   111  mean  +0.460  med -8.914  MFE/MAE 1.569  ff 52.2%  POS
+      2022 n    57  mean  -3.612  med-17.464  MFE/MAE 1.349  ff 52.4%  NEG
+      2023 n    67  mean  -8.934  med-12.307  MFE/MAE 0.583  ff 41.8%  NEG
+      2024 n    76  mean  -8.003  med-15.054  MFE/MAE 0.414  ff 44.8%  NEG
+      2025 n    47  mean  -8.350  med-17.520  MFE/MAE 0.936  ff 42.9%  NEG
+      2026 n    43  mean  +7.970  med-20.276  MFE/MAE 1.093  ff 48.6%  POS
+  volatility era:
+      COVID 2020     n    83  mean  -5.789  med -9.701  MFE/MAE 0.567
+      2021 melt-up   n   111  mean  +0.460  med -8.914  MFE/MAE 1.569
+      2022 bear      n    57  mean  -3.612  med-17.464  MFE/MAE 1.349
+      2023-24        n   143  mean  -8.439  med-13.920  MFE/MAE 0.507
+      2025-26        n    90  mean  -0.553  med-18.776  MFE/MAE 0.961
+  time of day (broad windows only):
+      09:30-11:00  n   222  mean  -2.706  med-14.632  MFE/MAE 0.731
+      11:00-13:30  n   201  mean  -4.206  med-10.395  MFE/MAE 0.837
+      13:30-15:00  n    91  mean  -6.038  med -9.851  MFE/MAE 0.735
+  RVMR diagnostic (predeclared: reported AFTER the primary, never a promoter):
+      RANGE-LOW     n   137  mean  -0.911  med -7.826  MFE/MAE 0.857
+      RANGE-MEDIUM  n   200  mean  -2.029  med-11.886  MFE/MAE 0.760
+      RANGE-HIGH    n   177  mean  -8.278  med-15.439  MFE/MAE 0.675
+  tails: max  +543.88  min   -56.26  top1%share -0.692  mean  -3.883  ex-top1%  -6.635  ex-top5% -10.590
+
+==============================================================================
+XMK-H3  NQ LEADS -> ES CATCH-UP
+==============================================================================
+  PARENT_NO_ES_COND      n   6675  mean  -0.575  med -10.432  MFE  20.25 MAE  21.25  MFE/MAE 0.953  win% 23.3  stop% 75.1
+      fwd  5m -0.025  10m -0.089  15m -0.059  30m +0.348  60m +0.220  |move60|  37.23
+  CATCHUP                n   3673  mean  -0.611  med -10.508  MFE  20.00 MAE  22.00  MFE/MAE 0.909  win% 23.1  stop% 75.4
+      fwd  5m -0.066  10m -0.147  15m -0.080  30m +0.249  60m -0.311  |move60|  38.02
+  REFUSAL                n   3002  mean  -0.531  med -10.311  MFE  20.50 MAE  20.25  MFE/MAE 1.012  win% 23.5  stop% 74.6
+      fwd  5m +0.025  10m -0.017  15m -0.033  30m +0.469  60m +0.870  |move60|  36.25
+  favourable-first CATCHUP
+      0.25/0.25  FAV  1442  ADV  1529  AMBIGUOUS   702  NEITHER     0   fav% of decided  48.5
+      0.5/0.5    FAV  1740  ADV  1786  AMBIGUOUS   147  NEITHER     0   fav% of decided  49.3
+      1/1        FAV  1782  ADV  1864  AMBIGUOUS    20  NEITHER     7   fav% of decided  48.9
+      1.5/1      FAV  1476  ADV  2178  AMBIGUOUS     9  NEITHER    10   fav% of decided  40.4
+      2/1        FAV  1285  ADV  2353  AMBIGUOUS     5  NEITHER    30   fav% of decided  35.3
+
+  PRIMARY COMPARISON: NQ-LEADS + ES catch-up  vs  NQ-LEADS, no ES condition
+    raw delta         -0.036 pts/trade   95% CI [-0.818, +0.744]   p 0.9363
+    MATCHED-CONTROL   +0.032 pts/trade   (n matched 3673)  sig -0.611  ctrl -0.643
+    signal alone: mean -0.611  day-clustered CI [-1.815, +0.574]  sign-flip p 0.3214
+  H3 CATCHUP LONG        n   1896  mean  -1.568  med  -9.889  MFE  24.12 MAE  23.50  MFE/MAE 1.027  win% 25.0  stop% 73.9
+      fwd  5m +0.041  10m -0.056  15m +0.230  30m +0.808  60m +0.277  |move60|  35.64
+  H3 CATCHUP SHORT       n   1777  mean  +0.410  med -11.051  MFE  15.00 MAE  20.00  MFE/MAE 0.750  win% 21.2  stop% 77.0
+      fwd  5m -0.181  10m -0.244  15m -0.411  30m -0.348  60m -0.938  |move60|  40.57
+  by year:
+      2019 n   282  mean  -1.264  med -3.973  MFE/MAE 1.038  ff 51.5%  NEG
+      2020 n   641  mean  -0.089  med -8.258  MFE/MAE 1.090  ff 51.7%  NEG
+      2021 n   719  mean  +0.444  med -9.026  MFE/MAE 0.762  ff 47.0%  POS
+      2022 n   374  mean  -1.292  med-15.823  MFE/MAE 1.030  ff 47.6%  NEG
+      2023 n   520  mean  -0.285  med-10.779  MFE/MAE 0.934  ff 43.5%  NEG
+      2024 n   470  mean  -1.306  med-12.982  MFE/MAE 0.909  ff 48.2%  NEG
+      2025 n   374  mean  -3.914  med-13.714  MFE/MAE 0.892  ff 52.3%  NEG
+      2026 n   293  mean  +1.908  med-18.326  MFE/MAE 0.994  ff 48.5%  POS
+  volatility era:
+      COVID 2020     n   641  mean  -0.089  med -8.258  MFE/MAE 1.090
+      2021 melt-up   n   719  mean  +0.444  med -9.026  MFE/MAE 0.762
+      2022 bear      n   374  mean  -1.292  med-15.823  MFE/MAE 1.030
+      2023-24        n   990  mean  -0.770  med-11.792  MFE/MAE 0.942
+      2025-26        n   667  mean  -1.356  med-15.401  MFE/MAE 0.962
+  time of day (broad windows only):
+      09:30-11:00  n  1279  mean  +0.781  med-14.783  MFE/MAE 0.929
+      11:00-13:30  n  1575  mean  -1.749  med-10.001  MFE/MAE 0.908
+      13:30-15:00  n   819  mean  -0.596  med -8.501  MFE/MAE 0.892
+  RVMR diagnostic (predeclared: reported AFTER the primary, never a promoter):
+      RANGE-LOW     n  1478  mean  -1.191  med -8.407  MFE/MAE 0.859
+      RANGE-MEDIUM  n  1409  mean  -0.966  med-11.820  MFE/MAE 0.927
+      RANGE-HIGH    n   781  mean  +1.104  med-14.576  MFE/MAE 0.934
+  tails: max  +427.38  min   -82.15  top1%share -3.482  mean  -0.611  ex-top1%  -2.766  ex-top5%  -6.988
+  DECLARED SECONDARY WINDOWS (reported, never promoted):
+  catch-up window 1      n   2201  mean  -1.588  med -10.620  MFE  20.50 MAE  21.75  MFE/MAE 0.943  win% 21.9  stop% 77.1
+      fwd  5m -0.052  10m -0.300  15m +0.108  30m +0.524  60m -0.001  |move60|  37.53
+  catch-up window 5      n   4723  mean  -0.284  med -10.395  MFE  20.25 MAE  21.25  MFE/MAE 0.953  win% 24.0  stop% 74.7
+      fwd  5m -0.204  10m -0.022  15m +0.120  30m +0.550  60m -0.068  |move60|  38.31
+
+==============================================================================
+XMK-H4  NQ LEADS -> ES REFUSAL (split by NQ own state)
+==============================================================================
+  PARENT_ALL_REV         n   6675  mean  -0.772  med -10.357  MFE  20.00 MAE  20.25  MFE/MAE 0.988  win% 24.0  stop% 74.2
+      fwd  5m +0.025  10m +0.089  15m +0.059  30m -0.348  60m -0.220  |move60|  37.23
+  REFUSAL_ALL            n   3002  mean  -0.650  med -10.179  MFE  19.00 MAE  20.00  MFE/MAE 0.950  win% 24.5  stop% 73.9
+      fwd  5m -0.025  10m +0.017  15m +0.033  30m -0.469  60m -0.870  |move60|  36.25
+  A_EFFICIENT            n     12  mean  -5.068  med -10.048  MFE   4.50 MAE  27.50  MFE/MAE 0.164  win% 16.7  stop% 83.3
+      fwd  5m +0.708  10m -0.500  15m -9.396  30m-21.875  60m-24.333  |move60|  35.88
+  B_DETERIORATES         n     12  mean  +4.706  med  -9.757  MFE  10.25 MAE  32.00  MFE/MAE 0.320  win% 16.7  stop% 83.3
+      fwd  5m +0.604  10m +2.896  15m -3.271  30m -1.729  60m-18.646  |move60|  53.31
+  C_LOST_ACCEPTANCE      n   2978  mean  -0.654  med -10.179  MFE  19.25 MAE  19.75  MFE/MAE 0.975  win% 24.5  stop% 73.8
+      fwd  5m -0.030  10m +0.008  15m +0.084  30m -0.378  60m -0.703  |move60|  36.19
+  PRIMARY_B_OR_C         n   2990  mean  -0.633  med -10.179  MFE  19.25 MAE  19.75  MFE/MAE 0.975  win% 24.5  stop% 73.8
+      fwd  5m -0.028  10m +0.019  15m +0.071  30m -0.383  60m -0.775  |move60|  36.25
+  favourable-first PRIMARY_B_OR_C
+      0.25/0.25  FAV  1167  ADV  1278  AMBIGUOUS   545  NEITHER     0   fav% of decided  47.7
+      0.5/0.5    FAV  1409  ADV  1464  AMBIGUOUS   117  NEITHER     0   fav% of decided  49.0
+      1/1        FAV  1478  ADV  1499  AMBIGUOUS    12  NEITHER     1   fav% of decided  49.6
+      1.5/1      FAV  1213  ADV  1764  AMBIGUOUS     5  NEITHER     8   fav% of decided  40.7
+      2/1        FAV  1040  ADV  1921  AMBIGUOUS     2  NEITHER    27   fav% of decided  35.1
+
+  PRIMARY COMPARISON: ES refusal + NQ deteriorates/loses acceptance  vs  all NQ-LEADS parents, same direction
+    raw delta         +0.139 pts/trade   95% CI [-0.745, +1.025]   p 0.7524
+    MATCHED-CONTROL   +0.200 pts/trade   (n matched 2990)  sig -0.633  ctrl -0.832
+    signal alone: mean -0.633  day-clustered CI [-1.790, +0.597]  sign-flip p 0.2990
+  H4 PRIMARY LONG        n   1418  mean  +0.570  med  -9.870  MFE  25.00 MAE  24.00  MFE/MAE 1.042  win% 27.9  stop% 71.0
+      fwd  5m +0.084  10m +0.155  15m +0.201  30m +0.396  60m -0.072  |move60|  37.69
+  H4 PRIMARY SHORT       n   1572  mean  -1.717  med -10.451  MFE  13.75 MAE  17.50  MFE/MAE 0.786  win% 21.4  stop% 76.4
+      fwd  5m -0.129  10m -0.103  15m -0.046  30m -1.086  60m -1.410  |move60|  34.96
+  by year:
+      2019 n   260  mean  -1.421  med -4.039  MFE/MAE 1.071  ff 50.2%  NEG
+      2020 n   485  mean  -2.502  med -9.008  MFE/MAE 0.779  ff 44.4%  NEG
+      2021 n   592  mean  -0.157  med -8.595  MFE/MAE 1.113  ff 46.3%  NEG
+      2022 n   300  mean  -1.462  med-16.339  MFE/MAE 0.875  ff 51.0%  NEG
+      2023 n   385  mean  +0.826  med-10.995  MFE/MAE 1.085  ff 49.5%  POS
+      2024 n   419  mean  -0.092  med-12.045  MFE/MAE 0.949  ff 45.9%  NEG
+      2025 n   312  mean  +0.335  med-11.895  MFE/MAE 1.044  ff 48.6%  POS
+      2026 n   237  mean  -0.681  med-18.120  MFE/MAE 0.902  ff 50.8%  NEG
+  volatility era:
+      COVID 2020     n   485  mean  -2.502  med -9.008  MFE/MAE 0.779
+      2021 melt-up   n   592  mean  -0.157  med -8.595  MFE/MAE 1.113
+      2022 bear      n   300  mean  -1.462  med-16.339  MFE/MAE 0.875
+      2023-24        n   804  mean  +0.348  med-11.492  MFE/MAE 1.052
+      2025-26        n   549  mean  -0.104  med-14.539  MFE/MAE 0.965
+  time of day (broad windows only):
+      09:30-11:00  n  1029  mean  +1.061  med-15.289  MFE/MAE 1.009
+      11:00-13:30  n  1298  mean  -0.990  med -9.504  MFE/MAE 0.957
+      13:30-15:00  n   663  mean  -2.562  med -8.820  MFE/MAE 0.909
+  RVMR diagnostic (predeclared: reported AFTER the primary, never a promoter):
+      RANGE-LOW     n  1294  mean  -0.996  med -8.258  MFE/MAE 0.927
+      RANGE-MEDIUM  n  1140  mean  -0.246  med-11.670  MFE/MAE 1.035
+      RANGE-HIGH    n   555  mean  -0.635  med-15.401  MFE/MAE 0.917
+  tails: max  +352.38  min   -74.18  top1%share -2.880  mean  -0.633  ex-top1%  -2.479  ex-top5%  -6.453
+
+==============================================================================
+XMK-H5  RELATIVE-STRENGTH EXTREME
+==============================================================================
+  RESOLUTION OF DIVERGENCE WITHIN 30 BARS (information study):
+    LOW   n   6583  CONVERGED_VIA_NQ   9.2%  CONVERGED_VIA_ES   9.9%  WIDENED  81.0%  UNRESOLVED   0.0%
+    MID   n   6277  CONVERGED_VIA_NQ  26.4%  CONVERGED_VIA_ES  29.1%  WIDENED  44.4%  UNRESOLVED   0.0%
+    HIGH  n   6356  CONVERGED_VIA_NQ  37.0%  CONVERGED_VIA_ES  39.1%  WIDENED  23.9%  UNRESOLVED   0.0%
+  RS LOW                 n   6583  mean  -1.544  med -12.795  MFE  25.25 MAE  26.50  MFE/MAE 0.953  win% 22.8  stop% 75.9
+      fwd  5m -0.659  10m -0.852  15m -0.918  30m -0.837  60m -0.982  |move60|  46.52
+  RS MID                 n   6277  mean  -1.584  med -12.195  MFE  24.75 MAE  25.50  MFE/MAE 0.971  win% 22.5  stop% 76.0
+      fwd  5m -0.165  10m -0.400  15m -0.342  30m +0.018  60m -0.255  |move60|  43.90
+  RS HIGH                n   6356  mean  -0.565  med  -9.889  MFE  22.00 MAE  21.50  MFE/MAE 1.023  win% 21.5  stop% 77.2
+      fwd  5m +0.206  10m +0.357  15m +0.630  30m +1.347  60m +1.750  |move60|  40.05
+  favourable-first RS HIGH
+      0.25/0.25  FAV  2328  ADV  2367  AMBIGUOUS  1661  NEITHER     0   fav% of decided  49.6
+      0.5/0.5    FAV  2893  ADV  2849  AMBIGUOUS   614  NEITHER     0   fav% of decided  50.4
+      1/1        FAV  3029  ADV  3102  AMBIGUOUS   221  NEITHER     4   fav% of decided  49.4
+      1.5/1      FAV  2547  ADV  3621  AMBIGUOUS   170  NEITHER    18   fav% of decided  41.3
+      2/1        FAV  2250  ADV  3947  AMBIGUOUS   124  NEITHER    35   fav% of decided  36.3
+
+  PRIMARY COMPARISON: |REL_STRENGTH| HIGH tercile  vs  |REL_STRENGTH| LOW tercile
+    raw delta         +0.980 pts/trade   95% CI [-0.330, +2.330]   p 0.1433
+    MATCHED-CONTROL   +0.327 pts/trade   (n matched 5619)  sig -0.483  ctrl -0.810
+    signal alone: mean -0.565  day-clustered CI [-1.379, +0.266]  sign-flip p 0.1789
+  H5 HIGH LONG           n   3140  mean  -0.385  med  -9.458  MFE  26.25 MAE  24.25  MFE/MAE 1.082  win% 23.9  stop% 75.0
+      fwd  5m +0.409  10m +0.785  15m +0.897  30m +2.012  60m +3.010  |move60|  37.30
+  H5 HIGH SHORT          n   3216  mean  -0.740  med -10.273  MFE  16.25 MAE  18.75  MFE/MAE 0.867  win% 19.2  stop% 79.3
+      fwd  5m +0.007  10m -0.062  15m +0.370  30m +0.698  60m +0.520  |move60|  42.74
+  by year:
+      2019 n   462  mean  +0.218  med -3.814  MFE/MAE 1.089  ff 49.1%  POS
+      2020 n  1073  mean  -1.083  med -8.239  MFE/MAE 0.973  ff 48.0%  NEG
+      2021 n  1285  mean  -0.867  med -8.164  MFE/MAE 1.027  ff 48.5%  NEG
+      2022 n   622  mean  +0.941  med-13.789  MFE/MAE 1.340  ff 54.7%  POS
+      2023 n   876  mean  -0.238  med-10.170  MFE/MAE 1.000  ff 52.7%  NEG
+      2024 n   864  mean  -0.941  med-11.782  MFE/MAE 0.917  ff 47.6%  NEG
+      2025 n   657  mean  +0.790  med-12.607  MFE/MAE 0.991  ff 49.2%  POS
+      2026 n   517  mean  -2.900  med-17.183  MFE/MAE 1.012  ff 48.2%  NEG
+  volatility era:
+      COVID 2020     n  1073  mean  -1.083  med -8.239  MFE/MAE 0.973
+      2021 melt-up   n  1285  mean  -0.867  med -8.164  MFE/MAE 1.027
+      2022 bear      n   622  mean  +0.941  med-13.789  MFE/MAE 1.340
+      2023-24        n  1740  mean  -0.587  med-10.892  MFE/MAE 0.980
+      2025-26        n  1174  mean  -0.835  med-14.708  MFE/MAE 0.954
+  time of day (broad windows only):
+      09:30-11:00  n  2728  mean  -0.545  med-11.417  MFE/MAE 1.000
+      11:00-13:30  n  2407  mean  -0.889  med -9.682  MFE/MAE 1.028
+      13:30-15:00  n  1221  mean  +0.029  med -8.351  MFE/MAE 0.972
+  RVMR diagnostic (predeclared: reported AFTER the primary, never a promoter):
+      RANGE-LOW     n  3159  mean  -0.455  med -8.651  MFE/MAE 1.027
+      RANGE-MEDIUM  n  2489  mean  -0.104  med-11.051  MFE/MAE 1.010
+      RANGE-HIGH    n   703  mean  -2.658  med-14.670  MFE/MAE 1.028
+  tails: max  +407.63  min   -85.58  top1%share -3.364  mean  -0.565  ex-top1%  -2.490  ex-top5%  -6.567
+
+==============================================================================
+XMK-H6  ES LEADS -> NQ CATCH-UP  (mirror of H3)
+==============================================================================
+  PARENT_NO_ES_COND      n   6729  mean  -0.100  med -10.414  MFE  21.50 MAE  20.75  MFE/MAE 1.036  win% 25.0  stop% 73.6
+      fwd  5m +0.055  10m +0.490  15m +0.902  30m +1.534  60m +1.963  |move60|  37.54
+  CATCHUP                n   3665  mean  -1.061  med -10.564  MFE  21.25 MAE  21.00  MFE/MAE 1.012  win% 24.3  stop% 74.3
+      fwd  5m -0.341  10m -0.123  15m +0.415  30m +1.275  60m +1.616  |move60|  37.14
+  REFUSAL                n   3064  mean  +1.050  med -10.245  MFE  21.75 MAE  20.50  MFE/MAE 1.061  win% 25.8  stop% 72.7
+      fwd  5m +0.528  10m +1.223  15m +1.485  30m +1.844  60m +2.378  |move60|  38.02
+  favourable-first CATCHUP
+      0.25/0.25  FAV  1453  ADV  1540  AMBIGUOUS   672  NEITHER     0   fav% of decided  48.5
+      0.5/0.5    FAV  1725  ADV  1788  AMBIGUOUS   152  NEITHER     0   fav% of decided  49.1
+      1/1        FAV  1824  ADV  1827  AMBIGUOUS    13  NEITHER     1   fav% of decided  50.0
+      1.5/1      FAV  1552  ADV  2100  AMBIGUOUS     8  NEITHER     5   fav% of decided  42.5
+      2/1        FAV  1330  ADV  2303  AMBIGUOUS     4  NEITHER    28   fav% of decided  36.6
+
+  PRIMARY COMPARISON: ES-LEADS + NQ catch-up  vs  ES-LEADS, no NQ condition
+    raw delta         -0.961 pts/trade   95% CI [-1.758, -0.169]   p 0.0185
+    MATCHED-CONTROL   -0.478 pts/trade   (n matched 3665)  sig -1.061  ctrl -0.583
+    signal alone: mean -1.061  day-clustered CI [-2.190, +0.060]  sign-flip p 0.0666
+  H6 CATCHUP LONG        n   1923  mean  -1.136  med -10.320  MFE  26.00 MAE  23.75  MFE/MAE 1.095  win% 26.7  stop% 72.2
+      fwd  5m +0.045  10m -0.067  15m +0.702  30m +2.146  60m +1.774  |move60|  35.92
+  H6 CATCHUP SHORT       n   1742  mean  -0.977  med -10.807  MFE  15.38 MAE  17.50  MFE/MAE 0.879  win% 21.6  stop% 76.6
+      fwd  5m -0.768  10m -0.184  15m +0.098  30m +0.313  60m +1.442  |move60|  38.49
+  by year:
+      2019 n   275  mean  -0.933  med -4.001  MFE/MAE 1.348  ff 52.4%  NEG
+      2020 n   620  mean  -2.122  med -9.092  MFE/MAE 0.901  ff 46.2%  NEG
+      2021 n   715  mean  -1.359  med -9.045  MFE/MAE 1.015  ff 48.3%  NEG
+      2022 n   341  mean  -0.999  med-15.833  MFE/MAE 1.302  ff 48.9%  NEG
+      2023 n   506  mean  +0.584  med-10.545  MFE/MAE 1.101  ff 50.9%  POS
+      2024 n   478  mean  -1.528  med-13.086  MFE/MAE 0.986  ff 48.8%  NEG
+      2025 n   404  mean  +1.246  med-12.617  MFE/MAE 1.384  ff 48.8%  POS
+      2026 n   326  mean  -3.288  med-19.658  MFE/MAE 1.098  ff 45.7%  NEG
+  volatility era:
+      COVID 2020     n   620  mean  -2.122  med -9.092  MFE/MAE 0.901
+      2021 melt-up   n   715  mean  -1.359  med -9.045  MFE/MAE 1.015
+      2022 bear      n   341  mean  -0.999  med-15.833  MFE/MAE 1.302
+      2023-24        n   984  mean  -0.442  med-11.633  MFE/MAE 0.990
+      2025-26        n   730  mean  -0.779  med-14.989  MFE/MAE 1.183
+  time of day (broad windows only):
+      09:30-11:00  n  1234  mean  -1.237  med-15.589  MFE/MAE 1.103
+      11:00-13:30  n  1574  mean  -0.962  med-10.226  MFE/MAE 0.959
+      13:30-15:00  n   857  mean  -0.989  med -8.445  MFE/MAE 0.986
+  RVMR diagnostic (predeclared: reported AFTER the primary, never a promoter):
+      RANGE-LOW     n  1460  mean  -0.736  med -8.192  MFE/MAE 1.062
+      RANGE-MEDIUM  n  1403  mean  +0.054  med-11.295  MFE/MAE 1.045
+      RANGE-HIGH    n   798  mean  -3.606  med-15.776  MFE/MAE 0.924
+  tails: max  +495.88  min   -83.91  top1%share -1.788  mean  -1.061  ex-top1%  -2.987  ex-top5%  -6.926
+
+==============================================================================
+XMK-H7  CROSS-MARKET ACCEPTANCE AGREEMENT
+==============================================================================
+  NQ_ANY                 n  11064  mean  -0.908  med -12.120  MFE  24.75 MAE  25.00  MFE/MAE 0.990  win% 23.4  stop% 75.1
+      fwd  5m -0.845  10m -0.565  15m -0.337  30m -0.090  60m +0.710  |move60|  44.70
+  BOTH_ACCEPT            n   5411  mean  -0.466  med -13.245  MFE  26.75 MAE  26.50  MFE/MAE 1.009  win% 23.7  stop% 74.8
+      fwd  5m -0.743  10m -0.372  15m +0.130  30m +0.558  60m +1.150  |move60|  47.86
+  NQ_ONLY                n   5647  mean  -1.324  med -11.295  MFE  22.75 MAE  23.50  MFE/MAE 0.968  win% 23.2  stop% 75.4
+      fwd  5m -0.935  10m -0.741  15m -0.776  30m -0.709  60m +0.293  |move60|  41.72
+  ES_ONLY                n  26775  mean  -0.143  med -13.076  MFE  27.25 MAE  26.50  MFE/MAE 1.028  win% 24.9  stop% 73.7
+      fwd  5m -0.529  10m -0.410  15m -0.181  30m -0.216  60m +0.937  |move60|  47.91
+  DISAGREEMENT           n      6  mean  -7.739  med  -8.211  MFE  14.25 MAE  18.62  MFE/MAE 0.765  win%  0.0  stop%100.0
+      fwd  5m -8.000  10m -8.250  15m -9.125  30m -2.333  60m -2.375  |move60|   8.79
+  favourable-first BOTH_ACCEPT
+      0.25/0.25  FAV  2071  ADV  2275  AMBIGUOUS  1065  NEITHER     0   fav% of decided  47.7
+      0.5/0.5    FAV  2468  ADV  2698  AMBIGUOUS   245  NEITHER     0   fav% of decided  47.8
+      1/1        FAV  2641  ADV  2725  AMBIGUOUS    43  NEITHER     2   fav% of decided  49.2
+      1.5/1      FAV  2207  ADV  3170  AMBIGUOUS    23  NEITHER    11   fav% of decided  41.0
+      2/1        FAV  1910  ADV  3454  AMBIGUOUS    14  NEITHER    33   fav% of decided  35.6
+
+  PRIMARY COMPARISON: NQ accepts AND ES accepts  vs  NQ accepts, ES does not
+    raw delta         +0.858 pts/trade   95% CI [-0.589, +2.289]   p 0.2399
+    MATCHED-CONTROL   +2.022 pts/trade   (n matched 5215)  sig -0.450  ctrl -2.472
+    signal alone: mean -0.466  day-clustered CI [-1.618, +0.659]  sign-flip p 0.4162
+  H7 BOTH LONG           n   2833  mean  +0.308  med -12.176  MFE  30.25 MAE  28.00  MFE/MAE 1.080  win% 26.4  stop% 72.0
+      fwd  5m +0.057  10m +0.390  15m +0.826  30m +1.293  60m +2.228  |move60|  44.82
+  H7 BOTH SHORT          n   2578  mean  -1.316  med -14.407  MFE  22.00 MAE  25.25  MFE/MAE 0.871  win% 20.9  stop% 77.8
+      fwd  5m -1.621  10m -1.208  15m -0.634  30m -0.249  60m -0.035  |move60|  51.20
+  by year:
+      2019 n   336  mean  -1.610  med -5.595  MFE/MAE 0.886  ff 50.6%  NEG
+      2020 n   708  mean  -2.649  med-10.957  MFE/MAE 1.011  ff 44.8%  NEG
+      2021 n   615  mean  -0.495  med-10.770  MFE/MAE 0.967  ff 47.1%  NEG
+      2022 n   925  mean  -0.084  med-16.939  MFE/MAE 1.030  ff 47.4%  NEG
+      2023 n   741  mean  -0.356  med-12.026  MFE/MAE 1.128  ff 49.7%  NEG
+      2024 n   766  mean  +0.772  med-13.939  MFE/MAE 0.930  ff 46.9%  POS
+      2025 n   838  mean  -0.448  med-16.751  MFE/MAE 0.955  ff 47.8%  NEG
+      2026 n   482  mean  +0.680  med-21.026  MFE/MAE 1.046  ff 49.1%  POS
+  volatility era:
+      COVID 2020     n   708  mean  -2.649  med-10.957  MFE/MAE 1.011
+      2021 melt-up   n   615  mean  -0.495  med-10.770  MFE/MAE 0.967
+      2022 bear      n   925  mean  -0.084  med-16.939  MFE/MAE 1.030
+      2023-24        n  1507  mean  +0.217  med-13.020  MFE/MAE 1.039
+      2025-26        n  1320  mean  -0.036  med-18.204  MFE/MAE 0.943
+  time of day (broad windows only):
+      09:30-11:00  n  1604  mean  +1.164  med-15.317  MFE/MAE 1.115
+      11:00-13:30  n  2310  mean  -0.414  med-13.254  MFE/MAE 0.995
+      13:30-15:00  n  1497  mean  -2.291  med-11.876  MFE/MAE 0.979
+  RVMR diagnostic (predeclared: reported AFTER the primary, never a promoter):
+      RANGE-LOW     n  1840  mean  -0.597  med-11.614  MFE/MAE 1.083
+      RANGE-MEDIUM  n  2232  mean  -0.324  med-13.845  MFE/MAE 1.014
+      RANGE-HIGH    n  1337  mean  -0.525  med-15.101  MFE/MAE 0.968
+  tails: max  +541.88  min  -206.93  top1%share -5.062  mean  -0.466  ex-top1%  -2.851  ex-top5%  -7.982
+
+==============================================================================
+XMK-H8  DISAGREEMENT RESOLUTION
+==============================================================================
+  first resolution within 10 bars:
+  NQ geometry from the RESOLUTION bar, signed by the NQ direction
+  (negative mean = NQ reverted):
+  ALL                     n=0
+  ES_JOINS_NQ             n=0
+  NQ_RETURNS_TO_ES        n=0
+  BOTH_REVERSE            n=0
+  PERSISTS                n=0
+  favourable-first ES_JOINS_NQ
+      0.25/0.25  FAV     0  ADV     0  AMBIGUOUS     0  NEITHER     0   fav% of decided   nan
+      0.5/0.5    FAV     0  ADV     0  AMBIGUOUS     0  NEITHER     0   fav% of decided   nan
+      1/1        FAV     0  ADV     0  AMBIGUOUS     0  NEITHER     0   fav% of decided   nan
+      1.5/1      FAV     0  ADV     0  AMBIGUOUS     0  NEITHER     0   fav% of decided   nan
+      2/1        FAV     0  ADV     0  AMBIGUOUS     0  NEITHER     0   fav% of decided   nan
+
+  PRIMARY COMPARISON: resolution = ES_JOINS_NQ  vs  all disagreements pooled
+    INSUFFICIENT DATA  (n_sig 0  n_ctrl 0)
+
+==============================================================================
+MULTIPLE TESTING - BH and Holm at the FROZEN M = 8
+==============================================================================
+  family          n  raw delta    matched          p       BH q     Holm
+  XMK-H1      10137     -0.119     +0.021     0.2306     0.3839   1.0000
+  XMK-H2        514     -3.086     -2.293     0.0916     0.3666   0.6415
+  XMK-H3       3673     -0.036     +0.032     0.9363     1.0000   1.0000
+  XMK-H4       2990     +0.139     +0.200     0.7524     1.0000   1.0000
+  XMK-H5       6356     +0.980     +0.327     0.1433     0.3823   0.8601
+  XMK-H6       3665     -0.961     -0.478     0.0185     0.1484   0.1484
+  XMK-H7       5411     +0.858     +2.022     0.2399     0.3839   1.0000
+  XMK-H8          0       +nan       +nan        nan     1.0000   1.0000
+
+  M was frozen at 8 before any ES bar existed and is NOT shrunk.
+
+==============================================================================
+PROMOTION GATE - all fourteen pre-registered conditions, printed
+==============================================================================
+
+  XMK-H1  (n 10137)
+    1  positive economic directional geometry                  FAIL
+    2  adequate N                                              PASS
+    3  matched-control advantage                               PASS
+    4  ES adds incremental info beyond NQ-only                 FAIL
+    5  MFE/MAE improves vs control                             FAIL
+    6  favourable-first improves vs control                    FAIL
+    7  credible median                                         FAIL
+    8  year/partition stability                                FAIL
+    9  long/short not catastrophically asymmetric              FAIL
+    10 low/moderate tail dependence                            FAIL
+    11 no roll artifact (Gate 2 quarantine)                    PASS
+    12 no synchronization artifact (Gate 1, 0 clock discrepancy) PASS
+    13 no time-of-day construction artifact                    PASS
+    14 survives cost/slippage (0.87 already charged)           FAIL
+    *  BH q < 0.05 at M=8                                      FAIL
+    ---> NOT PROMOTED
+
+  XMK-H2  (n 514)
+    1  positive economic directional geometry                  FAIL
+    2  adequate N                                              PASS
+    3  matched-control advantage                               FAIL
+    4  ES adds incremental info beyond NQ-only                 FAIL
+    5  MFE/MAE improves vs control                             FAIL
+    6  favourable-first improves vs control                    FAIL
+    7  credible median                                         FAIL
+    8  year/partition stability                                FAIL
+    9  long/short not catastrophically asymmetric              FAIL
+    10 low/moderate tail dependence                            FAIL
+    11 no roll artifact (Gate 2 quarantine)                    PASS
+    12 no synchronization artifact (Gate 1, 0 clock discrepancy) PASS
+    13 no time-of-day construction artifact                    PASS
+    14 survives cost/slippage (0.87 already charged)           FAIL
+    *  BH q < 0.05 at M=8                                      FAIL
+    ---> NOT PROMOTED
+
+  XMK-H3  (n 3673)
+    1  positive economic directional geometry                  FAIL
+    2  adequate N                                              PASS
+    3  matched-control advantage                               PASS
+    4  ES adds incremental info beyond NQ-only                 PASS
+    5  MFE/MAE improves vs control                             FAIL
+    6  favourable-first improves vs control                    FAIL
+    7  credible median                                         FAIL
+    8  year/partition stability                                FAIL
+    9  long/short not catastrophically asymmetric              FAIL
+    10 low/moderate tail dependence                            FAIL
+    11 no roll artifact (Gate 2 quarantine)                    PASS
+    12 no synchronization artifact (Gate 1, 0 clock discrepancy) PASS
+    13 no time-of-day construction artifact                    PASS
+    14 survives cost/slippage (0.87 already charged)           FAIL
+    *  BH q < 0.05 at M=8                                      FAIL
+    ---> NOT PROMOTED
+
+  XMK-H4  (n 2990)
+    1  positive economic directional geometry                  FAIL
+    2  adequate N                                              PASS
+    3  matched-control advantage                               PASS
+    4  ES adds incremental info beyond NQ-only                 PASS
+    5  MFE/MAE improves vs control                             FAIL
+    6  favourable-first improves vs control                    FAIL
+    7  credible median                                         FAIL
+    8  year/partition stability                                FAIL
+    9  long/short not catastrophically asymmetric              FAIL
+    10 low/moderate tail dependence                            FAIL
+    11 no roll artifact (Gate 2 quarantine)                    PASS
+    12 no synchronization artifact (Gate 1, 0 clock discrepancy) PASS
+    13 no time-of-day construction artifact                    PASS
+    14 survives cost/slippage (0.87 already charged)           FAIL
+    *  BH q < 0.05 at M=8                                      FAIL
+    ---> NOT PROMOTED
+
+  XMK-H5  (n 6356)
+    1  positive economic directional geometry                  FAIL
+    2  adequate N                                              PASS
+    3  matched-control advantage                               PASS
+    4  ES adds incremental info beyond NQ-only                 PASS
+    5  MFE/MAE improves vs control                             PASS
+    6  favourable-first improves vs control                    PASS
+    7  credible median                                         FAIL
+    8  year/partition stability                                FAIL
+    9  long/short not catastrophically asymmetric              FAIL
+    10 low/moderate tail dependence                            FAIL
+    11 no roll artifact (Gate 2 quarantine)                    PASS
+    12 no synchronization artifact (Gate 1, 0 clock discrepancy) PASS
+    13 no time-of-day construction artifact                    PASS
+    14 survives cost/slippage (0.87 already charged)           FAIL
+    *  BH q < 0.05 at M=8                                      FAIL
+    ---> NOT PROMOTED
+
+  XMK-H6  (n 3665)
+    1  positive economic directional geometry                  FAIL
+    2  adequate N                                              PASS
+    3  matched-control advantage                               FAIL
+    4  ES adds incremental info beyond NQ-only                 FAIL
+    5  MFE/MAE improves vs control                             FAIL
+    6  favourable-first improves vs control                    FAIL
+    7  credible median                                         FAIL
+    8  year/partition stability                                FAIL
+    9  long/short not catastrophically asymmetric              FAIL
+    10 low/moderate tail dependence                            FAIL
+    11 no roll artifact (Gate 2 quarantine)                    PASS
+    12 no synchronization artifact (Gate 1, 0 clock discrepancy) PASS
+    13 no time-of-day construction artifact                    PASS
+    14 survives cost/slippage (0.87 already charged)           FAIL
+    *  BH q < 0.05 at M=8                                      FAIL
+    ---> NOT PROMOTED
+
+  XMK-H7  (n 5411)
+    1  positive economic directional geometry                  FAIL
+    2  adequate N                                              PASS
+    3  matched-control advantage                               PASS
+    4  ES adds incremental info beyond NQ-only                 PASS
+    5  MFE/MAE improves vs control                             PASS
+    6  favourable-first improves vs control                    PASS
+    7  credible median                                         FAIL
+    8  year/partition stability                                FAIL
+    9  long/short not catastrophically asymmetric              FAIL
+    10 low/moderate tail dependence                            FAIL
+    11 no roll artifact (Gate 2 quarantine)                    PASS
+    12 no synchronization artifact (Gate 1, 0 clock discrepancy) PASS
+    13 no time-of-day construction artifact                    PASS
+    14 survives cost/slippage (0.87 already charged)           FAIL
+    *  BH q < 0.05 at M=8                                      FAIL
+    ---> NOT PROMOTED
+
+  XMK-H8  (n 0)
+    INSUFFICIENT DATA - not promoted
+
+==============================================================================
+NO HYPOTHESIS PASSES THE PROMOTION GATE.
+ES DOES NOT ADD MATERIAL INCREMENTAL INFORMATION TO NQ
+AT THE TESTED RESOLUTION.
+==============================================================================
+OFH13_PROSPECTIVE_V1 REMAINS UNTOUCHED.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
