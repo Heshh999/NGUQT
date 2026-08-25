@@ -1,0 +1,139 @@
+==============================================================================
+ANOMALY-SCAN-V1  WAVE 2   DISCOVERY <= 2023-12-31 ONLY
+  menu frozen at commit c4c4d8202 before computation
+  EXPLORATORY. SUBMITS NO ORDERS.
+==============================================================================
+discovery bars 1577173
+
+==============================================================================
+S9  SHOCK-RESPONSE: forward 15m return by decile of prior 15m return
+==============================================================================
+  dec     prior bp     fwd15 bp       day-clustered 95% CI       n
+  0         -22.64       -0.333   [   -0.699,    +0.064]    9930
+  1          -7.83       +0.088   [   -0.174,    +0.351]    9931
+  2          -4.08       -0.020   [   -0.210,    +0.162]    9931
+  3          -1.98       +0.038   [   -0.147,    +0.213]    9931
+  4          -0.49       -0.030   [   -0.185,    +0.122]    9931
+  5          +0.88       +0.055   [   -0.100,    +0.202]    9930
+  6          +2.42       +0.108   [   -0.062,    +0.288]    9931
+  7          +4.52       +0.242   [   +0.051,    +0.429]    9931  <-- CI excludes 0
+  8          +8.16       +0.096   [   -0.150,    +0.343]    9931
+  9         +21.78       +0.451   [   +0.036,    +0.861]    9931  <-- CI excludes 0
+
+  extreme deciles by RVMR state (fwd15 bp):
+    dec 0  LOW     fwd15    -0.106 bp  CI [  -0.581,   +0.372]  n   4801
+    dec 0  MEDIUM  fwd15    -0.722 bp  CI [  -1.382,   -0.017]  n   3539  <-- CI excludes 0
+    dec 0  HIGH    fwd15    -0.167 bp  CI [  -1.514,   +1.268]  n   1587
+    dec 9  LOW     fwd15    +0.042 bp  CI [  -0.375,   +0.466]  n   5729
+    dec 9  MEDIUM  fwd15    +0.975 bp  CI [  +0.259,   +1.717]  n   3198  <-- CI excludes 0
+    dec 9  HIGH    fwd15    +1.118 bp  CI [  -0.569,   +2.797]  n   1003
+
+==============================================================================
+S10  ASYMMETRIC PRICE IMPACT  |r|/volume, up-bars vs down-bars
+==============================================================================
+  lambda UP   1144.983  CI [ 971.295, 1363.614]  n 751836
+  lambda DOWN 1171.851  CI [ 968.452, 1433.759]  n 741197
+  DOWN/UP ratio 1.0235
+  LOW     DOWN/UP 1.0243   (nU 561771 nD 550254)
+  MEDIUM  DOWN/UP 1.0402   (nU 143318 nD 141222)
+  HIGH    DOWN/UP 1.0278   (nU 46150 nD 49093)
+
+==============================================================================
+S11  PARKINSON/CC VARIANCE RATIO + CLOSE-LOCATION VALUE
+==============================================================================
+  Parkinson/CC per day: mean 1.0006  CI [0.9948, 1.0057]  (GBM = 1.0)
+  corr(CLV_t, r_{t+1}) pooled +0.0002   (n 1562911, naive se 0.0008)
+  LOW     corr(CLV, r+1) -0.0070  (n 1178256)
+  MEDIUM  corr(CLV, r+1) +0.0088  (n 287853)
+  HIGH    corr(CLV, r+1) +0.0141  (n 95624)
+
+==============================================================================
+S12  OPEN-GAP RESPONSE CURVE (deciles; strategies before, curve new)
+==============================================================================
+  dec       gap bp  RTH O->C bp       day-clustered 95% CI     n
+  0         -135.3        +5.51   [   -18.51,    +30.38]   111
+  1          -56.9        +2.09   [   -14.84,    +18.33]   111
+  2          -30.7        +4.23   [   -13.50,    +22.21]   112
+  3          -12.7        +4.37   [   -11.48,    +19.55]   111
+  4           +0.3        +3.91   [   -11.66,    +19.52]   112
+  5          +11.0        +7.41   [    -7.25,    +21.48]   111
+  6          +23.7        -4.50   [   -21.41,    +11.50]   111
+  7          +37.7       +12.13   [    -2.05,    +26.58]   112
+  8          +59.3        -2.07   [   -20.24,    +15.70]   111
+  9         +120.4        +2.15   [   -21.96,    +25.34]   112
+
+==============================================================================
+S13  LONG MEMORY OF |r| - ACF decay and memory length vs RVMR 1440
+==============================================================================
+  lag     1   ACF|r| +0.4161
+  lag     5   ACF|r| +0.3767
+  lag    10   ACF|r| +0.3607
+  lag    30   ACF|r| +0.3192
+  lag    60   ACF|r| +0.2972
+  lag   120   ACF|r| +0.2411
+  lag   240   ACF|r| +0.1975
+  lag   480   ACF|r| +0.1060
+  lag   960   ACF|r| +0.1266
+  lag  1440   ACF|r| +0.2297
+  log-log decay slope -0.161  (power-law long memory; -0.2..-0.4 typical of equity vol)
+  first frozen lag with ACF < 0.05: >1440   (RVMR window = 1440)
+
+==============================================================================
+S14  MINUTE-OF-DAY |r| SEASONALITY - deviations > 30% from local
+==============================================================================
+  08:31 ET  |r| = 3.22x local median
+  15:51 ET  |r| = 2.09x local median
+  02:01 ET  |r| = 1.67x local median
+  07:01 ET  |r| = 1.65x local median
+  16:00 ET  |r| = 1.62x local median
+  16:01 ET  |r| = 1.59x local median
+  09:30 ET  |r| = 0.42x local median
+  03:01 ET  |r| = 1.57x local median
+  10:01 ET  |r| = 1.53x local median
+  15:55 ET  |r| = 1.52x local median
+  14:01 ET  |r| = 1.51x local median
+  08:32 ET  |r| = 1.51x local median
+  09:31 ET  |r| = 1.50x local median
+  20:01 ET  |r| = 1.49x local median
+  08:33 ET  |r| = 1.48x local median
+
+==============================================================================
+S19  RVMR STATE PROCESS - transitions, dwell, leverage asymmetry
+==============================================================================
+  from LOW      LOW 0.8831  MEDIUM 0.1039  HIGH 0.0130   (n 1190340)
+  from MEDIUM   LOW 0.4426  MEDIUM 0.4303  HIGH 0.1270   (n 288896)
+  from HIGH     LOW 0.1168  MEDIUM 0.4244  HIGH 0.4588   (n 96496)
+  dwell LOW     median     2 min   p90    18   n 139149
+  dwell MEDIUM  median     1 min   p90     3   n 164581
+  dwell HIGH    median     1 min   p90     3   n 52223
+
+  leverage asymmetry: P(HIGH within 30m | prior 15m return decile):
+    dec 0  P 0.6402  (n 10117)
+    dec 1  P 0.4257  (n 10116)
+    dec 2  P 0.3228  (n 10240)
+    dec 3  P 0.2608  (n 10416)
+    dec 4  P 0.2374  (n 10505)
+    dec 5  P 0.2469  (n 10509)
+    dec 6  P 0.2741  (n 10340)
+    dec 7  P 0.3174  (n 10221)
+    dec 8  P 0.3870  (n 10130)
+    dec 9  P 0.5562  (n 10112)
+
+==============================================================================
+S22  DAY-CYCLE PERIODOGRAM of mean signed return by minute-of-day
+==============================================================================
+  harmonic k=15  period   91.9 min  amplitude 0.0064 bp
+  harmonic k=46  period   30.0 min  amplitude 0.0051 bp
+  harmonic k=14  period   98.5 min  amplitude 0.0047 bp
+  harmonic k=38  period   36.3 min  amplitude 0.0038 bp
+  harmonic k=29  period   47.6 min  amplitude 0.0037 bp
+
+  MONDAY DECOMPOSITION (accrual per Monday, day-clustered):
+    SUN 18:00-24:00  mean   +1.03 bp/session  CI [  -5.06,   +6.86]  n 231
+    MON 00:00-09:29  mean   -1.06 bp/session  CI [  -8.36,   +5.71]  n 231
+    MON RTH          mean  +16.63 bp/session  CI [  +5.82,  +27.21]  n 231  <-- CI excludes 0
+
+==============================================================================
+WAVE 2 COMPLETE - DISCOVERY ONLY. HOLDOUT UNTOUCHED.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
+==============================================================================

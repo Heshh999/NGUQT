@@ -99,3 +99,90 @@ touched; no rule was created; RVMR remains magnitude-plus-structure
 context only.
 
 **THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.**
+
+---
+
+# WAVE 2 FINDINGS (discovery window only; menu frozen at `c4c4d82`)
+
+## E. THE ECONOMIC HEADLINE — shock continuation, gated by RVMR MEDIUM
+
+S9 forward-15m return by decile of the prior non-overlapping 15m return:
+
+| decile | prior move | fwd15 | CI |
+|---|---|---|---|
+| 0 (big down) | −22.6 bp | −0.333 bp | [−0.699, +0.064] |
+| 7 | +4.5 bp | **+0.242 bp** | [+0.051, +0.429] — excludes 0 |
+| 9 (big up) | +21.8 bp | **+0.451 bp** | [+0.036, +0.861] — excludes 0 |
+
+**By RVMR state, the effect concentrates in MEDIUM and is signed
+continuation on BOTH tails:** dec 9 MEDIUM **+0.975 bp** CI [+0.259,
++1.717]; dec 0 MEDIUM **−0.722 bp** CI [−1.382, −0.017]. LOW shows
+nothing; HIGH is positive but wide. A ~1 bp/15m conditional edge is
+~1.5–2.5 NQ points — the first scan-level effect of the same order as
+the 0.87 pt cost. It is also mutually consistent with Wave 1: pooled
+15m AC1 +0.022 (continuation) coexisting with HIGH-state 15m AC1 −0.032
+(reversion) resolves into a **regime ladder: LOW inert, MEDIUM
+continues, HIGH reverts.**
+
+## F. The leverage V-curve — RVMR arrival is forecastable
+
+S19: P(reaching RANGE-HIGH within 30m | prior 15m return decile):
+
+```
+dec:  0     1     2     3     4     5     6     7     8     9
+P： 0.640 0.426 0.323 0.261 0.237 0.247 0.274 0.317 0.387 0.556
+```
+
+A clean V with **down-shock asymmetry** (0.640 vs 0.556 at symmetric
+extremes) — the intraday leverage effect, expressed directly in RVMR's
+own state space. The state RVMR-BANDS could not calibrate in points is
+nonetheless **predictable as an event**. Dwell times (median 1–2 min,
+p90 3–18) show the bucket sequence flickers even though the score
+persists — any future state-machine use needs debouncing.
+
+## G. Wave-2 corroborations and structure
+
+- **CLV flip (S11)** — corr(close-location, next return): LOW −0.0070 /
+  MEDIUM +0.0088 / HIGH +0.0141. A third independent statistic showing
+  the LOW-vs-active sign flip of Wave 1's AC-FLIP.
+- **Down-impact asymmetry (S10):** λ(down)/λ(up) = 1.02–1.04 in every
+  state — down moves consume ~2–4% more price per unit volume. Small,
+  consistent, correct sign for the leverage story.
+- **News-minute map (S14):** |r| spikes at **08:31 (3.22×)** [08:30
+  releases], **15:51 (2.09×)** [MOC imbalance], 02:01, 07:01, 16:00–01,
+  10:01, 14:01, 20:01 — and **09:30 is 0.42×** (the quiet last
+  pre-open minute). Execution/risk knowledge.
+- **Clock harmonics (S22):** top periods ~92 min and ~30 min — the 30-min
+  line matching Wave 1's half-hour-mark drift.
+- **Vol long memory (S13):** ACF|r| never falls below 0.05 within 1,440
+  lags (slope −0.161); the lag-1440 bump is the daily seasonal. RVMR's
+  window sits *inside* the market's memory — its persistence is real.
+- **MONDAY sharpened (S22):** the entire effect is **Monday RTH +16.63
+  bp CI [+5.82, +27.21]**; Sunday and Monday overnight are null.
+
+## H. Wave-2 nulls
+
+Open-gap response curve: **flat** — all ten deciles include 0,
+consistent with every prior gap-strategy failure. Parkinson/CC = 1.0006
+CI [0.9948, 1.0057] — range geometry is exactly GBM-consistent (also a
+data-sanity pass).
+
+## FINAL COMBINED RECOMMENDATION (declared before any holdout contact)
+
+Per the frozen two-candidate cap, the confirmation study
+**ANOMALY-CONFIRM-V1** shall test on the untouched holdout, M = 2:
+
+1. **SHOCK-CONT-MEDIUM** — in RVMR RANGE-MEDIUM, fwd15 after a
+   top-decile prior 15m move continues (dec9 − dec0 delta > 0, both
+   tails' signs as found), day-clustered CI excluding 0, using
+   discovery-frozen decile cutpoints. *Declared non-promotable
+   secondaries inside the same study:* the 1m AC-FLIP, the CLV flip,
+   and the leverage V-curve — reported, never promoted.
+2. **MONDAY-RTH** — mean Monday RTH accrual > 0, day-clustered CI
+   excluding 0.
+
+This supersedes the Wave-1 pick of raw AC-FLIP as primary (it becomes a
+secondary), declared here while the holdout remains untouched, as the
+frozen protocol permits.
+
+**THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.**
