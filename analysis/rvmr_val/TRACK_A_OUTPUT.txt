@@ -1,0 +1,218 @@
+==============================================================================
+RVMR-VALIDATION-V1   TRACK A - RVMR-ES-V1
+  OUT-OF-MARKET REPLICATION, ZERO RECALIBRATION
+  frozen thresholds  LOW < 1.270 <= MEDIUM <= 2.335 < HIGH
+  frozen lookback    W = 1440 bars, current bar EXCLUDED
+  frozen horizons    (5, 10, 15, 30, 60)
+  frozen universe    RTH 570..960, >=60m to close, ATR20>0,
+                     both scores non-None, 60 contiguous fwd bars
+  HISTORICAL RESEARCH - never relabelled prospective.
+  THIS MODULE SUBMITS NO ORDERS.
+==============================================================================
+==============================================================================
+PARITY GATE - val_lib.features vs FROZEN rvmr_run.features (NQ)
+==============================================================================
+  universe size            510309  MATCH
+  column i      mismatches 0  MATCH
+  column day    mismatches 0  MATCH
+  column mod    mismatches 0  MATCH
+  column rb     mismatches 0  MATCH
+  column vb     mismatches 0  MATCH
+  column rr     mismatches 0  MATCH
+  column vr     mismatches 0  MATCH
+  column abs5   mismatches 0  MATCH
+  column abs10  mismatches 0  MATCH
+  column abs15  mismatches 0  MATCH
+  column abs30  mismatches 0  MATCH
+  column abs60  mismatches 0  MATCH
+  PARITY GATE: PASS
+
+loading ES ...
+ES bars 2542424   2019-06-02 18:02:00 .. 2026-08-17 16:59:00
+ES eligible universe 602664 bars, 1858 days
+
+==============================================================================
+A7 - CALIBRATION TRANSPORT: do the frozen NQ cutoffs produce
+     usable ES groups?  (each bucket must hold >= 5%)
+==============================================================================
+  RANGE-REGIME-V1    LOW  248860 (41.29%)   MEDIUM  254557 (42.24%)   HIGH   99247 (16.47%)
+      smallest bucket 16.47%   A7 PASS
+  VOLUME-REGIME-V1   LOW  143426 (23.80%)   MEDIUM  226378 (37.56%)   HIGH  232860 (38.64%)
+      smallest bucket 23.80%   A7 PASS
+
+==============================================================================
+A1/A2/A3 - PRIMARY: monotonicity, separation, day-level stats
+==============================================================================
+RANGE-REGIME-V1
+  bucket         n |      5m      10m      15m      30m      60m
+  LOW       248860 |    1.50     2.00     2.50     3.50     5.00
+  MEDIUM    254557 |    2.00     2.75     3.25     4.75     6.75
+  HIGH       99247 |    2.50     3.75     4.50     6.25     8.25
+  monotone LOW<MED<HIGH: 5 of 5 horizons  5m:Y 10m:Y 15m:Y 30m:Y 60m:Y
+  mean|ret|@30  HIGH 8.94 CI[8.65,9.24]  LOW 5.45 CI[5.27,5.64]
+  HIGH-LOW +3.489  day-clustered 95% CI [+3.224, +3.758]  p 0.0000
+  H/L 1.640x   H/M 1.259x
+  full Spearman (point est only) +0.1939
+  DAY-level Spearman +0.4048 over 1858 days   day-shuffle p 0.00005
+
+VOLUME-REGIME-V1
+  bucket         n |      5m      10m      15m      30m      60m
+  LOW       143426 |    1.25     1.75     2.25     3.00     4.50
+  MEDIUM    226378 |    1.75     2.50     3.00     4.25     6.00
+  HIGH      232860 |    2.25     3.25     4.00     5.50     7.50
+  monotone LOW<MED<HIGH: 5 of 5 horizons  5m:Y 10m:Y 15m:Y 30m:Y 60m:Y
+  mean|ret|@30  HIGH 8.16 CI[7.91,8.40]  LOW 4.85 CI[4.67,5.04]
+  HIGH-LOW +3.306  day-clustered 95% CI [+3.092, +3.522]  p 0.0000
+  H/L 1.682x   H/M 1.266x
+  full Spearman (point est only) +0.2020
+  DAY-level Spearman +0.4660 over 1858 days   day-shuffle p 0.00005
+
+==============================================================================
+A5 - YEAR STABILITY (thresholds NEVER altered)
+==============================================================================
+RANGE-REGIME-V1
+    2019  N L/M/H  23915/ 18200/  6464  mean30 L/M/H  2.34/ 3.06/ 4.31  H-L  +1.97  mono 4/5  POS
+    2020  N L/M/H  44950/ 29843/  8856  mean30 L/M/H  5.44/ 7.51/ 8.00  H-L  +2.56  mono 5/5  POS
+    2021  N L/M/H  39131/ 31789/ 13053  mean30 L/M/H  3.77/ 5.30/ 6.87  H-L  +3.10  mono 5/5  POS
+    2022  N L/M/H  31968/ 38078/ 13783  mean30 L/M/H  7.68/ 9.32/12.25  H-L  +4.57  mono 5/5  POS
+    2023  N L/M/H  27171/ 40153/ 16153  mean30 L/M/H  4.72/ 5.60/ 7.24  H-L  +2.52  mono 5/5  POS
+    2024  N L/M/H  27699/ 39420/ 16557  mean30 L/M/H  5.26/ 6.17/ 7.58  H-L  +2.32  mono 5/5  POS
+    2025  N L/M/H  31324/ 36347/ 15544  mean30 L/M/H  7.23/ 9.31/11.38  H-L  +4.15  mono 5/5  POS
+    2026  N L/M/H  22702/ 20727/  8837  mean30 L/M/H  7.21/ 9.62/12.58  H-L  +5.37  mono 5/5  POS
+    -> 8 of 8 years positive   A5 PASS
+
+VOLUME-REGIME-V1
+    2019  N L/M/H  17441/ 14936/ 16202  mean30 L/M/H  2.24/ 2.80/ 3.63  H-L  +1.39  mono 5/5  POS
+    2020  N L/M/H  25665/ 29305/ 28679  mean30 L/M/H  4.81/ 6.82/ 7.54  H-L  +2.73  mono 5/5  POS
+    2021  N L/M/H  24158/ 29087/ 30728  mean30 L/M/H  3.49/ 4.46/ 6.24  H-L  +2.75  mono 5/5  POS
+    2022  N L/M/H  15734/ 33760/ 34335  mean30 L/M/H  7.26/ 8.48/10.73  H-L  +3.47  mono 5/5  POS
+    2023  N L/M/H  16774/ 33428/ 33275  mean30 L/M/H  4.51/ 5.19/ 6.64  H-L  +2.13  mono 5/5  POS
+    2024  N L/M/H  17459/ 33041/ 33176  mean30 L/M/H  4.92/ 5.67/ 7.27  H-L  +2.35  mono 5/5  POS
+    2025  N L/M/H  14823/ 33438/ 34954  mean30 L/M/H  6.60/ 8.37/10.41  H-L  +3.81  mono 5/5  POS
+    2026  N L/M/H  11372/ 19383/ 21511  mean30 L/M/H  6.63/ 8.28/11.07  H-L  +4.44  mono 5/5  POS
+    -> 8 of 8 years positive   A5 PASS
+
+==============================================================================
+A4 - MONTH STABILITY (inverted months shown, never hidden)
+==============================================================================
+RANGE-REGIME-V1  months 87  positive 87 (100%)  median +2.50
+    worst +0.75 (2024-05)   best +7.50 (2026-02)   A4 PASS
+
+VOLUME-REGIME-V1  months 87  positive 86 (99%)  median +2.00
+    worst +0.00 (2025-04)   best +5.75 (2026-02)   A4 PASS
+    inverted/flat months (1): 2025-04 +0.00
+
+==============================================================================
+A6 - TIME OF DAY (frozen predeclared buckets) + ToD-matched
+==============================================================================
+RANGE-REGIME-V1
+  OPEN 0930-1030       n 111154  med30 L/M/H  4.50/ 6.00/ 6.75  mono 5/5
+  MIDMORN 1030-1200    n 166790  med30 L/M/H  3.75/ 4.75/ 5.50  mono 5/5
+  MIDDAY 1200-1330     n 161601  med30 L/M/H  3.25/ 4.25/ 5.25  mono 5/5
+  AFTERNOON 1330-1500  n 161327  med30 L/M/H  3.50/ 4.50/ 6.25  mono 5/5
+  pooled H-L median@30 +2.750   ToD-matched +2.347   retained 85%   A6 PASS
+  3-trading-day-lagged label H-L +1.000  (slow regime component)
+
+VOLUME-REGIME-V1
+  OPEN 0930-1030       n 111154  med30 L/M/H  2.25/ 5.50/ 6.50  mono 5/5
+  MIDMORN 1030-1200    n 166790  med30 L/M/H  3.00/ 4.50/ 5.00  mono 5/5
+  MIDDAY 1200-1330     n 161601  med30 L/M/H  3.00/ 4.25/ 4.75  mono 5/5
+  AFTERNOON 1330-1500  n 161327  med30 L/M/H  3.25/ 4.25/ 5.25  mono 5/5
+  pooled H-L median@30 +2.500   ToD-matched +2.548   retained 102%   A6 PASS
+  3-trading-day-lagged label H-L +1.250  (slow regime component)
+
+==============================================================================
+PERSISTENCE (mean 1m range per minute AFTER the state)
+==============================================================================
+RANGE-REGIME-V1
+  window      3      5     10     15     30
+  LOW      1.58   1.60   1.62   1.63   1.64
+  MEDIUM   2.17   2.20   2.23   2.22   2.19
+  HIGH     2.92   2.95   2.88   2.85   2.77
+  H/L      1.84   1.84   1.77   1.74   1.69
+
+VOLUME-REGIME-V1
+  window      3      5     10     15     30
+  LOW      1.33   1.40   1.43   1.43   1.46
+  MEDIUM   1.92   1.95   1.98   1.98   1.98
+  HIGH     2.67   2.65   2.62   2.60   2.55
+  H/L      2.00   1.89   1.84   1.81   1.75
+
+==============================================================================
+SYMMETRY - does HIGH enlarge BOTH excursions together?
+==============================================================================
+RANGE-REGIME-V1
+  LOW     n  248860   med MFE60   5.25   med MAE60   5.00   MFE/MAE 1.050
+  MEDIUM  n  254557   med MFE60   6.75   med MAE60   6.75   MFE/MAE 1.000
+  HIGH    n   99247   med MFE60   8.25   med MAE60   8.50   MFE/MAE 0.971
+
+VOLUME-REGIME-V1
+  LOW     n  143426   med MFE60   4.75   med MAE60   4.50   MFE/MAE 1.056
+  MEDIUM  n  226378   med MFE60   6.25   med MAE60   6.25   MFE/MAE 1.000
+  HIGH    n  232860   med MFE60   7.50   med MAE60   7.75   MFE/MAE 0.968
+
+==============================================================================
+REDUNDANCY between the two ES tools (never combined)
+==============================================================================
+  Spearman(range score, volume score) = +0.7297
+
+==============================================================================
+TAIL DESTRUCTION (robustness only - NOT the primary result)
+==============================================================================
+  drop top 1%  RANGE-REGIME-V1    H-L mean30 +2.916   mono 5/5
+  drop top 1%  VOLUME-REGIME-V1   H-L mean30 +2.872   mono 5/5
+  drop top 5%  RANGE-REGIME-V1    H-L mean30 +2.009   mono 5/5
+  drop top 5%  VOLUME-REGIME-V1   H-L mean30 +2.041   mono 5/5
+
+==============================================================================
+DECLARED SECONDARY SLICES
+==============================================================================
+  roll-quarantined slice: 535177 of 602664 bars retained
+    RANGE-REGIME-V1    H-L mean30 +3.500  mono 5/5
+    VOLUME-REGIME-V1   H-L mean30 +3.334  mono 5/5
+  pre-discovery window (< 2025-08-18): 519005 bars
+    RANGE-REGIME-V1    H-L mean30 +3.174  mono 5/5
+    VOLUME-REGIME-V1   H-L mean30 +3.037  mono 5/5
+
+==============================================================================
+MECHANISM-vs-CALIBRATION DIAGNOSTIC
+  ES-internal terciles of the RAW score. Reported SOLELY to
+  separate the two conclusions. NEVER adopted as thresholds,
+  never used in any other test, creates no new tool.
+==============================================================================
+  RANGE-REGIME-V1  ES-internal terciles at 1.1453 / 1.7644
+    med30 L/M/H  3.25/ 4.50/ 5.75   H-L mean30 +2.973   monotone 5/5
+  VOLUME-REGIME-V1  ES-internal terciles at 1.4965 / 2.5623
+    med30 L/M/H  3.25/ 4.50/ 5.75   H-L mean30 +3.146   monotone 5/5
+
+==============================================================================
+TRACK A - DECLARED PASS RULES
+==============================================================================
+
+  RANGE-REGIME-V1
+    A1 monotone >=4 of 5 horizons            PASS
+    A2 HIGH-LOW mean30 CI excludes 0         PASS
+    A3 day-level permutation p < 0.05        PASS
+    A4 >=70% months positive                 PASS
+    A5 >=6 of 8 years positive               PASS
+    A6 ToD-matched retains >=50%             PASS
+    A7 every bucket >= 5% occupancy          PASS
+    ---> FULL OUT-OF-MARKET REPLICATION
+
+  VOLUME-REGIME-V1
+    A1 monotone >=4 of 5 horizons            PASS
+    A2 HIGH-LOW mean30 CI excludes 0         PASS
+    A3 day-level permutation p < 0.05        PASS
+    A4 >=70% months positive                 PASS
+    A5 >=6 of 8 years positive               PASS
+    A6 ToD-matched retains >=50%             PASS
+    A7 every bucket >= 5% occupancy          PASS
+    ---> FULL OUT-OF-MARKET REPLICATION
+
+==============================================================================
+TRACK A VERDICTS
+  RANGE-REGIME-V1      FULL OUT-OF-MARKET REPLICATION
+  VOLUME-REGIME-V1     FULL OUT-OF-MARKET REPLICATION
+==============================================================================
+HISTORICAL RESEARCH ONLY. NOTHING FROZEN WAS MODIFIED.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
