@@ -1,0 +1,264 @@
+==============================================================================
+ANOMALY-CONFIRM-V1   ONE-SHOT HOLDOUT EXECUTION
+  preregistration sha256 813f03e274059bf664b0a283291899d174e00
+  freeze commit fd2311af1cd7e4071e6105a1ebf58f4089796cce
+  M = 2   SHOCK-CONT-MEDIUM (primary) + MONDAY-RTH
+  SUBMITS NO ORDERS.  NO STRATEGY IS SIMULATED.
+==============================================================================
+
+==============================================================================
+PHASE 0  FREEZE REPRODUCTION  (discovery side; runs BEFORE any
+         holdout outcome is computed)
+==============================================================================
+  (6) RVMR thresholds  LOW < 1.270 <= MEDIUM <= 2.335 < HIGH
+      W=1440, own bar excluded, first scored index 1440, probes EXACT
+  (5) discovery pairs rebuilt: 99308   cutpoints reproduce within half a ULP of the 10-dp published precision (5e-11): EXACT
+      cut 1  frozen(published) -0.0011017009   reproduced -0.00110170086197   delta 3.80e-11
+      cut 2  frozen(published) -0.0005520548   reproduced -0.00055205484095   delta 4.10e-11
+      cut 3  frozen(published) -0.0002889478   reproduced -0.00028894775063   delta 4.94e-11
+      cut 4  frozen(published) -0.0001179931   reproduced -0.00011799310597   delta 5.97e-12
+      cut 5  frozen(published) +0.0000168159   reproduced +0.00001681590785   delta 7.85e-12
+      cut 6  frozen(published) +0.0001601759   reproduced +0.00016017590261   delta 2.61e-12
+      cut 7  frozen(published) +0.0003325537   reproduced +0.00033255368277   delta 1.72e-11
+      cut 8  frozen(published) +0.0005951824   reproduced +0.00059518244098   delta 4.10e-11
+      cut 9  frozen(published) +0.0011091640   reproduced +0.00110916402595   delta 2.60e-11
+      ENGINE USES THE FROZEN PUBLISHED VALUES.
+  FREEZE VERIFIED. Opening the holdout now, exactly once.
+
+==============================================================================
+PHASE 1  HOLDOUT BOUNDARY AND COVERAGE RECONCILIATION
+==============================================================================
+  holdout bars              926449   (frozen expectation 926,449)
+  contiguous 1m returns     925748   (frozen expectation 925,748)
+  exchange days             820   (frozen expectation 820)
+  distinct months           32   (frozen expectation 32)
+  days by year              2024 313  2025 311  2026 196
+  first holdout bar         2024-01-01 18:01:00
+  last  holdout bar         2026-08-17 15:16:00
+  returns using a DISCOVERY predecessor bar: 0  (must be 0)
+  15m blocks 61073   shock/forward pairs 59700
+  pairs crossing a calendar-date label (true midnight contiguity): 1
+
+  15m GRID PHASE (frozen: anchored to each day's first valid
+  contiguous return, NOT a :00/:15/:30/:45 clock grid)
+    2024-01-01  block1 bars 18:02 .. 18:16
+    2024-01-02  block1 bars 00:00 .. 00:14
+    2024-01-03  block1 bars 00:00 .. 00:14
+    2024-01-04  block1 bars 00:00 .. 00:14
+    distinct grid phases across 820 holdout days: 6
+
+==============================================================================
+CANDIDATE 1   SHOCK-CONT-MEDIUM   (PRIMARY, promotable)
+==============================================================================
+  holdout decile occupancy under the FROZEN cutpoints
+  (bins are NOT expected to be 10%% each - that is the point):
+    dec 0  n   5918  ( 9.91%)
+    dec 1  n   6190  (10.37%)
+    dec 2  n   5868  ( 9.83%)
+    dec 3  n   5954  ( 9.97%)
+    dec 4  n   5696  ( 9.54%)
+    dec 5  n   6048  (10.13%)
+    dec 6  n   5954  ( 9.97%)
+    dec 7  n   6079  (10.18%)
+    dec 8  n   6210  (10.40%)
+    dec 9  n   5783  ( 9.69%)
+  holdout shocks lying within 1e-9 of ANY frozen cutpoint (i.e. reclassifiable by 10-dp rounding): 0
+
+  extreme events (dec0 U dec9) 11701   UP 5783   DOWN 5918   (dropped, no RVMR score: 0)
+
+  PRIMARY LADDER  cont = sign(shock) x forward15, state = RB[j0]
+  state          n      cont bp                  95% CI (bp)     boot p
+  LOW         6296      -0.1698   [    -0.5358,     +0.1959]    0.35690
+  MEDIUM      3880      +0.5345   [    -0.1041,     +1.1703]    0.10050   <-- PRIMARY
+  HIGH        1525      +0.1990   [    -1.1917,     +1.5576]    0.77260
+
+  UP / DOWN inside MEDIUM (both required positive)
+  UP     n   1791  cont   +1.1838 bp  CI [  +0.1193,   +2.2664]  p 0.02830
+  DOWN   n   2089  cont   -0.0222 bp  CI [  -1.0680,   +0.9579]  p 0.96590
+
+  UP / DOWN inside LOW and HIGH (context, not gated)
+    LOW     UP    n   3416  cont   +0.1696 bp
+    LOW     DOWN  n   2880  cont   -0.5724 bp
+    HIGH    UP    n    576  cont   -1.8076 bp
+    HIGH    DOWN  n    949  cont   +1.4169 bp
+
+  dec7 SECONDARY (corroboration only, cannot rescue):
+    MEDIUM     n    729  fwd15   -0.0915 bp  CI [  -1.1514,   +0.9794]  p 0.86790
+    all states n   6079  fwd15   -0.0415 bp
+    discovery anchors: MEDIUM +0.7274 bp
+
+  EFFECT RETENTION
+    discovery MEDIUM  +0.8423 bp
+    holdout   MEDIUM  +0.5345 bp
+    retention         63.5%   (frozen floor +0.2808 bp)
+  ECONOMIC SCALE (reported, NEVER gated)
+    mean close at MEDIUM extreme events  23640.57
+    effect in NQ points  +1.2636   round-turn cost 0.87 pts
+    gross multiple of cost  1.452x   (cost = 0.3680 bp here)
+
+  CONTROL C1  ATR TERCILES (frozen cuts 0.0004875675 / 0.0007651141)
+    tercile      n MED  MED cont bp      CI lo |    n all   ATRonly bp
+    ATR-LOW        879      -0.2649    -0.9997 |     4107      -0.1112
+    ATR-MID       1372      +1.0992     0.2757 |     3934      +0.1871
+    ATR-HIGH      1629      +0.4902    -0.8284 |     3660      +0.2811
+    MEDIUM-size weighted   +0.5345 bp  (degenerate: equals the unstratified mean by construction)
+    ATR-standardised       +0.4299 bp  (reweighted to the ALL-STATE ATR distribution)
+    unstratified MEDIUM    +0.5345 bp
+    terciles with MEDIUM cont > 0: 2 of 3
+    REDUNDANT-WITH-ATR condition 1 (standardised < 50% of unstratified): False
+    REDUNDANT-WITH-ATR condition 2 (max ATR-only >= MEDIUM): False
+
+  CONTROL C2  TIME OF DAY of forward-block start j0
+    OVERNIGHT  n    887  cont   +0.0370 bp  CI [  -0.9621,   +0.9817]
+    RTH_AM     n   1865  cont   +0.5880 bp  CI [  -0.3774,   +1.5288]
+    RTH_PM     n   1128  cont   +0.8373 bp  CI [  -0.5288,   +2.2521]
+    buckets with MEDIUM cont > 0: 3 of 3
+
+  CONTROL C3  SHOCK MAGNITUDE median split (frozen per side)
+    smaller |shock|  n   1698  cont   +0.6929 bp  CI [  -0.1855,   +1.6408]  p 0.13100
+    larger  |shock|  n   2182  cont   +0.4112 bp  CI [  -0.5526,   +1.3655]  p 0.39740
+    smaller-half CI lies entirely below 0: False
+
+  REPORTED-ONLY DIAGNOSTICS (flagged, never gated)
+    momentum: preceding block same sign as shock  n 5798  cont +0.0087 bp
+    momentum: preceding block opposite sign       n 5709  cont +0.2734 bp
+
+  YEAR STABILITY (frozen: positive in >= 2 of 3)
+  year     n MED      MED bp       UP bp     DOWN bp      LOW bp     HIGH bp
+  2024      1318     +0.5535     +2.2988     -1.0841     +0.1400     +1.3974
+  2025      1490     +0.2503     +0.6555     -0.0817     -0.1512     -1.0345
+  2026      1072     +0.9063     +0.4435     +1.2843     -0.3823     +0.1642
+  years with MEDIUM cont > 0: 3 of 3
+
+  MONTH STABILITY (frozen: >= 18 of 32 positive AND median month > 0)
+    2024-01 n 104   +0.514   2024-02 n  98   -0.482   2024-03 n  89   +1.378   2024-04 n 131   +0.020
+    2024-05 n  79   +1.468   2024-06 n  85   +0.710   2024-07 n 128   +1.740   2024-08 n 155   -0.250
+    2024-09 n 125   +2.053   2024-10 n 117   +1.438   2024-11 n 108   +0.266   2024-12 n  99   -2.181
+    2025-01 n 147   +1.332   2025-02 n 118   +0.112   2025-03 n 206   -1.378   2025-04 n 236   +1.924
+    2025-05 n 131   -1.490   2025-06 n  97   -0.602   2025-07 n  75   -0.253   2025-08 n  82   -1.133
+    2025-09 n  56   +2.700   2025-10 n 104   -0.168   2025-11 n 142   +3.737   2025-12 n  96   -3.178
+    2026-01 n 111   -2.114   2026-02 n 132   +0.328   2026-03 n 183   +0.568   2026-04 n 106   +0.971
+    2026-05 n 123   -0.480   2026-06 n 179   +0.818   2026-07 n 197   +5.091   2026-08 n  41   -3.274
+    months 32   positive 19   negative 13   median +0.3275 bp
+    best 2026-07 +5.0906 bp   worst 2026-08 -3.2742 bp
+
+  TAIL DESTRUCTION (frozen: mean > 0 after top-1%% AND top-5%% removal by SIGNED cont)
+    remove top  1.0% (  39 events)  n   3841  cont   -0.3629 bp
+    remove top  5.0% ( 194 events)  n   3686  cont   -2.1122 bp
+    top-1% share of total MEDIUM effect: 167.2%
+    symmetric |cont| trim  1.0% (  39)  cont   +0.6359 bp
+    symmetric |cont| trim  5.0% ( 194)  cont   +0.4020 bp
+
+  PERMUTATION NULLS (frozen, 20000 iterations, seed 20260825)
+    P1 day sign-flip                p = 0.09820
+    P2 within-day state shuffle     p = 0.06435
+    (elapsed 154 s)
+
+==============================================================================
+CANDIDATE 2   MONDAY-RTH   (secondary promotable)
+==============================================================================
+  Monday RTH sessions 137   non-Monday RTH sessions 539
+  MONDAY RTH      mean  +14.7444 bp  CI [  +0.8872,  +28.5287]  p 0.03570
+  NON-MONDAY RTH  mean   -2.8478 bp  CI [ -11.3800,   +5.9354]
+  DIFFERENTIAL     +17.5922 bp   (discovery +16.2602 bp)
+  SUN 18:00-24:00  n  137  mean   +6.0331 bp  CI [  -0.9135,  +13.1896]
+  MON 00:00-09:29  n  137  mean   +9.9777 bp  CI [  +0.7380,  +19.1120]
+
+  RETENTION  discovery +16.6296 bp -> holdout +14.7444 bp  = 88.7%   (floor +5.5432 bp)
+
+  YEAR STABILITY (frozen: > 0 in >= 2 of 3)
+    2024  n  52  mean   +9.9665 bp
+    2025  n  52  mean  +16.8174 bp
+    2026  n  33  mean  +19.0068 bp
+    years positive: 3 of 3
+
+  MONTH STABILITY (frozen: > 0 in >= 17 of 32)
+    2024-01 n 4   +52.48   2024-02 n 4   -14.53   2024-03 n 4    -8.51   2024-04 n 5   -44.63
+    2024-05 n 4   +35.47   2024-06 n 4   +15.38   2024-07 n 5    +6.86   2024-08 n 4   +58.63
+    2024-09 n 5   +17.29   2024-10 n 4    -9.62   2024-11 n 4   -19.12   2024-12 n 5   +36.00
+    2025-01 n 4   +33.90   2025-02 n 4    -5.71   2025-03 n 5   -41.88   2025-04 n 4   +21.78
+    2025-05 n 4   +47.11   2025-06 n 5   +55.95   2025-07 n 4   +15.24   2025-08 n 4   +17.40
+    2025-09 n 5   +26.46   2025-10 n 4   +36.12   2025-11 n 4   +36.18   2025-12 n 5   -27.24
+    2026-01 n 4   +37.76   2026-02 n 4   +35.87   2026-03 n 5   +35.80   2026-04 n 4   +40.25
+    2026-05 n 4   -15.45   2026-06 n 5   +42.45   2026-07 n 4   -67.37   2026-08 n 3   +37.24
+    months 32   positive 22   negative 10   median +26.459 bp
+    best 2024-08 +58.628 bp   worst 2026-07 -67.369 bp
+
+  TAIL DESTRUCTION (frozen: mean > 0 after top-1%% AND top-5%% removal by SIGNED return)
+    remove top  1.0% ( 1 Mondays)  n 136  mean  +12.3022 bp   removed share of total 17.2%
+    remove top  5.0% ( 7 Mondays)  n 130  mean   +4.7047 bp   removed share of total 69.7%
+    mean  +14.7444   median  +10.4514   10%-trimmed  +15.1978 bp
+
+  PERMUTATION NULLS
+    P3 sign flip                    p = 0.04055
+    P4 weekday-label permutation    p = 0.06710  (differential)
+
+==============================================================================
+MULTIPLICITY  (binding M = 2; M = 5 reported as NON-BINDING family-size sensitivity)
+==============================================================================
+  candidate                    boot p   BH q (M=2)   BH q (M=5)
+  SHOCK-CONT-MEDIUM           0.10050      0.10050      0.25125
+  MONDAY-RTH                  0.03570      0.07140      0.17850
+
+==============================================================================
+SC1-SC15  SHOCK-CONT-MEDIUM CONFIRMATION GATE
+==============================================================================
+  SC1   holdout-only data                          leak=0, all events >= 2024-01-01               PASS
+  SC2   frozen cutpoints transported               reproduced to 1e-12; 0 holdout quantiles       PASS
+  SC3   MEDIUM cont > 0                            +0.5345 bp                                     PASS
+  SC4   retention >= +0.2808 bp                    +0.5345 bp (63.5%)                             PASS
+  SC5   UP > 0 AND DOWN > 0                        UP +1.1838, DOWN -0.0222 bp                    FAIL
+  SC6   MED > LOW and MED > HIGH                   MED +0.5345, LOW -0.1698, HIGH +0.1990 bp      PASS
+  SC7   CI excludes 0 AND P1<=.05 AND P2<=.05      CI [-0.1041,+1.1703] P1 0.09820 P2 0.06435     FAIL
+  SC8   BH q <= 0.05 at M=2                        q = 0.10050                                    FAIL
+  SC9   positive in >= 2 of 3 years                3 of 3                                         PASS
+  SC10  >= 18/32 months AND median month > 0       19 of 32 positive, median +0.3275 bp           PASS
+  SC11  mean > 0 after top-1%% and top-5%% removal -0.3629 / -2.1122 bp                           FAIL
+  SC12  ATR control + not REDUNDANT-WITH-ATR       2/3 terciles >0, std +0.4299 vs unstrat +0.5345, redundant=False PASS
+  SC13  MEDIUM > 0 in >= 2 of 3 time buckets       3 of 3                                         PASS
+  SC14  smaller-|shock| half not significantly negative CI [-0.1855, +1.6408] bp                       PASS
+  SC15  min n: MED>=2000, extreme>=6000, side>=800 MED 3880, extreme 11701, UP 1791, DOWN 2089    PASS
+  SC PASSED 11 / 15
+
+==============================================================================
+MR1-MR9  MONDAY-RTH CONFIRMATION GATE
+==============================================================================
+  MR1   holdout-only data                          all Mondays >= 2024-01-01, leak=0              PASS
+  MR2   n >= 120 Mondays                           n = 137                                        PASS
+  MR3   mean Monday RTH > 0                        +14.7444 bp                                    PASS
+  MR4   retention >= +5.5432 bp                    +14.7444 bp (88.7%)                            PASS
+  MR5   CI excludes 0 AND P3 <= 0.05               CI [+0.8872,+28.5287] P3 0.04055               PASS
+  MR6   BH q <= 0.05 at M=2                        q = 0.07140                                    FAIL
+  MR7   >= 2/3 years AND >= 17/32 months           3 of 3 years, 22 of 32 months                  PASS
+  MR8   mean > 0 after top-1%% and top-5%% removal +12.3022 / +4.7047 bp                          PASS
+  MR9   definition unchanged AND Mon - nonMon > 0  RTH 570-960 unchanged; differential +17.5922 bp (P4 0.06710) PASS
+  MR PASSED 8 / 9
+
+==============================================================================
+NON-PROMOTABLE SECONDARY DIAGNOSTICS
+==============================================================================
+  AC-FLIP  (verbatim estimator on the STATE-FILTERED list)
+  state         n 1m       AC1 1m      disc 1m        n 15m      AC1 15m     disc 15m
+  LOW         706196    -0.012551    -0.028036        48046    -0.002351    +0.002265
+  MEDIUM      165327    +0.000460    +0.016644        10094    +0.024989    -0.005023
+  HIGH         54225    +0.009395    +0.023863         2933    -0.067115    -0.032083
+  adjacency-restricted variant (both minutes adjacent AND same state):
+    LOW     n   677756  adjacency-restricted AC1 -0.013145
+    MEDIUM  n   106438  adjacency-restricted AC1 -0.002058
+    HIGH    n    34741  adjacency-restricted AC1 +0.007271
+
+  CLV-FLIP
+    LOW     n   705577  corr(CLV_t, r_t+1) -0.006817   (discovery -0.007007)
+    MEDIUM  n   165239  corr(CLV_t, r_t+1) -0.007489   (discovery +0.008840)
+    HIGH    n    54214  corr(CLV_t, r_t+1) -0.004151   (discovery +0.014121)
+
+  LEVERAGE-V   P(RVMR RANGE HIGH within 30m | frozen shock decile)
+    holdout  d0 0.6342  d1 0.4045  d2 0.2947  d3 0.2302  d4 0.2111  d5 0.2119  d6 0.2261  d7 0.2698  d8 0.3392  d9 0.5553
+    discovery d0 0.6402 d1 0.4257 d2 0.3228 d3 0.2608 d4 0.2374 d5 0.2469 d6 0.2741 d7 0.3174 d8 0.3870 d9 0.5562
+    V-shape (d0 and d9 above every d3..d6): True   downside asymmetry P(d0) > P(d9): True
+
+==============================================================================
+EXECUTION COMPLETE  (elapsed 168 s)
+SUBMITS NO ORDERS.  NO STRATEGY WAS SIMULATED.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
+==============================================================================
