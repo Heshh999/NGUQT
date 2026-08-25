@@ -1,0 +1,249 @@
+TRACK A - harvested (canonical, unchanged):
+  A10_G4               218 events
+  A1_OFH13             133 events
+  A2_OFH14             462 events
+  A3_SWEEP_RECLAIM     589 events
+  A4_ACCEPT_BRK       1876 events
+  A5_REJECT_BRK       2018 events
+  A6_V_RECOVERY        995 events
+  A7_MEAN_REV          445 events
+  A8_OPEN_DRIVE        231 events
+  A9_OVN_RECLAIM       187 events
+
+================================================================================================
+A10_G4   n=218   (measurement frame identical across states)
+  RANGE  selectivity  L 12%  M 47%  H 41%
+    LOW    n   26  EV  +11.50  R +0.394  WR 42.3%  PF  1.76  medR -1.023  MFE 3.00  MAE 1.63  M/M 1.84  ff 60.0%  stop 57.7%  P1R 53.8%  P2R 38.5%  P3R 26.9%  wMFE 5.24
+    MEDIUM n  102  EV   -0.34  R -0.052  WR 24.5%  PF  0.99  medR -1.023  MFE 2.48  MAE 2.21  M/M 1.13  ff 43.7%  stop 75.5%  P1R 37.3%  P2R 21.6%  P3R 10.8%  wMFE 4.48
+    HIGH   n   90  EV   +5.02  R +0.179  WR 31.1%  PF  1.17  medR -1.015  MFE 2.07  MAE 2.06  M/M 1.00  ff 43.2%  stop 63.3%  P1R 45.6%  P2R 28.9%  P3R 20.0%  wMFE 5.99
+    HIGH-LOW EV   -6.48  CI[-34.27,+21.01]  p 0.6269  | ATR-controlled  -2.37  hour-controlled  -3.59
+      LOW  winners n  11 avg  +62.83  medMFE 5.24  p95MFE  nan | losers n  15 avg  -26.14  losing-MAE 2.60  full-stop 100.0%
+      HIGH winners n  28 avg +109.48  medMFE 5.99  p95MFE 11.32 | losers n  62 avg  -42.16  losing-MAE 2.80  full-stop 91.9%
+    best state LOW: top-10 winners kept 0/10, winner P&L kept 11%, per-original-parent EV +1.37 (vs unfiltered +3.29)
+  VOLUME  selectivity  L 4%  M 18%  H 78%
+    LOW    n    8  EV   -1.80  R +0.076  WR 25.0%  PF  0.88  medR -1.052  MFE 1.67  MAE 2.49  M/M 0.67  ff 28.6%  stop 75.0%  P1R 50.0%  P2R 25.0%  P3R 12.5%  wMFE 8.07
+    MEDIUM n   40  EV   +4.02  R +0.039  WR 32.5%  PF  1.22  medR -1.026  MFE 2.72  MAE 2.15  M/M 1.27  ff 60.0%  stop 67.5%  P1R 40.0%  P2R 27.5%  P3R 17.5%  wMFE 5.08
+    HIGH   n  170  EV   +3.35  R +0.111  WR 28.8%  PF  1.12  medR -1.017  MFE 2.12  MAE 2.14  M/M 0.99  ff 43.0%  stop 68.2%  P1R 42.9%  P2R 26.5%  P3R 16.5%  wMFE 5.15
+  3x3 (N / EV / MFE-MAE ratio):
+    R-LOW    |    8   -1.80 0.67 |   12  +21.21 2.53 |    6   +9.83 2.37
+    R-MEDIUM |    -       -    - |   27   -2.78 1.21 |   75   +0.54 0.95
+    R-HIGH   |    -       -    - |    1  -18.48 0.26 |   89   +5.28 1.05
+
+================================================================================================
+A1_OFH13   n=133   (measurement frame identical across states)
+  RANGE  selectivity  L 9%  M 51%  H 40%
+    LOW    n   12  EV   +6.47  R +0.348  WR 33.3%  PF  1.34  medR -1.026  MFE 1.75  MAE 2.38  M/M 0.74  ff 22.2%  stop 66.7%  P1R 33.3%  P2R 25.0%  P3R 25.0%  wMFE 6.98
+    MEDIUM n   67  EV  +13.89  R +0.268  WR 31.3%  PF  1.60  medR -1.020  MFE 2.76  MAE 2.06  M/M 1.34  ff 45.6%  stop 64.2%  P1R 47.8%  P2R 31.3%  P3R 23.9%  wMFE 5.22
+    HIGH   n   53  EV  +23.56  R +0.581  WR 41.5%  PF  2.13  medR -1.014  MFE 2.62  MAE 1.43  M/M 1.83  ff 48.9%  stop 54.7%  P1R 52.8%  P2R 35.8%  P3R 15.1%  wMFE 3.92
+    HIGH-LOW EV  +17.09  CI[-27.37,+54.89]  p 0.4125  | ATR-controlled +15.81  hour-controlled   +nan
+      LOW  winners n   4 avg  +75.94  medMFE 6.98  p95MFE  nan | losers n   8 avg  -28.26  losing-MAE 3.18  full-stop 100.0%
+      HIGH winners n  22 avg +107.02  medMFE 3.92  p95MFE 12.13 | losers n  31 avg  -35.67  losing-MAE 2.69  full-stop 93.5%
+    best state HIGH: top-10 winners kept 4/10, winner P&L kept 46%, per-original-parent EV +9.39 (vs unfiltered +17.26)
+  VOLUME  selectivity  L 1%  M 14%  H 86%
+    LOW    n    1  EV  -16.45  R -1.056  WR  0.0%  PF  0.00  medR -1.056  MFE 1.47  MAE 2.24  M/M 0.66  ff  0.0%  stop 100.0%  P1R  0.0%  P2R  0.0%  P3R  0.0%  wMFE  nan
+    MEDIUM n   18  EV   +3.70  R +0.200  WR 33.3%  PF  1.18  medR -1.026  MFE 1.55  MAE 3.02  M/M 0.51  ff 42.9%  stop 66.7%  P1R 33.3%  P2R 27.8%  P3R 27.8%  wMFE 6.78
+    HIGH   n  113  EV  +19.53  R +0.446  WR 36.3%  PF  1.88  medR -1.018  MFE 2.65  MAE 1.86  M/M 1.42  ff 45.8%  stop 59.3%  P1R 51.3%  P2R 33.6%  P3R 19.5%  wMFE 4.65
+  3x3 (N / EV / MFE-MAE ratio):
+    R-LOW    |    1  -16.45 0.66 |    7   +4.50 1.59 |    4  +15.66 0.63
+    R-MEDIUM |    -       -    - |   11   +3.19 0.46 |   56  +15.99 1.39
+    R-HIGH   |    -       -    - |    -       -    - |   53  +23.56 1.83
+  geometry LOW : med structDist 0.79 ATR   P(dist<=0.75ATR & MFE>=2ATR) 25.0%
+  geometry HIGH: med structDist 0.67 ATR   P(dist<=0.75ATR & MFE>=2ATR) 35.8%
+
+================================================================================================
+A2_OFH14   n=462   (measurement frame identical across states)
+  RANGE  selectivity  L 25%  M 50%  H 25%
+    LOW    n  114  EV   -2.14  R -0.356  WR 12.3%  PF  0.78  medR -1.094  MFE 2.88  MAE 2.19  M/M 1.32  ff 44.9%  stop 87.7%  P1R 40.4%  P2R 23.7%  P3R 16.7%  wMFE 6.00
+    MEDIUM n  229  EV   -0.75  R +0.018  WR 11.8%  PF  0.95  medR -1.060  MFE 2.47  MAE 2.67  M/M 0.93  ff 45.9%  stop 88.2%  P1R 38.9%  P2R 26.2%  P3R 19.7%  wMFE 5.95
+    HIGH   n  116  EV  +11.28  R +0.474  WR 20.7%  PF  1.72  medR -1.047  MFE 2.26  MAE 1.79  M/M 1.26  ff 46.7%  stop 75.9%  P1R 35.3%  P2R 25.0%  P3R 22.4%  wMFE 5.72
+    HIGH-LOW EV  +13.42  CI[+0.79,+26.95]  p 0.0370  | ATR-controlled  +6.74  hour-controlled +14.95
+      LOW  winners n  14 avg  +61.84  medMFE 6.00  p95MFE  nan | losers n 100 avg  -11.09  losing-MAE 2.48  full-stop 100.0%
+      HIGH winners n  24 avg +129.85  medMFE 5.72  p95MFE 12.13 | losers n  92 avg  -19.65  losing-MAE 2.43  full-stop 95.7%
+    best state HIGH: top-10 winners kept 5/10, winner P&L kept 44%, per-original-parent EV +2.83 (vs unfiltered +1.96)
+  VOLUME  selectivity  L 9%  M 29%  H 62%
+    LOW    n   40  EV   -2.15  R -0.497  WR 12.5%  PF  0.72  medR -1.120  MFE 3.13  MAE 1.97  M/M 1.59  ff 53.1%  stop 87.5%  P1R 42.5%  P2R 20.0%  P3R 15.0%  wMFE 4.54
+    MEDIUM n  133  EV   -1.15  R +0.025  WR 11.3%  PF  0.90  medR -1.073  MFE 2.27  MAE 2.67  M/M 0.85  ff 48.0%  stop 88.0%  P1R 42.1%  P2R 27.8%  P3R 18.0%  wMFE 7.48
+    HIGH   n  286  EV   +3.95  R +0.123  WR 15.7%  PF  1.26  medR -1.054  MFE 2.42  MAE 2.26  M/M 1.07  ff 44.1%  stop 83.2%  P1R 36.0%  P2R 24.8%  P3R 21.0%  wMFE 5.43
+    HIGH-LOW EV   +6.10  CI[-4.46,+16.04]  p 0.2390  | ATR-controlled  +2.68  hour-controlled  +7.53
+      LOW  winners n   5 avg  +43.18  medMFE 4.54  p95MFE  nan | losers n  35 avg   -8.62  losing-MAE 2.05  full-stop 100.0%
+      HIGH winners n  45 avg +121.10  medMFE 5.43  p95MFE 12.13 | losers n 241 avg  -17.92  losing-MAE 2.77  full-stop 98.8%
+    best state HIGH: top-10 winners kept 9/10, winner P&L kept 77%, per-original-parent EV +2.45 (vs unfiltered +1.96)
+  3x3 (N / EV / MFE-MAE ratio):
+    R-LOW    |   40   -2.15 1.59 |   66   -0.82 1.11 |    8  -12.93 0.53
+    R-MEDIUM |    -       -    - |   66   -1.40 0.67 |  163   -0.49 0.98
+    R-HIGH   |    -       -    - |    1   -5.87 2.45 |  115  +11.43 1.25
+  geometry LOW : med structDist 0.65 ATR   P(dist<=0.75ATR & MFE>=2ATR) 38.6%
+  geometry HIGH: med structDist 0.70 ATR   P(dist<=0.75ATR & MFE>=2ATR) 32.8%
+
+================================================================================================
+A3_SWEEP_RECLAIM   n=581   (measurement frame identical across states)
+  RANGE  selectivity  L 23%  M 32%  H 45%
+    LOW    n  132  EV   -2.09  R -0.018  WR 20.5%  PF  0.84  medR -1.054  MFE 2.56  MAE 2.77  M/M 0.92  ff 58.7%  stop 78.8%  P1R 39.4%  P2R 28.0%  P3R 16.7%  wMFE 5.79
+    MEDIUM n  186  EV   +4.66  R +0.157  WR 28.5%  PF  1.29  medR -1.034  MFE 3.01  MAE 2.42  M/M 1.24  ff 55.1%  stop 70.4%  P1R 50.0%  P2R 28.5%  P3R 20.4%  wMFE 5.42
+    HIGH   n  262  EV   +2.61  R +0.107  WR 19.8%  PF  1.12  medR -1.033  MFE 3.70  MAE 3.35  M/M 1.10  ff 58.0%  stop 80.2%  P1R 45.8%  P2R 27.9%  P3R 17.6%  wMFE 8.57
+    HIGH-LOW EV   +4.70  CI[-5.96,+15.45]  p 0.3907  | ATR-controlled +13.50  hour-controlled  +5.49
+      LOW  winners n  27 avg  +51.96  medMFE 5.79  p95MFE 23.35 | losers n 105 avg  -15.99  losing-MAE 3.32  full-stop 99.0%
+      HIGH winners n  52 avg +119.01  medMFE 8.57  p95MFE 20.13 | losers n 210 avg  -26.21  losing-MAE 4.48  full-stop 100.0%
+    best state MEDIUM: top-10 winners kept 1/10, winner P&L kept 33%, per-original-parent EV +1.49 (vs unfiltered +2.37)
+  VOLUME  selectivity  L 10%  M 23%  H 67%
+    LOW    n   57  EV   +3.42  R +0.226  WR 24.6%  PF  1.36  medR -1.067  MFE 2.54  MAE 2.30  M/M 1.10  ff 56.5%  stop 73.7%  P1R 40.4%  P2R 31.6%  P3R 22.8%  wMFE 5.70
+    MEDIUM n  135  EV   +1.66  R +0.081  WR 25.9%  PF  1.12  medR -1.042  MFE 2.82  MAE 2.31  M/M 1.22  ff 57.7%  stop 73.3%  P1R 48.1%  P2R 30.4%  P3R 18.5%  wMFE 5.06
+    HIGH   n  388  EV   +2.20  R +0.080  WR 21.4%  PF  1.11  medR -1.033  MFE 3.50  MAE 3.10  M/M 1.13  ff 57.2%  stop 78.4%  P1R 45.6%  P2R 26.8%  P3R 17.5%  wMFE 6.81
+    HIGH-LOW EV   -1.22  CI[-13.66,+9.94]  p 0.8520  | ATR-controlled  +3.92  hour-controlled  -3.56
+      LOW  winners n  14 avg  +52.38  medMFE 5.70  p95MFE  nan | losers n  43 avg  -12.52  losing-MAE 3.16  full-stop 97.7%
+      HIGH winners n  83 avg +103.61  medMFE 6.81  p95MFE 19.50 | losers n 305 avg  -25.39  losing-MAE 4.27  full-stop 99.7%
+    best state LOW: top-10 winners kept 0/10, winner P&L kept 6%, per-original-parent EV +0.34 (vs unfiltered +2.37)
+  3x3 (N / EV / MFE-MAE ratio):
+    R-LOW    |   55   +1.26 0.89 |   60   -3.09 1.21 |   17   -9.39 0.35
+    R-MEDIUM |    2  +63.00 22.58 |   74   +5.81 1.20 |  110   +2.82 1.14
+    R-HIGH   |    -       -    - |    1  -20.33 0.69 |  261   +2.70 1.11
+
+================================================================================================
+A4_ACCEPT_BRK   n=1863   (measurement frame identical across states)
+  RANGE  selectivity  L 44%  M 35%  H 21%
+    LOW    n  827  EV   -1.39  R -0.164  WR 21.9%  PF  0.91  medR -1.041  MFE 2.53  MAE 2.85  M/M 0.89  ff 48.2%  stop 76.7%  P1R 41.4%  P2R 27.2%  P3R 16.4%  wMFE 5.36
+    MEDIUM n  649  EV   -4.96  R -0.158  WR 22.0%  PF  0.79  medR -1.027  MFE 2.35  MAE 2.65  M/M 0.89  ff 43.5%  stop 77.3%  P1R 40.7%  P2R 24.3%  P3R 14.3%  wMFE 4.89
+    HIGH   n  387  EV   +2.18  R +0.041  WR 21.2%  PF  1.09  medR -1.028  MFE 2.97  MAE 2.73  M/M 1.09  ff 49.7%  stop 76.7%  P1R 38.0%  P2R 26.1%  P3R 18.1%  wMFE 7.79
+    HIGH-LOW EV   +3.58  CI[-6.18,+14.80]  p 0.5349  | ATR-controlled  +2.83  hour-controlled  +0.25
+      LOW  winners n 181 avg  +66.08  medMFE 5.36  p95MFE 12.59 | losers n 646 avg  -20.30  losing-MAE 3.64  full-stop 98.1%
+      HIGH winners n  82 avg +125.20  medMFE 7.79  p95MFE 17.60 | losers n 305 avg  -30.89  losing-MAE 3.71  full-stop 97.4%
+    best state HIGH: top-10 winners kept 8/10, winner P&L kept 30%, per-original-parent EV +0.45 (vs unfiltered -1.89)
+  VOLUME  selectivity  L 11%  M 31%  H 58%
+    LOW    n  208  EV   -0.58  R -0.144  WR 21.2%  PF  0.96  medR -1.052  MFE 2.44  MAE 3.08  M/M 0.79  ff 50.0%  stop 78.4%  P1R 43.3%  P2R 27.4%  P3R 19.2%  wMFE 6.42
+    MEDIUM n  582  EV   -4.15  R -0.258  WR 19.6%  PF  0.77  medR -1.038  MFE 2.31  MAE 2.88  M/M 0.80  ff 46.9%  stop 78.5%  P1R 39.3%  P2R 24.7%  P3R 13.9%  wMFE 5.37
+    HIGH   n 1073  EV   -0.92  R -0.039  WR 23.1%  PF  0.96  medR -1.028  MFE 2.71  MAE 2.59  M/M 1.04  ff 46.2%  stop 75.8%  P1R 40.4%  P2R 26.4%  P3R 16.6%  wMFE 5.25
+    HIGH-LOW EV   -0.34  CI[-9.30,+8.16]  p 0.9300  | ATR-controlled  -4.78  hour-controlled  +5.77
+      LOW  winners n  44 avg  +61.93  medMFE 6.42  p95MFE 14.10 | losers n 164 avg  -17.35  losing-MAE 3.67  full-stop 99.4%
+      HIGH winners n 248 avg  +95.60  medMFE 5.25  p95MFE 14.15 | losers n 825 avg  -29.93  losing-MAE 3.57  full-stop 98.5%
+    best state LOW: top-10 winners kept 0/10, winner P&L kept 8%, per-original-parent EV -0.06 (vs unfiltered -1.89)
+  3x3 (N / EV / MFE-MAE ratio):
+    R-LOW    |  204   +0.56 0.80 |  467   -3.82 0.81 |  156   +3.30 1.28
+    R-MEDIUM |    2  -50.78 0.73 |  114   -5.24 0.76 |  533   -4.72 0.91
+    R-HIGH   |    2  -66.43 0.09 |    1  -38.18 0.57 |  384   +2.65 1.12
+
+================================================================================================
+A5_REJECT_BRK   n=2005   (measurement frame identical across states)
+  RANGE  selectivity  L 33%  M 40%  H 27%
+    LOW    n  665  EV   -1.34  R -0.068  WR 23.2%  PF  0.91  medR -1.043  MFE 2.43  MAE 2.53  M/M 0.96  ff 48.3%  stop 76.1%  P1R 43.2%  P2R 26.3%  P3R 16.1%  wMFE 5.64
+    MEDIUM n  796  EV   -1.93  R -0.100  WR 25.1%  PF  0.91  medR -1.028  MFE 2.47  MAE 2.50  M/M 0.99  ff 48.4%  stop 73.0%  P1R 42.6%  P2R 27.0%  P3R 18.5%  wMFE 5.19
+    HIGH   n  544  EV   +0.38  R +0.027  WR 23.5%  PF  1.01  medR -1.023  MFE 2.60  MAE 3.11  M/M 0.84  ff 52.4%  stop 75.4%  P1R 47.6%  P2R 30.0%  P3R 18.6%  wMFE 5.77
+    HIGH-LOW EV   +1.72  CI[-5.32,+9.09]  p 0.6479  | ATR-controlled  +3.57  hour-controlled  +7.55
+      LOW  winners n 154 avg  +59.66  medMFE 5.64  p95MFE 12.85 | losers n 511 avg  -19.72  losing-MAE 3.12  full-stop 99.0%
+      HIGH winners n 128 avg +111.78  medMFE 5.77  p95MFE 17.30 | losers n 416 avg  -33.90  losing-MAE 4.21  full-stop 98.6%
+    best state HIGH: top-10 winners kept 6/10, winner P&L kept 37%, per-original-parent EV +0.10 (vs unfiltered -1.11)
+  VOLUME  selectivity  L 16%  M 32%  H 52%
+    LOW    n  317  EV   +0.36  R -0.018  WR 23.7%  PF  1.03  medR -1.046  MFE 2.48  MAE 2.34  M/M 1.06  ff 51.4%  stop 75.7%  P1R 43.8%  P2R 27.1%  P3R 16.7%  wMFE 5.44
+    MEDIUM n  649  EV   -1.18  R -0.039  WR 25.6%  PF  0.93  medR -1.035  MFE 2.61  MAE 2.49  M/M 1.05  ff 47.8%  stop 72.7%  P1R 43.6%  P2R 27.7%  P3R 17.7%  wMFE 5.55
+    HIGH   n 1039  EV   -1.51  R -0.077  WR 23.2%  PF  0.94  medR -1.025  MFE 2.40  MAE 2.90  M/M 0.83  ff 49.6%  stop 75.6%  P1R 44.6%  P2R 27.6%  P3R 18.0%  wMFE 5.49
+    HIGH-LOW EV   -1.87  CI[-8.42,+4.65]  p 0.5733  | ATR-controlled  -7.20  hour-controlled  +0.45
+      LOW  winners n  75 avg  +59.73  medMFE 5.44  p95MFE 15.03 | losers n 242 avg  -18.04  losing-MAE 3.05  full-stop 99.2%
+      HIGH winners n 241 avg  +98.60  medMFE 5.49  p95MFE 13.79 | losers n 798 avg  -31.74  losing-MAE 3.88  full-stop 98.4%
+    best state LOW: top-10 winners kept 2/10, winner P&L kept 12%, per-original-parent EV +0.06 (vs unfiltered -1.11)
+  3x3 (N / EV / MFE-MAE ratio):
+    R-LOW    |  294   +0.42 1.10 |  335   -4.37 0.89 |   36  +12.49 1.13
+    R-MEDIUM |   22   -3.95 0.80 |  303   +2.69 1.45 |  471   -4.80 0.85
+    R-HIGH   |    1  +76.88 8.46 |   11  -10.86 1.18 |  532   +0.47 0.83
+
+================================================================================================
+A6_V_RECOVERY   n=984   (measurement frame identical across states)
+  RANGE  selectivity  L 26%  M 36%  H 38%
+    LOW    n  253  EV   -2.79  R -0.161  WR 23.7%  PF  0.77  medR -1.049  MFE 2.42  MAE 2.96  M/M 0.82  ff 47.8%  stop 75.1%  P1R 42.3%  P2R 26.9%  P3R 19.0%  wMFE 5.30
+    MEDIUM n  352  EV   -1.30  R -0.111  WR 24.1%  PF  0.92  medR -1.036  MFE 2.82  MAE 2.68  M/M 1.05  ff 51.4%  stop 73.9%  P1R 44.3%  P2R 27.6%  P3R 19.0%  wMFE 5.17
+    HIGH   n  374  EV   +0.11  R +0.037  WR 20.9%  PF  1.01  medR -1.031  MFE 3.55  MAE 3.21  M/M 1.10  ff 49.6%  stop 78.9%  P1R 46.0%  P2R 31.6%  P3R 19.5%  wMFE 6.49
+    HIGH-LOW EV   +2.90  CI[-4.52,+10.73]  p 0.4611  | ATR-controlled  +6.88  hour-controlled  +6.19
+      LOW  winners n  60 avg  +40.06  medMFE 5.30  p95MFE 12.34 | losers n 193 avg  -16.11  losing-MAE 3.63  full-stop 98.4%
+      HIGH winners n  78 avg +104.17  medMFE 6.49  p95MFE 18.82 | losers n 296 avg  -27.31  losing-MAE 4.47  full-stop 99.7%
+    best state HIGH: top-10 winners kept 7/10, winner P&L kept 50%, per-original-parent EV +0.04 (vs unfiltered -0.89)
+  VOLUME  selectivity  L 12%  M 28%  H 60%
+    LOW    n  117  EV   -4.42  R -0.314  WR 21.4%  PF  0.62  medR -1.061  MFE 2.17  MAE 2.63  M/M 0.82  ff 41.8%  stop 77.8%  P1R 39.3%  P2R 24.8%  P3R 14.5%  wMFE 5.05
+    MEDIUM n  272  EV   -3.50  R -0.156  WR 22.8%  PF  0.75  medR -1.043  MFE 2.87  MAE 2.79  M/M 1.03  ff 52.8%  stop 74.3%  P1R 45.2%  P2R 28.3%  P3R 19.5%  wMFE 5.30
+    HIGH   n  590  EV   +0.59  R +0.022  WR 23.1%  PF  1.03  medR -1.032  MFE 3.28  MAE 3.11  M/M 1.06  ff 50.1%  stop 76.6%  P1R 45.1%  P2R 30.0%  P3R 20.0%  wMFE 5.69
+    HIGH-LOW EV   +5.01  CI[-1.30,+11.38]  p 0.1229  | ATR-controlled  +7.87  hour-controlled  +6.35
+      LOW  winners n  25 avg  +34.00  medMFE 5.05  p95MFE 10.56 | losers n  92 avg  -14.87  losing-MAE 3.29  full-stop 98.9%
+      HIGH winners n 136 avg  +89.18  medMFE 5.69  p95MFE 16.61 | losers n 454 avg  -25.95  losing-MAE 4.32  full-stop 99.6%
+    best state HIGH: top-10 winners kept 10/10, winner P&L kept 75%, per-original-parent EV +0.35 (vs unfiltered -0.89)
+  3x3 (N / EV / MFE-MAE ratio):
+    R-LOW    |  111   -4.20 0.79 |  130   -1.91 0.87 |   12   +0.73 0.39
+    R-MEDIUM |    6   -8.50 0.88 |  140   -4.76 1.12 |  206   +1.26 1.00
+    R-HIGH   |    -       -    - |    2  -17.78 1.54 |  372   +0.21 1.10
+
+================================================================================================
+A7_MEAN_REV   n=442   (measurement frame identical across states)
+  RANGE  selectivity  L 32%  M 38%  H 30%
+    LOW    n  141  EV   +0.43  R -0.011  WR 26.2%  PF  1.03  medR -1.039  MFE 1.89  MAE 1.93  M/M 0.97  ff 49.3%  stop 70.2%  P1R 46.1%  P2R 28.4%  P3R 17.0%  wMFE 5.23
+    MEDIUM n  167  EV   -0.97  R -0.100  WR 22.8%  PF  0.96  medR -1.027  MFE 2.29  MAE 2.27  M/M 1.01  ff 44.0%  stop 73.7%  P1R 43.1%  P2R 26.9%  P3R 18.0%  wMFE 5.23
+    HIGH   n  131  EV   -5.70  R -0.154  WR 26.0%  PF  0.82  medR -1.019  MFE 2.49  MAE 2.61  M/M 0.95  ff 47.1%  stop 73.3%  P1R 51.1%  P2R 28.2%  P3R 15.3%  wMFE 4.76
+    HIGH-LOW EV   -6.13  CI[-20.44,+8.70]  p 0.3931  | ATR-controlled  -4.74  hour-controlled  -0.63
+      LOW  winners n  37 avg  +57.27  medMFE 5.23  p95MFE 10.10 | losers n 104 avg  -19.79  losing-MAE 2.58  full-stop 95.2%
+      HIGH winners n  34 avg  +97.02  medMFE 4.76  p95MFE 8.40 | losers n  97 avg  -41.70  losing-MAE 3.46  full-stop 99.0%
+    best state LOW: top-10 winners kept 1/10, winner P&L kept 24%, per-original-parent EV +0.14 (vs unfiltered -1.97)
+  VOLUME  selectivity  L 10%  M 26%  H 64%
+    LOW    n   43  EV   -1.86  R -0.212  WR 23.3%  PF  0.85  medR -1.055  MFE 1.89  MAE 1.61  M/M 1.17  ff 54.8%  stop 76.7%  P1R 44.2%  P2R 27.9%  P3R 14.0%  wMFE 4.80
+    MEDIUM n  115  EV   -0.13  R +0.022  WR 27.8%  PF  0.99  medR -1.033  MFE 2.30  MAE 2.04  M/M 1.13  ff 44.7%  stop 69.6%  P1R 42.6%  P2R 27.8%  P3R 18.3%  wMFE 5.58
+    HIGH   n  281  EV   -2.68  R -0.113  WR 23.8%  PF  0.90  medR -1.021  MFE 2.26  MAE 2.38  M/M 0.95  ff 46.1%  stop 73.0%  P1R 48.4%  P2R 27.8%  P3R 16.7%  wMFE 5.17
+    HIGH-LOW EV   -0.82  CI[-14.67,+11.68]  p 0.9003  | ATR-controlled  +0.11  hour-controlled  +8.48
+      LOW  winners n  10 avg  +46.50  medMFE 4.80  p95MFE  nan | losers n  33 avg  -16.51  losing-MAE 2.53  full-stop 100.0%
+      HIGH winners n  67 avg  +97.48  medMFE 5.17  p95MFE 11.68 | losers n 214 avg  -34.03  losing-MAE 3.24  full-stop 95.8%
+    best state MEDIUM: top-10 winners kept 2/10, winner P&L kept 21%, per-original-parent EV -0.03 (vs unfiltered -1.97)
+  3x3 (N / EV / MFE-MAE ratio):
+    R-LOW    |   42   -0.06 1.00 |   79   +3.61 1.08 |   20  -11.09 0.60
+    R-MEDIUM |    1  -77.45 2.36 |   36   -8.34 1.25 |  130   +1.66 0.92
+    R-HIGH   |    -       -    - |    -       -    - |  131   -5.70 0.95
+
+================================================================================================
+A8_OPEN_DRIVE   n=229   (measurement frame identical across states)
+  RANGE  selectivity  L 4%  M 37%  H 58%
+    LOW    n   10  EV  +13.44  R +0.036  WR 40.0%  PF  1.95  medR -1.023  MFE 2.08  MAE 2.55  M/M 0.82  ff 33.3%  stop 60.0%  P1R 50.0%  P2R 20.0%  P3R 10.0%  wMFE 2.65
+    MEDIUM n   85  EV   +7.62  R +0.326  WR 34.1%  PF  1.26  medR -1.016  MFE 2.99  MAE 1.81  M/M 1.65  ff 56.5%  stop 65.9%  P1R 51.8%  P2R 40.0%  P3R 21.2%  wMFE 5.86
+    HIGH   n  133  EV   +4.65  R +0.038  WR 24.8%  PF  1.15  medR -1.019  MFE 2.17  MAE 2.07  M/M 1.05  ff 52.2%  stop 73.7%  P1R 39.8%  P2R 27.1%  P3R 21.1%  wMFE 5.44
+    HIGH-LOW EV   -8.79  CI[-60.94,+30.60]  p 0.7726  | ATR-controlled +11.28  hour-controlled  -8.79
+      LOW  winners n   4 avg  +68.94  medMFE 2.65  p95MFE  nan | losers n   6 avg  -23.57  losing-MAE 6.09  full-stop 100.0%
+      HIGH winners n  33 avg +146.86  medMFE 5.44  p95MFE 11.29 | losers n 100 avg  -42.29  losing-MAE 3.73  full-stop 98.0%
+    best state LOW: top-10 winners kept 0/10, winner P&L kept 3%, per-original-parent EV +0.59 (vs unfiltered +6.67)
+  VOLUME  selectivity  L 3%  M 4%  H 93%
+    LOW    n    6  EV  -17.95  R -0.502  WR 33.3%  PF  0.16  medR -1.028  MFE 1.36  MAE 2.55  M/M 0.53  ff 25.0%  stop 66.7%  P1R 50.0%  P2R 16.7%  P3R  0.0%  wMFE 2.20
+    MEDIUM n    9  EV  +57.86  R +0.934  WR 55.6%  PF  5.79  medR +0.926  MFE 4.84  MAE 1.28  M/M 3.78  ff 50.0%  stop 44.4%  P1R 66.7%  P2R 66.7%  P3R 55.6%  wMFE 5.77
+    HIGH   n  213  EV   +4.63  R +0.130  WR 27.7%  PF  1.15  medR -1.018  MFE 2.49  MAE 1.96  M/M 1.27  ff 53.9%  stop 71.4%  P1R 43.7%  P2R 30.5%  P3R 19.7%  wMFE 5.44
+  3x3 (N / EV / MFE-MAE ratio):
+    R-LOW    |    5   -4.24 1.23 |    3  +47.79 0.43 |    2   +6.11 0.54
+    R-MEDIUM |    -       -    - |    6  +62.89 4.56 |   79   +3.42 1.46
+    R-HIGH   |    1  -86.48 0.04 |    -       -    - |  132   +5.34 1.13
+
+================================================================================================
+A9_OVN_RECLAIM   n=187   (measurement frame identical across states)
+  RANGE  selectivity  L 6%  M 21%  H 73%
+    LOW    n   11  EV   +2.93  R +0.186  WR 36.4%  PF  1.10  medR -1.017  MFE 2.88  MAE 2.32  M/M 1.24  ff 60.0%  stop 63.6%  P1R 45.5%  P2R 27.3%  P3R 27.3%  wMFE 5.17
+    MEDIUM n   39  EV  +11.81  R +0.055  WR 30.8%  PF  1.52  medR -1.020  MFE 2.28  MAE 3.41  M/M 0.67  ff 51.4%  stop 69.2%  P1R 53.8%  P2R 28.2%  P3R 15.4%  wMFE 4.18
+    HIGH   n  137  EV  +10.62  R +0.365  WR 28.5%  PF  1.43  medR -1.022  MFE 3.31  MAE 2.24  M/M 1.47  ff 49.0%  stop 70.8%  P1R 48.9%  P2R 34.3%  P3R 22.6%  wMFE 6.52
+    HIGH-LOW EV   +7.69  CI[-42.86,+51.21]  p 0.7117  | ATR-controlled +13.45  hour-controlled   +nan
+      LOW  winners n   4 avg  +85.50  medMFE 5.17  p95MFE  nan | losers n   7 avg  -44.25  losing-MAE 3.87  full-stop 100.0%
+      HIGH winners n  39 avg +124.50  medMFE 6.52  p95MFE 19.28 | losers n  98 avg  -34.70  losing-MAE 3.84  full-stop 99.0%
+    best state MEDIUM: top-10 winners kept 3/10, winner P&L kept 21%, per-original-parent EV +2.46 (vs unfiltered +10.42)
+  VOLUME  selectivity  L 1%  M 5%  H 94%
+    LOW    n    2  EV  -42.07  R -0.376  WR 50.0%  PF  0.03  medR -0.376  MFE 2.55  MAE 1.46  M/M 1.75  ff 100.0%  stop 50.0%  P1R 50.0%  P2R  0.0%  P3R  0.0%  wMFE 1.87
+    MEDIUM n    9  EV  -11.65  R -0.613  WR 22.2%  PF  0.51  medR -1.025  MFE 2.32  MAE 2.46  M/M 0.94  ff 57.1%  stop 77.8%  P1R 22.2%  P2R 11.1%  P3R 11.1%  wMFE 3.93
+    HIGH   n  176  EV  +12.14  R +0.343  WR 29.5%  PF  1.50  medR -1.021  MFE 3.07  MAE 2.38  M/M 1.29  ff 49.3%  stop 69.9%  P1R 51.1%  P2R 34.1%  P3R 22.2%  wMFE 5.60
+  3x3 (N / EV / MFE-MAE ratio):
+    R-LOW    |    1  -86.52 2.06 |    5  -28.92 0.36 |    5  +52.67  nan
+    R-MEDIUM |    1   +2.38 1.39 |    3  -17.53 0.86 |   35  +14.60 0.65
+    R-HIGH   |    -       -    - |    1  +92.38 7.24 |  136  +10.02 1.45
+
+================================================================================================
+TRACK A FAMILY ACCOUNTING  (M = 16 interaction tests, BH)
+  A2_OFH14/RANGE               HIGH-LOW   +13.42  nH  116 nL  114  p 0.0370  q 0.5928
+  A6_V_RECOVERY/VOLUME         HIGH-LOW    +5.01  nH  590 nL  117  p 0.1229  q 0.9300
+  A2_OFH14/VOLUME              HIGH-LOW    +6.10  nH  286 nL   40  p 0.2390  q 0.9300
+  A3_SWEEP_RECLAIM/RANGE       HIGH-LOW    +4.70  nH  262 nL  132  p 0.3907  q 0.9300
+  A7_MEAN_REV/RANGE            HIGH-LOW    -6.13  nH  131 nL  141  p 0.3931  q 0.9300
+  A1_OFH13/RANGE               HIGH-LOW   +17.09  nH   53 nL   12  p 0.4125  q 0.9300
+  A6_V_RECOVERY/RANGE          HIGH-LOW    +2.90  nH  374 nL  253  p 0.4611  q 0.9300
+  A4_ACCEPT_BRK/RANGE          HIGH-LOW    +3.58  nH  387 nL  827  p 0.5349  q 0.9300
+  A5_REJECT_BRK/VOLUME         HIGH-LOW    -1.87  nH 1039 nL  317  p 0.5733  q 0.9300
+  A10_G4/RANGE                 HIGH-LOW    -6.48  nH   90 nL   26  p 0.6269  q 0.9300
+  A5_REJECT_BRK/RANGE          HIGH-LOW    +1.72  nH  544 nL  665  p 0.6479  q 0.9300
+  A9_OVN_RECLAIM/RANGE         HIGH-LOW    +7.69  nH  137 nL   11  p 0.7117  q 0.9300
+  A8_OPEN_DRIVE/RANGE          HIGH-LOW    -8.79  nH  133 nL   10  p 0.7726  q 0.9300
+  A3_SWEEP_RECLAIM/VOLUME      HIGH-LOW    -1.22  nH  388 nL   57  p 0.8520  q 0.9300
+  A7_MEAN_REV/VOLUME           HIGH-LOW    -0.82  nH  281 nL   43  p 0.9003  q 0.9300
+  A4_ACCEPT_BRK/VOLUME         HIGH-LOW    -0.34  nH 1073 nL  208  p 0.9300  q 0.9300
+full cell metrics -> TA_CELLS.csv
