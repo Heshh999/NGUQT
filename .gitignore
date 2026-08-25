@@ -5,3 +5,7 @@ tests/run_tests.exe
 # the frozen ofh6_spec.py module, which generates these).
 __pycache__/
 *.pyc
+
+# Working data: uploaded archives, extracted captures, off-platform build
+# stubs. Large raw datasets - never committed.
+scratchpad/
