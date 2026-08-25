@@ -39,18 +39,44 @@ ROLL_PAD = 2
 
 
 def roll_days(y0=2019, y1=2027, pad=ROLL_PAD):
+    """Quarterly contract-transition quarantine, both markets.
+
+    GATE-2 DEFECT FIX. The original form anchored only on the 2nd
+    Thursday of the quarter month. The CME equity-index roll is defined
+    relative to EXPIRY - the 3rd Friday - at 8 days prior, and those two
+    anchors coincide only when the month's weekday alignment happens to
+    make them coincide. Across 2019-2026 they diverge by 7 days in 4 of
+    32 quarters (2019-03, 2023-09, 2023-12, 2024-03), which the +/-2 pad
+    could not bridge, so the true roll day fell OUTSIDE the quarantine.
+
+    Empirically those four days carry no discontinuity at all (largest
+    boundary gap 1.50 NQ points, 0.25 ES points - both series are
+    additively back-adjusted, so a roll leaves no trace). The universe is
+    widened anyway: quarantining is purely subtractive and can only ever
+    make the study more conservative. Expiry week itself is also covered,
+    since that is where the genuine quad-witching volatility lives.
+
+    Nothing about any hypothesis, threshold or window changes here. This
+    is a DATA-UNIVERSE correction only.
+    """
     out = set()
     for y in range(y0, y1):
         for m in (3, 6, 9, 12):
             d = datetime.date(y, m, 1)
-            thu = []
+            thu, fri = [], []
             while d.month == m:
                 if d.weekday() == 3:
                     thu.append(d)
+                if d.weekday() == 4:
+                    fri.append(d)
                 d += datetime.timedelta(days=1)
-            r = thu[1]
-            for k in range(-pad, pad + 1):
-                out.add((r + datetime.timedelta(days=k)).isoformat())
+            expiry = fri[2]
+            anchors = (thu[1],                                  # original
+                       expiry - datetime.timedelta(days=8),      # CME roll
+                       expiry)                                   # expiry
+            for r in anchors:
+                for k in range(-pad, pad + 1):
+                    out.add((r + datetime.timedelta(days=k)).isoformat())
     return out
 
 
