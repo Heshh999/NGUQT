@@ -1090,7 +1090,7 @@ def matched_vs_generic(D, EV, DV, gj, gd, nd):
     mb = ~ma
     raw = float(y1.mean() - y2.mean())
     cw, nc = L.common_weight(y, ma, mb, cl, 10)
-    o, lo, hi, p, _ = L.dc_diff_cw(dd, y, ma, mb, cl, nd, 10)
+    o, lo, hi, p, _, _ = L.dc_diff_cw(dd, y, ma, mb, cl, nd, 10)
     return raw, cw, nc, lo, hi, p
 
 
