@@ -1,0 +1,556 @@
+====================================================================================================
+MEMORY-MATH-IFVG-V1   FROZEN ONE-SHOT EXECUTION
+  EXPLORATORY / DEVELOPMENT-DERIVED.  NOT OOS.  NOT CONFIRMED.
+  NO ORDERS.  THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
+====================================================================================================
+
+PHASE 0  FREEZE VERIFICATION
+   1 prereg sha256        313127d24a8178b7064e9d90af38d7ecaac18d9110f8ba46f0b7827fbc2dac9b  MATCH
+   2 prereg commit        7a9136feb54f201295d83e37e0b0c929310de827
+   3 RVMR spec            T1 1.270 T2 2.335 W 1440  OK
+   4 MEMORY lineage       m[t]=sign(r[t])*r[t+1]; anchor +0.30013 bp; cont edge +3.2469 pp
+   5 return convention    r[t]=log(c[t]/c[t-1]); r[t]==0 excluded; r[t+1]==0 kept for mean, dropped from sign endpoint
+   6 close-stamp          STAMP_SHIFT=0, close-stamped ET
+   7 Lane A               A1 age 1-3/4-15/16-60/>=61 | A2 arrival vs persistence | A3 rr[t]-rr[t-5] +-0.10 | A4 runlen 1/2/>=3
+                          A5 eff10 terciles | A6 flips8 <=2/3-4/>=5 | A7 atr[t]/atr[t-15] 1.15 | A8 h=1,2,3,5
+   8 Lane B               B2 hold-vs-invert | B3 post-inversion | B4 retest-reject | B5 MEMORYxIFVG | B6 generic-failure control
+   9 IFVG                 3-bar FVG, gap>=0.25*ATR20, 120-bar life, close through FAR boundary = inversion,
+                          first-close HOLD/INVERT race, single retest-reject, 60-bar window, 30-bar cooldown, re-inversion invalidates
+  10 strategies           S1 HIGH+age<=3 | S2 LOW+runlen>=3 | S3 HIGH-arrival | S4 IFVG retest + MEMORY-ALIGNED
+  11 cost                 0.87 NQ points round turn
+  12 MA1-MA8              frozen; MA3 floor 0.60 bp (rate transport 6.4938 pp, disclosure D1)
+  13 SG1-SG12             frozen
+  14 M_math               12   (A1-A8, B2-B5)
+  15 M_strat              4    (S1-S4)
+  16 M_total              16   programme ledger 8 + 16 = 24 (non-binding)
+  17 ceiling              <= 2 mathematical anomalies, <= 1 strategy
+  18 firewall             no row >= 2026-08-26 00:00 ET consumed
+  inference              day-cluster bootstrap B=20000, seed 20260826, 95% CI; within-day circular rotation P=20000
+  FREEZE VERIFIED.
+
+  loading canonical grid ...
+
+====================================================================================================
+PHASE 1  DATA / CAUSAL AUDIT
+====================================================================================================
+  raw rows loaded                        2503622
+  rows >= 2026-08-26 excluded (firewall)          0
+    first excluded                    None
+    last  excluded                    None
+  bars consumed                          2503622
+  range                               2019-07-04 18:25:00 .. 2026-08-17 15:16:00
+  unique exchange days                      2218
+  duplicate close stamps                       0  (assert 0)
+  minutes spanned / bars present         3745252 / 2503622
+  missing minutes (session gaps, weekends, holidays, halts): 1241630  -> SKIPPED, NEVER BRIDGED
+  session handling                    contiguity by em clock only; any window crossing a gap is UNAVAILABLE
+  ATR warmup                          first 19 bars have no atr20
+  RVMR unavailable                    1440 bars (first 1440 have no 1440-bar trailing window)
+  MEMORY unavailable                  r[t]==0 or r[t]/r[t+1] not contiguous -> event dropped (frozen)
+
+  CAUSAL AVAILABILITY TABLE (every decision input)
+    FIELD                              KNOWN AT                   CAUSAL
+    r[t]=log(c[t]/c[t-1])              close of bar t             YES
+    sign(r[t])                         close of bar t             YES
+    rr[t] (den = rng[t-1440..t-1])     close of bar t             YES
+    RB[t]                              close of bar t             YES
+    age(t) consecutive RB              close of bar t             YES
+    RB[t-1] transition                 close of bar t-1           YES
+    vel(t)=rr[t]-rr[t-5]               close of bar t             YES
+    runlen(t)                          close of bar t             YES
+    eff(t) over c[t-10..t]             close of bar t             YES
+    flips(t) over r[t-7..t]            close of bar t             YES
+    va(t)=atr[t]/atr[t-15]             close of bar t             YES
+    atr20(t)                           close of bar t             YES
+    FVG formation (k-2,k-1,k)          close of bar k             YES
+    FVG zone boundaries                close of bar k             YES
+    touch of zone                      close of touching bar      YES
+    inversion (close thru far bnd)     close of inverting bar j   YES
+    IFVG availability                  close of bar j             YES
+    retest re-entry                    close of bar q             YES
+    retest-reject                      close of bar q'            YES
+    generic breakout ref window        close of bar b-1           YES
+    generic failure close              close of failing bar       YES
+    r[t+1] / future path  OUTCOME      strictly after decision    YES
+    NO future-bar qualification enters any decision timestamp.
+    RVMR causality probe: rr[i] uses rng[i-1440..i-1] only -> verified inside the frozen trailing_ratio implementation.
+
+====================================================================================================
+PHASE 2  LINEAGE EXCLUSIONS
+====================================================================================================
+  OBJECT                     PREV TESTED?             RESULT                                     SETTLED?            
+  AC-FLIP                    YES                      replicated; absorbed as the MEMORY margina SETTLED             
+      open: nothing standalone
+  MEMORY-PRED-V1             YES                      real, SUB-COST standalone                  SETTLED standalone  
+      open: conditional amplification = Lane A
+  LEVERAGE-V                 YES                      replicated, forecast-REDUNDANT             SETTLED             
+      open: control use only
+  RVMR duration / flicker    DESCRIPTIVE              dwell facts only                           PARTLY              
+      open: never used to condition MEMORY -> A1/A2
+  serial correlation         YES                      lag1 real; 5m anti-persistent; 30m RVMR-re SETTLED at those lags
+      open: decay profile -> A8
+  variance ratios            NO                       -                                          NO                  
+      open: not added (menu discipline)
+  entropy / sign order       PARTLY (V-turn motifs)   V-turn partially confirmed                 SETTLED as V-turn   
+      open: flip-count conditioning -> A6 w/ incrementality duty
+  run structure              YES                      run-age hazard decline (diagnostic)        DIAGNOSTIC          
+      open: runlen conditioning -> A4
+  shock continuation         YES                      FAILED HOLDOUT                             SETTLED negative    
+      open: excluded; A7 is ATR trajectory, not |shock|
+  ordinal V-turn             YES                      PARTIALLY CONFIRMED, overnight-only        SETTLED             
+      open: not re-run; A6 must be incremental to it
+  FVG                        component of OFH13/14 only entry component                            NO                  
+      open: hold-vs-invert never studied -> B1/B2
+  IFVG                       NEVER                    -                                          NO                  
+      open: all of Lane B
+  FVG mitigation             YES                      frozen OFH13 mechanism                     SETTLED             
+      open: untouched; Lane B uses no mitigation logic
+  OFH13 FVG mechanics        YES                      frozen prospective                         SETTLED             
+      open: no MEMORY attachment (closed by OFH13-MEMORY-V1)
+  OFH14 displacement/FVG     YES                      frozen prospective                         SETTLED             
+      open: untouched
+
+  No executed cell re-tests AC-FLIP, LEVERAGE-V, SHOCK-CONT, MONDAY,
+  HALF-SESSION-LOW, the failed 5m momentum object, the failed 30m trend
+  object, ORDINAL-V-TURN, or OFH13 x MEMORY. OFH13/OFH14 are not used as
+  a component of any Lane-A, Lane-B or strategy object. LINEAGE CLEAN.
+
+  OUTCOME-BLIND CONTROL CUTPOINTS (printed before any outcome join)
+    ATR/close terciles   0.00020835  0.00040027
+    |r[t]| terciles      0.00006765  0.00018132
+
+====================================================================================================
+PHASE 3  LANE A - PURE MEMORY MATHEMATICS
+====================================================================================================
+  Lane-A base population 2384666 events on 2215 days
+  unconditional memoryReturn +0.00423 bp   P(cont) 0.4882   (anchor +0.30013 bp)
+    LOW     n   1787338  mem -0.00393 bp  P(cont) 0.4862
+    MEDIUM  n    448154  mem +0.01569 bp  P(cont) 0.4929
+    HIGH    n    149174  mem +0.06754 bp  P(cont) 0.4966
+
+  ------------------------------------------------------------------------------------------------
+    A1 HIGH age           n   days   P(cont)       mem bp     NQ pts   x anchor
+    FRESH            118459   2139    0.4943     +0.04409    +0.0570      +0.15
+    YOUNG             26128   1721    0.5037     +0.15330    +0.2650      +0.51
+    ESTABLISHED        4392    338    0.5145     +0.14780    +0.1609      +0.49
+    MATURE              195     12    0.5722     +1.01263    +2.1949      +3.37
+    A1 LOW age            n   days   P(cont)       mem bp     NQ pts   x anchor
+    FRESH            446048   2215    0.4927     -0.00557    -0.0071      -0.02
+    YOUNG            529241   2214    0.4868     -0.00547    -0.0145      -0.02
+    ESTABLISHED      498156   2210    0.4827     -0.00251    -0.0090      -0.01
+    MATURE           313893   2042    0.4812     -0.00124    -0.0045      -0.00
+  A1  HIGH memoryReturn: FRESH(1-3) minus MATURE(>=61)
+    predicted sign POSITIVE
+    arm A n   118459  days  2139  mean +0.04409 bp
+    arm B n      195  days    12  mean +1.01263 bp
+    PRIMARY -0.96853 bp   CI [-2.65825, +1.24997]   boot p 0.45320   rotation perm p 0.19430 (degenerate-day share 0.001)
+    common-weight standardised +0.82443 (2 cells)  |  trims 1% -0.98998  5% -1.19961
+    years 2/8 same sign   ToD 1/3 same sign
+      by year: 2019 +1.2572  2020 nan  2021 +2.3758  2022 nan  2023 -0.7813  2024 -3.9675  2025 +0.3002  2026 nan
+      by ToD : OVN nan  AM +1.3325  PM -2.2139
+    floors: n>=5000 both arms FAIL ; days>=200 both arms FAIL
+
+  ------------------------------------------------------------------------------------------------
+    full 3x3 transition table (memoryReturn bp / n):
+      LOW     ->  LOW:-0.0043(1578034)  MED:+0.0183(191848)  HIG:+0.0674(22745)
+      MEDIUM  ->  LOW:+0.0034(193153)  MED:+0.0204(192887)  HIG:+0.0362(57263)
+      HIGH    ->  LOW:-0.0513(16150)  MED:-0.0066(63419)  HIG:+0.0936(69166)
+    A2                    n   days   P(cont)       mem bp     NQ pts   x anchor
+    HIGH-ARRIVAL      80008   2123    0.4934     +0.04504    +0.0551      +0.15
+    HIGH-PERSIST      69166   2031    0.5004     +0.09357    +0.1504      +0.31
+  A2  HIGH-ARRIVAL minus HIGH-PERSISTENCE
+    predicted sign POSITIVE
+    arm A n    80008  days  2123  mean +0.04504 bp
+    arm B n    69166  days  2031  mean +0.09357 bp
+    PRIMARY -0.04853 bp   CI [-0.11876, +0.02046]   boot p 0.16980   rotation perm p 0.31145 (degenerate-day share 0.001)
+    common-weight standardised -0.02307 (25 cells)  |  trims 1% -0.02713  5% -0.05190
+    years 6/8 same sign   ToD 2/3 same sign
+      by year: 2019 +0.0599  2020 -0.1071  2021 -0.0394  2022 -0.1374  2023 -0.0087  2024 +0.0068  2025 -0.0490  2026 -0.1899
+      by ToD : OVN +0.1124  AM -0.0522  PM -0.0939
+    floors: n>=5000 both arms PASS ; days>=200 both arms PASS
+
+  ------------------------------------------------------------------------------------------------
+    A3 HIGH vel           n   days   P(cont)       mem bp     NQ pts   x anchor
+    RISING           112346   2096    0.4952     +0.07245    +0.1095      +0.24
+    FLAT               5690   1586    0.5116     +0.16083    +0.3321      +0.54
+    FALLING           30281   1881    0.4995     +0.03520    +0.0201      +0.12
+    A3 LOW vel            n   days   P(cont)       mem bp     NQ pts   x anchor
+    RISING           556705   2215    0.4847     +0.00472    +0.0083      +0.02
+    FLAT             441988   2215    0.4848     -0.00659    -0.0177      -0.02
+    FALLING          778289   2215    0.4883     -0.00814    -0.0170      -0.03
+  A3  HIGH memoryReturn: RISING minus FALLING score
+    predicted sign POSITIVE
+    arm A n   112346  days  2096  mean +0.07245 bp
+    arm B n    30281  days  1881  mean +0.03520 bp
+    PRIMARY +0.03726 bp   CI [-0.05523, +0.12953]   boot p 0.42540   rotation perm p 0.45950 (degenerate-day share 0.001)
+    common-weight standardised +0.02873 (19 cells)  |  trims 1% +0.03267  5% -0.01145
+    years 3/8 same sign   ToD 1/3 same sign
+      by year: 2019 -0.0132  2020 -0.1261  2021 -0.0032  2022 +0.3557  2023 -0.0891  2024 -0.0942  2025 +0.1039  2026 +0.1772
+      by ToD : OVN -0.1359  AM +0.1697  PM -0.2173
+    floors: n>=5000 both arms PASS ; days>=200 both arms PASS
+
+  ------------------------------------------------------------------------------------------------
+    A4 LOW runlen          n   days   P(cont)       mem bp     NQ pts   x anchor
+    RUN1             971861   2215    0.4942     +0.01703    +0.0284      +0.06
+    RUN2             451132   2215    0.4801     -0.01857    -0.0357      -0.06
+    RUN3+            364345   2215    0.4726     -0.04169    -0.0773      -0.14
+    A4 HIGH runlen          n   days   P(cont)       mem bp     NQ pts   x anchor
+    RUN1              72462   2088    0.5067     +0.12760    +0.1964      +0.43
+    RUN2              37543   2025    0.4958     +0.05719    +0.0816      +0.19
+    RUN3+             39169   2042    0.4787     -0.03366    -0.0635      -0.11
+  A4  LOW memoryReturn: RUN>=3 minus RUN==1 (predicted MORE NEGATIVE = stronger reversal)
+    predicted sign NEGATIVE
+    arm A n   364345  days  2215  mean -0.04169 bp
+    arm B n   971861  days  2215  mean +0.01703 bp
+    PRIMARY -0.05871 bp   CI [-0.06802, -0.04920]   boot p 0.00005   rotation perm p 0.00005 (degenerate-day share 0.000)
+    common-weight standardised -0.05863 (27 cells)  |  trims 1% -0.06172  5% -0.06398
+    years 8/8 same sign   ToD 3/3 same sign
+      by year: 2019 -0.0032  2020 -0.1331  2021 -0.0338  2022 -0.0845  2023 -0.0268  2024 -0.0609  2025 -0.0487  2026 -0.0442
+      by ToD : OVN -0.0499  AM -0.1161  PM -0.0864
+    floors: n>=5000 both arms PASS ; days>=200 both arms PASS
+
+  ------------------------------------------------------------------------------------------------
+    A5 outcome-blind efficiency terciles (full Lane-A base): 0.176471 / 0.389474
+    A5 HIGH eff           n   days   P(cont)       mem bp     NQ pts   x anchor
+    NOISY             41735   1919    0.5039     +0.12217    +0.1763      +0.41
+    MID               45317   1942    0.5038     +0.08638    +0.1395      +0.29
+    EFFICIENT         60697   2053    0.4866     +0.01874    +0.0223      +0.06
+    raw (unstandardised) EFFICIENT-NOISY -0.10343 bp
+  A5  HIGH memoryReturn: EFFICIENT minus NOISY, common-weight standardised within |r[t]| terciles  [primary = standardised, 3 |r| cells]
+    predicted sign POSITIVE
+    arm A n    60697  days  2053  mean +0.01874 bp
+    arm B n    41735  days  1919  mean +0.12217 bp
+    PRIMARY -0.10336 bp   CI [-0.18262, -0.02359]   boot p 0.01030   rotation perm p 0.22025 (degenerate-day share 0.001)
+    common-weight standardised -0.09428 (25 cells)  |  trims 1% -0.09513  5% -0.09379
+    years 7/8 same sign   ToD 3/3 same sign
+      by year: 2019 -0.1492  2020 -0.3103  2021 -0.2132  2022 -0.1591  2023 -0.1160  2024 -0.0496  2025 +0.2707  2026 -0.2011
+      by ToD : OVN -0.0552  AM -0.0818  PM -0.1529
+    floors: n>=5000 both arms PASS ; days>=200 both arms PASS
+
+  ------------------------------------------------------------------------------------------------
+    A6 HIGH flips          n   days   P(cont)       mem bp     NQ pts   x anchor
+    ORDERLY           31572   1953    0.4849     -0.01353    -0.0271      -0.05
+    MIXED             72970   2002    0.4999     +0.09148    +0.1352      +0.30
+    CHOPPY            27542   1928    0.5065     +0.12421    +0.1920      +0.41
+  A6  HIGH memoryReturn: ORDERLY(<=2) minus CHOPPY(>=5)
+    predicted sign POSITIVE
+    arm A n    31572  days  1953  mean -0.01353 bp
+    arm B n    27542  days  1928  mean +0.12421 bp
+    PRIMARY -0.13774 bp   CI [-0.25524, -0.02088]   boot p 0.02160   rotation perm p 0.89590 (degenerate-day share 0.001)
+    common-weight standardised -0.13642 (22 cells)  |  trims 1% -0.17232  5% -0.17549
+    years 6/8 same sign   ToD 3/3 same sign
+      by year: 2019 -0.1816  2020 -0.1974  2021 -0.3076  2022 -0.1602  2023 -0.1744  2024 -0.1845  2025 +0.0517  2026 +0.0928
+      by ToD : OVN -0.0816  AM -0.1259  PM -0.1895
+    floors: n>=5000 both arms PASS ; days>=200 both arms PASS
+    INCREMENTALITY DUTY vs run length: standardised +0.03870 bp (3 cells) -> REDUNDANT WITH RUN LENGTH
+
+  ------------------------------------------------------------------------------------------------
+    A7 HIGH va            n   days   P(cont)       mem bp     NQ pts   x anchor
+    EXPANDING         65944   2040    0.4972     +0.07471    +0.1350      +0.25
+    STABLE            62245   1970    0.4971     +0.06228    +0.0720      +0.21
+    CONTRACTING       19229   1853    0.4950     +0.06804    +0.0883      +0.23
+    A7 LOW va             n   days   P(cont)       mem bp     NQ pts   x anchor
+    EXPANDING        331583   2215    0.4856     -0.00849    -0.0136      -0.03
+    STABLE           942666   2215    0.4873     -0.00392    -0.0097      -0.01
+    CONTRACTING      477552   2215    0.4852     -0.00068    -0.0068      -0.00
+  A7  HIGH memoryReturn: EXPANDING minus STABLE ATR trajectory  (NOT shock continuation)
+    predicted sign POSITIVE
+    arm A n    65944  days  2040  mean +0.07471 bp
+    arm B n    62245  days  1970  mean +0.06228 bp
+    PRIMARY +0.01242 bp   CI [-0.06023, +0.08707]   boot p 0.74480   rotation perm p 0.75265 (degenerate-day share 0.001)
+    common-weight standardised +0.01611 (25 cells)  |  trims 1% +0.00241  5% +0.03828
+    years 5/8 same sign   ToD 1/3 same sign
+      by year: 2019 +0.0079  2020 -0.1596  2021 -0.1036  2022 +0.0431  2023 +0.0472  2024 -0.0933  2025 +0.1876  2026 +0.3120
+      by ToD : OVN -0.0055  AM +0.0811  PM -0.1115
+    floors: n>=5000 both arms PASS ; days>=200 both arms PASS
+
+  ------------------------------------------------------------------------------------------------
+    A8 PERSISTENCE DECAY  (frozen horizons 1,2,3,5)
+    state    h               n       cum bp      incr bp  P(cont h)
+    LOW      1         1787338     -0.00393     -0.00393     0.4623
+    LOW      2         1784251     -0.02436     -0.02052     0.4685
+    LOW      3         1781242     -0.02781     -0.00353     0.4732
+    LOW      5         1775465     -0.02657     -0.00092     0.4794
+    MEDIUM   1          448154     +0.01569     +0.01569     0.4817
+    MEDIUM   2          447872     -0.03656     -0.05279     0.4803
+    MEDIUM   3          447665     -0.04526     -0.00889     0.4836
+    MEDIUM   5          447243     -0.04612     -0.00382     0.4876
+    HIGH     1          149174     +0.06754     +0.06754     0.4897
+    HIGH     2          149093     +0.02216     -0.04416     0.4890
+    HIGH     3          149042     +0.00256     -0.01707     0.4908
+    HIGH     5          148931     +0.01031     -0.02284     0.4933
+  A8  HIGH incremental memory beyond minute 1: m3 - m1 (paired, contiguity to t+3)
+    predicted sign POSITIVE
+    n   149042  days  2138
+    PRIMARY -0.06218 bp   CI [-0.10798, -0.01777]   boot p 0.00670   rotation perm p 0.28140 (degenerate-day share 0.001)
+    common-weight standardised nan (0 cells)  |  trims 1% -0.04852  5% -0.06701
+    years 5/8 same sign   ToD 3/3 same sign
+      by year: 2019 +0.0818  2020 -0.2250  2021 -0.0579  2022 -0.0914  2023 -0.0847  2024 +0.0321  2025 -0.1160  2026 +0.0695
+      by ToD : OVN -0.0973  AM -0.0546  PM -0.0563
+    floors: n>=5000 both arms PASS ; days>=200 both arms PASS
+
+====================================================================================================
+PHASE 4  LANE B - MATHEMATICAL IFVG
+====================================================================================================
+  PUBLIC CONCEPT (audited, cited in the preregistration) vs OUR IMPLEMENTATION:
+    public: an FVG that price closes through is "inverted" and flips role; traders watch a retest.
+    ours  : the exact mechanical translation frozen in the prereg. NOT claimed to be any official ICT strategy.
+    no public profitability claim is treated as evidence anywhere.
+
+  B1 FVG CONSTRUCTION
+    raw 3-bar FVGs (contiguous)              514338
+    size-qualified gap >= 0.25*ATR20         302398   <- PRIMARY population
+    secondary (>= 1 tick, reported once)     514338
+    bullish 154817   bearish 147581
+    tracked in 1 s
+    UNTOUCHED         16951
+    UNRESOLVED         6266
+    HOLD             198175
+    INVERT            80971
+    EXPIRED              35
+    TOUCHED 279181   RESOLVED (hold|invert) 279146   inversion rate 0.2901
+
+  ------------------------------------------------------------------------------------------------
+  B2  WHICH FVGS INVERT?  (population = resolved, touched FVGs)
+    class             n   days  inversion %
+    NEUTRAL       63239   2212      28.5726
+    ALIGNED       70614   2214      30.6540
+    OPPOSED      145293   2215      28.3950
+    bullish FVG   142352               28.4358
+    bearish FVG   136794               29.6007
+  B2  inversion rate: MEMORY-OPPOSED minus MEMORY-ALIGNED at FVG formation
+    predicted sign POSITIVE
+    arm A n   145293  days  2215  mean +28.39504 pp
+    arm B n    70614  days  2214  mean +30.65398 pp
+    PRIMARY -2.25894 pp   CI [-2.66136, -1.85392]   boot p 0.00005   rotation perm p 0.00005 (degenerate-day share 0.000)
+    common-weight standardised -2.35324 (27 cells)  |  trims 1% -2.25894  5% -2.25894
+    years 8/8 same sign   ToD 3/3 same sign
+      by year: 2019 -0.8728  2020 -2.3778  2021 -2.6027  2022 -2.5496  2023 -3.5233  2024 -2.3641  2025 -1.1559  2026 -2.4667
+      by ToD : OVN -2.9181  AM -0.7652  PM -1.2561
+    floors: n>=0 both arms PASS ; days>=0 both arms PASS
+    one-way tables on the other frozen predictors (descriptive):
+      RB[k]     LOW 29.538 (n211532)  MEDIUM 27.461 (n49769)  HIGH 26.854 (n17569)
+      vel       0 30.061 (n92386)  1 29.262 (n92385)  2 27.571 (n92386)
+      runlen    1 31.635 (n72049)  2 28.703 (n62470)  3+ 27.333 (n130758)
+      eff       0 30.327 (n91637)  1 29.001 (n91659)  2 27.453 (n91611)
+
+  ------------------------------------------------------------------------------------------------
+  B3  POST-INVERSION DRIFT (at the inversion close)
+    events 80971   with +5m available 79951   days 2216
+    horizon           n           bp       NQ pts
+    +1            80740      -0.0133      -0.0247
+    +3            80343      +0.0194      +0.0295
+    +5            79951      +0.0556      +0.0823
+    +15           78627      +0.0577      +0.1217
+    MFE 14.057  MAE 13.781  MFE/MAE 1.020  |  FF@1ATR/60m 49.86% (fav 37098 / adv 37302)
+  B3  post-inversion +5m drift in the inverted direction
+    predicted sign POSITIVE
+    n    79951  days  2215
+    PRIMARY +0.05556 bp   CI [-0.00175, +0.11263]   boot p 0.05820   rotation perm p 0.05370 (degenerate-day share 0.000)
+    common-weight standardised nan (0 cells)  |  trims 1% +0.07057  5% +0.00547
+    years 5/8 same sign   ToD 2/3 same sign
+      by year: 2019 -0.0191  2020 +0.1926  2021 +0.1693  2022 +0.1273  2023 -0.0636  2024 +0.0448  2025 +0.0092  2026 -0.1131
+      by ToD : OVN -0.0062  AM +0.4625  PM +0.0202
+    floors: n>=0 both arms PASS ; days>=0 both arms PASS
+
+  ------------------------------------------------------------------------------------------------
+  B4  FIRST RETEST-REJECT
+    inversions 80971 -> retest-reject before cooldown 44498
+    after the frozen per-direction 30-bar cooldown: 34952 events
+    events 34952   with +5m available 34645   days 2215
+    horizon           n           bp       NQ pts
+    +1            34895      +0.0163      +0.0286
+    +3            34759      +0.0411      +0.0615
+    +5            34645      +0.0113      +0.0195
+    +15           34214      -0.1059      -0.1836
+    MFE 13.727  MAE 13.795  MFE/MAE 0.995  |  FF@1ATR/60m 49.87% (fav 16296 / adv 16380)
+  B4  post-retest-reject +5m drift
+    predicted sign POSITIVE
+    n    34645  days  2215
+    PRIMARY +0.01127 bp   CI [-0.06384, +0.08496]   boot p 0.76700   rotation perm p 0.77785 (degenerate-day share 0.003)
+    common-weight standardised nan (0 cells)  |  trims 1% +0.01234  5% +0.01217
+    years 6/8 same sign   ToD 2/3 same sign
+      by year: 2019 -0.0929  2020 +0.0835  2021 +0.0515  2022 -0.1017  2023 +0.0205  2024 +0.0288  2025 +0.0529  2026 +0.0044
+      by ToD : OVN -0.0093  AM +0.1138  PM +0.0197
+    floors: n>=0 both arms PASS ; days>=0 both arms PASS
+
+  ------------------------------------------------------------------------------------------------
+  B5  MEMORY x IFVG at the retest-reject close
+    class             n   days       +5m bp
+    NEUTRAL        7421   1923      -0.0238
+    ALIGNED        6526   1953      +0.0944
+    OPPOSED       20698   2205      -0.0024
+    frozen B5 floors: ALIGNED >=60 ev / >=40 days, OPPOSED >=60 / >=40  -> PASS
+  B5  IFVG retest +5m drift: MEMORY-ALIGNED minus MEMORY-OPPOSED
+    predicted sign POSITIVE
+    arm A n     6526  days  1953  mean +0.09444 bp
+    arm B n    20698  days  2205  mean -0.00239 bp
+    PRIMARY +0.09684 bp   CI [-0.13563, +0.33476]   boot p 0.41620   rotation perm p 0.35120 (degenerate-day share 0.003)
+    common-weight standardised +0.08349 (23 cells)  |  trims 1% +0.16356  5% +0.09425
+    years 4/8 same sign   ToD 2/3 same sign
+      by year: 2019 -0.0280  2020 -0.2093  2021 +0.2628  2022 -0.1761  2023 +0.2368  2024 +0.3847  2025 +0.3583  2026 -0.2927
+      by ToD : OVN +0.1125  AM -0.3823  PM +0.2384
+    floors: n>=60 both arms PASS ; days>=40 both arms PASS
+
+  ------------------------------------------------------------------------------------------------
+  B6  GENERIC FAILURE / REVERSAL CONTROL  (decisive for interpretation)
+    generic failed-structure events (30m close breakout then close back through the breakout bar, 30-bar cooldown): 59395
+    B3 post-inversion    matched common-weight IFVG minus GENERIC +0.1045 bp (26 cells)  CI [+0.0221, +0.1871]  p 0.01250  -> IFVG EXCEEDS GENERIC
+    B4 retest-reject     matched common-weight IFVG minus GENERIC +0.0576 bp (26 cells)  CI [-0.0490, +0.1615]  p 0.29250  -> IFVG EXCEEDS GENERIC
+
+====================================================================================================
+PHASE 5  MATHEMATICAL DESTRUCTION   MA1-MA8   (M_math = 12, BH binding)
+====================================================================================================
+  id      primary       unit     raw p      BH q    perm p  MA1..MA8
+  A1      -0.9685         bp   0.45320   0.54384   0.19430  MA1:P MA2:F MA3:F MA4:F MA5:F MA6:F MA7:F MA8:P  (2/8)
+  A2      -0.0485         bp   0.16980   0.29109   0.31145  MA1:P MA2:P MA3:F MA4:F MA5:P MA6:P MA7:F MA8:P  (5/8)
+  A3      +0.0373         bp   0.42540   0.54384   0.45950  MA1:P MA2:P MA3:F MA4:F MA5:F MA6:F MA7:P MA8:F  (3/8)
+  A4      -0.0587         bp   0.00005   0.00030   0.00005  MA1:P MA2:P MA3:F MA4:P MA5:P MA6:P MA7:P MA8:P  (7/8)
+  A5      -0.1034         bp   0.01030   0.03090   0.22025  MA1:P MA2:P MA3:F MA4:F MA5:P MA6:P MA7:P MA8:P  (6/8)
+  A6      -0.1377         bp   0.02160   0.05184   0.89590  MA1:P MA2:P MA3:F MA4:F MA5:P MA6:P MA7:P MA8:P  (6/8)
+  A7      +0.0124         bp   0.74480   0.76700   0.75265  MA1:P MA2:P MA3:F MA4:F MA5:P MA6:F MA7:P MA8:F  (4/8)
+  A8      -0.0622         bp   0.00670   0.02680   0.28140  MA1:P MA2:P MA3:F MA4:F MA5:P MA6:P MA7:P MA8:P  (6/8)
+  B2      -2.2589         pp   0.00005   0.00030   0.00005  MA1:P MA2:P MA3:F MA4:P MA5:P MA6:P MA7:P MA8:P  (7/8)
+  B3      +0.0556         bp   0.05820   0.11640   0.05370  MA1:P MA2:P MA3:F MA4:F MA5:P MA6:P MA7:P MA8:F  (5/8)
+  B4      +0.0113         bp   0.76700   0.76700   0.77785  MA1:P MA2:P MA3:F MA4:F MA5:P MA6:P MA7:P MA8:P  (6/8)
+  B5      +0.0968         bp   0.41620   0.54384   0.35120  MA1:P MA2:P MA3:F MA4:F MA5:F MA6:P MA7:P MA8:P  (5/8)
+
+  NOTE  MA7 for B3/B4/A8 is single-arm drift: there is no two-arm contrast to standardise, so MA7 is scored on the frozen control comparisons reported in B6 / A8 instead of a common-weight delta.
+
+  MATHEMATICAL SURVIVORS (all 8 gates): NONE
+
+====================================================================================================
+PHASE 6  STRATEGY HYPOTHESES  (raw geometry only; NO management)
+====================================================================================================
+  HIERARCHY (frozen, as written in the preregistration): a strategy is
+  ELIGIBLE FOR PROMOTION only if its parent survives; geometry is
+  REPORTED for all four regardless. Parents: S1<-A1 S2<-A4 S3<-A2 S4<-B5.
+
+  ------------------------------------------------------------------------------------------------
+  S1  HIGH + state age <= 3, continuation of sign(r[t])
+    events 118459   unique days 2139   LONG 56175   SHORT 62284
+    horizon           n           bp    gross pts   gross/cost
+    +1           118459      +0.0441      +0.0570       +0.066
+    +3           118348      -0.0194      -0.0321       -0.037
+    +5           118263      +0.0063      -0.0021       -0.002
+    +15          117450      +0.0468      +0.0582       +0.067
+    MFE 27.456  MAE 26.924  MFE/MAE 1.020  |  FF@1ATR/60m 50.18% (fav 55256 / adv 54850, n=110106)  |  median +5m -0.2500 pts
+    GROSS +5m  -0.0021 pts  CI [-0.1392, +0.1349]   gross/cost -0.002  CIlo/cost -0.160
+    GROSS +15m +0.0582 pts  CI [-0.1739, +0.2979]   gross/cost 0.067  CIlo/cost -0.200
+    NET   +5m  -0.8721 pts  CI [-1.0092, -0.7351]   boot p 0.00005
+    net by year  : 2019 -0.702(n8573)  2020 -0.773(n15346)  2021 -0.763(n17283)  2022 -0.687(n16373)  2023 -1.112(n17902)  2024 -0.724(n17793)  2025 -1.430(n16000)  2026 -0.575(n8993)
+    gross by ToD : OVN -0.073(n22284)  AM +0.013(n64428)  PM +0.016(n31551)
+    gross +5m trims: top1% -0.0352   top5% -0.0814
+    LONG   n    56068  gross +5m +0.0107 pts
+    SHORT  n    62195  gross +5m -0.0137 pts
+    rotation permutation on the cost-adjusted primary (cost is an additive constant and cancels; see D5): p 0.99865 (degenerate-day share 0.001)
+    FF@1ATR mean-0.5 +0.0018   CI [-0.0011, +0.0048]
+    CONTROL last-return only strategy -0.0021 vs -0.0496 pts  ->  common-weight incremental -0.2471 pts (27 cells)  DOES NOT BEAT
+    CONTROL RVMR state only  strategy -0.0021 vs +0.0177 pts  ->  common-weight incremental -0.0255 pts (27 cells)  DOES NOT BEAT
+
+  ------------------------------------------------------------------------------------------------
+  S2  LOW + runlen >= 3, reversal of the run
+    events 364345   unique days 2215   LONG 172249   SHORT 192096
+    horizon           n           bp    gross pts   gross/cost
+    +1           364345      +0.0417      +0.0773       +0.089
+    +3           363280      +0.0713      +0.1254       +0.144
+    +5           362294      +0.0685      +0.1200       +0.138
+    +15          357972      +0.0286      +0.0511       +0.059
+    MFE 12.040  MAE 12.023  MFE/MAE 1.001  |  FF@1ATR/60m 51.17% (fav 174692 / adv 166716, n=341408)  |  median +5m +0.2500 pts
+    GROSS +5m  +0.1200 pts  CI [+0.0740, +0.1651]   gross/cost 0.138  CIlo/cost 0.085
+    GROSS +15m +0.0511 pts  CI [-0.0300, +0.1329]   gross/cost 0.059  CIlo/cost -0.035
+    NET   +5m  -0.7500 pts  CI [-0.7960, -0.7049]   boot p 0.00005
+    net by year  : 2019 -0.733(n16764)  2020 -0.732(n48790)  2021 -0.845(n49440)  2022 -0.650(n54233)  2023 -0.719(n49188)  2024 -0.741(n51442)  2025 -0.903(n55852)  2026 -0.624(n36585)
+    gross by ToD : OVN +0.104(n286998)  AM -0.025(n19964)  PM +0.253(n55332)
+    gross +5m trims: top1% +0.1092   top5% +0.1254
+    LONG   n   171199  gross +5m +0.1521 pts
+    SHORT  n   191095  gross +5m +0.0912 pts
+    rotation permutation on the cost-adjusted primary (cost is an additive constant and cancels; see D5): p 0.00005 (degenerate-day share 0.000)
+    FF@1ATR mean-0.5 +0.0117   CI [+0.0096, +0.0138]
+    CONTROL last-return only strategy +0.1200 vs +0.0496 pts  ->  common-weight incremental +0.0782 pts (27 cells)  BEATS
+    CONTROL RVMR state only  strategy +0.1200 vs +0.0466 pts  ->  common-weight incremental +0.0721 pts (27 cells)  BEATS
+
+  ------------------------------------------------------------------------------------------------
+  S3  HIGH-ARRIVAL, continuation of sign(r[t])
+    events 80008   unique days 2123   LONG 37477   SHORT 42531
+    horizon           n           bp    gross pts   gross/cost
+    +1            80008      +0.0450      +0.0551       +0.063
+    +3            79923      -0.0345      -0.0642       -0.074
+    +5            79854      -0.0152      -0.0371       -0.043
+    +15           79440      +0.1020      +0.1761       +0.202
+    MFE 25.978  MAE 25.295  MFE/MAE 1.027  |  FF@1ATR/60m 50.16% (fav 37452 / adv 37212, n=74664)  |  median +5m -0.2500 pts
+    GROSS +5m  -0.0371 pts  CI [-0.2007, +0.1238]   gross/cost -0.043  CIlo/cost -0.231
+    GROSS +15m +0.1761 pts  CI [-0.0911, +0.4488]   gross/cost 0.202  CIlo/cost -0.105
+    NET   +5m  -0.9071 pts  CI [-1.0707, -0.7462]   boot p 0.00005
+    net by year  : 2019 -0.785(n5799)  2020 -0.774(n10735)  2021 -0.841(n11485)  2022 -0.899(n11221)  2023 -0.974(n11856)  2024 -0.794(n11890)  2025 -1.322(n10696)  2026 -0.762(n6172)
+    gross by ToD : OVN -0.092(n16917)  AM -0.062(n39933)  PM +0.047(n23004)
+    gross +5m trims: top1% -0.0570   top5% -0.0875
+    LONG   n    37397  gross +5m -0.0442 pts
+    SHORT  n    42457  gross +5m -0.0308 pts
+    rotation permutation on the cost-adjusted primary (cost is an additive constant and cancels; see D5): p 0.81160 (degenerate-day share 0.002)
+    FF@1ATR mean-0.5 +0.0016   CI [-0.0020, +0.0052]
+    CONTROL last-return only strategy -0.0371 vs -0.0496 pts  ->  common-weight incremental -0.3312 pts (27 cells)  DOES NOT BEAT
+    CONTROL RVMR state only  strategy -0.0371 vs +0.0177 pts  ->  common-weight incremental -0.0759 pts (27 cells)  DOES NOT BEAT
+
+  ------------------------------------------------------------------------------------------------
+  S4  IFVG first retest-reject + MEMORY ALIGNED with the inverted direction
+    events 6565   unique days 1958   LONG 3290   SHORT 3275
+    horizon           n           bp    gross pts   gross/cost
+    +1             6559      +0.0593      +0.0943       +0.108
+    +3             6541      +0.1730      +0.3065       +0.352
+    +5             6526      +0.0944      +0.2087       +0.240
+    +15            6466      -0.1320      -0.1809       -0.208
+    MFE 17.820  MAE 17.523  MFE/MAE 1.017  |  FF@1ATR/60m 50.40% (fav 3118 / adv 3069, n=6187)  |  median +5m +0.0000 pts
+    GROSS +5m  +0.2087 pts  CI [-0.1964, +0.6232]   gross/cost 0.240  CIlo/cost -0.226
+    GROSS +15m -0.1809 pts  CI [-0.8835, +0.5556]   gross/cost -0.208  CIlo/cost -1.016
+    NET   +5m  -0.6613 pts  CI [-1.0664, -0.2468]   boot p 0.00100
+    net by year  : 2019 -1.029(n443)  2020 -1.113(n869)  2021 -0.538(n947)  2022 -1.067(n944)  2023 -0.453(n929)  2024 -0.082(n902)  2025 -0.090(n894)  2026 -1.339(n598)
+    gross by ToD : OVN +0.316(n3903)  AM -0.185(n1470)  PM +0.346(n1153)
+    gross +5m trims: top1% +0.2442   top5% +0.2212
+    LONG   n     3268  gross +5m +0.1221 pts
+    SHORT  n     3258  gross +5m +0.2955 pts
+    rotation permutation on the cost-adjusted primary (cost is an additive constant and cancels; see D5): p 0.28465 (degenerate-day share 0.167)
+    FF@1ATR mean-0.5 +0.0040   CI [-0.0085, +0.0163]
+    CONTROL IFVG alone       strategy +0.2087 vs +0.0195 pts  ->  common-weight incremental +0.2894 pts (23 cells)  BEATS
+    CONTROL MEMORY alone     strategy +0.2087 vs +0.0444 pts  ->  common-weight incremental +0.3293 pts (23 cells)  BEATS
+
+====================================================================================================
+  SG1-SG12   (M_strat = 4, BH binding)
+====================================================================================================
+  S1  parent A1(FAILED)  net+5m -0.8721  q 0.00007  perm 0.99865   SG1:F SG2:F SG3:F SG4:F SG5:F SG6:F SG7:F SG8:P SG9:F SG10:F SG11:F SG12:P   (2/12)
+  S2  parent A4(FAILED)  net+5m -0.7500  q 0.00007  perm 0.00005   SG1:F SG2:P SG3:P SG4:F SG5:P SG6:F SG7:F SG8:P SG9:P SG10:P SG11:P SG12:P   (8/12)
+  S3  parent A2(FAILED)  net+5m -0.9071  q 0.00007  perm 0.81160   SG1:F SG2:F SG3:F SG4:F SG5:F SG6:F SG7:F SG8:F SG9:F SG10:F SG11:F SG12:P   (1/12)
+  S4  parent B5(FAILED)  net+5m -0.6613  q 0.00100  perm 0.28465   SG1:F SG2:P SG3:F SG4:F SG5:F SG6:F SG7:F SG8:P SG9:P SG10:P SG11:F SG12:P   (5/12)
+
+  STRATEGY SURVIVORS (all 12 gates): NONE
+
+====================================================================================================
+VERDICTS
+====================================================================================================
+  A1   INSUFFICIENT (sample floors unmet)                   -0.9685 bp
+  A2   FAILED - WRONG DIRECTION (MA3,MA4,MA7)               -0.0485 bp
+  A3   FAILED (MA3,MA4,MA5,MA6,MA8)                         +0.0373 bp
+  A4   REAL BUT SUB-MATERIAL (correct sign, below 2x-anchor floor) -0.0587 bp
+  A5   FAILED - WRONG DIRECTION (MA3,MA4)                   -0.1034 bp
+  A6   REDUNDANT WITH RUN LENGTH                            -0.1377 bp
+  A7   FAILED (MA3,MA4,MA6,MA8)                             +0.0124 bp
+  A8   FAILED - WRONG DIRECTION (MA3,MA4)                   -0.0622 bp
+  B2   FAILED - SIGNIFICANT BUT OPPOSITE TO THE FROZEN PREDICTION -2.2589 pp
+  B3   FAILED (MA3,MA4,MA8)                                 +0.0556 bp
+  B4   FAILED (MA3,MA4)                                     +0.0113 bp
+  B5   FAILED (MA3,MA4,MA5)                                 +0.0968 bp
+  S1   TAIL-DEPENDENT / FAILED (SG1,SG2,SG3,SG4,SG5,SG6,SG7,SG9,SG10,SG11)
+  S2   REAL BUT SUB-COST (also failing SG1,SG4,SG6,SG7)
+  S3   TAIL-DEPENDENT / FAILED (SG1,SG2,SG3,SG4,SG5,SG6,SG7,SG8,SG9,SG10,SG11)
+  S4   FAILED (SG1,SG3,SG4,SG5,SG6,SG7,SG11)
+
+  CANDIDATE CEILING: <= 2 mathematical anomalies, <= 1 strategy.
+  advanced: 0 mathematical, 0 strategy
+
+  MEMORY-MATH-IFVG-V1 FOUND NO MONETIZABLE MEMORY AMPLIFICATION.
+  MEMORY-PRED remains REAL PREDICTIVE STRUCTURE BUT SUB-COST STANDALONE.
+
+EXECUTION COMPLETE  (91 s)
+EXPLORATORY / DEVELOPMENT-DERIVED. NOT OOS. NOT CONFIRMED. NO ORDERS.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
+====================================================================================================

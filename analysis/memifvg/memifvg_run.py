@@ -1184,9 +1184,19 @@ def strategy_block(name, label, D, T, dirv, nd, ctrls, minc):
     st, ct = L.day_slices(d5)
     raw = D['c'][T[ok5] + 5] - D['c'][T[ok5]]
     nn = int(ok5.sum())
+    # DISCLOSURE D5. The cost-adjusted primary differs from the gross
+    # primary by the ADDITIVE CONSTANT -COST, which the rotation does not
+    # touch. A two-sided |statistic| test is not invariant to that shift:
+    # scoring |mean - COST| compares an observed value near -0.75 against
+    # a null centred on -0.87 and reports the NULL as the more extreme,
+    # which inverts the test. The permutation is therefore evaluated on
+    # the quantity the rotation actually randomises - the directional
+    # mean - which is the identical hypothesis with the constant removed
+    # from both sides. No gate, threshold or population changes.
     perm, degen = L.rot_perm(st, ct, raw, [dirv[ok5].astype(float)],
-                             lambda s: s[0] / nn - COST, o5)
-    say('    rotation permutation on the cost-adjusted primary: p %.5f'
+                             lambda s: s[0] / nn, gr5)
+    say('    rotation permutation on the cost-adjusted primary (cost is an'
+        ' additive constant and cancels; see D5): p %.5f'
         ' (degenerate-day share %.3f)' % (perm, degen))
     ffind = (g['ff'] == 1).astype(np.float64)[(g['ff'] == 1) | (g['ff'] == 2)]
     ffday = day[(g['ff'] == 1) | (g['ff'] == 2)]
@@ -1394,10 +1404,18 @@ def main():
             v = 'INSUFFICIENT (sample floors unmet)'
         elif k == 'A6' and RA['A6'].get('redundant_runlen'):
             v = 'REDUNDANT WITH RUN LENGTH'
+        elif not ((r['obs'] == r['obs']) and
+                  ((r['obs'] > 0) == (r['pred'] > 0))):
+            # sign opposite to the frozen prediction. MA3 already fails on
+            # direction; the taxonomy must NOT report this as merely small.
+            v = ('FAILED - SIGNIFICANT BUT OPPOSITE TO THE FROZEN PREDICTION'
+                 if g['MA4'] else
+                 'FAILED - WRONG DIRECTION (' +
+                 ','.join(a for a in sorted(g) if not g[a]) + ')')
         elif g['MA3'] and g['MA4'] and not g['MA7']:
             v = 'REDUNDANT (control absorbs the effect)'
         elif g['MA4'] and not g['MA3']:
-            v = 'REAL BUT SUB-MATERIAL (below the 2x-anchor floor)'
+            v = 'REAL BUT SUB-MATERIAL (correct sign, below 2x-anchor floor)'
         else:
             v = 'FAILED (' + ','.join(a for a in sorted(g) if not g[a]) + ')'
         r['verdict'] = v
@@ -1412,15 +1430,16 @@ def main():
             say('  %-4s INSUFFICIENT' % k)
             continue
         g = SG[k]
+        fl = ','.join(a for a in sorted(g, key=lambda z: int(z[2:]))
+                      if not g[a])
         if all(g.values()):
             v = 'EXPLORATORY-DERIVED STRATEGY CANDIDATE'
         elif not g['SG6'] and g['SG3']:
-            v = 'REAL BUT SUB-COST'
+            v = 'REAL BUT SUB-COST (also failing %s)' % fl
         elif not g['SG9']:
-            v = 'TAIL-DEPENDENT / FAILED'
+            v = 'TAIL-DEPENDENT / FAILED (%s)' % fl
         else:
-            v = 'FAILED (' + ','.join(a for a in sorted(
-                g, key=lambda z: int(z[2:])) if not g[a]) + ')'
+            v = 'FAILED (%s)' % fl
         S[k]['verdict'] = v
         say('  %-4s %s' % (k, v))
     say('\n  CANDIDATE CEILING: <= 2 mathematical anomalies, <= 1 strategy.')
