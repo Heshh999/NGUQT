@@ -1,0 +1,252 @@
+==============================================================================
+HIGH-ARRIVAL-UTILITY-V1  (H2)   FROZEN HISTORICAL EXECUTION
+  prereg sha256 afac484b3d75a7bce9533a0fd8304a66fd653587
+  commit cdfcb3148513264ba58a7880ea794c4baa72f1e4
+  DEVELOPMENT / MECHANISM TESTING - NOT OOS, NOT PROSPECTIVE
+  H2 ONLY. H1 NOT USED. NO COMBINATION. NO ORDERS.
+==============================================================================
+
+==============================================================================
+PHASE 0  FREEZE VERIFICATION
+==============================================================================
+  (1,2) prereg sha256 afac484b3d75a7bce9533a0fd8304a66  matches frozen: True
+  (3) RVMR spec  T1 1.270 T2 2.335 W 1440  -> True
+  (6) propensity groups  P-LOW < 0.30 <= P-MID < 0.40 <= P-HIGH
+      derived bin sets  P-LOW [3, 4, 5, 6]  P-MID [2, 7, 8]  P-HIGH [0, 1, 9]
+      matches frozen sets {d3..d6}/{d2,d7,d8}/{d1,d9,d0}: True
+  (7) outcome  move30 = (max high[i1+1..i1+30] - min low[..]) / close[i1]
+  (8) B2 = B1 + |shock|^2 + down + down*|shock|;  A = B2 + propensity
+  (9) controls: ATR terc, |shock| terc, ToD, C_matched 27-cell, current-RVMR score in B1/B2
+  (10) calibration: 3 frozen groups + 10 deciles, Brier vs constant base rate, |err|<=0.10 per group
+  (11) HA1..HA10 as frozen   (12) prospective start 2026-08-26
+
+  bars 2503622   2019-07-04 18:25:00 .. 2026-08-17 15:16:00   rows at/after prospective start: 0
+  RVMR causality probes: EXACT
+
+  (4) discovery cutpoint parity (tolerance 5e-11):
+      99308 discovery pairs; max |delta| 4.94e-11  -> True
+  (5) discovery propensity parity (verbatim leverage scan, FULL-PRECISION cuts; 4-dp published):
+      d0  reproduced 0.640210   frozen 0.6402   delta +9.55e-06
+      d1  reproduced 0.425662   frozen 0.4257   delta -3.77e-05
+      d2  reproduced 0.322754   frozen 0.3228   delta -4.61e-05
+      d3  reproduced 0.260753   frozen 0.2608   delta -4.73e-05
+      d4  reproduced 0.237411   frozen 0.2374   delta +1.08e-05
+      d5  reproduced 0.246931   frozen 0.2469   delta +3.12e-05
+      d6  reproduced 0.274081   frozen 0.2741   delta -1.88e-05
+      d7  reproduced 0.317386   frozen 0.3174   delta -1.42e-05
+      d8  reproduced 0.386969   frozen 0.3870   delta -3.06e-05
+      d9  reproduced 0.556171   frozen 0.5562   delta -2.91e-05
+      max |delta| 4.73e-05  (tolerance 5e-5)  -> True
+  FREEZE VERIFIED.  (48 s)
+
+==============================================================================
+EVENT CONSTRUCTION  (full development set; post-start rows excluded)
+==============================================================================
+  15m blocks (frozen construction) 163779
+  skipped - state/atr unavailable                     56
+  skipped - forward window not contiguous           5277
+  skipped - end-of-data                                2
+  ELIGIBLE EVENTS 158444
+    P-LOW     63290  (39.9%)
+    P-MID     47793  (30.2%)
+    P-HIGH    47361  (29.9%)
+  decile occupancy under FROZEN cutpoints: 0:15720 1:16049 2:15802 3:15896 4:15585 5:15948 6:15861 7:15937 8:16054 9:15592
+
+==============================================================================
+CAUSAL AUDIT
+==============================================================================
+  FIELD                                          AVAILABLE          OUTCOME  CAUSAL
+  block return rv (bars i0..i1)                  close of bar i1    move30   YES
+  decile: frozen 10-dp cutpoints (2026-08-25)    close of i1        move30   YES
+  propensity: frozen 10-constant lookup          close of i1        move30   YES
+  group P-LOW/MID/HIGH (cuts .30/.40, frozen)    close of i1        move30   YES
+  down = (rv < 0)                                close of i1        move30   YES
+  atrRel = atr20(i1)/c[i1] (bars i1-19..i1)      close of i1        move30   YES
+  RVMR score rr[i1] (bars i1-1440..i1-1)         close of i1-1      move30   YES
+  current state RB[i1]                           close of i1-1      move30   YES
+  ToD bucket of mod[i1]                          clock              move30   YES
+  rr60 / logv60 (bars i1-59..i1)                 close of i1        move30   YES
+  move30 (bars i1+1..i1+30)  OUTCOME             close of i1+30     itself   YES
+  HIGH-arrival y (states of bars i1+1..i1+30)    outcome window     itself   YES
+  ALL ROWS YES: True
+
+==============================================================================
+PRIMARY   E[move30] by frozen propensity group
+==============================================================================
+  group          n     mean bp   median bp              95% CI (bp)
+  P-LOW      63290      14.835      10.803   [   14.555,    15.119]
+  P-MID      47793      19.598      15.075   [   19.285,    19.922]
+  P-HIGH     47361      33.236      26.314   [   32.337,    34.191]
+
+  monotone P-LOW < P-MID < P-HIGH: True
+  C = E[move30|P-HIGH] - E[move30|P-LOW] = +18.401 bp   CI [+17.582, +19.284]   boot p 0.00005
+  as % of P-LOW mean: +124.0%   in NQ points at mean close 18724: +34.455 pts
+  (68 s)
+
+==============================================================================
+THE DECISIVE TEST  B1 / B2 / A = B2 + propensity  (HA6 binding)
+==============================================================================
+  R2(B1) 0.576099   R2(B2) 0.577108   R2(A) 0.577176   dR2(A vs B2) +0.000068
+  full-sample propensity coefficient +2.3977 bp of move30 per unit propensity
+  ( = +0.2398 bp per +0.10 propensity; frozen P spread P-HIGH-P-LOW mean gap is reported below )
+  mean propensity by group  P-LOW 0.2549  P-MID 0.3426  P-HIGH 0.5399
+  model-implied adjusted P-HIGH-P-LOW gap: +0.683 bp
+  day-clustered bootstrap (20,000 multinomial day-weights, PCG64 seed 20260825):
+    coefficient CI [-1.2088, +4.7896]   two-sided p 0.28630
+  HA6: coef>0 True  CI excl 0 False  dR2>0 True  -> FAIL
+  NOTE: with an intercept, in-sample R2 cannot fall when a regressor is added, so dR2>0 is near-tautological; the CI is the informative leg.
+  (72 s)
+
+==============================================================================
+CONTROL SLICES  (C recomputed inside frozen partitions)
+==============================================================================
+  atrRel tercile cuts (bp)  2.064308  3.945836
+  |shock| tercile cuts (bp) 2.480677  7.015923
+
+  ATR CONTROL (HA5 leg 1)
+    ATR terc 0  nPH   2509 nPL  36051  C +2.657 bp  CI [+2.374, +2.947]
+    ATR terc 1  nPH  13352 nPL  18637  C +1.567 bp  CI [+1.309, +1.820]
+    ATR terc 2  nPH  31500 nPL   8602  C +7.118 bp  CI [+6.205, +8.127]
+    terciles with C > 0: 3 of 3
+
+  |SHOCK| TERCILE SLICES (the overlap problem, reported)
+    |shock| terc 0  nPH      0 nPL  52815  C: DEGENERATE (no overlap - propensity is a function of the shock)
+    |shock| terc 1  nPH   5964 nPL  10475  C +5.650 bp  CI [+5.127, +6.166]
+    |shock| terc 2  nPH  41397 nPL      0  C: DEGENERATE (no overlap - propensity is a function of the shock)
+
+  C_matched  27-cell (ATR x |shock| x ToD), common weight, cells >=30 both sides (HA5 leg 2)
+    cells used 8 of 27   events covered 14.8% of P-HIGH u P-LOW
+    C_matched +1.049 bp   vs C_raw +18.401 bp   retention 5.7%
+
+  TIME-OF-DAY (HA7; bucket of decision bar i1)
+    OVERNIGHT  nPH  23901 nPL  51790  C +13.811 bp  CI [+13.016, +14.712]
+    RTH_AM     nPH  12176 nPL   4238  C +15.724 bp  CI [+14.489, +17.101]
+    RTH_PM     nPH  11284 nPL   7262  C +15.058 bp  CI [+13.811, +16.357]
+    buckets with C > 0: 3 of 3
+
+  CURRENT-RVMR STATE SLICES (directive-requested diagnostic, NON-GATED;
+  the frozen current-RVMR control is the score covariate inside B1/B2)
+    RB[i1]=LOW     nPH  27176 nPL  55605  C +14.881 bp  CI [+14.037, +15.830]
+    RB[i1]=MEDIUM  nPH  14850 nPL   6585  C +13.587 bp  CI [+12.546, +14.727]
+    RB[i1]=HIGH    nPH   5335 nPL   1100  C +11.779 bp  CI [+10.008, +13.500]
+  (92 s)
+
+==============================================================================
+CALIBRATION  (frozen 3 groups primary; 10 deciles reported; HA8)
+==============================================================================
+  observed overall HIGH-arrival frequency 0.3502
+  Brier(frozen propensity) 0.209153   Brier(constant base rate) 0.227571   -> beats base: True
+  P-LOW   n   63290  predicted 0.2549  observed 0.2334  |err| 0.0215
+  P-MID   n   47793  predicted 0.3426  observed 0.3224  |err| 0.0202
+  P-HIGH  n   47361  predicted 0.5399  observed 0.5345  |err| 0.0054
+  reliability by decile (frozen predicted vs observed):
+    d0  pred 0.6402  obs 0.6370  (n 15720)
+    d1  pred 0.4257  obs 0.4138  (n 16049)
+    d2  pred 0.3228  obs 0.3074  (n 15802)
+    d3  pred 0.2608  obs 0.2410  (n 15896)
+    d4  pred 0.2374  obs 0.2194  (n 15585)
+    d5  pred 0.2469  obs 0.2237  (n 15948)
+    d6  pred 0.2741  obs 0.2492  (n 15861)
+    d7  pred 0.3174  obs 0.2939  (n 15937)
+    d8  pred 0.3870  obs 0.3655  (n 16054)
+    d9  pred 0.5562  obs 0.5554  (n 15592)
+  HA8: max group |err| 0.0215 <= 0.10 True  AND Brier <= base True  -> PASS
+
+==============================================================================
+DOWNSIDE ASYMMETRY  (secondary, never gated; frozen |shock| bands)
+==============================================================================
+  band     nNeg     nPos   P(H|neg)   P(H|pos)         dP |   mvNeg bp   mvPos bp
+  0        2117     2047     0.2145     0.2003    +0.0142 |     14.406     13.357
+  1       11421    11529     0.2238     0.2238    +0.0000 |     14.379     13.953
+  2        4478     4419     0.2244     0.2236    +0.0009 |     14.925     14.314
+  3       11418    12263     0.2475     0.2446    +0.0029 |     15.680     15.317
+  4        3224     3598     0.2686     0.2646    +0.0040 |     17.213     16.396
+  5       12578    13765     0.3173     0.2866    +0.0307 |     18.939     17.507
+  6        1878     2172     0.3525     0.3402    +0.0123 |     21.159     19.867
+  7       14171    15923     0.4219     0.3648    +0.0572 |     24.454     22.332
+  8         122      131     0.4836     0.4504    +0.0332 |     27.969     24.382
+  9       15598    15592     0.6382     0.5554    +0.0827 |     39.493     36.455
+
+  band-matched P(HIGH|neg) - P(HIGH|pos) = +0.0336   CI [+0.0288, +0.0385]   (4000 iters)
+  band-matched move30(neg) - move30(pos) = +1.491 bp
+  by year (point estimates):
+    2019  dP +0.0229   dmove30 +0.583 bp
+    2020  dP +0.0379   dmove30 +2.355 bp
+    2021  dP +0.0383   dmove30 +1.310 bp
+    2022  dP +0.0260   dmove30 +0.824 bp
+    2023  dP +0.0186   dmove30 +0.639 bp
+    2024  dP +0.0316   dmove30 +1.491 bp
+    2025  dP +0.0503   dmove30 +1.918 bp
+    2026  dP +0.0454   dmove30 +2.331 bp
+  (131 s)
+
+==============================================================================
+YEAR DESTRUCTION  (no year is OOS for H2)
+==============================================================================
+  year        n     P-LOW     P-MID    P-HIGH   mono      C bp  beta_prop
+  2019     9334    10.708    14.156    22.107    YES   +11.399    -8.6180
+  2020    21563    17.662    22.615    39.691    YES   +22.029    +2.0726
+  2021    22376    12.406    17.003    27.589    YES   +15.183    +2.4521
+  2022    22710    21.779    25.080    37.955    YES   +16.176    -3.4857
+  2023    22781    12.608    17.167    27.154    YES   +14.546    -2.7608
+  2024    22868    12.644    17.292    28.045    YES   +15.401    -0.4463
+  2025    22612    15.033    19.161    35.594    YES   +20.561    -0.5042
+  2026    14200    20.509    22.170    32.973    YES   +12.463    -2.0467
+  years with C > 0: 8 of 8
+
+  MONTH DESTRUCTION
+    months 86   positive 86   negative 0   median +12.669 bp
+    best 2025-04 +30.101 bp    worst 2019-11 +5.065 bp
+
+==============================================================================
+TAIL DESTRUCTION  (gate = WITHIN-GROUP trim; pooled reported - header note (a))
+==============================================================================
+  within-group remove top  1.0% (PH   474, PL   633 removed)  C +17.827 bp
+  within-group remove top  5.0% (PH  2368, PL  3164 removed)  C +16.583 bp
+  pooled       remove top  1.0% (  1107 removed;  88.2% of them P-HIGH;  2.1% of ALL P-HIGH)  C +16.376 bp
+  pooled       remove top  5.0% (  5533 removed;  84.4% of them P-HIGH;  9.9% of ALL P-HIGH)  C +13.056 bp
+
+==============================================================================
+PERMUTATION NULL  within-day shuffle of propensity-group labels (20000 iters, seed 20260825)
+==============================================================================
+    ... permutation   2000 / 20000   exceedances 0  (156 s)
+    ... permutation   4000 / 20000   exceedances 0  (182 s)
+    ... permutation   6000 / 20000   exceedances 0  (208 s)
+    ... permutation   8000 / 20000   exceedances 0  (233 s)
+    ... permutation  10000 / 20000   exceedances 0  (258 s)
+    ... permutation  12000 / 20000   exceedances 0  (283 s)
+    ... permutation  14000 / 20000   exceedances 0  (310 s)
+    ... permutation  16000 / 20000   exceedances 0  (335 s)
+    ... permutation  18000 / 20000   exceedances 0  (359 s)
+    ... permutation  20000 / 20000   exceedances 0  (384 s)
+  observed C +18.401 bp    permutation p = 0.00005
+
+==============================================================================
+MULTIPLICITY  (BH exact - both primary p-values now exist)
+==============================================================================
+  H1 primary p 0.00005   H2 primary p 0.00005
+  BH q (M_binding=2):  H1 0.00005   H2 0.00005
+  BH q (M_cum=4, NON-BINDING sensitivity, exact): H2 0.00010
+
+==============================================================================
+HA1 - HA10   HIGH-ARRIVAL-UTILITY-V1 GATES
+==============================================================================
+  PRECONDITION  total 158444>=100000, groups 63290/47793/47361 >= 20000  -> PASS
+  HA1   no leakage                                       frozen lookup; predictors at close of i1; outcome i1+1..i1+30; 0 post-start rows excluded; audit all YES PASS
+  HA2   monotone P-LOW < P-MID < P-HIGH                  14.835 < 19.598 < 33.236                             PASS
+  HA3   CI on C excludes 0                               C +18.401, CI [+17.582, +19.284]                     PASS
+  HA4   BH q<=0.05 AND perm p<=0.05                      q 0.00005, perm p 0.00005                            PASS
+  HA5   C>0 in >=2/3 ATR tercs AND C_matched >= 0.5 C_raw 3/3; matched +1.049 vs raw +18.401                   FAIL
+  HA6   B2-incremental propensity (BINDING)              coef +2.3977, CI [-1.2088, +4.7896], dR2 +0.000068   FAIL
+  HA7   C>0 in >=2/3 ToD buckets                         3 of 3                                               PASS
+  HA8   calibration                                      max group err 0.0215, Brier 0.209153 vs base 0.227571 PASS
+  HA9   C>0 in >=6/8 years                               8 of 8                                               PASS
+  HA10  C>0 after within-group 1%/5% trims               +17.827 / +16.583 bp                                 PASS
+  HA PASSED 8 / 10
+
+==============================================================================
+EXECUTION COMPLETE  (elapsed 384 s)
+H2 ONLY. H1 NOT USED. NO COMBINATION. NO STRATEGY SIMULATED.
+DEVELOPMENT ONLY - NOT OOS, NOT PROSPECTIVE, NOT CONFIRMED.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
+==============================================================================
