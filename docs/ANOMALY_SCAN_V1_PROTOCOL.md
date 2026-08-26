@@ -81,3 +81,72 @@ Outputs remain EXPLORATORY. The two-candidate cap for holdout
 confirmation applies to the COMBINED waves: the final recommendation
 after Wave 2 may still name at most TWO hypotheses (which may replace
 Wave-1 picks only by being declared before any holdout contact).
+
+---
+
+# WAVE 3 ADDENDUM — DIRECTION / TREND MACHINERY
+# (frozen BEFORE any Wave-3 statistic is computed)
+
+Same discovery window (<= 2023-12-31), same holdout rule, day-clustered
+machinery, **seed 20260826** for Wave 3 (new-work seed convention).
+Eight further statistics, fixed now — the parameter lists below are the
+COMPLETE set; no post-hoc additions, no sweeps.
+
+## The exclusion zone (binding on this wave)
+
+RVMR-MOMENTUM-V1 (`docs/RVMR_MOMENTUM_V1_PREREGISTRATION.md`, sha256
+`210306f0…`, commit `832faa61…`) is frozen and UNEXECUTED. Its objects —
+`sign(c[t]/c[t-5]-1) x (5m forward return)` and
+`sign(c[t]/c[t-30]-1) x (15m forward return)`, pooled or by RVMR state,
+including its declared baselines — may NOT be computed, revealed, or
+reconstructed by any Wave-3 statistic. No statistic below conditions on
+a trailing 5m or 30m return sign, and no statistic uses the 30m-trail /
+15m-forward pairing. Where a Wave-3 object is a timeframe NEIGHBOUR of
+the frozen ones (S28's 60m-trail/30m-forward), that adjacency is
+declared here, in advance.
+
+## Holdout-contamination ledger (recorded now, per statistic)
+
+The 2024-2026 window is LESS pristine than it was for Waves 1-2:
+ANOMALY-CONFIRM, MEMORY-PRED and HIGH-ARRIVAL computed on it. For any
+future confirmation claim, each Wave-3 statistic carries this exposure
+label, fixed in advance:
+
+- S23 run hazard: k=1 hazard by state EXPOSED via MEMORY-PRED
+  (full-window sign-continuation); k>=2 structure unexposed.
+- S24 ordinal motifs: unexposed, except the last-leg marginal (== lag-1,
+  exposed). The scan's headline is therefore the WITHIN-last-leg /
+  cross-motif structure, not the lag-1 marginal.
+- S25 range position: neighbourhood exposed via XMARKET breakout
+  outcomes on 2024-2026 (different definitions); partial flag.
+- S26 extreme aging: unexposed.
+- S27 VWAP occupancy: strategy neighbourhood touched (RVMR-STRAT, DVT);
+  the occupancy response curve itself unexposed; partial flag.
+- S28 OBV-price divergence: unexposed (bar-volume flow proxy; genuine
+  order-flow delta does not exist in the archive).
+- S29 daily TSMOM: daily returns exposed on 2024+ only as weekday
+  aggregates (MONDAY); TSMOM-conditional means unexposed; minor flag.
+- S30 half-session persistence: unexposed.
+
+## Frozen statistic menu
+
+| # | statistic | mathematical object | RVMR interaction asked |
+|---|---|---|---|
+| S23 | Directional run hazard h(k) = P(run continues \| length k), k = 1..8 (k>=9 pooled), on contiguous nonzero 1m signs; zero return or minute gap TERMINATES a run; a zero next-return is NOT an opportunity. Headline contrast h(3+) - h(1), day-clustered. Also 15m-block sign runs, k = 1..4 | renewal / hazard analysis of directional runs; flat hazard = martingale | hazard curve by RB[t]; does HIGH raise the far hazard? |
+| S24 | Ordinal 3-motifs of (c[t-2], c[t-1], c[t]) (Bandt-Pompe, strict inequalities, ties skipped, em-contiguity 2): motif frequencies vs 1/6; P(next 1m up \| motif); E[r_{t+1} \| motif]. Headline: E[r \| ascending] - E[r \| descending], day-clustered | ordinal-pattern statistics, invariant to monotone transforms | motif table by RB[t] |
+| S25 | Range-position response: PosR = (c - min low 60) / (max high 60 - min low 60) over trailing 60 contiguous bars (incl. t) -> forward 30m return, FIXED 0.1-grid deciles (natural units, nothing fitted) | Donchian position response curve — breakout persistence vs range reversion | extreme deciles by RB[t] |
+| S26 | Extreme aging: a = (bars since trailing-240m high) - (bars since trailing-240m low), ties to most recent; FIXED bins ±{1-29, 30-89, 90-179, 180-239} and {0} -> forward 30m return. Headline: E[fwd30 \| a<=-30] - E[fwd30 \| a>=+30] (fresh-high minus fresh-low), day-clustered | age-of-extremes drift (drawup/drawdown asymmetry) | headline contrast by RB[t] |
+| S27 | VWAP-side occupancy: occ = share of last 60 contiguous bars with close > session VWAP (frozen SessionVwap) -> forward 60m return; FIXED bins {0}, 0.1-grid, {1}. Headline: E[fwd60 \| occ=1] - E[fwd60 \| occ=0], day-clustered | side-persistence at the OU-informed 60m horizon (median VWAP half-life 106m, S6) | headline contrast by RB[t] |
+| S28 | OBV-price divergence: over trailing 60 contiguous bars, dP = c[t]-c[t-60], dV = sum(sign(r) x volume); 2x2 cells (sign dP x sign dV); aligned30 = sign(dP) x forward 30m return. Headline: confirm - diverge contrast within each price sign and pooled, day-clustered. DECLARED timeframe-neighbour of the frozen momentum objects (60m/30m vs frozen 30m/15m) | volume-flow confirmation vs divergence (bar-volume proxy; no fabricated order flow) | contrasts by RB[t] |
+| S29 | Daily time-series momentum, COMPLETE lag family {1, 5, 20} days: aligned = sign(sum of last L day returns) x next-day return; day bootstrap | classic TSMOM at the shortest daily scales — the longer-horizon direction the OU finding points at | by day-level RANGE-score tercile (S6 construction) |
+| S30 | Half-session persistence: A = 09:31-12:00 accrual, B = 12:01-16:00 accrual (>=120 / >=180 bars present); aligned = sign(A) x B; day bootstrap | morning-trend -> afternoon persistence (session structure, no tunable window) | by RB at the last bar <= 12:00 and by day-level tercile |
+
+Machinery: contiguous 1m log returns, gaps never bridged; frozen RVMR
+states unchanged; frozen `dvt_spec.SessionVwap`; forward windows
+verified inside the discovery window; day-clustered bootstrap (5,000
+iterations headline / 1,000 per cell, seed 20260826); no ML; no
+parameter sweeps. At most TWO promotable candidates may emerge from this
+wave, and any future promotable test enters the cumulative programme
+family (next slot: M_cum = 7). Outputs remain EXPLORATORY.
+
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
