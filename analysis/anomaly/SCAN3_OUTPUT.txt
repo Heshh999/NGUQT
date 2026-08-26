@@ -1,0 +1,179 @@
+==============================================================================
+ANOMALY-SCAN-V1  WAVE 3   DISCOVERY <= 2023-12-31 ONLY
+  menu frozen at commit b054a00c before computation, seed 20260826
+  EXCLUSION ZONE ACTIVE: frozen RVMR-MOMENTUM-V1 objects not computed
+  EXPLORATORY. SUBMITS NO ORDERS.
+==============================================================================
+discovery bars 1577173 of 2503622   last discovery index 1577172 (2023-12-29)
+
+==============================================================================
+S23  DIRECTIONAL RUN HAZARD  h(k) = P(run continues | length k)
+     flat hazard = martingale; zero return or gap terminates
+==============================================================================
+  k       pooled       LOW    MEDIUM      HIGH
+  1       0.4966    0.4940    0.5025    0.5106   (n pooled 758818)
+  2       0.4828    0.4790    0.4910    0.5002   (n pooled 358173)
+  3       0.4761    0.4751    0.4779    0.4807   (n pooled 165008)
+  4       0.4654    0.4646    0.4704    0.4600   (n pooled 75189)
+  5       0.4638    0.4591    0.4700    0.4826   (n pooled 33582)
+  6       0.4543    0.4514    0.4543    0.4748   (n pooled 14980)
+  7       0.4592    0.4591    0.4604    0.4558   (n pooled 6590)
+  8       0.4567    0.4597    0.4558    0.4435   (n pooled 2930)
+  9+      0.4447    0.4490    0.4542    0.4054   (n pooled 2280)
+
+  HEADLINE h(3+) - h(1) pooled  -0.0264   CI [-0.0285, -0.0242]   p 0.00020
+    LOW     h(3+) - h(1)  -0.0250   CI [-0.0274, -0.0224]
+    MEDIUM  h(3+) - h(1)  -0.0298   CI [-0.0343, -0.0251]
+    HIGH    h(3+) - h(1)  -0.0375   CI [-0.0451, -0.0296]
+
+  15m BLOCK RUNS  (k, pooled hazard, n):
+    k=1   pooled 0.5011 (n 51326)   LOW 0.4976  MED 0.5137  HIGH 0.5099
+    k=2   pooled 0.4953 (n 25024)   LOW 0.4957  MED 0.4909  HIGH 0.5046
+    k=3   pooled 0.4899 (n 12069)   LOW 0.4843  MED 0.5088  HIGH 0.5008
+    k=4+  pooled 0.4814 (n 10889)   LOW 0.4730  MED 0.5019  HIGH 0.5089
+  (87 s)
+
+==============================================================================
+S24  ORDINAL 3-MOTIFS of closes (Bandt-Pompe; ties skipped)
+==============================================================================
+  pattern encoding: indices of sorted closes; 012 = ascending (x0<x1<x2), 210 = descending
+  pat           n     freq      P(up)    E[r+1] bp
+  012      349914   0.2563     0.4804      -0.0137
+  021      174236   0.1276     0.4951      -0.0400
+  102      165799   0.1214     0.4960      +0.0616
+  120      171801   0.1258     0.5093      +0.0396
+  201      163515   0.1198     0.5146      -0.0534
+  210      340001   0.2490     0.5264      +0.0297
+
+  HEADLINE E[r|ascending 012] - E[r|descending 210]  -0.0435 bp   CI [-0.0591, -0.0275]   p 0.00020
+
+  motif mean E[r+1] bp by state:
+  pat          LOW     MEDIUM       HIGH
+  012      -0.0190   -0.0184   +0.0607
+  021      -0.0234   -0.0978   -0.1700
+  102      +0.0298   +0.1066   +0.1877
+  120      +0.0287   +0.0739   +0.1116
+  201      -0.0129   -0.0889   -0.2623
+  210      +0.0385   +0.0164   -0.0140
+  disclosure: the last-leg sign marginal duplicates the exposed lag-1 result.
+  the incremental content is CROSS-motif structure at a FIXED last leg:
+    last leg UP   = x2 > x1 = motifs {012, 102, 120}
+    last leg DOWN = x2 < x1 = motifs {021, 201, 210}
+  (93 s)
+
+==============================================================================
+S25  RANGE-POSITION RESPONSE  PosR (60m Donchian) -> fwd 30m
+==============================================================================
+  decile         n     fwd30 bp       day-clustered 95% CI
+  0         115554      +0.2359   [  -0.1550,   +0.6371]
+  1         139957      -0.1903   [  -0.4983,   +0.1223]
+  2         141289      -0.0582   [  -0.3264,   +0.1904]
+  3         133711      +0.2039   [  -0.0351,   +0.4196]
+  4         125882      +0.2681   [  +0.0422,   +0.4643]  <-- CI excludes 0
+  5         130704      +0.2235   [  +0.0124,   +0.4667]  <-- CI excludes 0
+  6         140390      +0.1032   [  -0.1051,   +0.3263]
+  7         156819      +0.2434   [  +0.0243,   +0.4358]  <-- CI excludes 0
+  8         175153      +0.2616   [  +0.0385,   +0.4949]  <-- CI excludes 0
+  9         157789      +0.1513   [  -0.1568,   +0.4351]
+  extreme deciles by state (fwd30 bp):
+    dec 0 LOW     n   68169    +0.2130  [  -0.1104,   +0.5418]
+    dec 0 MEDIUM  n   31677    +0.4370  [  -0.2168,   +1.1232]
+    dec 0 HIGH    n   15643    -0.0692  [  -1.1758,   +1.1417]
+    dec 9 LOW     n  112415    +0.2290  [  -0.0174,   +0.4969]
+    dec 9 MEDIUM  n   34836    -0.0114  [  -0.5283,   +0.5328]
+    dec 9 HIGH    n   10433    -0.1522  [  -1.4426,   +1.1252]
+  (102 s)
+
+==============================================================================
+S26  EXTREME AGING  a = ageOfHigh - ageOfLow (240m, ties->recent)
+     a < 0: high is FRESHER (recent strength)
+==============================================================================
+  a bin                  n     fwd30 bp
+  [-239,-180]      162322      -0.1105
+  [-179, -90]      285773      +0.1206
+  [ -89, -30]      148098      +0.4351
+  [ -29,  -1]       20267      -0.7688
+  [   0,   0]         410     +15.4858
+  [   1,  29]       25374      +0.0116
+  [  30,  89]      162134      +0.3125
+  [  90, 179]      259441      +0.3305
+  [ 180, 239]      119638      -0.0554
+
+  HEADLINE fresh-high (a<=-30) - fresh-low (a>=+30)  -0.1040 bp   CI [-0.4969, +0.2777]   p 0.58800
+    LOW     -0.2009 bp   CI [-0.5004, +0.1027]
+    MEDIUM  +0.1565 bp   CI [-0.5873, +0.9046]
+    HIGH    +0.0092 bp   CI [-1.6891, +1.6791]
+  (110 s)
+
+==============================================================================
+S27  VWAP-SIDE OCCUPANCY (60m) -> fwd 60m  (OU-informed horizon)
+==============================================================================
+  bin                  n     fwd60 bp
+  occ=0           335255      +0.1627
+  (0.0,0.1]        69671      +0.2106
+  (0.1,0.2]        56019      +0.3152
+  (0.2,0.3]        50344      +0.6955
+  (0.3,0.4]        49133      +0.5965
+  (0.4,0.5]        49009      +0.5055
+  (0.5,0.6]        48478      +0.0431
+  (0.6,0.7]        49983      +0.2156
+  (0.7,0.8]        53562      -0.1026
+  (0.8,0.9]        60776      +0.6426
+  (0.9,1.0]        91365      +0.2297
+  occ=1           463138      +0.3052
+
+  HEADLINE E[fwd60 | occ=1] - E[fwd60 | occ=0]  +0.1425 bp   CI [-0.7324, +0.9918]   p 0.74320
+    LOW     -0.2288 bp   CI [-0.9620, +0.4596]
+    MEDIUM  +1.0142 bp   CI [-0.4980, +2.6158]
+    HIGH    +1.1517 bp   CI [-2.1852, +4.3117]
+  (118 s)
+
+==============================================================================
+S28  OBV-PRICE DIVERGENCE (60m trail -> 30m fwd; declared
+     timeframe-neighbour of frozen momentum objects)
+==============================================================================
+  dP   volume            n   aligned30 bp
+  up   confirm      622218        +0.1461
+  up   diverge      114010        +0.2771
+  dn   confirm      562434        -0.0944
+  dn   diverge      109104        -0.2562
+
+  HEADLINE confirm - diverge (pooled, aligned30)  +0.0156 bp   CI [-0.2900, +0.3238]   p 0.91480
+    LOW     -0.0293 bp   CI [-0.2788, +0.2162]
+    MEDIUM  -0.0386 bp   CI [-0.7035, +0.6405]
+    HIGH    +0.7454 bp   CI [-0.7001, +2.3641]
+  (125 s)
+
+==============================================================================
+S29  DAILY TIME-SERIES MOMENTUM  lags {1, 5, 20} (complete set)
+==============================================================================
+  L=1   n 1396  aligned    -4.84 bp/day  CI [  -11.06,    +0.97]  P(match) 0.4986
+      day-score LOW terc  n  465  aligned    +0.95 bp
+      day-score MID terc  n  466  aligned    -9.21 bp
+      day-score HIGH terc n  464  aligned    -6.34 bp
+  L=5   n 1392  aligned    +1.68 bp/day  CI [   -4.16,    +7.66]  P(match) 0.5151
+      day-score LOW terc  n  464  aligned    +0.66 bp
+      day-score MID terc  n  464  aligned    +2.19 bp
+      day-score HIGH terc n  464  aligned    +2.20 bp
+  L=20  n 1377  aligned    +2.06 bp/day  CI [   -4.00,    +7.84]  P(match) 0.5004
+      day-score LOW terc  n  460  aligned    -0.09 bp
+      day-score MID terc  n  458  aligned    +3.29 bp
+      day-score HIGH terc n  459  aligned    +2.97 bp
+  (128 s)
+
+==============================================================================
+S30  HALF-SESSION PERSISTENCE  sign(09:31-12:00) x (12:01-16:00)
+==============================================================================
+  n days 1120   aligned PM    +3.69 bp   CI [   -0.44,    +7.60]   P(match) 0.5661
+    noon RB=LOW     n  591  aligned    +8.32 bp  P(match) 0.6007
+    noon RB=MEDIUM  n  461  aligned    +0.79 bp  P(match) 0.5401
+    noon RB=HIGH    n   67  aligned   -16.54 bp  P(match) 0.4478
+    day-score LOW terc  n  241  aligned    +2.03 bp
+    day-score MID terc  n  430  aligned    +5.61 bp
+    day-score HIGH terc n  448  aligned    +2.84 bp
+
+==============================================================================
+WAVE 3 COMPLETE - DISCOVERY ONLY. HOLDOUT UNTOUCHED BY THIS SCAN.
+EXCLUSION ZONE RESPECTED: no frozen RVMR-MOMENTUM-V1 object computed.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.  (129 s)
+==============================================================================
