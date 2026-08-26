@@ -1,0 +1,235 @@
+==============================================================================
+MEMORY-PRED-V1  (H1)   FROZEN HISTORICAL EXECUTION
+  prereg sha256 afac484b3d75a7bce9533a0fd8304a66fd653587
+  commit cdfcb3148513264ba58a7880ea794c4baa72f1e4
+  DEVELOPMENT / MECHANISM TESTING - NOT OOS, NOT PROSPECTIVE
+  H1 ONLY. H2 NOT EXECUTED. NO COMBINATION. NO ORDERS.
+==============================================================================
+
+==============================================================================
+PHASE 0  FREEZE VERIFICATION
+==============================================================================
+  (1) prereg sha256      afac484b3d75a7bce9533a0fd8304a66fd653587eea5f20e4dac794a0898dbb8
+      matches frozen     YES
+  (4) RVMR spec          T1 1.270  T2 2.335  W 1440  RTH 570..960
+  (5) H1 formula         memoryReturn = sign(r[t]) * r[t+1]
+  (6) zero handling      r[t]==0 EXCLUDED; r[t+1]==0 retained as 0 for the mean, excluded from sign endpoint
+  (7) state conditioning PRIMARY RB[t]==RB[t+1]; SECONDARY RB[t+1] only (cannot rescue)
+  (8) controls           ATR tercile x |r[t]| tercile x ToD bucket, common-weight difference-of-means standardisation
+  (9) inference          day-cluster on day[t+1], boot 20000, seed 20260825, 95% CI, within-day label shuffle 20000
+  (10) gates             MP1..MP10 as frozen
+  (3) AC-FLIP lineage    scan_run.py ac() + confirm_run.py adjacency-restricted variant (both bars same state)
+  RVMR causality probes  EXACT   first scored index 1440
+  FREEZE VERIFIED.
+
+==============================================================================
+DATA COVERAGE
+==============================================================================
+  bars 2503622   exchange days 2218   2019-07-04 18:25:00 .. 2026-08-17 15:16:00
+  duplicate close stamps: 0
+  prospective start 2026-08-26  -> bars at/after it: 0
+  UNSEEN-BUT-PRE-EXISTING window 2026-08-18..2026-08-25 -> exchange days present in repository: 0
+
+==============================================================================
+ADJACENCY AUDIT AND EVENT CONSTRUCTION
+==============================================================================
+  candidate (t, t+1) index pairs              2503620
+  removed - gap / non-contiguous minutes         9348
+  removed - r[t] == 0 (sign undefined)         108421
+  removed - RVMR state unavailable               1185
+  VALID ADJACENT EVENTS                       2384666
+  duplicate close stamps in source                   0
+  events whose t and t+1 sit on different calendar dates (true midnight contiguity, RETAINED): 1667
+  every retained event satisfies em[t+1]-em[t]==1 AND em[t]-em[t-1]==1 by construction
+
+  PRIMARY assignment (RB[t] == RB[t+1]):
+    LOW        1579398
+    MEDIUM      192879
+    HIGH         68958
+    mixed       543431  (state changed between t and t+1 - not assigned under the primary construction)
+
+==============================================================================
+CAUSAL AUDIT
+==============================================================================
+  FIELD                                  AVAILABLE TIME       OUTCOME    CAUSAL
+  r[t] = log(c[t]/c[t-1])                close of bar t       n/a        YES
+  sign(r[t])                             close of bar t       n/a        YES
+  RB[t]  (window t-1440..t-1)            close of bar t-1     r[t+1]     YES
+  RB[t+1] (window t+1-1440..t)           close of bar t       r[t+1]     YES
+  atr20(t) (bars t-19..t)                close of bar t       r[t+1]     YES
+  |r[t]|                                 close of bar t       r[t+1]     YES
+  time-of-day bucket of t+1              clock                r[t+1]     YES
+  sign(r[t-1])                           close of bar t-1     r[t+1]     YES
+  RVMR thresholds 1.270/2.335            fixed 2019           r[t+1]     YES
+  r[t+1] = log(c[t+1]/c[t])  OUTCOME     close of bar t+1     itself     YES
+  RVMR window excludes its own bar: verified EXACT at 5 probes
+  ALL ROWS YES: True
+
+==============================================================================
+PRIMARY RESULT   memoryReturn = sign(r[t]) x r[t+1]
+  state = RB[t] == RB[t+1]   (the replicated adjacency-restricted object)
+==============================================================================
+  state            n     mean bp   median bp      sd bp       CI lo       CI hi     boot p
+  LOW        1579398    -0.03340    -0.00000     1.6438    -0.03607    -0.03067    0.00005
+  MEDIUM      192879    +0.01547    -0.00000     4.2171    -0.00449    +0.03622    0.13230
+  HIGH         68958    +0.26674    +0.33073     9.3238    +0.19713    +0.33702    0.00005
+
+  DELTA = E[mem|HIGH] - E[mem|LOW]  +0.30013 bp   CI [+0.22979, +0.37161]   boot p 0.00005
+  required: DELTA > 0  -> True        E[mem|LOW] < 0  -> True
+
+  SIGN-PROBABILITY ENDPOINT  (r[t+1]==0 excluded, as frozen)
+  state    n nonzero      P(cont)  P(reversal)   dev from 50%
+  LOW        1493160     0.481314     0.518686        -1.8686 pp
+  MEDIUM      190483     0.501037     0.498963        +0.1037 pp
+  HIGH         68562     0.513783     0.486217        +1.3783 pp
+  HIGH - LOW continuation probability  +0.032469  = +3.2469 pp   CI [+2.8587, +3.6317] pp   p 0.00005
+
+  ECONOMIC SCALE (reported, NEVER a gate)
+    mean close over HIGH u LOW events   18790.69
+    DELTA in NQ points                  +0.563968
+    round-turn cost                      0.87 points (= 0.4630 bp here)
+    DELTA as a multiple of cost         0.64824 x
+
+==============================================================================
+MAGNITUDE ROBUSTNESS  (frozen set only: ALL / TOP50 / TOP20)
+==============================================================================
+  cutpoints computed once on the assigned population (in-sample, no search): p50 0.0000947975   p80 0.0002253362
+  ALL     nHIGH    68958  nLOW   1579398   DELTA +0.30013 bp  CI [+0.22920, +0.37202]  p 0.00025
+  TOP50   nHIGH    64409  nLOW    694347   DELTA +0.32094 bp  CI [+0.24657, +0.39466]  p 0.00025
+  TOP20   nHIGH    56422  nLOW    201216   DELTA +0.37282 bp  CI [+0.29023, +0.45738]  p 0.00025
+
+==============================================================================
+CONTROLS - common-weight difference-of-means standardisation
+  (NOT the degenerate subgroup weighting of ANOMALY-CONFIRM 4.13: the weight is a COMMON distribution applied to a
+   DIFFERENCE of two means, so it genuinely differs from raw)
+==============================================================================
+  ATR tercile cuts  0.0001859412  0.0003433469
+  |r[t]| tercile cuts 0.0000590562  0.0001486436
+
+  ATR CONTROL
+    ATR tercile 0   nHIGH      722  nLOW    606608   DELTA_cell +0.55934 bp
+    ATR tercile 1   nHIGH     4739  nLOW    578402   DELTA_cell +0.47851 bp
+    ATR tercile 2   nHIGH    63497  nLOW    394388   DELTA_cell +0.28902 bp
+    raw DELTA                    +0.30013 bp
+    ATR-standardised DELTA       +0.45565 bp   retention 151.8%
+
+  RETURN-MAGNITUDE CONTROL
+    |r[t]| tercile 0  nHIGH     2617  nLOW    593405   DELTA_cell +0.15420 bp
+    |r[t]| tercile 1  nHIGH     5009  nLOW    574681   DELTA_cell +0.39285 bp
+    |r[t]| tercile 2  nHIGH    61332  nLOW    411312   DELTA_cell +0.33089 bp
+    magnitude-standardised DELTA +0.28879 bp   retention 96.2%
+
+  MP8 FULL 27-CELL MATCH (ATR x |r[t]| x time-of-day)
+    cells used (n>=30 in both states) 23 of 27
+    DELTA_matched                +0.45607 bp   retention 152.0%
+
+  TIME-OF-DAY CONTROL (frozen buckets, bucket of t+1)
+    OVERNIGHT  nHIGH     7975  nLOW   1327093  DELTA +0.57352 bp  CI [+0.32460, +0.81015]
+    RTH_AM     nHIGH    46124  nLOW     48473  DELTA +0.19044 bp  CI [+0.10985, +0.27112]
+    RTH_PM     nHIGH    14859  nLOW    203832  DELTA +0.40291 bp  CI [+0.24112, +0.56601]
+    buckets with DELTA > 0: 3 of 3
+
+  RECENT-MOMENTUM CONTROL (sign(r[t-1]) vs sign(r[t]); reported, not a gate)
+    prior return same sign as r[t]  DELTA +0.28613 bp  CI [+0.19099, +0.38046]
+    prior return opposite sign      DELTA +0.32505 bp  CI [+0.21613, +0.43379]
+    momentum-standardised DELTA  +0.30637 bp   retention 102.1%
+
+==============================================================================
+YEAR DESTRUCTION  (NO year is OOS for H1 - temporal robustness only)
+==============================================================================
+  year        n LOW     n HIGH       LOW bp      HIGH bp     DELTA bp  dP(cont) pp
+  2019        93818       5037     -0.06358     +0.26399     +0.32757      +5.2852
+  2020       213650       7824     -0.04304     +0.61514     +0.65819      +5.6356
+  2021       222345      10621     -0.02884     +0.25130     +0.28015      +3.6649
+  2022       226666       9254     -0.03339     +0.62257     +0.65596      +3.9141
+  2023       221353      11025     -0.03133     +0.11069     +0.14201      +2.4538
+  2024       225702      10473     -0.02944     +0.24692     +0.27636      +3.4152
+  2025       229506       9689     -0.01797     -0.04519     -0.02723      +0.9032
+  2026       146358       5035     -0.04030     +0.08982     +0.13013      +2.1671
+  years with DELTA > 0: 7 of 8
+
+  MONTH DESTRUCTION
+    months 86   positive 72   negative 14   median +0.27232 bp
+    best 2022-06 +1.36801 bp    worst 2026-02 -1.27374 bp
+
+==============================================================================
+TAIL DESTRUCTION  (gate = WITHIN-STATE trim; pooled trim also reported - see engine header note (a))
+==============================================================================
+  within-state  remove top  1.0%  (H    690, L   15794 removed)   DELTA +0.29617 bp
+  within-state  remove top  5.0%  (H   3448, L   78970 removed)   DELTA +0.27982 bp
+  pooled        remove top  1.0%  (  16484 removed)           DELTA +0.15651 bp
+  pooled        remove top  5.0%  (  82418 removed)           DELTA +0.04445 bp
+
+==============================================================================
+PERMUTATION NULL  within-day shuffle of state labels  (20000 iters, seed 20260825)
+==============================================================================
+    ... permutation   2000 / 20000   exceedances 0  (387 s)
+    ... permutation   4000 / 20000   exceedances 0  (567 s)
+    ... permutation   6000 / 20000   exceedances 0  (748 s)
+    ... permutation   8000 / 20000   exceedances 0  (930 s)
+    ... permutation  10000 / 20000   exceedances 0  (1111 s)
+    ... permutation  12000 / 20000   exceedances 0  (1291 s)
+    ... permutation  14000 / 20000   exceedances 0  (1471 s)
+    ... permutation  16000 / 20000   exceedances 0  (1651 s)
+    ... permutation  18000 / 20000   exceedances 0  (1832 s)
+    ... permutation  20000 / 20000   exceedances 0  (2013 s)
+  observed DELTA +0.30013 bp    permutation p = 0.00005
+  (elapsed 2013 s)
+
+==============================================================================
+SECONDARY 1  forward-state-only conditioning (RB[t+1] alone)
+  CANNOT rescue the primary and cannot overturn it
+==============================================================================
+  LOW     n    1794474   mean -0.04173 bp
+  MEDIUM  n     442715   mean +0.06223 bp
+  HIGH    n     147477   mean +0.38940 bp
+  DELTA(fwd-state-only) +0.43113 bp  CI [+0.38210, +0.48321]  p 0.00025
+
+==============================================================================
+SECONDARY 2  15m construction  (frozen blocks; HIGH should show
+  GREATER REVERSAL: E[mem15|HIGH] < E[mem15|LOW])
+==============================================================================
+  15m blocks 163779   consecutive contiguous block pairs 159008
+  --- both blocks same state
+      LOW     n  106253  mem15 -0.0251 bp  CI [-0.0788, +0.0258]
+      MEDIUM  n   10459  mem15 +0.3873 bp  CI [+0.0622, +0.7194]
+      HIGH    n    2135  mem15 +0.0709 bp  CI [-1.0447, +1.1917]
+      E[mem15|HIGH] < E[mem15|LOW] : False
+  --- forward block state only
+      LOW     n  123045  mem15 -0.0202 bp  CI [-0.0775, +0.0339]
+      MEDIUM  n   27951  mem15 +0.4420 bp  CI [+0.2443, +0.6386]
+      HIGH    n    7949  mem15 +0.2927 bp  CI [-0.2446, +0.8052]
+      E[mem15|HIGH] < E[mem15|LOW] : False
+
+==============================================================================
+MULTIPLICITY
+==============================================================================
+  H1 bootstrap p                         0.00005
+  BH q at M_binding=2, CONSERVATIVE bound 0.00010   (H1 rank 1; H2 not yet run)
+  BH q at M_binding=2, optimistic bound   0.00005   (H1 rank 2)
+  BH q at M_cum=4, conservative (NON-BINDING sensitivity) 0.00020
+
+==============================================================================
+MP1 - MP10   MEMORY-PRED-V1 GATES
+==============================================================================
+  PRECONDITION min n  LOW 1579398>=500000  MED 192879>=80000  HIGH 68958>=25000  -> PASS
+  MP1   adjacency exactness                          all 2384666 events em-adjacent both sides; violations 0 PASS
+  MP2   no leakage                                   causal audit all YES; RVMR probes EXACT      PASS
+  MP3   DELTA > 0 AND E[mem|LOW] < 0                 DELTA +0.30013 bp, LOW -0.03340 bp           PASS
+  MP4   day-clustered 95% CI on DELTA excludes 0     [+0.22979, +0.37161] bp                      PASS
+  MP5   BH q<=0.05 at M=2 AND permutation p<=0.05    q 0.00010 (cons), perm p 0.00005             PASS
+  MP6   DELTA > 0 in >= 6 of 8 years                 7 of 8                                       PASS
+  MP7   DELTA > 0 in >= 2 of 3 time buckets          3 of 3                                       PASS
+  MP8   DELTA_matched > 0 AND >= 0.50 x DELTA_raw    matched +0.45607 vs raw +0.30013 bp          PASS
+  MP9   DELTA > 0 in TOP50 and TOP20 subsets         TOP50 +0.32094, TOP20 +0.37282 bp            PASS
+  MP10  DELTA > 0 after top-1% and top-5% trims      within-state +0.29617 / +0.27982 bp          PASS
+  MP PASSED 10 / 10
+
+  15m SECONDARY (both-same-state) reproduces HIGH reversal: False
+
+==============================================================================
+EXECUTION COMPLETE  (elapsed 2036 s)
+H1 ONLY. H2 NOT EXECUTED. NO COMBINATION. NO STRATEGY SIMULATED.
+DEVELOPMENT ONLY - NOT OOS, NOT PROSPECTIVE, NOT CONFIRMED.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
+==============================================================================

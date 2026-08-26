@@ -1,0 +1,20 @@
+==============================================================================
+MEMORY-PRED-V1  POOLED-TRIM COMPOSITION (diagnostic only)
+==============================================================================
+  HIGH u LOW population 1648356   (HIGH 68958, LOW 1579398)
+
+  POOLED trim top  1.0%  (16484 events removed)
+    removed from HIGH   14004  =  20.3% of all HIGH events
+    removed from LOW     2480  =   0.2% of all LOW events
+    surviving HIGH   54954   surviving LOW  1576918
+    DELTA after pooled trim  +0.15651 bp
+
+  POOLED trim top  5.0%  (82418 events removed)
+    removed from HIGH   41251  =  59.8% of all HIGH events
+    removed from LOW    41167  =   2.6% of all LOW events
+    surviving HIGH   27707   surviving LOW  1538231
+    DELTA after pooled trim  +0.04445 bp
+
+  For comparison, the WITHIN-STATE trim (the MP10 gate) removes the same
+  PERCENTAGE from each state, so both samples stay intact.
+==============================================================================
