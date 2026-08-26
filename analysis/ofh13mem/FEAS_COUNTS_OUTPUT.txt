@@ -1,0 +1,52 @@
+==============================================================================
+OFH13-MEMORY-V1   COUNTS-ONLY FEASIBILITY
+  no P&L, no MFE, no MAE, no win rate, no outcome of any kind
+==============================================================================
+
+OFH13 frozen reproduction
+  merged OF bars 355455   2025-08-18 18:21:00 .. 2026-08-19 16:59:00
+  OFH6 parent signals 952
+  OFH13 events 133   UNSEEN 16 / DEV 57 / IR 60   (expect 16/57/60)
+
+rvmr 1m grid: 2503622 bars   2019-07-04 18:25:00 .. 2026-08-17 15:16:00
+
+TOTAL OFH13 events                  133
+  LONG 55   SHORT 78
+
+MEMORY availability at entry
+  MEMORY-AVAILABLE                    130
+  no rvmr bar at entry stamp            3
+  non-contiguous prior minute           0
+  RVMR state unavailable                0
+
+RB[t] among MEMORY-AVAILABLE
+  LOW        12
+  MEDIUM     68
+  HIGH       50
+
+INTERACTION CLASSES
+  ALIGNED                      10   unique days  10
+  OPPOSED                      52   unique days  48
+  NEUTRAL-medium               68   unique days  61
+  NEUTRAL-zero                  0   unique days   0
+  NEUTRAL-unavail(nogrid)       3   unique days   3
+  NEUTRAL-unavail(gap)          0   unique days   0
+  NEUTRAL-unavail(nostate)      0   unique days   0
+
+CLASS x SIDE
+  ALIGNED                    LONG   5  SHORT   5
+  OPPOSED                    LONG  16  SHORT  36
+  NEUTRAL-medium             LONG  33  SHORT  35
+  NEUTRAL-unavail(nogrid)    LONG   1  SHORT   2
+
+CLASS x PARTITION
+  ALIGNED                    UNSEEN   1  DEV   3  IR   6
+  OPPOSED                    UNSEEN   9  DEV  26  IR  17
+  NEUTRAL-medium             UNSEEN   5  DEV  28  IR  35
+  NEUTRAL-unavail(nogrid)    UNSEEN   1  DEV   0  IR   2
+
+STATE x PARTITION (directional states only)
+  LOW      UNSEEN   0  DEV   4  IR   8
+  HIGH     UNSEEN  10  DEV  25  IR  15
+
+COUNTS-ONLY FEASIBILITY COMPLETE. No outcomes were computed.
