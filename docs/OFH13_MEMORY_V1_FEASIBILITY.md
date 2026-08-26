@@ -177,9 +177,82 @@ rare by construction.
 - The MEMORY-PRED-V1 Lane A prospective plan (start 2026-08-26
   00:00:00 ET) is untouched by this record.
 
-## 6. Reproduction
+## 6. ADDENDUM — PER-EVENT DIAGNOSTIC LISTING AND WINDOW CONTAMINATION
+
+**Added after §1–§5 were committed (`234f763`), on explicit user request.**
+
+The user requested a per-event listing joining OFH13 direction, entry
+timestamp, MEMORY class, RVMR state, and last 1m direction to the
+frozen OFH13 outcomes (FF / MFE / MAE / P&L / winner-loser). That join
+IS the interaction result. It was produced, and its cost is recorded
+here rather than left implicit:
+
+> **WINDOW CONTAMINATION.** The 2025-08-18 → 2026-08-19 OFH13 capture
+> is now EXAMINED for the OFH13 × MEMORY-PRED interaction question. No
+> future study — V2 or otherwise — may treat any part of it as
+> unexamined, hypothesis-blind, or confirmatory for this interaction.
+> Independent confirmation now requires OFH13 parents arriving after
+> 2026-08-19 only.
+
+No preregistration exists for this join, so nothing below is
+promotable. No p-value, CI, permutation, control, or matching was
+computed, and no promotion gate was scored — deliberately, because the
+ALIGNED arm holds 10 events and cannot support inference. Engine:
+`analysis/ofh13mem/event_listing.py`; output
+`analysis/ofh13mem/EVENT_LISTING.txt`.
+
+Scorer validation: the pooled row reproduces the frozen registry
+object exactly — 133 events, +17.26 pt/trade, win rate 36.1%,
+PF 1.80, ff@1ATR 49.6.
+
+Descriptive class summary (frozen management ATR1.5 / no target / 60m,
+cost 0.87):
+
+| class | n | days | winRate | EV/trade | totalP&L | PF | FF@1ATR | avgMAE | stop% |
+|---|---|---|---|---|---|---|---|---|---|
+| ALIGNED | 10 | 10 | 40.0% | +5.77 | +57.7 | 1.26 | 40.0 | 70.33 | 60% |
+| OPPOSED | 52 | 48 | 42.3% | +26.82 | +1394.4 | 2.41 | 46.2 | 56.26 | 54% |
+| NEUTRAL-medium | 68 | 61 | 32.4% | +14.25 | +969.3 | 1.63 | 55.9 | 66.43 | 63% |
+| NEUTRAL-unavail | 3 | 3 | 0.0% | −41.94 | −125.8 | 0.00 | 0.0 | 120.67 | 100% |
+| **OFH13 (all)** | **133** | **108** | **36.1%** | **+17.26** | **+2295.6** | **1.80** | **49.6** | **63.97** | **60%** |
+
+Per ORIGINAL parent (denominator 133, the binding rule): ALIGNED-only
+**+0.43 pt** vs baseline **+17.26 pt**. Tail: ALIGNED retains **0 of the
+top 1, top 5, and top 10 winners** and **5.3%** of total winner P&L.
+
+**Direction of the descriptive result.** The interaction runs OPPOSITE
+to the hypothesis. MEMORY-ALIGNED OFH13 entries are the *worst* class
+on every dimension that matters — per-trade expectancy, per-parent
+expectancy, profit factor, favorable-first, average MAE — while
+MEMORY-OPPOSED entries are the best. Under the directive's own binding
+rules an ALIGNED-only overlay fails outright: it lowers per-original-parent
+expectancy by 97.5% and destroys the entire winner tail. The 40.0% vs
+36.1% win-rate rise is exactly the trap the ABSOLUTE WIN-RATE RULE was
+written to catch.
+
+This is mechanistically consistent with §4: OFH13's edge comes from
+entering *against* the last completed 1-minute move (the mitigation
+pullback). A signal that endorses continuing that move is endorsing
+entries where the pullback was not yet exhausted.
+
+**Status is unchanged: INSUFFICIENT / NOT PROMOTED.** With ALIGNED at
+n = 10 across 10 days, the sign of this comparison is not established —
+it is a description of 10 trades, not evidence. It does not create a
+"filter for OPPOSED" hypothesis either: that would be an outcome-selected
+variant of a failed study, which the directive's no-variant rule forbids.
+Any future work is a NEW preregistration, and per the contamination
+notice above it can only be confirmed on post-2026-08-19 parents.
+
+Nothing frozen was modified. OFH13_PROSPECTIVE_V1 remains the only
+frozen OFH13 object and is byte-for-byte unchanged.
+
+## 7. Reproduction
 
 - `analysis/ofh13mem/feas_counts.py` — deterministic, no RNG used.
 - `analysis/ofh13mem/FEAS_COUNTS_OUTPUT.txt` — full counts output.
+- `analysis/ofh13mem/event_listing.py` — §6 addendum, deterministic,
+  no RNG used; reproduces `cand_audit.path()` and
+  `cand_mgmt.race_time()` verbatim.
+- `analysis/ofh13mem/EVENT_LISTING.txt` — all 133 rows plus summaries.
 - Verified 2026-08-26: prereg-registry OFH13 reproduction EXACT
   (133 = 16/57/60); frozen source hashes match FROZEN_HASHES.txt.
