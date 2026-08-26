@@ -931,6 +931,11 @@ def lane_b(D, nd, seedoff=0):
     invm = res == 'INVERT'
     J = invj[invm]
     dI = (-dF[invm]).astype(np.int8)
+    # inversion bars are NOT in formation order (a later FVG can invert
+    # first); chronological order is required for the within-day rotation
+    # null. Sorting changes no statistic - the bootstrap is order-free.
+    oi = np.argsort(J, kind='stable')
+    J, dI = J[oi], dI[oi]
     R['B3'], g3 = drift_block('B3', 'post-inversion +5m drift in the inverted'
                               ' direction', D, J, dI, nd)
 
