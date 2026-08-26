@@ -1,0 +1,149 @@
+==============================================================================
+ANOMALY-CONFIRM-V2   ONE-SHOT HYPOTHESIS-SPECIFIC CONFIRMATION
+  prereg sha256 0d7bae634c58d835bcc09577881564a037e828b1
+  commit e6f3f06ca54dc6e14e46a5fe1910086436a4d851
+  CONFIRMED (hypothesis-specific historical) is the CEILING label
+  SUBMITS NO ORDERS. NO RETUNING. NO STRATEGY.
+==============================================================================
+
+PHASE 0  prereg sha256 match True   RVMR spec True
+  bars 2503622   2019-07-04 18:25:00 .. 2026-08-17 15:16:00   rows >= 2026-08-26 (firewall): 0
+  discovery days 1398   confirmation days 820   (56 s)
+
+==============================================================================
+H1  ORDINAL-V-TURN
+==============================================================================
+  confirmation motif events 848395
+    012  n   217432
+    021  n   108213
+    102  n   105362
+    120  n   106842
+    201  n   103561
+    210  n   206985
+
+  PRIMARY  Delta_turn = E[ta|V-turn] - E[ta|established]
+    holdout  +0.0314 bp   CI [+0.0150, +0.0478]   boot p 0.00005
+    discovery anchor +0.0792 bp   retention 39.6%   floor (1/3) +0.0264
+  per-motif mean turnAligned (bp):  102 -0.0003  012 -0.0202  201 +0.0042  210 -0.0392
+  VT6 V-up vs est-up   +0.0199 bp  (PASS)
+  VT7 V-dn vs est-dn   +0.0434 bp  (PASS)
+  incremental check: pooled turnAligned (= lag-1 MEMORY-PRED marginal) -0.0102 bp;  Delta_turn cancels it by construction
+
+  VT8 final-leg-magnitude match (|lastleg| x ATR x ToD, common weight)
+    matched Delta_turn +0.0336 bp   raw +0.0314   retention 107.0%   cells 1606   -> PASS
+
+  VT-amp RVMR (secondary, corroborating): Delta_turn by RB[t]
+    LOW     +0.0403 bp  CI [+0.0266, +0.0540]
+    MEDIUM  +0.0057 bp  CI [-0.0418, +0.0522]
+    HIGH    +0.0265 bp  CI [-0.1185, +0.1754]
+    HIGH > LOW amplification: False
+
+  VT9 ATR terciles (Delta_turn):
+    ATR0  +0.0116 bp  CI [+0.0018, +0.0212]
+    ATR1  +0.0511 bp  CI [+0.0310, +0.0719]
+    ATR2  +0.0315 bp  CI [-0.0127, +0.0759]
+    terciles > 0: 3/3
+  VT10 ToD (Delta_turn):
+    OVN  +0.0534 bp  CI [+0.0381, +0.0689]
+    AM   -0.0278 bp  CI [-0.1058, +0.0497]
+    PM   -0.0012 bp  CI [-0.0459, +0.0436]
+    buckets > 0: 1/3
+  VT11 years:
+    2024  n  316617  raw +0.0480  matched +0.0486  Vup +0.0404  Vdn +0.0560
+    2025  n  323080  raw +0.0167  matched +0.0243  Vup -0.0055  Vdn +0.0398
+    2026  n  208698  raw +0.0297  matched +0.0219  Vup +0.0287  Vdn +0.0308
+    years > 0: 3/3
+  VT12 months: 32 total  24 positive  median +0.0363  worst ('2025-04', np.float64(-0.09987655640205839))  best ('2024-09', np.float64(0.11488225493616235))
+  VT13 within-group trim  1.0%  Delta_turn +0.0374 bp
+  VT13 within-group trim  5.0%  Delta_turn +0.0361 bp
+  rotation permutation (motif-id sequence; r[t+1] outcome preserved):
+    permutation p = 0.00285  (84 s)
+  RUN-AGE-HAZARD diagnostic (non-promotable): h(k) by state
+    POOL   h(1) 0.4954  h(3) 0.4819  h(5) 0.4757  h(9) 0.4965
+    LOW    h(1) 0.4945  h(3) 0.4794  h(5) 0.4711  h(9) 0.4963
+    MEDIUM h(1) 0.4980  h(3) 0.4888  h(5) 0.4849  h(9) 0.5076
+    HIGH   h(1) 0.5002  h(3) 0.4894  h(5) 0.4883  h(9) 0.4739
+
+==============================================================================
+H2  HALF-SESSION-LOW
+==============================================================================
+  confirmation eligible days 649   (discovery 1120)
+  by noon RB:  LOW 366  MED 244  HIGH 39  (None 0)
+  pooled aligned +3.527 bp (CONTEXT ONLY, non-supporting)
+    LOW     n  366  aligned   +3.980 bp  P(match) 0.5027
+    MEDIUM  n  244  aligned   +2.394 bp  P(match) 0.5041
+    HIGH    n   39  aligned   +6.360 bp  P(match) 0.4872
+
+  PRIMARY  E[aligned | noon LOW] = +3.980 bp   CI [-3.542, +12.586]   p 0.33190
+    discovery LOW +8.322 bp   retention 47.8%   floor +2.77
+    economics: LOW mean +3.980 bp
+  HS7 direction symmetry: am>0 +2.176 bp (n 242)   am<0 +7.502 bp (n 124)
+  HS8 morning-magnitude split: small|am| +0.856 (n 183)  big|am| +7.105 (n 183)
+  HS9 LOW-specificity: LOW - nonLOW +1.040 bp  CI [-8.986, +11.998]
+  HS10 ATR split: lowvol -3.214 (n 183)  highvol +11.175 (n 183)
+  HS11 years:
+    2024  LOW days 111  aligned   -0.558 bp  am>0  -6.986  am<0 +12.298
+    2025  LOW days 154  aligned   +9.807 bp  am>0 +13.487  am<0  +3.185
+    2026  LOW days 101  aligned   +0.084 bp  am>0  -4.225  am<0  +9.376
+    LOW-years > 0: 2/3
+  HS12 months: 32 total  15 positive  median -0.870  worst ('2024-12', -44.22023173514368)  best ('2025-04', 114.69742703324191)
+  HS13 remove top  1.0% (4 days)  LOW mean -1.123 bp
+  HS13 remove top  5.0% (18 days)  LOW mean -6.054 bp
+    median +0.585  10%-trim +0.393  5 largest days +991.8 +434.7 +224.0 +213.1 +182.6
+  permutation (day sign-flip) p = 0.35393
+
+==============================================================================
+JOINT MULTIPLICITY
+==============================================================================
+  raw p:  H1 0.00005   H2 0.33190
+  BH q (M=2 binding):  H1 0.00010   H2 0.33190
+  BH q (M_cum=8 non-binding):  H1 0.00013   H2 0.41234
+
+==============================================================================
+VT1-VT14 GATES
+==============================================================================
+  VT1   holdout integrity                        all in-window; 0 rows>=bound           PASS
+  VT2   motifs transported                       tie-skip+em2 verbatim; 6 classes       PASS
+  VT3   Delta_turn > 0                           +0.0314 bp                             PASS
+  VT4   CI excludes 0                            [+0.0150,+0.0478]                      PASS
+  VT5   BH q<=.05 AND perm p<=.05                q 0.00010, perm 0.00285                PASS
+  VT6   V-up > est-up                            +0.0199                                PASS
+  VT7   V-dn > est-dn                            +0.0434                                PASS
+  VT8   magnitude match >=0.5 raw                matched +0.0336                        PASS
+  VT9   >=2/3 ATR terciles                       3/3                                    PASS
+  VT10  >=2/3 ToD                                1/3                                    FAIL
+  VT11  >=2/3 years                              3/3                                    PASS
+  VT12  >=18 months                              24/32 pos                              PASS
+  VT13  tails                                    +0.0374/+0.0361                        PASS
+  VT14  retention >= 1/3 disc                    39.6%                                  PASS
+  VT PASSED 13 / 14
+
+==============================================================================
+HS1-HS14 GATES
+==============================================================================
+  HS1   exact LOW subgroup def                   S30 verbatim                               PASS
+  HS2   n >= 120 LOW days                        366                                        PASS
+  HS3   LOW aligned > 0                          +3.980 bp                                  PASS
+  HS4   retention >= +2.77 bp                    +3.980 bp                                  PASS
+  HS5   CI excludes 0                            [-3.542,+12.586]                           FAIL
+  HS6   BH q<=.05 AND perm<=.05                  q 0.33190, perm 0.35393                    FAIL
+  HS7   both morning signs > 0                   am>0 +2.176 am<0 +7.502                    PASS
+  HS8   morning-magnitude both halves > 0        +0.856/+7.105                              PASS
+  HS9   LOW-specific vs nonLOW                   +1.040 CI [-8.986,+11.998]                 FAIL
+  HS10  ATR both halves > 0                      -3.214/+11.175                             FAIL
+  HS11  >=2/3 years                              2/3                                        PASS
+  HS12  >=17 months                              15/32                                      FAIL
+  HS13  tails                                    -1.123/-6.054                              FAIL
+  HS14  no subgroup rescue                       pooled not used as support                 PASS
+  HS PASSED 8 / 14
+
+==============================================================================
+VERDICTS
+==============================================================================
+  H1 ORDINAL-V-TURN:   PARTIALLY CONFIRMED
+  H2 HALF-SESSION-LOW: FAILED  (failing: HS5, HS6, HS9, HS10, HS12, HS13)
+
+EXECUTION COMPLETE  (87 s)
+CONFIRMED ceiling = hypothesis-specific historical. NO STRATEGY. NO ORDERS.
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
+==============================================================================
