@@ -1,0 +1,32 @@
+==============================================================================
+OFH13-POSTENTRY-V1   CHECKPOINT ELIGIBILITY  (COUNTS ONLY)
+  no P&L, no MFE, no MAE, no win rate, no feature, no outcome
+==============================================================================
+
+frozen reproduction  OFH13 133 events  UNSEEN 16 / DEV 57 / IR 60
+  merged OF bars 355455   2025-08-18 18:21:00 .. 2026-08-19 16:59:00
+  rvmr 1m grid 2503622 bars  2019-07-04 18:25:00 .. 2026-08-17 15:16:00
+
+==============================================================================
+CHECKPOINT ELIGIBILITY (frozen management unchanged)
+==============================================================================
+  ALL PARENTS      n  133   days  108   LONG  55  SHORT  78   UNSEEN 16 / DEV 57 / IR 60
+  T5-ELIGIBLE      n   95   days   81   LONG  38  SHORT  57   UNSEEN 14 / DEV 36 / IR 45
+  T15-ELIGIBLE     n   73   days   64   LONG  32  SHORT  41   UNSEEN 13 / DEV 27 / IR 33
+  stopped by +5m   n   38
+  stopped by +15m  n   60
+
+FEATURE-INPUT AVAILABILITY (counts only)
+  frozen FVG zone (zLo/zHi) recoverable   133 of 133
+  entry stamp present on the rvmr 1m grid 130 of 133   (F4 only)
+  60 forward bars present                 133 of 133
+  T5-eligible AND on rvmr grid             92
+  T15-eligible AND on rvmr grid            71
+
+BROAD FROZEN ToD BUCKETS (OFH13 is RTH-only, >=30m after open, >=90m to close)
+  RTH_AM 570-750   T5   n  82
+  RTH_AM 570-750   T15  n  61
+  RTH_PM 751-960   T5   n  13
+  RTH_PM 751-960   T15  n  12
+
+COUNTS-ONLY ELIGIBILITY COMPLETE. No outcome was computed.
