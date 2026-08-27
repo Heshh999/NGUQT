@@ -1,0 +1,11 @@
+project,test_family,n_formal_tests,outcome,commit,partition_status
+MGSD-V1,strategy variants (1m families F01-F19 + baseline),244,0 passed preliminary gates,commit bb6986b,EXPOSED DEV
+MGSD-V1,anomaly screen cells (19 conditions x 9 horizons),162,"2 BH-significant, economically immaterial",commit bb6986b,EXPOSED DEV
+MGSD-V1,premarket->open influence tests,32,0 at BH q<=0.05,commit bb6986b,EXPOSED DEV
+MGSD-V1,30-second arm variants,20,0 provisional candidates (floors failed),commit bb6986b,EXPOSED DEV
+WAVE-4,"mathematical structure cells (A drift, B VR, C anchor, D passage)",90,3 VR windows BH-surviving; anchor field regime-dependent,commit eac54fe,EXPOSED DEV
+LPCC-V1,primary strategy hypothesis (late-premarket arm 1/3),1,FAILED: first binding gate G04 base PF 0.857; 15/21 gates fail,commit be1fff6,EXPOSED DEV
+LPCC-V1,formal diagnostics D1-D8,10,all destruction tests confirm no signal,commit be1fff6,EXPOSED DEV
+CCHC-V1,primary strategy hypothesis (closing arm 2/3),1,PENDING at freeze,this freeze,EXPOSED DEV
+CCHC-V1,formal diagnostics D1-D9,11,PENDING at freeze,this freeze,EXPOSED DEV
+OPENING-DRIVE,arm 3/3 of the pre-ranked window family,0,"RESERVED - UNOPENED, error budget held",n/a,UNOPENED

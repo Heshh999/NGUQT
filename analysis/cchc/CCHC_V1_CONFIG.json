@@ -1,0 +1,106 @@
+{
+ "project": "CCHC-V1",
+ "version": "1.0",
+ "frozen_utc": "2026-08-27",
+ "provenance_head": "be1fff683e28003cbe3ca7856758978828b713f2",
+ "wave4_commit": "eac54fe420eab5c5d1df20e6bd6c77471ee02c38",
+ "lpcc_results_commit": "be1fff683e28003cbe3ca7856758978828b713f2",
+ "cell": {
+  "module": "B",
+  "stratum": "S9close",
+  "q": 30,
+  "stamps": [
+   931,
+   960
+  ],
+  "market_interval": "(15:30,16:00] ET",
+  "intervals_per_day": 1,
+  "vr": 1.269759,
+  "ci": [
+   1.083273,
+   1.469282
+  ],
+  "bh_q": 0.032,
+  "windows": 1767,
+  "days": 1771,
+  "seed": 20260858
+ },
+ "mapping": {
+  "decision_stamp": 930,
+  "entry_open_stamp": 931,
+  "exit_open_stamp": 961,
+  "contiguity_stamps": [
+   930,
+   961
+  ],
+  "stamp_convention": "close-stamped: bar T covers (T-1min,T]"
+ },
+ "anchor": {
+  "name": "current_RTH_open",
+  "source": "open of stamp 571 (09:30:00 print)"
+ },
+ "displacement_gate": {
+  "lookback_eligible_sessions": 252,
+  "min_obs": 126,
+  "percentile": 0.9,
+  "quantile": "type-7 (numpy linear)",
+  "strict": true,
+  "tie": "no_trade"
+ },
+ "regime_gate": {
+  "stat": "OLS slope with intercept",
+  "lookback": 126,
+  "F": "open(stamp961) - open(stamp931)",
+  "trade_if": "beta>0",
+  "no_tstat_filter": true
+ },
+ "direction": "continuation sign(D)",
+ "stop": {
+  "mult": 1.5,
+  "scale": "trailing 60-eligible-session median of the interval high-low range (stamps 931..960)",
+  "min_obs": 40,
+  "round": "up to 0.25 tick",
+  "min": "1 tick",
+  "trailing": false,
+  "execution": "stop-market; gap-through fills at worse open; touch fills at stop; adverse slippage applied"
+ },
+ "exit": {
+  "type": "time",
+  "minutes": 30,
+  "price": "open of stamp 961",
+  "no_auction_or_settlement_fill": true
+ },
+ "costs": {
+  "base_rt_pts": 0.87,
+  "stressed_rt_pts_BINDING": 1.305,
+  "stressed_nonrth_supplementary": 1.74,
+  "slippage_ticks_per_side": [
+   1,
+   2,
+   3
+  ],
+  "slip_base": 2,
+  "slip_stress": 3,
+  "tick": 0.25,
+  "dollars_per_pt": 2.0,
+  "dollar_gate": "UNRESOLVED"
+ },
+ "inference": {
+  "bootstrap_B": 10000,
+  "seed": 20260901,
+  "perm": "direction-sign flip in 5-trade blocks",
+  "perm_iters": 10000,
+  "local_bh_family": 1,
+  "three_arm_familywise_threshold": 0.0166667,
+  "arms": [
+   "LPCC-V1 late-premarket (FAILED)",
+   "CCHC-V1 closing (this test)",
+   "opening-drive (RESERVED, UNOPENED)"
+  ]
+ },
+ "dev_last_day": "2026-08-17",
+ "buffer_no_role": [
+  "2026-08-18",
+  "2026-08-31"
+ ]
+}
