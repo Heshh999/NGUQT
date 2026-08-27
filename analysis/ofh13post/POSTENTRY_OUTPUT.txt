@@ -1,0 +1,235 @@
+========================================================================================================
+OFH13-POSTENTRY-V1   FROZEN ONE-SHOT EXECUTION
+  PREDICTIVE POST-ENTRY STATE ONLY.  NO MANAGEMENT RULE.
+  ALL OFH13 HISTORY IS DEVELOPMENT DATA. NOTHING IS OOS.
+  NO ORDERS. THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
+========================================================================================================
+
+PHASE 0  FREEZE / LINEAGE VERIFICATION
+   1 prereg sha256        90490ecba8556cf9f4d6facb44fdf186aa3355aafc3e20651d2af64198fe44b3  MATCH
+   2 prereg commit        f4964c9fcf09f85b683b47f7695e815a496e671d
+   3 OFH13 lineage        cand_spec.generate()["OFH13"] (frozen shelf)
+   5 stop                 ATR1.5 = 1.5 * atr[entry]   (UNCHANGED)
+   6 target               NONE                        (UNCHANGED)
+   7 exit                 60m                         (UNCHANGED)
+   8 T5                   entry + 5 min, strict tmin contiguity
+   9 T15                  entry + 15 min, strict tmin contiguity
+  10 eligibility          open under UNCHANGED management at +T
+  11 primary endpoint     futureMFE(T) = max_{k in (T,e]} dir*(extreme[j+k] - c[j+T]), floored at 0
+  12 F1..F6               exact frozen formulas
+  13 baseline controls    sret_T, MFE_T, MAE_T (all in R units)
+  14 tail winner          top 13 by original frozen net P&L; remaining-tail-fraction >= 0.50
+  15 floors               T5 >=90/70d  T15 >=70/55d  cells >=20/15d
+  16 multiplicity         M_binding 11 per family, M_total 22
+  17 permutation          stratified day-respecting label permutation (see I1), P=20000, seed 20260826
+  18 gates                P1..P15 frozen numeric
+  19 ceiling              <=1 tail-development + <=1 loss-failure
+  20 contamination        ALL history is development; no protected segment exists; baseline controls themselves pre-contaminated
+  inference              day-cluster bootstrap B=20000, seed 20260826, 95% CI
+  FREEZE VERIFIED.
+
+  loading frozen OFH13 shelf and RVMR grid ...
+
+========================================================================================================
+PHASE 1  FROZEN OFH13 BASELINE REPRODUCTION
+========================================================================================================
+  events 133   UNSEEN 16 / DEV 57 / IR 60   (expect 133 = 16/57/60)
+  win rate 36.1%   EV +17.26 pt/trade   PF 1.80   maxDD 333 pt
+  registry object: N 133, WR 36.1%, EV +17.26, PF 1.80, maxDD 333
+  REPRODUCTION: EXACT
+
+========================================================================================================
+PHASE 2  CHECKPOINT ELIGIBILITY  (no synthetic survival; stop and exit UNCHANGED)
+========================================================================================================
+  T5   ELIGIBLE  n  95   days  81   LONG  38  SHORT  57   F4/RVMR available  92
+  T15  ELIGIBLE  n  73   days  64   LONG  32  SHORT  41   F4/RVMR available  71
+  expected from the freeze: T5 95/81, T15 73/64; F4 92 / 71
+  stopped by +5m 38   stopped by +15m 60
+  SURVIVOR POPULATION: eligibility is conditional on the trade still being open under the ORIGINAL frozen management. No trade was
+  carried past its stop, and no stop was altered to raise eligibility.
+
+========================================================================================================
+PHASE 3  CAUSAL AUDIT   (feature window vs outcome window)
+========================================================================================================
+  FAMILY     T    FEATURE LAST INPUT         OUTCOME FIRST INPUT        LEAKAGE?
+  F1         5    bar j+5 (close)            bar j+6 onward             NO
+  F1         15   bar j+15 (close)           bar j+16 onward            NO
+  F2G1       5    bar j+5 (close)            bar j+6 onward             NO
+  F2G1       15   bar j+15 (close)           bar j+16 onward            NO
+  F3         5    bar j+5 (close)            bar j+6 onward             NO
+  F3         15   bar j+15 (close)           bar j+16 onward            NO
+  F4         5    bar j+5 (close)            bar j+6 onward             NO
+  F4         15   bar j+15 (close)           bar j+16 onward            NO
+  F5align    5    bar j+5 (close)            bar j+6 onward             NO
+  F5align    15   bar j+15 (close)           bar j+16 onward            NO
+  F6         15   bar j+15 (close)           bar j+16 onward            NO
+  every feature uses only completed bars j+1..j+T; futureMFE/futureMAE/remaining P&L use bars strictly after the checkpoint,
+  measured from the checkpoint CLOSE c[j+T]. LEAKAGE DETECTED: NO
+
+========================================================================================================
+PHASE 4  PRIMARY ENDPOINT VALIDATION
+========================================================================================================
+  T5   futureMFE  mean   76.81 pt  median   54.00 pt   mean 2.119 R   |  secondary new-high extension mean   64.68 pt
+  T15  futureMFE  mean   76.97 pt  median   55.75 pt   mean 2.098 R   |  secondary new-high extension mean   53.18 pt
+  futureMFE is measured from c[j+T] over (T, e]; excursion achieved before T cannot contribute by construction.
+
+========================================================================================================
+BINDING FAMILY: futureMFE  (TAIL family)
+========================================================================================================
+  cell      T      nA    nB      meanA      meanB    effect         p      BH q      perm
+  F1        5      32    32     +86.56     +79.97    +6.594   0.79720   0.90160   0.69580
+  F1        15     24    25    +113.26     +67.48   +45.780   0.02950   0.08113   0.18625
+  F2G1      5      32    32     +98.52     +55.63   +42.883   0.04370   0.09614   0.00410
+  F2G1      15     24    25     +94.51     +50.41   +44.100   0.02400   0.08113   0.04445
+  F3        5      63    32     +89.64     +51.55   +38.096   0.02870   0.08113   0.00655
+  F3        15     54    19     +77.48     +75.51    +1.968   0.90160   0.90160   0.89035
+  F4        5       7    47     +66.14     +78.93   -12.788   0.57314   0.78807   0.73735
+  F4        15      7    35     +69.68     +73.65    -3.971   0.84402   0.90160   0.88260
+  F5align   5      29    33    +106.94     +55.64   +51.303   0.00720   0.07920   0.00885
+  F5align   15     21    35    +103.62     +60.72   +42.898   0.06100   0.11183   0.14240
+  F6        15     24    25     +63.03     +96.22   -33.189   0.08810   0.13844   0.13435
+
+  INCREMENTALITY DUTY (raw / residualised / matched common-weight, retention vs raw, sign agreement)
+  cell      T          raw      resid    ret%    matched    ret%  agree
+  F1        5       +6.594    -24.020     364    -29.567     448    YES
+  F1        15     +45.780    +15.493      34        nan     nan     NO
+  F2G1      5      +42.883     -9.941      23        nan     nan     NO
+  F2G1      15     +44.100     -2.474       6        nan     nan     NO
+  F3        5      +38.096     +1.860       5        nan     nan     NO
+  F3        15      +1.968    -19.860    1009    -15.265     776    YES
+  F4        5      -12.788    -21.600     169        nan     nan     NO
+  F4        15      -3.971    -17.824     449        nan     nan     NO
+  F5align   5      +51.303    +16.456      32    -11.767      23     NO
+  F5align   15     +42.898    +21.017      49    +54.439     127    YES
+  F6        15     -33.189    -24.338      73        nan     nan     NO
+
+  DESTRUCTION  (partitions / quarters / long-short / ToD / ATR-standardised / trims / drop-1 / tail identification)
+  F1        T5    parts 1/3  quarters 2/3  L -30.23 S +40.43  AM +20.02 PM -98.12 (nPM 13)  cwATR +13.18  trims -8.41/+13.00  drop1 -8.41  tail flagged 5 of which 5 mostly-after-T
+  F1        T15   parts 3/3  quarters 1/1  L +2.73 S +69.65  AM +41.39 PM +72.50 (nPM 12)  cwATR +50.80  trims +31.81/+21.41  drop1 +31.81  tail flagged 9 of which 7 mostly-after-T
+  F2G1      T5    parts 2/3  quarters 3/3  L +33.69 S +51.97  AM +36.99 PM +95.79 (nPM 13)  cwATR +47.76  trims +28.26/+27.25  drop1 +28.26  tail flagged 7 of which 7 mostly-after-T
+  F2G1      T15   parts 3/3  quarters 1/1  L +17.01 S +66.60  AM +40.26 PM +79.38 (nPM 12)  cwATR +51.60  trims +29.32/+15.44  drop1 +29.32  tail flagged 6 of which 4 mostly-after-T
+  F3        T5    parts 2/3  quarters 3/3  L +56.01 S +46.04  AM +36.06 PM +49.03 (nPM 13)  cwATR +41.70  trims +30.64/+27.86  drop1 +45.90  tail flagged 11 of which 11 mostly-after-T
+  F3        T15   parts 1/3  quarters 0/1  L -3.03 S +13.02  AM -0.67 PM +20.92 (nPM 12)  cwATR +10.37  trims -4.77/-2.67  drop1 +9.81  tail flagged 11 of which 7 mostly-after-T
+  F4        T5    parts 2/3  quarters 1/3  L +35.19 S -43.93  AM -11.10 PM -7.00 (nPM 13)  cwATR -29.09  trims -2.51/+7.13  drop1 -29.26  tail flagged 1 of which 1 mostly-after-T
+  F4        T15   parts 1/3  quarters 0/1  L -44.29 S -23.74  AM -16.25 PM +58.19 (nPM 12)  cwATR nan  trims +6.64/+10.80  drop1 -23.44  tail flagged 1 of which 1 mostly-after-T
+  F5align   T5    parts 3/3  quarters 2/3  L +38.23 S +62.08  AM +60.23 PM -69.69 (nPM 13)  cwATR +50.00  trims +35.42/+43.17  drop1 +35.42  tail flagged 6 of which 6 mostly-after-T
+  F5align   T15   parts 2/3  quarters 1/1  L +16.40 S +58.69  AM +42.30 PM +53.41 (nPM 12)  cwATR +39.98  trims +26.35/+10.97  drop1 +26.35  tail flagged 7 of which 5 mostly-after-T
+  F6        T15   parts 3/3  quarters 1/1  L -44.22 S -24.91  AM -29.83 PM -50.60 (nPM 12)  cwATR -32.93  trims -19.09/-12.03  drop1 -19.09  tail flagged 2 of which 2 mostly-after-T
+
+  15-GATE TABLE
+  cell      T   P1  P2  P3  P4  P5  P6  P7  P8  P9  P10  P11  P12  P13  P14  P15
+  F1        5   P   P   P   F   F   F   F   F   F   F   P   F   P   P   P   (7/15)
+  F1        15  P   P   P   F   F   P   F   F   P   P   P   F   P   P   P   (10/15)
+  F2G1      5   P   P   P   F   F   P   F   P   P   P   P   F   P   P   P   (11/15)
+  F2G1      15  P   P   P   F   F   P   F   F   P   P   P   F   P   P   P   (10/15)
+  F3        5   P   P   P   F   F   P   F   P   P   P   P   P   P   P   P   (12/15)
+  F3        15  P   F   P   F   F   F   F   F   F   F   P   F   P   P   P   (6/15)
+  F4        5   P   F   P   F   F   F   F   F   F   P   P   F   P   P   P   (7/15)
+  F4        15  P   F   P   F   F   F   F   F   P   F   F   F   P   P   P   (6/15)
+  F5align   5   P   P   P   F   F   P   F   P   P   F   P   F   P   P   P   (10/15)
+  F5align   15  P   P   P   F   F   F   F   F   P   P   P   F   P   P   P   (9/15)
+  F6        15  P   P   P   F   F   F   F   F   P   P   P   F   P   P   P   (9/15)
+
+========================================================================================================
+BINDING FAMILY: remaining P&L  (LOSS family)
+========================================================================================================
+  cell      T      nA    nB      meanA      meanB    effect         p      BH q      perm
+  F1        5      32    32     +30.00     +26.82    +3.183   0.90050   0.90050   0.84445
+  F1        15     24    25     +56.22     +17.89   +38.330   0.16040   0.32792   0.37375
+  F2G1      5      32    32     +41.71     +11.97   +29.734   0.19620   0.32792   0.04990
+  F2G1      15     24    25     +35.59      +0.06   +35.529   0.14880   0.32792   0.29845
+  F3        5      63    32     +27.25      +9.49   +17.761   0.31410   0.34551   0.17445
+  F3        15     54    19     +13.91     +35.41   -21.505   0.26830   0.32792   0.24325
+  F4        5       7    47     -12.12     +22.51   -34.627   0.25015   0.32792   0.49835
+  F4        15      7    35     -17.22     +17.78   -35.008   0.23452   0.32792   0.33130
+  F5align   5      29    33     +43.10      +6.93   +36.163   0.05870   0.32285   0.20450
+  F5align   15     21    35     +47.04      +6.72   +40.311   0.16070   0.32792   0.28255
+  F6        15     24    25      -8.63     +42.32   -50.954   0.02340   0.25740   0.12960
+
+  INCREMENTALITY DUTY (raw / residualised / matched common-weight, retention vs raw, sign agreement)
+  cell      T          raw      resid    ret%    matched    ret%  agree
+  F1        5       +3.183    -11.792     370    -28.515     896    YES
+  F1        15     +38.330    +25.497      67        nan     nan     NO
+  F2G1      5      +29.734     -8.719      29        nan     nan     NO
+  F2G1      15     +35.529     +2.819       8        nan     nan     NO
+  F3        5      +17.761     -6.209      35        nan     nan     NO
+  F3        15     -21.505    -35.308     164    -35.462     165    YES
+  F4        5      -34.627    -21.798      63        nan     nan     NO
+  F4        15     -35.008    -46.824     134        nan     nan     NO
+  F5align   5      +36.163    +16.301      45    +19.825      55    YES
+  F5align   15     +40.311    +31.206      77    +43.389     108    YES
+  F6        15     -50.954    -43.217      85        nan     nan     NO
+
+  DESTRUCTION  (partitions / quarters / long-short / ToD / ATR-standardised / trims / drop-1 / tail identification)
+  F1        T5    parts 1/3  quarters 1/3  L -26.58 S +28.34  AM +18.45 PM -119.26 (nPM 13)  cwATR +7.59  trims -13.10/+9.61  drop1 -13.10  tail flagged 5 of which 5 mostly-after-T
+  F1        T15   parts 2/3  quarters 1/1  L +14.92 S +50.48  AM +33.43 PM +59.84 (nPM 12)  cwATR +43.87  trims +22.62/+8.72  drop1 +22.62  tail flagged 9 of which 7 mostly-after-T
+  F2G1      T5    parts 2/3  quarters 3/3  L +18.64 S +37.52  AM +24.78 PM +76.32 (nPM 13)  cwATR +33.29  trims +13.83/+14.14  drop1 +13.83  tail flagged 7 of which 7 mostly-after-T
+  F2G1      T15   parts 3/3  quarters 1/1  L +10.47 S +56.83  AM +31.51 PM +70.63 (nPM 12)  cwATR +42.55  trims +18.92/+3.77  drop1 +18.92  tail flagged 6 of which 4 mostly-after-T
+  F3        T5    parts 2/3  quarters 2/3  L +28.49 S +21.63  AM +19.82 PM -0.73 (nPM 13)  cwATR +18.48  trims +9.58/+8.14  drop1 +26.50  tail flagged 11 of which 11 mostly-after-T
+  F3        T15   parts 2/3  quarters 1/1  L -35.68 S -9.54  AM -20.26 PM -29.07 (nPM 12)  cwATR -16.23  trims -29.12/-25.83  drop1 -12.15  tail flagged 11 of which 7 mostly-after-T
+  F4        T5    parts 3/3  quarters 2/3  L +34.94 S -58.04  AM -36.61 PM -11.03 (nPM 13)  cwATR -49.40  trims -23.49/-14.23  drop1 -57.81  tail flagged 1 of which 1 mostly-after-T
+  F4        T15   parts 3/3  quarters 1/1  L -16.66 S -51.36  AM -40.78 PM +6.53 (nPM 12)  cwATR nan  trims -23.25/-18.31  drop1 -56.80  tail flagged 1 of which 1 mostly-after-T
+  F5align   T5    parts 3/3  quarters 2/3  L +24.65 S +44.34  AM +47.09 PM -153.35 (nPM 13)  cwATR +36.90  trims +18.60/+12.16  drop1 +18.60  tail flagged 6 of which 6 mostly-after-T
+  F5align   T15   parts 2/3  quarters 1/1  L +13.81 S +58.91  AM +36.59 PM +61.67 (nPM 12)  cwATR +37.87  trims +21.79/-4.09  drop1 +21.79  tail flagged 7 of which 5 mostly-after-T
+  F6        T15   parts 3/3  quarters 1/1  L -55.47 S -48.03  AM -52.29 PM -45.93 (nPM 12)  cwATR -50.68  trims -35.32/-21.55  drop1 -35.32  tail flagged 2 of which 2 mostly-after-T
+
+  15-GATE TABLE
+  cell      T   P1  P2  P3  P4  P5  P6  P7  P8  P9  P10  P11  P12  P13  P14  P15
+  F1        5   P   P   P   F   F   F   F   F   F   F   P   F   P   P   P   (7/15)
+  F1        15  P   P   P   F   F   F   F   F   P   P   P   F   P   P   P   (9/15)
+  F2G1      5   P   P   P   F   F   F   F   P   P   P   P   F   P   P   P   (10/15)
+  F2G1      15  P   P   P   F   F   F   F   F   P   P   P   F   P   P   P   (9/15)
+  F3        5   P   P   P   F   F   F   F   P   P   F   P   P   P   P   P   (10/15)
+  F3        15  P   F   P   P   P   F   F   F   P   P   P   F   P   P   P   (10/15)
+  F4        5   P   F   P   F   F   F   F   P   F   P   P   P   P   P   P   (9/15)
+  F4        15  P   F   P   F   F   F   F   F   P   F   F   P   P   P   P   (7/15)
+  F5align   5   P   P   P   F   F   F   F   P   P   F   P   F   P   P   P   (9/15)
+  F5align   15  P   P   P   P   P   F   F   F   P   P   P   F   P   P   P   (11/15)
+  F6        15  P   P   P   F   F   P   F   F   P   P   P   F   P   P   P   (10/15)
+
+========================================================================================================
+VERDICTS
+========================================================================================================
+
+  futureMFE  (TAIL family)
+    F1        T5   REDUNDANT WITH EARLY RETURN        effect     +6.594   failing P4,P5,P6,P7,P8,P9,P10,P12
+    F1        T15  REDUNDANT WITH EARLY RETURN        effect    +45.780   failing P4,P5,P7,P8,P12
+    F2G1      T5   REDUNDANT WITH EARLY MFE/MAE       effect    +42.883   failing P4,P5,P7,P12
+    F2G1      T15  REDUNDANT WITH EARLY MFE/MAE       effect    +44.100   failing P4,P5,P7,P8,P12
+    F3        T5   REDUNDANT WITH EARLY MFE/MAE       effect    +38.096   failing P4,P5,P7
+    F3        T15  INSUFFICIENT (arm/day floor)       effect     +1.968   failing P2,P4,P5,P6,P7,P8,P9,P10,P12
+    F4        T5   INSUFFICIENT (arm/day floor)       effect    -12.788   failing P2,P4,P5,P6,P7,P8,P9,P12
+    F4        T15  INSUFFICIENT (arm/day floor)       effect     -3.971   failing P2,P4,P5,P6,P7,P8,P10,P11,P12
+    F5align   T5   REDUNDANT WITH EARLY RETURN        effect    +51.303   failing P4,P5,P7,P10,P12
+    F5align   T15  REDUNDANT WITH EARLY RETURN        effect    +42.898   failing P4,P5,P6,P7,P8,P12
+    F6        T15  REDUNDANT WITH EARLY RETURN        effect    -33.189   failing P4,P5,P6,P7,P8,P12
+
+  remaining P&L  (LOSS family)
+    F1        T5   REDUNDANT WITH EARLY RETURN        effect     +3.183   failing P4,P5,P6,P7,P8,P9,P10,P12
+    F1        T15  REDUNDANT WITH EARLY RETURN        effect    +38.330   failing P4,P5,P6,P7,P8,P12
+    F2G1      T5   REDUNDANT WITH EARLY MFE/MAE       effect    +29.734   failing P4,P5,P6,P7,P12
+    F2G1      T15  REDUNDANT WITH EARLY MFE/MAE       effect    +35.529   failing P4,P5,P6,P7,P8,P12
+    F3        T5   REDUNDANT WITH EARLY MFE/MAE       effect    +17.761   failing P4,P5,P6,P7,P10
+    F3        T15  INSUFFICIENT (arm/day floor)       effect    -21.505   failing P2,P6,P7,P8,P12
+    F4        T5   INSUFFICIENT (arm/day floor)       effect    -34.627   failing P2,P4,P5,P6,P7,P9
+    F4        T15  INSUFFICIENT (arm/day floor)       effect    -35.008   failing P2,P4,P5,P6,P7,P8,P10,P11
+    F5align   T5   REDUNDANT WITH EARLY RETURN        effect    +36.163   failing P4,P5,P6,P7,P10,P12
+    F5align   T15  TAIL-DEPENDENT                     effect    +40.311   failing P6,P7,P8,P12
+    F6        T15  REDUNDANT WITH EARLY RETURN        effect    -50.954   failing P4,P5,P7,P8,P12
+
+  CANDIDATE CEILING: <=1 TAIL-DEVELOPMENT + <=1 LOSS-FAILURE (max 2)
+    tail-development advancing: 0      loss-failure advancing: 0
+    binding cells passing every required gate: 0 / 22
+
+  OFH13-POSTENTRY-V1 FOUND NO NEW CAUSAL POST-ENTRY SEPARATOR.
+  Study CLOSED. No V1 rescue. No management rule created.
+
+  EPISTEMIC STATUS: ALL OFH13 history is DEVELOPMENT data for this
+  study; no protected segment exists; the baseline controls were
+  themselves previously viewed by outcome class. Nothing here is OOS
+  or independently confirmed.
+
+  OFH13 entry / ATR1.5 stop / 60m exit / prospective logger: UNCHANGED. No management rule tested. No orders.
+EXECUTION COMPLETE (128 s)
+THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
+========================================================================================================
