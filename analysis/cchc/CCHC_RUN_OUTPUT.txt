@@ -1,0 +1,76 @@
+CCHC-V1 ONE-SHOT RUN   freeze 5133c5114a236d29e6fff412325b6fddcf87d179
+eligible days 1767 | warm 1641 | displacement-gate 226 | regime beta>0 (warm) 677 | PRIMARY TRADES 98
+
+COST SCENARIOS (net pts/trade, n=98):
+  gross                                EV +16.640  +0.3030R  WR  61.2%  PF 1.802  payoff 1.14
+  slip 1 tick/side                     EV +16.140  +0.2971R  WR  61.2%  PF 1.771  payoff 1.12
+  slip 2/side (prov base)              EV +15.640  +0.2912R  WR  61.2%  PF 1.740  payoff 1.10
+  slip 3/side (stress)                 EV +15.140  +0.2852R  WR  61.2%  PF 1.710  payoff 1.08
+  repo base 0.87                       EV +15.770  +0.2927R  WR  61.2%  PF 1.748  payoff 1.11
+  REPO RTH STRESSED 1.305 (BINDING)    EV +15.335  +0.2876R  WR  61.2%  PF 1.722  payoff 1.09
+  non-RTH 1.740 (supplementary)        EV +14.900  +0.2824R  WR  61.2%  PF 1.696  payoff 1.07
+
+PRIMARY (binding stressed 1.305): EV +15.335 pt (+0.2876R)  CI95 [+0.710, +30.766]
+day-blocked permutation p = 0.0243 | local BH q (family 1) = 0.0243
+THREE-ARM FAMILYWISE: p 0.0243 vs threshold 0.0166667 -> FAIL
+
+BY YEAR (binding stressed):
+  2020 n  36  EV  +25.348  WR  66.7%  sum    +912.5
+  2022 n  39  EV  +15.477  WR  69.2%  sum    +603.6
+  2023 n   2  EV  -18.180  WR   0.0%  sum     -36.4
+  2024 n   4  EV  +24.507  WR  25.0%  sum     +98.0
+  2025 n  17  EV   -4.408  WR  47.1%  sum     -74.9
+quarters with >=5 trades: 7, positive: 6
+half-year segments >=5 trades: 4, positive 75%
+weekday EV: Mo +59.04(n15) Tu +17.31(n21) We +14.29(n18) Th +0.40(n23) Fr -0.61(n21)
+long 45 (EV +17.606)  short 53 (EV +13.407) | stop-outs 15  time-exits 83
+vol regime: low-range days EV +24.210 (n49) | high-range EV +6.460 (n49)
+Sharpe/trade 0.203  Sortino/trade 0.373  maxDD -312.5 pt  DD duration 20 trades  longest losing streak 4
+largest loss -144.6  CVaR5% -140.3  median win +43.32  median loss -42.05
+median MFE 47.62  median MAE 30.75 pts
+break-even WR 47.8%  actual 61.2%  margin +13.4 pts
+
+DIAGNOSTICS D1-D9 (binding stressed; never candidates):
+  D1 no-regime ablation            n  226  EV   +2.438  WR  49.1%  
+  D2 no-displacement ablation      n  676  EV   -0.369  WR  45.7%  
+  D3 component-free baseline       n 1639  EV   -0.797  WR  46.7%  
+  D4 direction-reversal placebo    n   98  EV  -12.078
+  D5 regime-label permutation      p = 0.0211  (null mean +2.276, 10000 perms)
+  D6 regime shift -20              n  116  EV  +16.753  
+  D6 regime shift -10              n  106  EV  +19.789  
+  D6 regime shift +10              n  104  EV   +7.495  NON-TRADABLE falsification
+  D6 regime shift +20              n   94  EV   +4.261  NON-TRADABLE falsification
+  D7 matched random-day control    n   98  EV  +10.932  WR  55.1%  half-year x |D| tercile
+  D8 randomized-anchor placebo     draws 200  null mean -5.352  p = 0.0050
+  D9 time-of-day placebo           n   62  EV   -4.228  (16:00->16:30 context only)
+
+influence: drop-most-influential EV +12.373 | drop-best-trade EV +12.373 | drop-best-month(2020-03) EV +8.044
+drop-best-year(2020) EV +9.522 | best year share of net 61%
+
+GATES (MGSD unweakened; binding stressed 1.305):
+  G01_events>=100              FAIL
+  G02_days>=40                 PASS
+  G03_subgroups                PASS
+  G04_basePF>=1.30             PASS
+  G05_stressPF>=1.15           PASS
+  G06_baseEVR>=0.10            PASS
+  G07_stressEVR>=0.05          PASS
+  G08_CIlow>0                  PASS
+  G09_perm<=.05                PASS
+  G10_BHq<=.05                 PASS
+  G11_familywise<=.0166667     FAIL
+  G12_retention>=50pct         PASS
+  G13_no_signflip              PASS
+  G15_segments>=70pct          PASS
+  G16_no_domination            FAIL
+  G17_influence                PASS
+  G18_placebo                  PASS
+  G19_destruction              PASS
+  G20_causal                   PASS
+  G21_repro                    PASS
+  Gprofile                     PASS
+
+FIRST BINDING FAILURE: G01_events>=100
+ALL FAILURES: G01_events>=100, G11_familywise<=.0166667, G16_no_domination
+
+CCHC-V1 PRELIMINARY VERDICT: FAIL

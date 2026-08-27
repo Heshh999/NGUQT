@@ -6,6 +6,6 @@ MGSD-V1,30-second arm variants,20,0 provisional candidates (floors failed),commi
 WAVE-4,"mathematical structure cells (A drift, B VR, C anchor, D passage)",90,3 VR windows BH-surviving; anchor field regime-dependent,commit eac54fe,EXPOSED DEV
 LPCC-V1,primary strategy hypothesis (late-premarket arm 1/3),1,FAILED: first binding gate G04 base PF 0.857; 15/21 gates fail,commit be1fff6,EXPOSED DEV
 LPCC-V1,formal diagnostics D1-D8,10,all destruction tests confirm no signal,commit be1fff6,EXPOSED DEV
-CCHC-V1,primary strategy hypothesis (closing arm 2/3),1,PENDING at freeze,this freeze,EXPOSED DEV
-CCHC-V1,formal diagnostics D1-D9,11,PENDING at freeze,this freeze,EXPOSED DEV
+CCHC-V1,primary strategy hypothesis (closing arm 2/3),1,FAILED: G01 n=98<100; G11 familywise p 0.0243>0.0166667; G16 2020=60.7% of net,results commit,EXPOSED DEV
+CCHC-V1,formal diagnostics D1-D9,11,D1-D9 complete; D6 shift and D7 matched control undermine the candidate,results commit,EXPOSED DEV
 OPENING-DRIVE,arm 3/3 of the pre-ranked window family,0,"RESERVED - UNOPENED, error budget held",n/a,UNOPENED
