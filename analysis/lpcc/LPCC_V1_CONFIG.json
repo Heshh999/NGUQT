@@ -1,0 +1,72 @@
+{
+ "version": "1.0",
+ "frozen_utc": "2026-08-27",
+ "provenance_head": "eac54fe420eab5c5d1df20e6bd6c77471ee02c38",
+ "interval": {
+  "T0": "08:00",
+  "T1": "08:30",
+  "decision_stamp_mod": 480,
+  "entry_stamp_mod": 481,
+  "exit_open_stamp_mod": 511,
+  "contiguity_stamps": [
+   480,
+   511
+  ]
+ },
+ "anchor": "previous_completed_RTH_close",
+ "displacement_gate": {
+  "lookback_eligible_days": 252,
+  "min_obs": 126,
+  "percentile": 0.9,
+  "quantile_convention": "numpy linear (type-7)",
+  "strict": true,
+  "tie": "no_trade"
+ },
+ "regime_gate": {
+  "stat": "OLS_slope_with_intercept",
+  "lookback_eligible_days": 126,
+  "F": "open(0831)-open(0801) raw window move",
+  "trade_if": "beta>0"
+ },
+ "direction": "continuation sign(D)",
+ "stop": {
+  "mult": 1.5,
+  "scale": "trailing 60-eligible-session median interval high-low range",
+  "min_obs": 40,
+  "round": "up to 0.25",
+  "min": "1 tick",
+  "trailing": false
+ },
+ "exit": {
+  "type": "time",
+  "minutes": 30,
+  "price": "open of 08:31 bar"
+ },
+ "costs": {
+  "repo_base_rt_pts": 0.87,
+  "repo_stressed_rt_pts": 1.74,
+  "slippage_ticks_per_side": [
+   1,
+   2,
+   3
+  ],
+  "slippage_base": 2,
+  "slippage_stress": 3,
+  "dollar_gate": "UNRESOLVED",
+  "tick": 0.25,
+  "dollars_per_pt": 2.0
+ },
+ "inference": {
+  "bootstrap_B": 10000,
+  "seed": 20260829,
+  "perm_iters": 10000,
+  "perm": "direction-sign 5-day blocks",
+  "bh_family_size": 1
+ },
+ "gates": "MGSD-V1 unweakened, see freeze md",
+ "dev_last_day": "2026-08-17",
+ "buffer": [
+  "2026-08-18",
+  "2026-08-31"
+ ]
+}
