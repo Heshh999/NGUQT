@@ -1,0 +1,8 @@
+start,end,dataset,classification,evidence,mgsd_role
+2019-07-04,2026-08-17,1m grid,PREVIOUSLY ANALYZED + USED FOR SELECTION,"RVMR-V1 battery; anomaly scans W1-W3; ANOMALY-CONFIRM-V1/V2 (2024-01..2026-08 opened as holdout, twice); MEMORY-PRED; HARU; RVMR-MOMENTUM; MEMORY-MATH-IFVG (full span); profit-taking study (full span); RVMR-AVOID/STRAT/BANDS/VAL; NQ-DIRECTION; XMARKET; 4H-DVT; BRK; MRV; MAG lineage",DEV only
+2025-08-18,2026-08-19,order-flow capture,PREVIOUSLY ANALYZED + USED FOR SELECTION,OFH/OFH6/OFH13/OFH14 lineage; OFH13-MEMORY diagnostic; OFH13-POSTENTRY,EXCLUDED from MGSD-V1
+2025-09-01,2026-05-29,30s ph2,PREVIOUSLY ANALYZED,V3 scalp research event exports carry outcome columns on these dates; dates also inside the analyzed 1m span,"DEV (30s arm), provisional only"
+2026-08-18,2026-08-31,all,BUFFER / PARTIALLY COLLECTED,OF capture extends to 2026-08-19; 1m grid ends 2026-08-17; ragged edge,ASSIGNED TO NO PARTITION
+2026-09-01,2027-02-28,future,FUTURE DATA NOT YET COLLECTED,none,VALIDATION (reserved)
+2027-03-01,2027-08-31,future,FUTURE DATA NOT YET COLLECTED,none,OOS (reserved)
+2027-09-01,open-ended,future,FUTURE DATA NOT YET COLLECTED,none,FINAL LOCKBOX (reserved)

@@ -1,0 +1,291 @@
+{
+ "grid_1m": {
+  "bars": 2503622,
+  "first": "2019-07-04 18:25:00",
+  "last": "2026-08-17 15:16:00",
+  "days": 2218,
+  "dupes": 0,
+  "missing_minutes": 1241630,
+  "ohlc_violations": 0,
+  "nonpos_price": 0,
+  "zero_vol_bars": 0,
+  "stamp": "CLOSE-stamped ET (frozen RVMR-V1 audit, STAMP_SHIFT=0)",
+  "tz": "US/Eastern wall clock; DST implicit in ET stamps",
+  "roll": "V3 continuous MNQ series; stitching audited in RVMR-V1 Phase 0",
+  "days_by_year": {
+   "2019": 155,
+   "2020": 312,
+   "2021": 311,
+   "2022": 310,
+   "2023": 310,
+   "2024": 313,
+   "2025": 311,
+   "2026": 196
+  },
+  "complete_years": [
+   "2020",
+   "2021",
+   "2022",
+   "2023",
+   "2024",
+   "2025"
+  ],
+  "stratum_coverage": [
+   {
+    "stratum": "S1_POSTCLOSE",
+    "expected_bars": 60,
+    "days_ge95pct": 1280,
+    "days_partial": 492,
+    "days_absent": 446
+   },
+   {
+    "stratum": "S2_GLOBEX_NIGHT",
+    "expected_bars": 480,
+    "days_ge95pct": 1437,
+    "days_partial": 779,
+    "days_absent": 2
+   },
+   {
+    "stratum": "S3_EARLY_PM",
+    "expected_bars": 360,
+    "days_ge95pct": 1817,
+    "days_partial": 20,
+    "days_absent": 381
+   },
+   {
+    "stratum": "S4_LATE_PM",
+    "expected_bars": 89,
+    "days_ge95pct": 1825,
+    "days_partial": 11,
+    "days_absent": 382
+   },
+   {
+    "stratum": "S5_OPEN_DRIVE",
+    "expected_bars": 30,
+    "days_ge95pct": 1829,
+    "days_partial": 4,
+    "days_absent": 385
+   },
+   {
+    "stratum": "S6_RTH_MORNING",
+    "expected_bars": 90,
+    "days_ge95pct": 1826,
+    "days_partial": 7,
+    "days_absent": 385
+   },
+   {
+    "stratum": "S7_MIDDAY",
+    "expected_bars": 150,
+    "days_ge95pct": 1768,
+    "days_partial": 65,
+    "days_absent": 385
+   },
+   {
+    "stratum": "S8_AFTERNOON",
+    "expected_bars": 90,
+    "days_ge95pct": 1766,
+    "days_partial": 6,
+    "days_absent": 446
+   },
+   {
+    "stratum": "S9_CLOSE",
+    "expected_bars": 30,
+    "days_ge95pct": 1768,
+    "days_partial": 3,
+    "days_absent": 447
+   }
+  ],
+  "agg_3m": {
+   "groups_tested": 50000,
+   "consistent": 50000
+  },
+  "agg_15m": {
+   "groups_tested": 50000,
+   "consistent": 50000
+  },
+  "agg_60m": {
+   "groups_tested": 38989,
+   "consistent": 38989
+  },
+  "source_files": [
+   {
+    "path": "../../../tmp/claude-0/-home-user-NGUQT/fdf51f53-eedc-531d-bbe6-d05384541cce/scratchpad/rvmr_1m/rvmr_1m_2019.csv",
+    "sha256": "3cc3feccbb0e169a",
+    "bytes": 9379668
+   },
+   {
+    "path": "../../../tmp/claude-0/-home-user-NGUQT/fdf51f53-eedc-531d-bbe6-d05384541cce/scratchpad/rvmr_1m/rvmr_1m_2020.csv",
+    "sha256": "afc77f28fdc16ce0",
+    "bytes": 19396820
+   },
+   {
+    "path": "../../../tmp/claude-0/-home-user-NGUQT/fdf51f53-eedc-531d-bbe6-d05384541cce/scratchpad/rvmr_1m/rvmr_1m_2021.csv",
+    "sha256": "2bf23614c2ddfdc9",
+    "bytes": 19730555
+   },
+   {
+    "path": "../../../tmp/claude-0/-home-user-NGUQT/fdf51f53-eedc-531d-bbe6-d05384541cce/scratchpad/rvmr_1m/rvmr_1m_2022.csv",
+    "sha256": "d66d58a87d0cd22c",
+    "bytes": 19847567
+   },
+   {
+    "path": "../../../tmp/claude-0/-home-user-NGUQT/fdf51f53-eedc-531d-bbe6-d05384541cce/scratchpad/rvmr_1m/rvmr_1m_2023.csv",
+    "sha256": "00a73a04128fdf35",
+    "bytes": 19803818
+   },
+   {
+    "path": "../../../tmp/claude-0/-home-user-NGUQT/fdf51f53-eedc-531d-bbe6-d05384541cce/scratchpad/rvmr_1m/rvmr_1m_2024.csv",
+    "sha256": "140f9c61e9c699ff",
+    "bytes": 19917512
+   },
+   {
+    "path": "../../../tmp/claude-0/-home-user-NGUQT/fdf51f53-eedc-531d-bbe6-d05384541cce/scratchpad/rvmr_1m/rvmr_1m_2025.csv",
+    "sha256": "41a43b4b4b2cef36",
+    "bytes": 19744805
+   },
+   {
+    "path": "../../../tmp/claude-0/-home-user-NGUQT/fdf51f53-eedc-531d-bbe6-d05384541cce/scratchpad/rvmr_1m/rvmr_1m_2026.csv",
+    "sha256": "59ea79b0d299a3fe",
+    "bytes": 12424854
+   }
+  ]
+ },
+ "arm_30s": {
+  "files": 20,
+  "file_hashes": [
+   {
+    "name": "V3_30s_20260818_071208_201912.csv",
+    "sha256": "926907d5a4fab3b3"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202001.csv",
+    "sha256": "3a789a741479729f"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202002.csv",
+    "sha256": "d36ec98cb1faecc0"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202003.csv",
+    "sha256": "d8fb83f4fe5c1878"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202005.csv",
+    "sha256": "1e20012b07d57621"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202402.csv",
+    "sha256": "19960cc811283114"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202404.csv",
+    "sha256": "2b87434ac61a3aa7"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202405.csv",
+    "sha256": "883a75dec1a57b82"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202406.csv",
+    "sha256": "1ec1db624bad5ad9"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202407.csv",
+    "sha256": "d00a7c0ac785cc70"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202507.csv",
+    "sha256": "030e535778b49f47"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202509.csv",
+    "sha256": "8aeda6e2b1c4917f"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202510.csv",
+    "sha256": "c366b99a9a87f094"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202511.csv",
+    "sha256": "8381ec41c3a3f220"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202512.csv",
+    "sha256": "9570efc008d36cb6"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202601.csv",
+    "sha256": "ffa997142ad43425"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202602.csv",
+    "sha256": "fa201c8fa7bcbd41"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202603.csv",
+    "sha256": "ad25416a41c53d8a"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202604.csv",
+    "sha256": "6059ce594fc407e6"
+   },
+   {
+    "name": "V3_30s_20260818_071208_202605.csv",
+    "sha256": "5e6e95f3e28f9c6a"
+   }
+  ],
+  "unique_30s_bars": 34944,
+  "dup_conflicts": 0,
+  "days_with_30s": 192,
+  "coverage_months": [
+   "2025-09",
+   "2025-10",
+   "2025-11",
+   "2025-12",
+   "2026-01",
+   "2026-02",
+   "2026-03",
+   "2026-04",
+   "2026-05"
+  ],
+  "first_day": "2025-09-01",
+  "last_day": "2026-05-29",
+  "slot_grid": {
+   "distinct_times": 182,
+   "first": "09:30:00",
+   "last": "11:00:30"
+  },
+  "days_by_slotcount": {
+   "182": 192
+  },
+  "note": "ph2 rows are EVENT exports with precomputed feature and outcome columns; ONLY raw OHLCV of timeframe==30s rows is admissible; all other columns are PROHIBITED (pre-exposed, non-causal provenance)",
+  "agg_vs_canonical_1m": {
+   "pairs_tested": 17190,
+   "exact_ohlc": 17190,
+   "exact_ohlc_and_volume": 17186,
+   "close_only_not_full": 0,
+   "stamp_rule": "1m[T] = 30s[T-30s] + 30s[T], all close-stamped"
+  }
+ },
+ "prohibited_datasets": [
+  {
+   "name": "5s/15s LTF capture (analysis/ltf_exec/data)",
+   "reason": "sub-30-second prohibited in MGSD-V1"
+  },
+  {
+   "name": "order-flow capture 2025-08..2026-08 (OFH lineage)",
+   "reason": "price-action first; order flow only as later incremental arm"
+  },
+  {
+   "name": "OFH13 133-trade table / outcome labels",
+   "reason": "prohibited discovery input (directive \u00a71)"
+  },
+  {
+   "name": "ph2 non-OHLCV columns (features, MFE/MAE, barTo-R races)",
+   "reason": "pre-computed, pre-exposed, unknown causal provenance"
+  }
+ ],
+ "dom_depth": "NOT AVAILABLE anywhere",
+ "bid_ask_prints": "NOT AVAILABLE on admissible grids",
+ "cross_market": "NO synchronized genuine ES/YM/RTY/vol series exists in the repository; cross-market arm = INSUFFICIENT DATA"
+}
