@@ -1,1 +1,1 @@
-{"pass": 17, "total": 19, "fails": ["entry_next_bar_contiguous", "one_event_per_day_side"]}
+{"pass": 19, "total": 19, "fails": []}

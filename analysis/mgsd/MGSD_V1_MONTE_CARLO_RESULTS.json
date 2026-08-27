@@ -1,0 +1,6 @@
+{
+ "protocol_freeze_commit": "7062e6783f96d59b071c6d31527f30e96f76411a",
+ "protocol_version": "1.0.1",
+ "preliminary_passers": [],
+ "note": "No variant passed the preliminary gates; the frozen protocol forbids running Monte Carlo on failed candidates (rescue prohibition). No paths simulated."
+}

@@ -1,0 +1,24 @@
+family,economic_class,stratum,signal,thresholds,management,budget,grid
+F01,displacement mean-reversion,S6-S8,15m move <= -k*ATR15 (mirror) -> fade,"k in {1.5,2.5}","2 stops x {T30,T120}",16,1m
+F02,displacement continuation,S6-S8,same event -> with move,"k in {1.5,2.5}","2 stops x {T30,T120}",16,1m
+F03,compression->expansion,S5-S6,OR30 <= q*trail-20d-median; first 1m close beyond,"q in {0.6,0.75}","2 stops x {T30,T120}",8,1m
+F04,expansion->exhaustion,RTH,3 same-dir 15m bars cum >= m*ATR15 -> fade,"m in {2.5,3.5}","2 stops x {T30,T120}",8,1m
+F05,"failed-break reclaim (BASELINE, non-promotable)",S5-S6,OR15 break then close back inside <=15m -> fade,fixed,"1.0 stop x {T30,T120}",4,1m
+F06,breakout acceptance PDH/PDL,S5-S7,15m close beyond prior-day H/L by 0.25*ATR15,fixed,"2 stops x {T30,T120}",8,1m
+F07,VWAP stretch reversion,S6-S8,|c-VWAP| >= k*ATR15 -> fade,"k in {2,3}","2 stops x {T30,VWAP-target}",8,1m
+F08,VWAP reclaim trend,S6-S8,>=60m one side then 15m close across,fixed,"2 stops x {T120,CLOSE}",8,1m
+F09,gap fade,S5 entry,|gap| >= g*priorRTHrange -> toward prior close,"g in {0.3,0.5}","2 stops x {T120,gap-target}",8,1m
+F10,gap continuation,S5 entry,same event -> with gap,"g in {0.3,0.5}","2 stops x {T30,T120}",8,1m
+F11,opening-range breakout,S5-S6,first 1m close beyond OR15 + c*ATR15,"c in {0,0.25}","2 stops x {T30,T120}",8,1m
+F12,overnight-range break at open,S5-S6,first 1m close beyond ON H/L + c*ATR15,"c in {0,0.25}","2 stops x {T30,T120}",8,1m
+F13,cross-TF alignment pullback,S6-S7,"60m+15m agree, 3m counter then resume",fixed,"2 stops x {T30,T120}",8,1m
+F14,volatility-regime transition,RTH,ATR15 >= 1.25x 20-bars-ago + new session extreme,fixed,"2 stops x {T30,T120}",8,1m
+F15,session drift / time-of-day,S2/S5,"unconditional ON->open, ON->close, open->close, L/S",none,"stops {2,3}",12,1m
+F16,late-premarket trend -> open,entry 09:31,08:00->09:29 move >= p*ATR15 -> continuation,"p in {0.5,1.0}","2 stops x {T30,T120}",8,1m
+F17,midday-range break,S8,15m close beyond 11:30-14:00 range + c*ATR15,"c in {0,0.25}","2 stops x {T30,T120}",8,1m
+F18,closing momentum,S9,14:00->15:30 move >= p*ATR15 -> 15:31 entry to close,"p in {1.0,1.5}",1.5 stop,4,1m
+F19,path-sequence run reversal,S6-S8,>=r same-dir 3m closes then first opposite -> reversal,"r in {4,6}","2 stops x {T30,T120}",8,1m
+S30A,30s opening momentum (PROVISIONAL ARM),09:30-11:00,first n 30s bars move >= t*scale -> continuation,"n{4,10} t{0.5,1}",2 stops x 2 exits,12,30s
+S30B,30s 5m ORB (PROVISIONAL ARM),09:30-11:00,close beyond 5m OR + c -> continuation,"c{0,0.25}",2 cells,8,30s
+PM,premarket->open influence study,day-level,"8 predictors x 4 outcomes, controls+placebos",frozen,n/a,32 tests,1m
+ANOM,anomaly screen layer,per family,"condition x 9 horizons, descriptive",frozen,n/a,171 cells,1m
