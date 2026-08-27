@@ -1,0 +1,70 @@
+eligible days 1817   warm days 1691   displacement-gate days 223   regime-gate(beta>0) among warm 1006   PRIMARY TRADES 127
+
+COST SCENARIOS (net points/trade, n=127):
+  gross                        EV  -0.823 pt  EV +0.0116R  WR  48.8%  PF 0.928  payoff 0.97
+  slip1/side                   EV  -1.323 pt  EV +0.0006R  WR  48.8%  PF 0.886  payoff 0.93
+  slip2/side (prov base)       EV  -1.823 pt  EV -0.0103R  WR  47.2%  PF 0.847  payoff 0.95
+  slip3/side (slip stress)     EV  -2.323 pt  EV -0.0213R  WR  47.2%  PF 0.809  payoff 0.90
+  repo base 0.87               EV  -1.693 pt  EV -0.0075R  WR  47.2%  PF 0.857  payoff 0.96
+  REPO STRESSED 1.74 (BINDING) EV  -2.563 pt  EV -0.0265R  WR  47.2%  PF 0.791  payoff 0.88
+
+PRIMARY (stressed 1.74): EV -2.563 pt  CI95 [-7.657, +2.492]
+permutation (direction-sign, 5-trade blocks, 10k): p = 0.5160
+BH q (family size 1) = 0.5160
+
+BY YEAR (stressed):
+  2020  n   5  EV  -19.640  WR  20.0%
+  2021  n  14  EV   -2.990  WR  42.9%
+  2022  n  14  EV   -6.508  WR  35.7%
+  2023  n  10  EV   +0.535  WR  60.0%
+  2024  n  44  EV   -0.109  WR  45.5%
+  2025  n  22  EV   +9.680  WR  72.7%
+  2026  n  18  EV  -17.101  WR  33.3%
+half-year segments >=5 trades: 9, positive: 33%
+long 73  short 54   stop-outs 12  time-exits 115
+Sharpe(ann approx) -0.37  maxDD -335.3 pt  longest losing streak 6
+median MFE 20.75  median MAE 15.50  (window pts)
+break-even WR 53.1%  actual WR 47.2%  margin -5.8 pts
+
+DIAGNOSTICS (stressed cost, never candidates):
+  D1 no-regime ablation              n  223  EV   -2.221  WR  46.6%  
+  D2 no-displacement ablation        n 1005  EV   -2.704  WR  43.5%  
+  D3 unconditional baseline          n 1689  EV   -1.722  WR  45.0%  
+  D4 direction-reversal placebo      n  127  EV   -2.159  (should mirror primary)
+  D5 regime-label permutation        p = 0.5625  (null mean -2.204, 10000 valid perms)
+  D6 regime shift -20                n  127  EV   +0.843  
+  D6 regime shift -10                n  118  EV   +4.252  
+  D6 regime shift +10                n  125  EV   -0.210  NON-TRADABLE falsification
+  D6 regime shift +20                n  117  EV   -3.249  NON-TRADABLE falsification
+  D7 matched random-day control      n   83  EV   -0.258  WR  55.4%  matched half-year x |D| tercile
+  D8 randomized-anchor placebo       draws 200  null mean -3.166  p = 0.4229
+
+influence: drop most-influential EV -1.776; drop best trade EV -3.220
+
+GATES (MGSD unweakened, stressed model 1.74):
+  G01_events>=100          PASS
+  G02_days>=40             PASS
+  G03_subgroups            PASS
+  G04_basePF>=1.30         FAIL
+  G05_stressPF>=1.15       FAIL
+  G06_baseEVR>=0.10        FAIL
+  G07_stressEVR>=0.05      FAIL
+  G08_CIlow>0              FAIL
+  G09_perm<=.05            FAIL
+  G10_BHq<=.05             FAIL
+  G11_retention            FAIL
+  G12_no_signflip          FAIL
+  G14_segments>=70pct      FAIL
+  G15_no_domination        FAIL
+  G16_influence            FAIL
+  G17_placebo              FAIL
+  G18_destruction          FAIL
+  G19_causal               PASS
+  G20_integrity            PASS
+  G21_repro                PASS
+  Gprofile                 FAIL
+
+FIRST BINDING FAILURE: G04_basePF>=1.30
+ALL FAILURES: G04_basePF>=1.30, G05_stressPF>=1.15, G06_baseEVR>=0.10, G07_stressEVR>=0.05, G08_CIlow>0, G09_perm<=.05, G10_BHq<=.05, G11_retention, G12_no_signflip, G14_segments>=70pct, G15_no_domination, G16_influence, G17_placebo, G18_destruction, Gprofile
+
+LPCC-V1 PRELIMINARY VERDICT: FAIL
