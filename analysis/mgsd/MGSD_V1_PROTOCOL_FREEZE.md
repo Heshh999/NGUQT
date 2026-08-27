@@ -218,3 +218,15 @@ results invalidated and ledgered.
 ## 13. Deliverables
 As directive §26, all under `analysis/mgsd/`. Reproduction:
 `python3 analysis/mgsd/run_all.py` (deterministic, seed 20260827).
+
+## Version 1.0.1 — implementation corrections (committed before rerun)
+- IC1: the entry-contiguity software test exempted F15's unconditional
+  session-open entries (the 18:01 bar necessarily follows the daily
+  maintenance gap; no prior-bar signal exists to leak). Signal-based
+  families remain strictly checked.
+- IC2: F15 evening entries deduplicated to one per tradedate (7
+  holiday-eve double sessions of 1,831).
+No family definition, threshold, gate, cost, floor, or statistic
+changed. The first DEV run (completed under v1.0.0 with these defects)
+is INVALIDATED; its outputs were deleted without inspection of its gate
+outcomes and the full matrix is rerun under v1.0.1.
