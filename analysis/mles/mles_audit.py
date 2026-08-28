@@ -3,6 +3,8 @@
 # No outcome, no P&L, no protected file opened.
 import hashlib, json, os, subprocess
 REPO = '/home/user/NGUQT'
+# always write beside this script, never into the caller's working directory
+HERE = os.path.dirname(os.path.abspath(__file__))
 def sh(c): return subprocess.run(c, shell=True, capture_output=True, text=True, cwd=REPO).stdout.strip()
 def h(p):
     fp = os.path.join(REPO, p)
@@ -56,7 +58,7 @@ A['message_data_present'] = dict(
   depth=len(glob.glob(SCR+'/mofad_capture/*depth*.csv')),
   note='0 everywhere = recorder has never been attached in NinjaTrader')
 
-json.dump(A, open('MLES_V1_AUDIT.json','w'), indent=1)
+json.dump(A, open(os.path.join(HERE, 'MLES_V1_AUDIT.json'), 'w'), indent=1)
 print('branch %s HEAD %s dirty %d' % (A['branch'], A['head'][:8], len(A['dirty'])))
 print('ancestry %d/%d present' % (sum(1 for v,_ in A['ancestry'].values() if v), len(A['ancestry'])))
 print('protected files hashed: %d (missing %d)' % (len(PROT)-len(A['protected_missing']), len(A['protected_missing'])))

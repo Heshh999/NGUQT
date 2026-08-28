@@ -1,9 +1,9 @@
 {
  "branch": "claude/ninjatrader-mnq-automation-rqjzgg",
- "head": "10a0c3244af24be4e4b57e164360b732d04f28fd",
+ "head": "7654a8a8dd4e0acd6fef0e6471138591e9b183cf",
  "remote": "origin\thttps://github.com/Heshh999/NGUQT (fetch)",
  "dirty": [
-  "?? analysis/mles/"
+  "M analysis/mles/mles_audit.py"
  ],
  "env": {
   "python": "Python 3.11.15",
