@@ -8,5 +8,6 @@ LPCC-V1,primary (arm 1/3 late premarket),1,FAILED: G04 base PF 0.857; gross EV n
 LPCC-V1,diagnostics D1-D8,10,all destruction confirms no signal,be1fff6,EXPOSED DEV
 CCHC-V1,primary (arm 2/3 closing half-hour),1,FAILED: G01 n=98<100; G11 p=0.0243>0.0166667; G16 2020=61% of net,963009d,EXPOSED DEV
 CCHC-V1,diagnostics D1-D9,11,D6 shift and D7 matched control undermine candidate,963009d,EXPOSED DEV
-ODMC-V1,primary (arm 3/3 opening drive),1,PENDING at freeze,this freeze,EXPOSED DEV
-ODMC-V1,diagnostics D1-D10,10,PENDING at freeze,this freeze,EXPOSED DEV
+ODMC-V1,primary (arm 3/3 opening drive),1,FAILED: G04 base PF 1.201<1.30; gross PF 1.272; p=0.5891; 2024=68% of net; 2026 -561pt,results commit,EXPOSED DEV
+ODMC-V1,diagnostics D1-D10,10,D1-D10 complete; D10 residual ~0 and D4 p=0.127 kill the signal,results commit,EXPOSED DEV
+THREE-ARM FAMILY,pre-ranked window family (LPCC/CCHC/ODMC),3,CLOSED - all three arms FAILED; no fourth fallback authorized,results commit,EXPOSED DEV

@@ -1,0 +1,81 @@
+ODMC-V1 ONE-SHOT RUN   freeze 9072bd3d8ef244eb6b87a6c56f9e983849e526a8
+eligible days 1830 | warm 1704 | raw nonzero impulses 1825 | magnitude-qualified (=TRADES) 257 | unique days 257
+
+COST SCENARIOS (net pts/trade, n=257):
+  gross                            EV  +3.599  +0.0836R  WR  56.0%  PF 1.272  payoff 1.00
+  slip 1t/side                     EV  +3.099  +0.0747R  WR  55.3%  PF 1.231  payoff 1.00
+  slip 2t/side (prov base)         EV  +2.599  +0.0658R  WR  54.1%  PF 1.190  payoff 1.01
+  repo base 0.87                   EV  +2.729  +0.0681R  WR  54.1%  PF 1.201  payoff 1.02
+  repo RTH 1.305 (reported)        EV  +2.294  +0.0603R  WR  54.1%  PF 1.166  payoff 0.99
+  slip 3t/side                     EV  +2.099  +0.0568R  WR  53.7%  PF 1.151  payoff 0.99
+  BINDING STRESS 4t/side = 2.00    EV  +1.599  +0.0479R  WR  53.3%  PF 1.113  payoff 0.98
+
+PRIMARY (BINDING STRESS 2.00): EV +1.599 pt (+0.0479R)  CI95 [-3.341, +6.546]
+day-blocked permutation (impulse-sign, 5-day blocks) p = 0.5891
+local BH q (family 1) = 0.5891
+THREE-ARM FAMILYWISE: p 0.5891 vs 0.0166667 -> FAIL
+FINAL BH across all three arms: ODMC-V1 q=0.5891  LPCC-V1 q=0.5891  CCHC-V1 q=0.0729
+
+BY YEAR (binding stress):
+  2020 n  51  EV   +2.882  WR  52.9%  sum    +147.0
+  2021 n  29  EV   +2.974  WR  58.6%  sum     +86.2
+  2022 n  47  EV   +5.340  WR  53.2%  sum    +251.0
+  2023 n  14  EV   +0.375  WR  71.4%  sum      +5.2
+  2024 n  43  EV   +6.471  WR  48.8%  sum    +278.2
+  2025 n  38  EV   +5.375  WR  50.0%  sum    +204.2
+  2026 n  35  EV  -16.029  WR  51.4%  sum    -561.0
+quarters >=5 trades: 22, positive 10
+half-year segments >=5 trades: 14, positive 57%
+weekday EV: Mo -2.03(n54) Tu +1.93(n42) We -2.15(n46) Th +12.52(n57) Fr -3.02(n58)
+long 126 (EV +1.813) | short 131 (EV +1.393) | stop-outs 23 | time-exits 234
+opening-vol split: low +4.092 (n130) | high -0.953 (n127)
+Sharpe/trade 0.039 Sortino/trade 0.060 maxDD -686.0 pt DDdur 70 trades streak 6 largest loss -122.2 CVaR5% -91.2
+median MFE 24.00  median MAE 18.50 | median win +21.75 median loss -23.88
+break-even WR 50.6%  actual 53.3%  margin +2.7 pts
+
+DIAGNOSTICS D1-D10 (binding stress; never candidates):
+  D1 no-magnitude-gate ablation    n 1700  EV   -1.407  WR  47.8%  
+  D2 below-threshold control       n 1443  EV   -1.943  WR  46.8%  never promoted
+  D3 direction-reversal placebo    n  257  EV   -4.294  WR  42.4%  
+  D4 impulse-sign destruction      p = 0.1270  (null mean -1.374)
+  D5 random-day pairing            draws 2000  null mean -1.823  p = 0.0695
+  D6 event shift -20               n   54  EV   -2.560  WR  40.7%  
+  D6 event shift -10               n   40  EV   +4.944  WR  62.5%  
+  D6 event shift +10               n   40  EV   +1.094  WR  47.5%  NON-TRADABLE falsification
+  D6 event shift +20               n   54  EV   -3.384  WR  44.4%  NON-TRADABLE falsification
+  D7 matched non-event control     n  252  EV   -5.268  WR  42.5%  half-year x gap x sig-range terciles
+  D8 adjacent-block placebo        n  257  EV   -2.430  WR  44.4%  09:40-09:50 block, specificity only
+  D9 unconditional opening drift   long EV   -1.798 (n1704) | short EV   -2.202 (n1704)
+  D10 residualization              raw aligned 2nd-half +3.264 pt -> residual mean -0.000 pt (controls: sig range, gap, lagged vol, weekday, year)
+
+influence: drop-most-influential +0.900 | drop-best-trade +0.900 | drop-best-month(2025-04) +0.665 | drop-best-year(2024) +0.620
+best-year share of net: 68%
+
+GATES (MGSD unweakened; BINDING STRESS 2.00 pt):
+  G01_events>=100              PASS
+  G02_days>=40                 PASS
+  G03_subgroups                PASS
+  G04_basePF>=1.30             FAIL
+  G05_stressPF>=1.15           FAIL
+  G06_baseEVR>=0.10            FAIL
+  G07_stressEVR>=0.05          FAIL
+  G08_CIlow>0                  FAIL
+  G09_perm<=.05                FAIL
+  G10_BHq<=.05                 FAIL
+  G11_familywise<=.0166667     FAIL
+  G12_retention>=50pct         PASS
+  G13_no_signflip              PASS
+  G15_segments>=70pct          FAIL
+  G16_no_domination            FAIL
+  G17_influence                PASS
+  G18_placebo                  FAIL
+  G19_destruction              FAIL
+  G20_causal                   PASS
+  G21_repro                    PASS
+  Gprofile                     FAIL
+
+FIRST BINDING FAILURE: G04_basePF>=1.30
+ALL FAILURES: G04_basePF>=1.30, G05_stressPF>=1.15, G06_baseEVR>=0.10, G07_stressEVR>=0.05, G08_CIlow>0, G09_perm<=.05, G10_BHq<=.05, G11_familywise<=.0166667, G15_segments>=70pct, G16_no_domination, G18_placebo, G19_destruction, Gprofile
+
+ODMC-V1 PRELIMINARY VERDICT: FAIL
+30-SECOND ARM: NOT REACHED - 1-MINUTE PARENT FAILED; NO SUB-MINUTE RESCUE.

@@ -1,0 +1,16 @@
+test,n,ev_stressed,wr,note
+PRIMARY ODMC-V1,257,1.5992217898832686,0.5330739299610895,"perm p 0.5891; CI [-3.341,+6.546]; familywise FAIL; verdict FAIL"
+D1 no-magnitude-gate ablation,1700,-1.4072058823529412,0.4776470588235294,
+D2 below-threshold control,1443,-1.9426541926541927,0.4677754677754678,never promoted
+D3 direction-reversal placebo,257,-4.293774319066148,0.42412451361867703,
+D4 sign-destruction,10000,-1.3738446498054475,nan,p=0.1270
+D5 random-day pairing,2000,-1.8232869649805448,nan,p=0.0695
+D6 event shift -20,54,-2.560185185185185,0.4074074074074074,
+D6 event shift -10,40,4.94375,0.625,
+D6 event shift +10,40,1.09375,0.475,NON-TRADABLE falsification
+D6 event shift +20,54,-3.384259259259259,0.4444444444444444,NON-TRADABLE falsification
+D7 matched non-event control,252,-5.267857142857143,0.4246031746031746,half-year x gap x sig-range terciles
+D8 adjacent-block placebo,257,-2.4299610894941632,0.44357976653696496,"09:40-09:50 block, specificity only"
+D9 uncond drift long,1704,-1.797975352112676,0.477112676056338,
+D9 uncond drift short,1704,-2.202318075117371,0.45539906103286387,
+D10 residualization,257,3.2636186770428015,nan,intercept-adjusted residual mean ~0 by construction; see coefficient on constant
