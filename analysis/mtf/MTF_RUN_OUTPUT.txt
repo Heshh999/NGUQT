@@ -1,0 +1,17 @@
+MTF-V1 one-shot   DEV 2019-07-04..2026-08-17   1m bars 2503622   (69s)
+
+========================================================================================
+MODULE A  -  DESCRIPTIVE MULTI-SCALE MAP  (ledgered, never promotable)
+========================================================================================
+A1  T-bar return autocorrelation (day-clustered CIs)
+   T=  5m lag1  n  490328  AC -0.0049  CI[-0.0127,+0.0021] 
+   T=  5m lag2  n  487331  AC -0.0072  CI[-0.0193,+0.0028] 
+   T= 15m lag1  n  158342  AC +0.0128  CI[+0.0004,+0.0251] *
+   T= 15m lag2  n  156199  AC -0.0105  CI[-0.0378,+0.0104] 
+   T= 30m lag1  n   75797  AC +0.0094  CI[-0.0069,+0.0280] 
+   T= 30m lag2  n   73755  AC +0.0002  CI[-0.0188,+0.0176] 
+   T= 60m lag1  n   34902  AC +0.0009  CI[-0.0236,+0.0234] 
+   T= 60m lag2  n   32934  AC +0.0045  CI[-0.0147,+0.0242] 
+   T=240m lag1  n    5076  AC +0.0141  CI[-0.0211,+0.0494] 
+   T=240m lag2  n    3295  AC -0.0128  CI[-0.0773,+0.0405] 
+A2  daily momentum spectrum (up-minus-down next-day mean, bp)
