@@ -58,6 +58,8 @@ CLASS_DEF = {
     'IMPACT_ASYMMETRY':          {'tokens': ['rolling_price_impact', 'buy_vs_sell_lambda', 'liquidity_asymmetry_state'], 'granularity': 'state'},
     'BIDIRECTIONAL_RANGE_HARVEST_DAILY': {'tokens': ['day_vol_forecast', 'open_anchored_two_sided_bands', 'realized_range_harvest'], 'granularity': 'state'},
     'ORDINAL_PATH_SHAPE':        {'tokens': ['ordinal_motif', 'path_shape', 'last_leg_continuation'], 'granularity': 'event'},
+    'VOLUME_CLOCK_STRUCTURE':    {'tokens': ['volume_bars', 'event_time_sampling', 'clock_free_structure'], 'granularity': 'descriptive'},
+    'DAY_TYPE_TAXONOMY':         {'tokens': ['daily_range_structure', 'day_classification', 'next_day_response'], 'granularity': 'state'},
 }
 
 

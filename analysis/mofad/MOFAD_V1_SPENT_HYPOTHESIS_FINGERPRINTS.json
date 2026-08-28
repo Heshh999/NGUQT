@@ -43,6 +43,23 @@
   ],
   "protected": false
  },
+ "DAY_TYPE_TAXONOMY": {
+  "information_set_tokens": [
+   "daily_range_structure",
+   "day_classification",
+   "next_day_response"
+  ],
+  "trigger_granularity": "state",
+  "members": [
+   "NVQ-DAYTYPE-DEAD",
+   "NVQ-STREAK3DN"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN",
+   "PASSED_HISTORICAL_EXPLORATORY"
+  ],
+  "protected": true
+ },
  "EXECUTION_REFINEMENT": {
   "information_set_tokens": [
    "subminute_timing",
@@ -405,6 +422,21 @@
    "DEAD_FROZEN",
    "DESCRIPTIVE_ONLY_SPENT",
    "RESERVED_UNTOUCHED"
+  ],
+  "protected": false
+ },
+ "VOLUME_CLOCK_STRUCTURE": {
+  "information_set_tokens": [
+   "volume_bars",
+   "event_time_sampling",
+   "clock_free_structure"
+  ],
+  "trigger_granularity": "descriptive",
+  "members": [
+   "NVQ-VOLCLOCK"
+  ],
+  "dispositions": [
+   "DESCRIPTIVE_ONLY_SPENT"
   ],
   "protected": false
  }

@@ -30,9 +30,10 @@ t('every non-reserved row has a known fingerprint class',
 t('unique hypothesis ids', len({r['hyp_id'] for r in rows}) == len(rows))
 t('ODMC registered DEAD_FROZEN',
   any(r['hyp_id'] == 'ODMC' and r['disposition'] == 'DEAD_FROZEN' for r in rows))
-t('OFH13/OFH14 are the only PASSED rows',
+t('PASSED rows are exactly OFH13/OFH14/NVQ-STREAK3DN',
   sorted(r['hyp_id'] for r in rows
-         if r['disposition'] == 'PASSED_HISTORICAL_EXPLORATORY') == ['OFH13', 'OFH14'])
+         if r['disposition'] == 'PASSED_HISTORICAL_EXPLORATORY')
+  == ['NVQ-STREAK3DN', 'OFH13', 'OFH14'])
 
 print('fingerprints deterministic')
 fp = SS.build_fingerprints()
