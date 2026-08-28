@@ -1,4 +1,19 @@
 {
+ "BIDIRECTIONAL_RANGE_HARVEST_DAILY": {
+  "information_set_tokens": [
+   "day_vol_forecast",
+   "open_anchored_two_sided_bands",
+   "realized_range_harvest"
+  ],
+  "trigger_granularity": "state",
+  "members": [
+   "VTBS-C1-C4"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
  "CALENDAR_TOD": {
   "information_set_tokens": [
    "clock",
