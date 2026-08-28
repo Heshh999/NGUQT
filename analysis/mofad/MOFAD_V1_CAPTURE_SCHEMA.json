@@ -1,0 +1,28 @@
+{
+ "version": "1.0",
+ "instruments": ["MNQ", "NQ", "ES"],
+ "storage": {"clock": "UTC ISO-8601, native precision", "et_rendering": "derived + DST-tested, never primary",
+             "manifest": "daily SHA-256 per file, immutable", "partitioning": "per instrument per UTC day"},
+ "streams": {
+  "quotes": {"file": "MOFAD_CAP_<sym>_<yyyymmdd>_quotes.csv",
+   "columns": ["seq", "utcRecv", "utcExch", "side(B|A)", "price", "size"]},
+  "trades": {"file": "MOFAD_CAP_<sym>_<yyyymmdd>_trades.csv",
+   "columns": ["seq", "utcRecv", "utcExch", "price", "size", "bestBid", "bestBidSz", "bestAsk", "bestAskSz"],
+   "aggressor": "not inferred at capture; prevailing quote stored for a downstream frozen rule"},
+  "depth": {"file": "MOFAD_CAP_<sym>_<yyyymmdd>_depth.csv",
+   "columns": ["seq", "utcRecv", "utcExch", "operation(Add|Update|Remove)", "side", "level", "price", "size", "mbo(MBP fixed)"],
+   "note": "market-by-price only; order-level queue reconstruction is impossible and must never be claimed"},
+  "quality": {"file": "MOFAD_CAP_<sym>_<yyyymmdd>_quality.csv",
+   "columns": ["utcRecv", "kind(SESSION_START|SESSION_END|HEARTBEAT|GAP|DISCONNECT|RECONNECT|LOCKED_OR_CROSSED)", "detail"]},
+  "bars_30s_derived": {"file": "MOFAD_DERIVED_<sym>_<yyyymmdd>_30s.csv",
+   "columns": ["utcBarClose", "open", "high", "low", "close", "volume", "tradeCount", "bidVol", "askVol_if_frozen_rule"],
+   "note": "built by a separate deterministic batch job from trades; stored apart from raw"},
+  "events": {"file": "MOFAD_EVENTS_<source>_<yyyymm>.csv", "status": "REQUIRES NEW AUTHORITY - no authenticated source configured",
+   "columns": ["event_id", "event_class", "name", "scheduled_utc", "timezone", "published_utc", "actual", "consensus", "prior", "revision_of", "cancelled", "source_id", "source_hash"]},
+  "shadow_orders": {"file": "MOFAD_SHADOW_<yyyymmdd>.csv", "status": "SPEC ONLY - order pathways exceed capture-only authority",
+   "columns": ["decision_utc", "md_recv_utc", "send_utc", "ack_utc", "exch_ack_utc", "fill_utc", "order_type", "limit_px", "req_qty", "fill_qty", "arrival_bid", "arrival_ask", "arrival_mid", "fill_px", "fees", "slippage_vs_mid", "state(FILLED|PARTIAL|CANCELLED|REJECTED|MISSED)", "paper_or_broker", "disconnect_flag"]}
+ },
+ "contract_roll_metadata": {"file": "MOFAD_ROLLS.csv", "columns": ["sym", "from_contract", "to_contract", "roll_utc", "rule"]},
+ "zero_orders": true,
+ "outcome_blind": true
+}
