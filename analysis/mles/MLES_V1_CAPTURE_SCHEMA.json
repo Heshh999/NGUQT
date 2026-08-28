@@ -158,5 +158,6 @@
   "direction",
   "win",
   "profit"
- ]
+ ],
+ "freeze_a_commit": "c40f39a18a3741836b7849d0e2ab3c758c0e67e5"
 }

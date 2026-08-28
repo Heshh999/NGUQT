@@ -53,3 +53,6 @@ negotiable downward: large raw message counts never substitute for
 unique days, independent episodes, or calendar duration (§9).
 
 `FIVE-YEAR MESSAGE-LEVEL DURABILITY: INSUFFICIENT DATA.`
+
+---
+Freeze A commit: `c40f39a18a3741836b7849d0e2ab3c758c0e67e5`

@@ -96,3 +96,6 @@ Message-level capture files present: **quotes 0, trades 0, depth 0.**
 The recorder has never been attached in NinjaTrader. **No tick, quote,
 depth, trade sequence or fill was reconstructed, interpolated or
 synthesized from bars**, and none will be.
+
+---
+Freeze A commit: `c40f39a18a3741836b7849d0e2ab3c758c0e67e5`

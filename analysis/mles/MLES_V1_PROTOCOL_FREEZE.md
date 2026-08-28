@@ -84,3 +84,6 @@ midprice fills. No touch-is-a-fill. No queue claim from MBP. No
 resurrection of a dead hypothesis under an execution label. No
 redesign of OFH13/OFH14 as "execution improvement". A negative-gross
 parent stays dead — tick execution may never rescue it.
+
+---
+Freeze A commit: `c40f39a18a3741836b7849d0e2ab3c758c0e67e5`

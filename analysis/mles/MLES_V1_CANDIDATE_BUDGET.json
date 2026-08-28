@@ -39,5 +39,6 @@
   "unadjusted_p_is_not_confirmation": true
  },
  "candidates_defined_so_far": 0,
- "note": "Budget is frozen now so it cannot expand after outcomes are seen."
+ "note": "Budget is frozen now so it cannot expand after outcomes are seen.",
+ "freeze_a_commit": "c40f39a18a3741836b7849d0e2ab3c758c0e67e5"
 }

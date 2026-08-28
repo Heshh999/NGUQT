@@ -70,3 +70,6 @@ at **18:00 ET**, matching the futures session, not midnight.
 The integrity JSON for the smoke test, plus which of Level I / Level II
 you actually have per instrument. Then we accumulate 20 engineering days
 before anything is called research data.
+
+---
+Freeze A commit: `c40f39a18a3741836b7849d0e2ab3c758c0e67e5`

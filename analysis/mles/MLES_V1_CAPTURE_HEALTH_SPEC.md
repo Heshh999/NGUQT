@@ -36,3 +36,6 @@ analysis module (tested).
 
 A FAIL blocks those days from research use. Days may also be excluded
 if the schema or recorder changes materially (§9).
+
+---
+Freeze A commit: `c40f39a18a3741836b7849d0e2ab3c758c0e67e5`

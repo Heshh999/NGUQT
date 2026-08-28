@@ -38,3 +38,6 @@ MLES *analysis* of those dates is not authorized here.
 ## 5. Automated scoring of protected parents
 Permitted only if results remain sealed and inaccessible until the
 predeclared opening date. No such scoring is configured by this run.
+
+---
+Freeze A commit: `c40f39a18a3741836b7849d0e2ab3c758c0e67e5`
