@@ -1,0 +1,119 @@
+{
+ "branch": "claude/ninjatrader-mnq-automation-rqjzgg",
+ "head": "10a0c3244af24be4e4b57e164360b732d04f28fd",
+ "remote": "origin\thttps://github.com/Heshh999/NGUQT (fetch)",
+ "dirty": [
+  "?? analysis/mles/"
+ ],
+ "env": {
+  "python": "Python 3.11.15",
+  "numpy": "2.4.6",
+  "mcs": "Mono C# compiler version 6.8.0.105"
+ },
+ "ancestry": {
+  "eac54fe": [
+   true,
+   "Wave-4"
+  ],
+  "f08396b": [
+   true,
+   "LPCC freeze"
+  ],
+  "be1fff6": [
+   true,
+   "LPCC results"
+  ],
+  "5133c51": [
+   true,
+   "CCHC freeze"
+  ],
+  "963009d": [
+   true,
+   "CCHC results"
+  ],
+  "9072bd3": [
+   true,
+   "ODMC freeze"
+  ],
+  "9fec078": [
+   true,
+   "ODMC results"
+  ],
+  "7062e67": [
+   true,
+   "MGSD freeze"
+  ],
+  "bb6986b": [
+   true,
+   "MGSD results"
+  ],
+  "7c8a854": [
+   true,
+   "MOFAD closure"
+  ],
+  "643343f": [
+   true,
+   "MOFAD freeze"
+  ],
+  "e628b9d": [
+   true,
+   "MOFAD capture"
+  ],
+  "938382b": [
+   true,
+   "MOFAD results"
+  ],
+  "8dfc2de": [
+   true,
+   "VTBS freeze"
+  ],
+  "537a662": [
+   true,
+   "VTBS results"
+  ],
+  "10a0c32": [
+   true,
+   "NMAE mode A"
+  ]
+ },
+ "protected_hashes": {
+  "analysis/v41/cand_spec.py": "9bea8f1cafc2b6eaba1beca6ff8f9ec5",
+  "analysis/v41/ofh6_spec.py": "e8145b7c493029de001551392dc12e4d",
+  "analysis/v41/ofht_spec.py": "272d7bca6402b6d2187c23191830510d",
+  "analysis/v41/ofht_cache.py": "376ce829086b5224eb95755322d71510",
+  "analysis/v41/prospective.py": "240189f3d41791983f315fa38ceee84e",
+  "docs/PROSPECTIVE_REGISTRY.md": "09f250a2d97410f19ea4fd99fa955a39",
+  "src/MnqV41ProspectiveResearchHost.cs": "05be525c4c68280f00d94748c367bbcc",
+  "src/V41FrozenCandidateEngine.cs": "22c249642e90b6b1ef95889f26bd7ebc",
+  "src/MofadV1MicroCaptureHost.cs": "c4bc97c7f6d4f1a0fe48a04c7ec8c372",
+  "analysis/mgsd/mgsd_lib.py": "8fdb21f8aa0622074dadc4ba2270a84e",
+  "analysis/mofad/MOFAD_V1_SPENT_HYPOTHESIS_REGISTRY.csv": "ba48d6fec08491fc6298c8ed7fef653c",
+  "analysis/mofad/similarity_screen.py": "ddb9310906572e2667bfd5b4bcfc72ca"
+ },
+ "protected_missing": [],
+ "frozen_hashes_file": "# frozen 2026-08-21\n9bea8f1cafc2b6ea  cand_spec.py\ne8145b7c493029de  ofh6_spec.py\n376ce829086b5224  ofht_cache.py\n272d7bca6402b6d2  ofht_spec.py",
+ "partitions": {
+  "DEV_last": "2026-08-17",
+  "buffer": "2026-08-18..2026-08-31",
+  "VALIDATION": "2026-09-01..2027-02-28",
+  "OOS": "2027-03-01..2027-08-31",
+  "LOCKBOX": "2027-09-01+",
+  "status": "all future partitions UNOPENED"
+ },
+ "spent_registry": {
+  "rows": 78,
+  "dispositions": {
+   "DEAD_FROZEN": 59,
+   "PASSED_HISTORICAL_EXPLORATORY": 2,
+   "INSUFFICIENT_DATA": 2,
+   "DESCRIPTIVE_ONLY_SPENT": 10,
+   "RESERVED_UNTOUCHED": 5
+  }
+ },
+ "message_data_present": {
+  "quotes": 0,
+  "trades": 0,
+  "depth": 0,
+  "note": "0 everywhere = recorder has never been attached in NinjaTrader"
+ }
+}

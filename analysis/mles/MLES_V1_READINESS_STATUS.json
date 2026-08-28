@@ -1,0 +1,39 @@
+{
+ "schema": "MLES-CAPTURE-1.0.0",
+ "freeze_a_commit": "PENDING - recorded on commit",
+ "mode": "A",
+ "mode_c_authorized": false,
+ "all_gates_passed": false,
+ "engineering": {
+  "days_captured": 0, "days_required": 20,
+  "session_coverage_pct": null, "coverage_required_pct": 95,
+  "parse_success_pct": null, "parse_required_pct": 99.9,
+  "unexplained_ts_reversals": null, "manifests_verified": null,
+  "status": "NOT STARTED - recorder has never been attached in NinjaTrader"
+ },
+ "research_general": {
+  "months_required": 12, "months_have": 0,
+  "eligible_days_required": 200, "eligible_days_have": 0,
+  "raw_triggers_required": 1000, "raw_triggers_have": 0,
+  "effective_events_required": 500, "effective_events_have": 0,
+  "subgroup_events_required": 100, "status": "BLOCKED"
+ },
+ "ofh13_overlay": {
+  "parent_signals_required": 100, "parent_signals_have": 0,
+  "parent_days_required": 40, "parent_days_have": 0,
+  "control_ledger_present": false, "status": "BLOCKED"
+ },
+ "cross_market_leadlag": {
+  "concurrent_days_required": 120, "concurrent_days_have": 0,
+  "clock_uncertainty_measured": false,
+  "uncertainty_must_be_below": "one third of claimed median lead",
+  "status": "BLOCKED - and NOT IDENTIFIABLE until measured"
+ },
+ "fill_model": {
+  "bbo_at_decision": false, "latency_distribution_measured": false,
+  "shadow_order_acks": false,
+  "passive_queue_identifiable": false,
+  "note": "MBP depth without queue identity - passive fills are NOT IDENTIFIABLE",
+  "status": "BLOCKED"
+ }
+}

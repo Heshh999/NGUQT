@@ -1,0 +1,162 @@
+{
+ "schema_version": "MLES-CAPTURE-1.0.0",
+ "recorder": "src/MlesV1CaptureHost.cs",
+ "supersedes": "src/MofadV1MicroCaptureHost.cs (retained untouched as a MOFAD artifact)",
+ "instruments": [
+  "NQ",
+  "ES",
+  "MNQ"
+ ],
+ "book_type": {
+  "value": "MBP",
+  "meaning": "market-by-price aggregated depth",
+  "prohibited_claims": [
+   "queue position",
+   "order identity",
+   "passive fill proof"
+  ]
+ },
+ "aggressor": {
+  "raw_field": "aggrRaw",
+  "raw_status": "ABSENT - feed supplies no exchange flag",
+  "inferred_fields": [
+   "aggrInf",
+   "aggrMethod",
+   "aggrConf"
+  ],
+  "method": "QUOTE_TEST_v1: >=ask BUY, <=bid SELL, else side of mid (LOW), mid exactly UNKNOWN/NONE",
+  "rule": "raw source fields are never overwritten with derived values"
+ },
+ "clocks": {
+  "tExch": "exchange/source time as delivered by NT8",
+  "tCb": "platform callback time",
+  "tRecv": "UTC receive time",
+  "tMono": "local monotonic Stopwatch ticks",
+  "causal_rule": "when tExch and tRecv disagree, the LATER availability time governs simulation"
+ },
+ "session_id": "ET session date; rolls at 18:00 ET (not UTC midnight)",
+ "streams": {
+  "quotes": [
+   "schema",
+   "runId",
+   "session",
+   "instrument",
+   "contract",
+   "stream",
+   "seq",
+   "tExch",
+   "tCb",
+   "tRecv",
+   "tMono",
+   "side",
+   "px",
+   "sz",
+   "bidPx",
+   "bidSz",
+   "askPx",
+   "askSz",
+   "flags"
+  ],
+  "trades": [
+   "schema",
+   "runId",
+   "session",
+   "instrument",
+   "contract",
+   "stream",
+   "seq",
+   "tExch",
+   "tCb",
+   "tRecv",
+   "tMono",
+   "px",
+   "sz",
+   "bidPx",
+   "bidSz",
+   "askPx",
+   "askSz",
+   "aggrRaw",
+   "aggrInf",
+   "aggrMethod",
+   "aggrConf",
+   "flags"
+  ],
+  "depth": [
+   "schema",
+   "runId",
+   "session",
+   "instrument",
+   "contract",
+   "stream",
+   "seq",
+   "tExch",
+   "tCb",
+   "tRecv",
+   "tMono",
+   "bookType",
+   "operation",
+   "side",
+   "level",
+   "px",
+   "sz",
+   "flags"
+  ],
+  "quality": [
+   "schema",
+   "runId",
+   "session",
+   "instrument",
+   "tRecv",
+   "tMono",
+   "kind",
+   "detail"
+  ]
+ },
+ "quality_kinds": [
+  "SESSION_START",
+  "SESSION_END",
+  "HEARTBEAT",
+  "GAP",
+  "DISCONNECT",
+  "RECONNECT",
+  "TS_REVERSAL",
+  "LOCKED_OR_CROSSED"
+ ],
+ "flags": [
+  "DISCONNECTED",
+  "BOOKRESET",
+  "CROSSED"
+ ],
+ "manifest": {
+  "file": "MLES_<inst>_<session>_manifest.json",
+  "atomic": true,
+  "contains": [
+   "schema",
+   "runId",
+   "session",
+   "instrument",
+   "contract",
+   "bookType",
+   "aggressorSource",
+   "firstRecvUtc",
+   "lastRecvUtc",
+   "rows",
+   "quality",
+   "sha256 per file"
+  ]
+ },
+ "append_only": true,
+ "derived_features": "separate versioned files with parent hashes - NEVER written by the recorder",
+ "outcome_fields_prohibited": [
+  "pnl",
+  "net",
+  "mfe",
+  "mae",
+  "return",
+  "label",
+  "signal",
+  "direction",
+  "win",
+  "profit"
+ ]
+}
