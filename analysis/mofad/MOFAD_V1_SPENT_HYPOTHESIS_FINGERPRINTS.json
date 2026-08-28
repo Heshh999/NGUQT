@@ -253,6 +253,21 @@
   ],
   "protected": false
  },
+ "ORDINAL_PATH_SHAPE": {
+  "information_set_tokens": [
+   "ordinal_motif",
+   "path_shape",
+   "last_leg_continuation"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "MTF-B1-VTURN-SCALE"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
  "PATTERN_GEOMETRY": {
   "information_set_tokens": [
    "1m_price",
@@ -317,6 +332,7 @@
   "trigger_granularity": "event",
   "members": [
    "MRV",
+   "MTF-B2-VWAP-OU",
    "RVMR-BANDS",
    "RVMR-STRAT"
   ],
@@ -358,6 +374,7 @@
    "MAG",
    "MGSD-ANOM-SCREEN",
    "MGSD-PM-OPEN",
+   "MTF-A-MAP",
    "NQDIR",
    "NSERIES",
    "RVMR-BATTERY",

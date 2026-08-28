@@ -57,6 +57,7 @@ CLASS_DEF = {
     'INVENTORY_TRANSITION_FLOW': {'tokens': ['overnight_cum_delta', 'session_transition', 'inventory_imbalance'], 'granularity': 'state'},
     'IMPACT_ASYMMETRY':          {'tokens': ['rolling_price_impact', 'buy_vs_sell_lambda', 'liquidity_asymmetry_state'], 'granularity': 'state'},
     'BIDIRECTIONAL_RANGE_HARVEST_DAILY': {'tokens': ['day_vol_forecast', 'open_anchored_two_sided_bands', 'realized_range_harvest'], 'granularity': 'state'},
+    'ORDINAL_PATH_SHAPE':        {'tokens': ['ordinal_motif', 'path_shape', 'last_leg_continuation'], 'granularity': 'event'},
 }
 
 
