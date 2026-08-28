@@ -1,0 +1,13 @@
+family,name,required_data,available_data,status,binding_reason
+F01,top-of-book imbalance / microprice,quotes with sizes + timestamps,none,CAPTURE_ONLY,no quote data exist anywhere; inference from OHLCV prohibited
+F02,OFI / queue depletion,quote additions/cancels/executions (depth messages),none,CAPTURE_ONLY,no depth or message data; f_depthHistoryAvailable=FALSE in capture
+F03,aggressive executed-volume imbalance,signed aggressor volume,1m bar-aggregate bid/ask volume + delta (313 days full session),READY_FOR_DISCOVERY,genuine directly-observed aggressor splits at 1m aggregation; heavily spent lineage - every candidate must pass the deterministic similarity screen
+F04,absorption / passive replenishment,depth replenishment evidence,bar-level absorption flags only (spent OFH3),CAPTURE_ONLY,genuine absorption requires observable passive replenishment; bar proxy is a spent fingerprint class
+F05,liquidity vacuum / sweep,multi-level depth,none,CAPTURE_ONLY,prompt requires depth; top-of-book or OHLCV insufficient - and neither exists
+F06,trade/quote intensity clustering,tick/message interarrival times,none,CAPTURE_ONLY,no per-trade or per-quote timestamps exist
+F07,spread/depth regime transitions,quotes + depth + realized spread,none,CAPTURE_ONLY,no spread observable in any stream
+F08,price impact and decay,signed volume + price response,1m delta + 1m price (313 days),READY_FOR_DISCOVERY,bar-level Kyle-lambda-style estimates feasible; resolution limits disclosed; candidates must pass similarity screen vs OF_EFFORT_RESULT
+F09,ES<->NQ lead/lag,synchronized ES+NQ quotes/trades,ES 1m OHLCV 42 days only,INSUFFICIENT_DATA,42-day span (1.86% of NQ history); 1m cross-market price mechanisms spent (XMARKET 0/8); no sub-minute clock sync provable
+F10,cross-market order-flow propagation,ES order flow,ES flow fields populated in 0 rows,CAPTURE_ONLY,no ES order-flow data exist at all
+F11,authenticated economic-event microstructure,authenticated release timestamps,none,INSUFFICIENT_DATA,no official/authenticated event source configured; downloading unauthenticated substitutes prohibited
+F12,session-transition inventory with real order flow,full-session signed flow,313 days full-session (24h) 1m flow capture,READY_FOR_DISCOVERY,genuinely new territory: all spent OF hypotheses were RTH intraday event-triggered; overnight/premarket flow inventory never tested

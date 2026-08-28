@@ -1,0 +1,346 @@
+{
+ "CALENDAR_TOD": {
+  "information_set_tokens": [
+   "clock",
+   "calendar"
+  ],
+  "trigger_granularity": "state",
+  "members": [
+   "DVT"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "CROSS_MARKET_PRICE_LEADLAG_1M": {
+  "information_set_tokens": [
+   "es_1m_price",
+   "nq_1m_price",
+   "lead_lag"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "XMARKET-H1-H8"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "EXECUTION_REFINEMENT": {
+  "information_set_tokens": [
+   "subminute_timing",
+   "parent_entries"
+  ],
+  "trigger_granularity": "execution",
+  "members": [
+   "OF-SUBMIN"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "FVG_FLOW_MITIGATION": {
+  "information_set_tokens": [
+   "fvg_zone",
+   "bar_delta",
+   "mitigation_retest"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "OFH13",
+   "OFH13-V2",
+   "OFH14"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN",
+   "PASSED_HISTORICAL_EXPLORATORY"
+  ],
+  "protected": true
+ },
+ "MANAGEMENT_VARIANT": {
+  "information_set_tokens": [
+   "stops_targets_exits",
+   "parent_entries"
+  ],
+  "trigger_granularity": "management",
+  "members": [
+   "OF-TARGETS",
+   "PROFIT-TAKING",
+   "STOP-FAMILY",
+   "TRH1-RR"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "OF_ABSORPTION_REVERSAL": {
+  "information_set_tokens": [
+   "absorption_flag",
+   "aggressive_volume",
+   "price_stall"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "OFH3"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "OF_BREAK_CONFIRMATION": {
+  "information_set_tokens": [
+   "bar_delta",
+   "price_break",
+   "confirmation_flag"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "OFH2"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "OF_CONTEXT_FILTER": {
+  "information_set_tokens": [
+   "flow_context",
+   "parent_entries"
+  ],
+  "trigger_granularity": "filter",
+  "members": [
+   "OF-GRADING",
+   "OFH13-MEMORY",
+   "RVMR-AVOID"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN",
+   "INSUFFICIENT_DATA"
+  ],
+  "protected": false
+ },
+ "OF_CUMDELTA_TREND": {
+  "information_set_tokens": [
+   "cum_delta",
+   "trend_slope"
+  ],
+  "trigger_granularity": "state",
+  "members": [
+   "OFH6"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "OF_DIVERGENCE_FADE": {
+  "information_set_tokens": [
+   "bar_delta",
+   "price_extreme",
+   "divergence"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "OFH1",
+   "OFH11",
+   "OFH12"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "OF_EFFORT_RESULT": {
+  "information_set_tokens": [
+   "bar_delta",
+   "bar_range",
+   "effort_vs_result"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "OFH7",
+   "OFN1-N12",
+   "PROOF"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "OF_STACKED_IMBALANCE": {
+  "information_set_tokens": [
+   "imbalance_count",
+   "stacked_levels",
+   "bar_delta"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "OFH4",
+   "OFH5"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "OF_VALUE_PROFILE": {
+  "information_set_tokens": [
+   "volume_profile",
+   "poc_vah_val",
+   "bar_delta"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "OFH10",
+   "OFH8",
+   "OFH9"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "PATTERN_GEOMETRY": {
+  "information_set_tokens": [
+   "1m_price",
+   "bar_pattern",
+   "structure_zone"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "FVG-UNCOND",
+   "MEMIFVG-B1-B6",
+   "PATTERN-SCAN",
+   "RED",
+   "V4-LINEAGE",
+   "VECH1"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "POSTENTRY_STATE": {
+  "information_set_tokens": [
+   "open_trade_path",
+   "checkpoint_state"
+  ],
+  "trigger_granularity": "filter",
+  "members": [
+   "OFH13-POSTENTRY-F1-F6"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "PRICE_CONTINUATION_INTRADAY": {
+  "information_set_tokens": [
+   "1m_price",
+   "impulse",
+   "continuation_window"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "ANOMALY-CONFIRM-V1",
+   "BRK",
+   "CCHC",
+   "LPCC",
+   "ODMC",
+   "RVMR-MOMENTUM",
+   "THREE-ARM-FAMILY"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "PRICE_MEANREV_INTRADAY": {
+  "information_set_tokens": [
+   "1m_price",
+   "extension",
+   "reversion_window"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "MRV",
+   "RVMR-BANDS",
+   "RVMR-STRAT"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "PRICE_ONLY_FAMILY_SEARCH": {
+  "information_set_tokens": [
+   "1m_price"
+  ],
+  "trigger_granularity": "search",
+  "members": [
+   "GEN10",
+   "MGSD-30S-ARM",
+   "MGSD-F01-F19",
+   "MGSD-SESSION-TRANS",
+   "OOS-AUG",
+   "S30A-OBS",
+   "V5-BATTERY"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN",
+   "INSUFFICIENT_DATA"
+  ],
+  "protected": false
+ },
+ "PRICE_ONLY_MAP": {
+  "information_set_tokens": [
+   "1m_price"
+  ],
+  "trigger_granularity": "descriptive",
+  "members": [
+   "ANOMALY-CONFIRM-V2",
+   "ANOMALY-SCAN-V1",
+   "HARU",
+   "HIGH-ARRIVAL",
+   "MAG",
+   "MGSD-ANOM-SCREEN",
+   "MGSD-PM-OPEN",
+   "NQDIR",
+   "NSERIES",
+   "RVMR-BATTERY",
+   "RVMR-VALIDATION",
+   "WAVE4-VR-CELLS"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN",
+   "DESCRIPTIVE_ONLY_SPENT"
+  ],
+  "protected": false
+ },
+ "SESSION_ANCHOR_DISPLACEMENT": {
+  "information_set_tokens": [
+   "1m_price",
+   "session_anchor",
+   "displacement_memory"
+  ],
+  "trigger_granularity": "state",
+  "members": [
+   "MEMIFVG-A1-A8",
+   "MEMIFVG-S1-S4",
+   "MEMORY-PRED-HIST",
+   "MEMORY-PRED-PROSP",
+   "WAVE4-ANCHOR-FIELD"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN",
+   "DESCRIPTIVE_ONLY_SPENT",
+   "RESERVED_UNTOUCHED"
+  ],
+  "protected": false
+ }
+}

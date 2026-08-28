@@ -1,0 +1,89 @@
+{
+ "of_capture": {
+  "files_ofnew": 4,
+  "files_of2": 10,
+  "rows_total": 381982,
+  "days_total": 315,
+  "day_min": "2025-08-18",
+  "day_max": "2026-08-19",
+  "days_dev_eligible": 313,
+  "dev_day_min": "2025-08-18",
+  "dev_day_max": "2026-08-17",
+  "hours_covered_dev": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23
+  ],
+  "buffer_days_present": [
+   "2026-08-18",
+   "2026-08-19"
+  ],
+  "sha256_ofnew": "6d42673293b79b77c7986b843fb0c79864cbf347433d3473a2226ccfca0ed53a",
+  "sha256_of2": "baf4ac59024688d0bbb36d26ab822dbf0d32cbf562b6d179bb0b0f3e6305a950"
+ },
+ "rvmr_1m": {
+  "files": 8,
+  "sha256": "0ae4a6cbcec3fe9e5d5b356b90b25821d419adbe0433543906638b04a6b83a49"
+ },
+ "es_pilot": {
+  "files": 42,
+  "rows": 837249,
+  "day_min": "20260630",
+  "day_max": "20260817",
+  "flow_fields_populated_rows": 0,
+  "sha256": "caece9956e1643445643213fb67bbb4f13921689b90a87e34e7776207fcec9a2"
+ },
+ "es_full_events": {
+  "files": 174,
+  "entries": 87,
+  "structure": 87,
+  "sha256": "f74f1f7712aa61f518b2b64d105670c0bfa6f697698d8f340a6570b85831b42d"
+ },
+ "s30_ph2": {
+  "files": 20,
+  "months": [
+   "201912",
+   "202001",
+   "202002",
+   "202003",
+   "202005",
+   "202402",
+   "202404",
+   "202405",
+   "202406",
+   "202407",
+   "202507",
+   "202509",
+   "202510",
+   "202511",
+   "202512",
+   "202601",
+   "202602",
+   "202603",
+   "202604",
+   "202605"
+  ],
+  "sha256": "67a51eb4c3b5441b75c42fade970e32bcfdb7fb1f43b9d7b0f012a87be91dcfb"
+ }
+}
