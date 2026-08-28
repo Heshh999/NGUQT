@@ -1,0 +1,12 @@
+project,test_family,n_formal_tests,outcome,commit,partition_status
+MGSD-V1,strategy variants (F01-F19 + baseline),244,0 passed preliminary gates,bb6986b,EXPOSED DEV
+MGSD-V1,anomaly screen cells,162,"2 BH-significant, immaterial",bb6986b,EXPOSED DEV
+MGSD-V1,premarket->open tests,32,0 at BH q<=0.05,bb6986b,EXPOSED DEV
+MGSD-V1,30-second arm variants,20,0 candidates; best n=28 fails floors,bb6986b,EXPOSED DEV
+WAVE-4,structure cells (A/B/C/D),90,3 VR windows BH-surviving,eac54fe,EXPOSED DEV
+LPCC-V1,primary (arm 1/3 late premarket),1,FAILED: G04 base PF 0.857; gross EV negative; p=0.5160,be1fff6,EXPOSED DEV
+LPCC-V1,diagnostics D1-D8,10,all destruction confirms no signal,be1fff6,EXPOSED DEV
+CCHC-V1,primary (arm 2/3 closing half-hour),1,FAILED: G01 n=98<100; G11 p=0.0243>0.0166667; G16 2020=61% of net,963009d,EXPOSED DEV
+CCHC-V1,diagnostics D1-D9,11,D6 shift and D7 matched control undermine candidate,963009d,EXPOSED DEV
+ODMC-V1,primary (arm 3/3 opening drive),1,PENDING at freeze,this freeze,EXPOSED DEV
+ODMC-V1,diagnostics D1-D10,10,PENDING at freeze,this freeze,EXPOSED DEV

@@ -1,0 +1,133 @@
+{
+ "project": "ODMC-V1",
+ "version": "1.0",
+ "frozen_utc": "2026-08-27",
+ "provenance_head": "963009d20bd11528da9728801645e38d3d5f6163",
+ "ancestry": [
+  "eac54fe420eab5c5d1df20e6bd6c77471ee02c38",
+  "be1fff683e28003cbe3ca7856758978828b713f2",
+  "963009d20bd11528da9728801645e38d3d5f6163"
+ ],
+ "cell": {
+  "module": "B",
+  "stratum": "S5open",
+  "q": 10,
+  "stamps": [
+   571,
+   600
+  ],
+  "blocks_per_day": 3,
+  "all_blocks": [
+   [
+    571,
+    580
+   ],
+   [
+    581,
+    590
+   ],
+   [
+    591,
+    600
+   ]
+  ],
+  "vr": 1.081912,
+  "ci": [
+   1.029336,
+   1.140243
+  ],
+  "bh_q": 0.032,
+  "blocks": 5485,
+  "days": 1833,
+  "seed": 20260838
+ },
+ "selected_block": {
+  "stamps": [
+   571,
+   580
+  ],
+  "market": "[09:30,09:40) ET",
+  "T5": "09:35"
+ },
+ "mapping": {
+  "P0": "open of stamp 571",
+  "signal_stamps": [
+   571,
+   575
+  ],
+  "P5": "close of stamp 575",
+  "entry_open_stamp": 576,
+  "trade_stamps": [
+   576,
+   580
+  ],
+  "exit_open_stamp": 581,
+  "contiguity_stamps": [
+   571,
+   581
+  ],
+  "convention": "close-stamped: bar T covers (T-1min,T]"
+ },
+ "impulse": {
+  "M": "close(stamp575) - open(stamp571)"
+ },
+ "magnitude_gate": {
+  "lookback_eligible_sessions": 252,
+  "min_obs": 126,
+  "percentile": 0.9,
+  "quantile": "type-7",
+  "strict": true,
+  "tie_or_zero": "no_trade"
+ },
+ "regime_gate": "NONE - explicitly excluded (no field slope, VR, vol, trend, gap, news)",
+ "direction": "continuation sign(M)",
+ "stop": {
+  "mult": 1.5,
+  "scale": "trailing 60-eligible-session median high-low range of the trade half (stamps 576-580)",
+  "min_obs": 40,
+  "round": "up to 0.25 tick",
+  "min": "1 tick",
+  "trailing": false,
+  "execution": "stop-market; gap-through at worse open; touch at stop; adverse slippage"
+ },
+ "exit": {
+  "type": "time",
+  "minutes": 5,
+  "price": "open of stamp 581"
+ },
+ "costs": {
+  "repo_base_rt_pts": 0.87,
+  "repo_rth_stressed_rt_pts": 1.305,
+  "slippage_ticks_per_side": [
+   1,
+   2,
+   3,
+   4
+  ],
+  "provisional_base_ticks_per_side": 2,
+  "BINDING_STRESS_ticks_per_side": 4,
+  "BINDING_STRESS_rt_pts": 2.0,
+  "tick": 0.25,
+  "dollars_per_pt": 2.0,
+  "dollar_gate": "UNRESOLVED",
+  "opening_specific_repo_model": "NONE"
+ },
+ "inference": {
+  "bootstrap_B": 10000,
+  "seed": 20260904,
+  "perm_iters": 10000,
+  "perm": "impulse-sign permutation in 5-day blocks",
+  "local_bh_family": 1,
+  "three_arm_familywise_threshold": 0.0166667,
+  "arms": {
+   "LPCC-V1": "FAILED p=0.5160",
+   "CCHC-V1": "FAILED p=0.0243",
+   "ODMC-V1": "this test"
+  }
+ },
+ "dev_last_day": "2026-08-17",
+ "buffer_no_role": [
+  "2026-08-18",
+  "2026-08-31"
+ ]
+}
