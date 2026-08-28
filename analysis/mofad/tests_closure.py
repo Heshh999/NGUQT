@@ -61,12 +61,22 @@ rej = [
 for p in rej:
     v, _ = SS.screen(p, fp)
     t('rejects %s' % p['hyp_id'], v == 'REJECT')
+# the MOFAD-V1 classes are spent now too - their rescue must be blocked
+for cls, toks in (('INVENTORY_TRANSITION_FLOW',
+                   ['overnight_cum_delta', 'session_transition',
+                    'inventory_imbalance']),
+                  ('IMPACT_ASYMMETRY',
+                   ['rolling_price_impact', 'buy_vs_sell_lambda',
+                    'liquidity_asymmetry_state'])):
+    v, _ = SS.screen(dict(hyp_id='rescue-' + cls, mechanism_class=cls,
+                          tokens=toks, granularity='state', distinctness='x'), fp)
+    t('rejects rescue of spent MOFAD class %s' % cls, v == 'REJECT')
 # a genuinely new mechanism class MUST be accepted
-acc = dict(hyp_id='inventory-transition', mechanism_class='INVENTORY_TRANSITION_FLOW',
-           tokens=['overnight_cum_delta', 'session_transition', 'inventory_imbalance'],
-           granularity='state',
-           distinctness='new causal source: overnight aggregated aggressor flow as '
-                        'inventory proxy; no spent hypothesis conditioned on it')
+acc = dict(hyp_id='queue-depletion-msg', mechanism_class='QUEUE_DEPLETION_MSG',
+           tokens=['depth_updates', 'queue_depletion', 'cancel_rate'],
+           granularity='event',
+           distinctness='new causal source: message-level depth updates from the '
+                        'MOFAD capture program; no spent hypothesis observed the book')
 v, why = SS.screen(acc, fp)
 t('accepts a genuinely new mechanism class', v == 'ACCEPT')
 

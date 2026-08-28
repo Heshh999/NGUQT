@@ -1,0 +1,58 @@
+cell,kind,n,value,note
+C-F12-1,primary,256,-2.624091796874974,stressed mean pts
+C-F12-1b,primary,256,-4.1754589843749645,stressed mean pts
+C-F12-2,primary,256,-1.3479931640624399,stressed mean pts
+C-F08-1,primary,2061,-2.22257338670547,stressed mean pts
+C-F08-2,primary,1246,-3.390914927768859,stressed mean pts
+C-F12-1,diag_dir_LONG,125,-5.901349999999948,stressed
+C-F12-1,diag_dir_SHORT,131,0.5030629770992393,stressed
+C-F12-1,diag_tercile_T1,86,-3.5513662790698133,stressed
+C-F12-1,diag_tercile_T2,85,-10.876985294117537,stressed
+C-F12-1,diag_tercile_T3,85,6.566985294117666,stressed
+C-F12-1,diag_quarters,256,2,quarters positive
+C-F12-1,destr_delay1bar,256,-3.98832519531248,stressed
+C-F12-1,diag_divergence,37,-3.766993243243244,stressed
+C-F12-1b,diag_dir_LONG,125,-4.953399999999937,stressed
+C-F12-1b,diag_dir_SHORT,131,-3.4331488549618236,stressed
+C-F12-1b,diag_tercile_T1,86,-1.688066860465144,stressed
+C-F12-1b,diag_tercile_T2,85,-13.641838235294022,stressed
+C-F12-1b,diag_tercile_T3,85,2.774264705882384,stressed
+C-F12-1b,diag_quarters,256,2,quarters positive
+C-F12-1b,destr_delay1bar,256,-3.679682617187477,stressed
+C-F12-1b,diag_divergence,37,-6.206182432432434,stressed
+C-F12-2,diag_dir_LONG,115,-4.177391304347804,stressed
+C-F12-2,diag_dir_SHORT,141,0.9596719858156941,stressed
+C-F12-2,diag_tercile_T1,86,3.3617151162790404,stressed
+C-F12-2,diag_tercile_T2,85,-2.4501470588234646,stressed
+C-F12-2,diag_tercile_T3,85,-5.0109558823528,stressed
+C-F12-2,diag_quarters,256,1,quarters positive
+C-F12-2,destr_delay1bar,256,-3.2642529296874545,stressed
+C-F12-2,diag_divergence,41,0.6701524390244054,stressed
+C-F08-1,diag_dir_LONG,1421,-2.056213933849392,stressed
+C-F08-1,diag_dir_SHORT,640,-2.591943359374978,stressed
+C-F08-1,diag_tercile_T1,687,0.19434497816592602,stressed
+C-F08-1,diag_tercile_T2,687,-2.9654985443959165,stressed
+C-F08-1,diag_tercile_T3,687,-3.896566593886417,stressed
+C-F08-1,diag_quarters,2061,0,quarters positive
+C-F08-1,destr_delay1bar,2061,-1.6201989325570099,stressed
+C-F08-1,abl_buy_only,2061,-1.2702383551673666,stressed
+C-F08-1,abl_sell_only,2061,-1.514658539543941,stressed
+C-F08-2,diag_dir_LONG,866,-3.1325981524249573,stressed
+C-F08-2,diag_dir_SHORT,380,-3.9796052631578553,stressed
+C-F08-2,diag_tercile_T1,416,-1.9851983173076886,stressed
+C-F08-2,diag_tercile_T2,415,-2.745240963855444,stressed
+C-F08-2,diag_tercile_T3,415,-5.445692771084315,stressed
+C-F08-2,diag_quarters,1246,0,quarters positive
+C-F08-2,destr_delay1bar,1246,-3.837358547351523,stressed
+C-F08-2,abl_buy_only,1246,-0.7564044943819968,stressed
+C-F08-2,abl_sell_only,1246,-1.3943559390048341,stressed
+C-F08-1,neigh_Q70,2420,-2.3528615702479434,stressed
+C-F08-1,neigh_Q80,1689,-2.2298889875666164,stressed
+C-F08-2,neigh_Q70,1433,-2.7677049895324477,stressed
+C-F08-2,neigh_Q80,1027,-2.7880696202531956,stressed
+C-F12-1,neigh_need250,257,-2.668715953307362,stressed
+C-F12-1,neigh_need350,256,-2.624091796874974,stressed
+C-F12-1b,neigh_need250,257,-4.214046692606964,stressed
+C-F12-1b,neigh_need350,256,-4.1754589843749645,stressed
+C-F12-2,neigh_need50,257,-1.3975826848248378,stressed
+C-F12-2,neigh_need70,256,-1.3479931640624399,stressed

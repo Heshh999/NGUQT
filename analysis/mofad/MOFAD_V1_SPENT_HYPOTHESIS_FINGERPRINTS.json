@@ -60,6 +60,39 @@
   ],
   "protected": true
  },
+ "IMPACT_ASYMMETRY": {
+  "information_set_tokens": [
+   "rolling_price_impact",
+   "buy_vs_sell_lambda",
+   "liquidity_asymmetry_state"
+  ],
+  "trigger_granularity": "state",
+  "members": [
+   "MOFAD-C-F08-1",
+   "MOFAD-C-F08-2"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
+ "INVENTORY_TRANSITION_FLOW": {
+  "information_set_tokens": [
+   "overnight_cum_delta",
+   "session_transition",
+   "inventory_imbalance"
+  ],
+  "trigger_granularity": "state",
+  "members": [
+   "MOFAD-C-F12-1",
+   "MOFAD-C-F12-1b",
+   "MOFAD-C-F12-2"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
  "MANAGEMENT_VARIANT": {
   "information_set_tokens": [
    "stops_targets_exits",

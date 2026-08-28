@@ -54,6 +54,8 @@ CLASS_DEF = {
     'CALENDAR_TOD':              {'tokens': ['clock', 'calendar'], 'granularity': 'state'},
     'PRICE_ONLY_FAMILY_SEARCH':  {'tokens': ['1m_price'], 'granularity': 'search'},
     'PRICE_ONLY_MAP':            {'tokens': ['1m_price'], 'granularity': 'descriptive'},
+    'INVENTORY_TRANSITION_FLOW': {'tokens': ['overnight_cum_delta', 'session_transition', 'inventory_imbalance'], 'granularity': 'state'},
+    'IMPACT_ASYMMETRY':          {'tokens': ['rolling_price_impact', 'buy_vs_sell_lambda', 'liquidity_asymmetry_state'], 'granularity': 'state'},
 }
 
 
