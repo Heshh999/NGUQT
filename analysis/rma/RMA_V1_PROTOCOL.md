@@ -40,9 +40,12 @@ present; returns from contiguous minutes only):
   0.5 = symmetric).
 - `SKW_m` = standardized third moment of the window's 1m returns.
 
-Thresholds are causal: the conditioning pool is the prior **60 days'**
+Thresholds are causal: the conditioning pool is the prior **250 days'**
 feature values at all evaluation stamps (≥ 1,000 pool values required;
-type-7 deciles).
+type-7 deciles). *TC1 correction, committed before any outcome: the
+original 60-day/≥1,000 pairing was mutually infeasible (~6 evals/day);
+the statistical floor is kept, the lookback extended. No outcome existed
+when this was corrected — the run crashed at the first cell.*
 
 ## 3. Confirmatory cells (4, frozen directions)
 

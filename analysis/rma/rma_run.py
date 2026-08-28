@@ -77,7 +77,13 @@ byd_feat = collections.defaultdict(list)
 for f in feat:
     byd_feat[f[0]].append(f)
 thr = {}
-pool_r, pool_s = collections.deque(maxlen=60), collections.deque(maxlen=60)
+# TC1 (pre-outcome correction, committed before rerun): the freeze
+# required BOTH a 60-day pool AND >=1000 values, which is infeasible at
+# ~6 evaluations/day (60d ~= 355 values) - zero events, run crashed
+# before any outcome. The >=1000-value statistical floor is retained;
+# the lookback extends to 250 days to make it satisfiable. Causality
+# unchanged (prior days only).
+pool_r, pool_s = collections.deque(maxlen=250), collections.deque(maxlen=250)
 for d in days:
     fr = [x for x in (pool_r[i] for i in range(len(pool_r))) for x in x]
     fs = [x for x in (pool_s[i] for i in range(len(pool_s))) for x in x]
@@ -161,7 +167,7 @@ OUT = {}
 ps = []
 for name, sel in CELLS.items():
     ev = build(sel)
-    s = M.strat_stats if False else None
+    assert len(ev) > 0, 'cell %s produced zero events' % name
     g = np.array([e['gross'] for e in ev])
     R = np.array([e['R'] for e in ev])
     dd = [e['day'] for e in ev]
