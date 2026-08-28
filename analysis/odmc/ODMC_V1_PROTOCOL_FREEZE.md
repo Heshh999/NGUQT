@@ -136,3 +136,15 @@ block start ∓1 minute) and the full MGSD institutional program run
 One primary run. No opening-strategy search, no fallback, no rescue.
 **The three-arm family closes after this run.** The buffer 2026-08-18→31
 and all partitions from 2026-09-01 remain untouched.
+
+## Version 1.0.1 — test correction (committed before any ODMC outcome)
+- **TC1**: `percentile_excludes_current_day` used a single-index
+  inequality as its discriminator. At k=500 the 252-day 90th percentile
+  is numerically identical with and without the current day, so the
+  clause failed spuriously. Verified the **engine is correct**: it
+  matches the excluded-day type-7 quantile at *every* eligible index,
+  and exclusion is materially binding on **81.4%** of days (mean |diff|
+  0.154 pt, max 2.425). The test now asserts exactly that.
+- **No engine behaviour, economic rule, threshold, gate, cost, or
+  statistic changed.** No ODMC trade outcome had been generated,
+  opened, or summarized at the time of this correction.
