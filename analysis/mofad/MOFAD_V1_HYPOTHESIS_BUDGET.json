@@ -1,0 +1,24 @@
+{
+ "program": "MOFAD-V1",
+ "budget_limits": {"max_families": 12, "max_candidates_per_family": 4,
+                   "max_total_candidates": 48, "max_horizons_per_family": 2},
+ "families_run": [
+  {"family": "F12", "mechanism_class": "INVENTORY_TRANSITION_FLOW",
+   "candidates": ["C-F12-1", "C-F12-1b", "C-F12-2"],
+   "horizons": ["T30", "T60"], "directions": "continuation of flow sign (declared, one per candidate)"},
+  {"family": "F08", "mechanism_class": "IMPACT_ASYMMETRY",
+   "candidates": ["C-F08-1", "C-F08-2"],
+   "horizons": ["T15", "T30"], "directions": "sign of impact asymmetry (declared, one per candidate)"}
+ ],
+ "families_ready_but_zero_candidates": [
+  {"family": "F03", "reason": "all four canonical constructions rejected by the spent-fingerprint screen (MOFAD_V1_SCREEN_DECISIONS.json)"}
+ ],
+ "families_not_run": {
+  "CAPTURE_ONLY": ["F01", "F02", "F04", "F05", "F06", "F07", "F10"],
+  "INSUFFICIENT_DATA": ["F09", "F11"]
+ },
+ "total_confirmatory_candidates": 5,
+ "diagnostics_are_ledgered_not_candidates": true,
+ "seeds": {"bootstrap": 20260828, "permutation": 20260829, "control": 20260830},
+ "no_expansion_after_results": true
+}

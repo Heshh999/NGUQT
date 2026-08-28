@@ -1,0 +1,125 @@
+[
+ {
+  "hyp_id": "P-F03-1 delta-burst continuation",
+  "family": "F03",
+  "mechanism_class": "OF_CUMDELTA_TREND",
+  "screen_verdict": "REJECT",
+  "reasons": [
+   "R1: mechanism_class 'OF_CUMDELTA_TREND' is a spent fingerprint class"
+  ],
+  "feasibility_exclusion": null
+ },
+ {
+  "hyp_id": "P-F03-2 trade-size exhaustion fade",
+  "family": "F03",
+  "mechanism_class": "OF_EFFORT_RESULT",
+  "screen_verdict": "REJECT",
+  "reasons": [
+   "R1: mechanism_class 'OF_EFFORT_RESULT' is a spent fingerprint class"
+  ],
+  "feasibility_exclusion": null
+ },
+ {
+  "hyp_id": "P-F03-3 delta-climax fade at extremes",
+  "family": "F03",
+  "mechanism_class": "OF_DIVERGENCE_FADE",
+  "screen_verdict": "REJECT",
+  "reasons": [
+   "R1: mechanism_class 'OF_DIVERGENCE_FADE' is a spent fingerprint class",
+   "R2: token Jaccard 1.00 vs OF_DIVERGENCE_FADE at same granularity"
+  ],
+  "feasibility_exclusion": null
+ },
+ {
+  "hyp_id": "P-F03-4 signed-imbalance persistence",
+  "family": "F03",
+  "mechanism_class": "OF_CUMDELTA_TREND",
+  "screen_verdict": "REJECT",
+  "reasons": [
+   "R1: mechanism_class 'OF_CUMDELTA_TREND' is a spent fingerprint class",
+   "R2: token Jaccard 1.00 vs OF_CUMDELTA_TREND at same granularity"
+  ],
+  "feasibility_exclusion": null
+ },
+ {
+  "hyp_id": "P-F08-3 impact of large delta shocks (continuation/decay)",
+  "family": "F08",
+  "mechanism_class": "OF_EFFORT_RESULT",
+  "screen_verdict": "REJECT",
+  "reasons": [
+   "R1: mechanism_class 'OF_EFFORT_RESULT' is a spent fingerprint class",
+   "R2: token Jaccard 1.00 vs OF_EFFORT_RESULT at same granularity"
+  ],
+  "feasibility_exclusion": null
+ },
+ {
+  "hyp_id": "C-F08-1 lambda-asymmetry drift T15",
+  "family": "F08",
+  "mechanism_class": "IMPACT_ASYMMETRY",
+  "screen_verdict": "ACCEPT",
+  "reasons": [
+   "new mechanism class 'IMPACT_ASYMMETRY'; new causal source: side-split rolling price-impact estimates as a book-asymmetry state; no spent hypothesis estimated impact per unit signed volume or conditioned on its asymmetry"
+  ],
+  "feasibility_exclusion": null
+ },
+ {
+  "hyp_id": "C-F08-2 lambda-asymmetry drift T30",
+  "family": "F08",
+  "mechanism_class": "IMPACT_ASYMMETRY",
+  "screen_verdict": "ACCEPT",
+  "reasons": [
+   "new mechanism class 'IMPACT_ASYMMETRY'; same new state as C-F08-1, second frozen horizon"
+  ],
+  "feasibility_exclusion": null
+ },
+ {
+  "hyp_id": "C-F12-1 overnight-inventory open continuation T30",
+  "family": "F12",
+  "mechanism_class": "INVENTORY_TRANSITION_FLOW",
+  "screen_verdict": "ACCEPT",
+  "reasons": [
+   "new mechanism class 'INVENTORY_TRANSITION_FLOW'; new causal source: overnight aggregated aggressor flow as an inventory proxy at the session transition; every spent OF hypothesis was RTH intraday event-triggered and the MGSD premarket study was price-only"
+  ],
+  "feasibility_exclusion": null
+ },
+ {
+  "hyp_id": "C-F12-1b overnight-inventory open continuation T60",
+  "family": "F12",
+  "mechanism_class": "INVENTORY_TRANSITION_FLOW",
+  "screen_verdict": "ACCEPT",
+  "reasons": [
+   "new mechanism class 'INVENTORY_TRANSITION_FLOW'; same new state as C-F12-1, second frozen horizon"
+  ],
+  "feasibility_exclusion": null
+ },
+ {
+  "hyp_id": "C-F12-2 preopen-flow open continuation T30",
+  "family": "F12",
+  "mechanism_class": "INVENTORY_TRANSITION_FLOW",
+  "screen_verdict": "ACCEPT",
+  "reasons": [
+   "new mechanism class 'INVENTORY_TRANSITION_FLOW'; late-premarket (08:00-09:29) aggressor flow window; flow-based, unlike the dead price-only LPCC arm"
+  ],
+  "feasibility_exclusion": null
+ },
+ {
+  "hyp_id": "P-F12-3 close-hour inventory overnight continuation",
+  "family": "F12",
+  "mechanism_class": "INVENTORY_TRANSITION_FLOW",
+  "screen_verdict": "ACCEPT",
+  "reasons": [
+   "new mechanism class 'INVENTORY_TRANSITION_FLOW'; same new class; EXCLUDED pre-freeze: 197 eligible days < 200 frozen floor (feas_counts.py)"
+  ],
+  "feasibility_exclusion": "EXCLUDED_PRE_FREEZE"
+ },
+ {
+  "hyp_id": "P-F12-4 overnight flow-price divergence",
+  "family": "F12",
+  "mechanism_class": "INVENTORY_TRANSITION_FLOW",
+  "screen_verdict": "ACCEPT",
+  "reasons": [
+   "new mechanism class 'INVENTORY_TRANSITION_FLOW'; same new class; EXCLUDED pre-freeze: 38 eligible days < 200 frozen floor; retained as a SUBGROUP DIAGNOSTIC of C-F12-1 only"
+  ],
+  "feasibility_exclusion": "EXCLUDED_PRE_FREEZE"
+ }
+]

@@ -1,0 +1,12 @@
+feature,definition,causal_window,source_fields,used_by
+R_on,sum(f_ofBarDelta)/sum(f_ofTotalVolume) over overnight window,prev-day stamps (1080;1440] + entry-day stamps (0;540]; window closes 30 min before entry,f_ofBarDelta f_ofTotalVolume,C-F12-1 C-F12-1b
+R_pre,sum(f_ofBarDelta)/sum(f_ofTotalVolume) over late premarket,entry-day stamps (480;569]; closes 1 bar before entry,f_ofBarDelta f_ofTotalVolume,C-F12-2
+lambda_buy,sum(dClose_t | delta_t>0)/sum(delta_t | delta_t>0) over trailing 60 bars,stamps [m-59;m]; entry at open of m+1,f_ofBarDelta f_close,C-F08-1 C-F08-2
+lambda_sell,sum(dClose_t | delta_t<0)/sum(delta_t | delta_t<0) over trailing 60 bars,stamps [m-59;m],f_ofBarDelta f_close,C-F08-1 C-F08-2
+A,lambda_buy - lambda_sell,at stamp m,derived,C-F08-1 C-F08-2
+A_thresh,type-7 Q75 of |A| pooled over prior 20 trading days' evaluation stamps (>=500 values),days d-20..d-1 only,derived,C-F08-1 C-F08-2
+atr_stop,1.5 * f_atr of last completed bar before entry,bar stamp <= entry stamp - 1,f_atr,all candidates
+entry_price,open of first bar after signal window + buffer,next-bar-open convention,f_open,all candidates
+exit_price,open of bar stamped entry+H (first later bar if missing; day-last close if none),H in {15;30;60},f_open f_close,all candidates
+day_atr_tercile,entry-day f_atr tercile for residualization diagnostic,entry bar,f_atr,diagnostics
+divergence_flag,sign(R_on) != sign(overnight close-to-close price change),overnight window,derived,diagnostic subgroup of C-F12-1
