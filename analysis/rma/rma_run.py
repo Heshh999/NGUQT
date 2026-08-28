@@ -252,8 +252,10 @@ for k, d in enumerate(days):
     hi_t.append(D['mod'][idx[int(np.argmax(hs))]])
     lo_t.append(D['mod'][idx[int(np.argmin(ls))]])
     prevc = [i for i in byday[days[k - 1]] if D['mod'][i] <= 960]
-    on_sign.append(1 if D['o'][idx[0]] > D['c'][prevc[-1]] else -1
-                   if prevc else 0)
+    if not prevc:
+        on_sign.append(0)
+    else:
+        on_sign.append(1 if D['o'][idx[0]] > D['c'][prevc[-1]] else -1)
 hi_t = np.array(hi_t); lo_t = np.array(lo_t); on_sign = np.array(on_sign)
 print('  P(high in first hour) %.3f   P(low in first hour) %.3f'
       % ((hi_t <= 631).mean(), (lo_t <= 631).mean()))

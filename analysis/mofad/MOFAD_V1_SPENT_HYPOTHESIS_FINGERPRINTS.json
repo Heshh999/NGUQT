@@ -394,6 +394,7 @@
    "MTF-A-MAP",
    "NQDIR",
    "NSERIES",
+   "RMA-EXTREME-MAP",
    "RVMR-BATTERY",
    "RVMR-VALIDATION",
    "WAVE4-VR-CELLS"
@@ -401,6 +402,21 @@
   "dispositions": [
    "DEAD_FROZEN",
    "DESCRIPTIVE_ONLY_SPENT"
+  ],
+  "protected": false
+ },
+ "REALIZED_MOMENT_ASYMMETRY": {
+  "information_set_tokens": [
+   "semivariance_composition",
+   "realized_skew",
+   "variance_asymmetry_state"
+  ],
+  "trigger_granularity": "state",
+  "members": [
+   "RMA-MOMENT-CELLS"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
   ],
   "protected": false
  },

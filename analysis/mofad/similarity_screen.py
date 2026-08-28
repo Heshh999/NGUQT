@@ -60,6 +60,7 @@ CLASS_DEF = {
     'ORDINAL_PATH_SHAPE':        {'tokens': ['ordinal_motif', 'path_shape', 'last_leg_continuation'], 'granularity': 'event'},
     'VOLUME_CLOCK_STRUCTURE':    {'tokens': ['volume_bars', 'event_time_sampling', 'clock_free_structure'], 'granularity': 'descriptive'},
     'DAY_TYPE_TAXONOMY':         {'tokens': ['daily_range_structure', 'day_classification', 'next_day_response'], 'granularity': 'state'},
+    'REALIZED_MOMENT_ASYMMETRY': {'tokens': ['semivariance_composition', 'realized_skew', 'variance_asymmetry_state'], 'granularity': 'state'},
 }
 
 

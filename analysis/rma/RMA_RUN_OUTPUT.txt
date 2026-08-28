@@ -1,0 +1,43 @@
+RMA-V1 one-shot  DEV 2019-07-04..2026-08-17  bars 2503622
+feature evaluations 10736 over 1831 days  (77s)
+
+============================================================================================
+CONFIRMATORY CELLS  (variance-composition reversion, next 60m)
+============================================================================================
+C1_RSVhi_L  n   626 days  442  gross -1.781 base -2.651 stressed -3.086 pt  PF 0.871/0.851  win 40.1%  payoff 1.28
+            CI[-6.735,+0.725]  perm p 0.8230  years+ 2/7  2020:-3.41 2021:+1.98 2022:-7.96 2023:+0.80 2024:-4.00 2025:-7.53 2026:-0.44
+C2_RSVlo_S  n   646 days  464  gross -0.710 base -1.580 stressed -2.015 pt  PF 0.905/0.881  win 36.8%  payoff 1.52
+            CI[-5.752,+1.628]  perm p 0.6448  years+ 1/7  2020:-1.12 2021:+0.63 2022:-3.37 2023:-1.15 2024:-2.37 2025:-4.32 2026:-2.82
+C3_SKWlo_L  n   585 days  405  gross +1.856 base +0.986 stressed +0.551 pt  PF 1.061/1.034  win 39.7%  payoff 1.58
+            CI[-3.238,+4.590]  perm p 0.1706  years+ 5/7  2020:+0.71 2021:+0.16 2022:+10.11 2023:-1.67 2024:+0.21 2025:+0.23 2026:-9.07
+C4_SKWhi_S  n   645 days  460  gross -2.629 base -3.499 stressed -3.934 pt  PF 0.832/0.814  win 35.8%  payoff 1.49
+            CI[-8.301,+0.334]  perm p 0.8786  years+ 4/7  2020:+1.70 2021:-7.58 2022:+0.11 2023:-6.46 2024:+0.55 2025:-11.50 2026:+0.11
+
+BH: C1_RSVhi_L q=0.8786 C2_RSVlo_S q=0.8786 C3_SKWlo_L q=0.6823 C4_SKWhi_S q=0.8786
+
+NEIGHBORS + DELAY (stressed mean, diagnostics):
+  C1_q85   n   920  -2.720
+  C1_q95   n   312  -6.588
+  C4_q85   n   927  -3.234
+  C4_q95   n   336  -4.565
+  C1_RSVhi_L delay+1  -2.796
+  C2_RSVlo_S delay+1  -2.252
+  C3_SKWlo_L delay+1  +0.090
+  C4_SKWhi_S delay+1  -4.129
+  C1_RSVhi_L exit 45m  -1.119
+  C1_RSVhi_L exit 90m  -1.619
+  C2_RSVlo_S exit 45m  -1.512
+  C2_RSVlo_S exit 90m  -1.941
+  C3_SKWlo_L exit 45m  +0.406
+  C3_SKWlo_L exit 90m  +0.975
+  C4_SKWhi_S exit 45m  -2.881
+  C4_SKWhi_S exit 90m  -4.661
+
+============================================================================================
+DESCRIPTIVE  -  session extreme-time map
+============================================================================================
+  P(high in first hour) 0.371   P(low in first hour) 0.450
+  P(high in last hour)  0.286   P(low in last hour)  0.188
+  gap-up days:  P(low first hour) 0.442 | gap-down: P(high first hour) 0.358
+
+done in 97s
