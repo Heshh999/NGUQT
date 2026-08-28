@@ -1,0 +1,18 @@
+{
+ "proposal": {
+  "hyp_id": "VTBS-V1 (C1-C4) day-scale open-anchored vol-timed bracket",
+  "mechanism_class": "BIDIRECTIONAL_RANGE_HARVEST_DAILY",
+  "tokens": [
+   "day_vol_forecast",
+   "open_anchored_two_sided_bands",
+   "realized_range_harvest"
+  ],
+  "granularity": "state",
+  "distinctness": "monetizes the proven magnitude-predictability finding (MAG-AUC-V1) through a payoff that never chooses direction; differs from spent BRK-H1 (minute-scale ATR0.5 bracket at OFH6 event minutes, 15-60min life) in anchor (RTH open, once/day), scale (0.15-0.30 x median DAILY range, ~10x wider), conditioning source (day-level overnight-range forecast, no flow event), and hold (hours to fixed exit)"
+ },
+ "screen_verdict": "ACCEPT",
+ "reasons": [
+  "new mechanism class 'BIDIRECTIONAL_RANGE_HARVEST_DAILY'; monetizes the proven magnitude-predictability finding (MAG-AUC-V1) through a payoff that never chooses direction; differs from spent BRK-H1 (minute-scale ATR0.5 bracket at OFH6 event minutes, 15-60min life) in anchor (RTH open, once/day), scale (0.15-0.30 x median DAILY range, ~10x wider), conditioning source (day-level overnight-range forecast, no flow event), and hold (hours to fixed exit)"
+ ],
+ "disclosed_spent_relative": "BRK-H1 (docs/BRK_FINDINGS.md) - minute-scale bracket, DEAD; judgment that day-scale is a distinct hypothesis is recorded here and reversible by review"
+}
