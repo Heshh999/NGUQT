@@ -15,6 +15,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', 'mtf'))
 import mtf_lib as M  # noqa: E402
 
+
+def q7(v, q):
+    return float(np.quantile(np.asarray(v, float), q, method='linear'))
+
 COST_B, COST_S = 0.87, 1.305
 STAMPS = [631, 661, 691, 721, 751, 781, 811, 841, 871]
 
@@ -88,10 +92,10 @@ for d in days:
     fr = [x for x in (pool_r[i] for i in range(len(pool_r))) for x in x]
     fs = [x for x in (pool_s[i] for i in range(len(pool_s))) for x in x]
     if len(fr) >= 1000:
-        thr[d] = dict(r90=M.q7(fr, 0.90), r10=M.q7(fr, 0.10),
-                      s90=M.q7(fs, 0.90), s10=M.q7(fs, 0.10),
-                      r85=M.q7(fr, 0.85), r95=M.q7(fr, 0.95),
-                      s85=M.q7(fs, 0.85), s95=M.q7(fs, 0.95))
+        thr[d] = dict(r90=q7(fr, 0.90), r10=q7(fr, 0.10),
+                      s90=q7(fs, 0.90), s10=q7(fs, 0.10),
+                      r85=q7(fr, 0.85), r95=q7(fr, 0.95),
+                      s85=q7(fs, 0.85), s95=q7(fs, 0.95))
     if d in byd_feat:
         pool_r.append([f[3] for f in byd_feat[d]])
         pool_s.append([f[4] for f in byd_feat[d]])
