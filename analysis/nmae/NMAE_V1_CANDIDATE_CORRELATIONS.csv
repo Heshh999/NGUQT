@@ -1,0 +1,2 @@
+status,binding_reason,mode_reached
+NOT_RUN,"MLES-V1 precondition failed (absent); NMAE Mode A only. Additionally 0/6 families data-ready.",MODE_A

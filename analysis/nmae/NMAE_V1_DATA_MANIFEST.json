@@ -1,0 +1,201 @@
+{
+ "head": "9c75fff743294a092b75c9502144edbfe716da8f",
+ "branch": "claude/ninjatrader-mnq-automation-rqjzgg",
+ "dirty_files": 1,
+ "python": "Python 3.11.15",
+ "numpy": "2.4.6",
+ "mles": {
+  "artifacts_found": [],
+  "commits_found": [],
+  "protocol_commit": null,
+  "results_commit": null,
+  "hypothesis_ledger": null,
+  "final_report": null,
+  "frozen_candidate_file": null,
+  "cumulative_exposure_ledger": null,
+  "verdict": "ABSENT - MLES-V1 was never preregistered, run, or committed"
+ },
+ "prior_commits_in_ancestry": {
+  "eac54fe": true,
+  "be1fff6": true,
+  "963009d": true,
+  "9fec078": true,
+  "7062e67": true,
+  "bb6986b": true,
+  "f08396b": true,
+  "5133c51": true,
+  "9072bd3": true,
+  "7c8a854": true,
+  "643343f": true,
+  "e628b9d": true,
+  "938382b": true,
+  "8dfc2de": true,
+  "537a662": true
+ },
+ "data": {
+  "MNQ_1m_price": {
+   "present": true,
+   "files": 8,
+   "span": "2019-07-04..2026-08-17",
+   "bars": 2503622,
+   "note": "EXPOSED; canonical grid"
+  },
+  "MNQ_1m_orderflow_bar_aggregate": {
+   "present": true,
+   "files": 14,
+   "span": "2025-08-18..2026-08-19",
+   "note": "EXPOSED; bar aggregates, no messages"
+  },
+  "MNQ_30s_OHLCV": {
+   "present": true,
+   "window": "09:30-11:00 only",
+   "days": 192,
+   "note": "EXPOSED; not full session; NOT a substitute for quotes"
+  },
+  "ES_1m_price": {
+   "present": true,
+   "files": 42,
+   "span": "2026-06-30..2026-08-17",
+   "note": "42 session days = 1.86% of NQ span"
+  },
+  "ES_orderflow": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "MES": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "YM_MYM": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "RTY_M2K": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "NDX_cash_index": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "QQQ_quotes": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "risk_free_rate": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "dividend_estimates": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "ETF_borrow": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "option_chains_NQ_QQQ": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "option_bid_ask": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "greeks_or_IV_source": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "VXN_VIX_spot_or_futures": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "treasury_futures_or_yields": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "dollar_index": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "semis_tech_ETF": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "authenticated_econ_calendar": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "consensus_pre_release": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "first_release_actual": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "revision_history": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "quotes_BBO_MNQ": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "depth_L2": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "raw_trades_messages": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "broker_fill_records": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  },
+  "latency_distributions": {
+   "present": false,
+   "note": "ABSENT - no file, feed, or licence in repo"
+  }
+ },
+ "families": {
+  "N1 hedged equity-index relative value": {
+   "needs": "NQ+ES+YM+RTY synchronized quotes, all legs",
+   "have": "NQ full; ES 42 days; YM/RTY none",
+   "status": "INSUFFICIENT_DATA",
+   "binding": "no YM/RTY at all; ES span 42 days vs floor 200 days / 5 years"
+  },
+  "N2 cash-futures basis / fair value": {
+   "needs": "NDX or QQQ quotes + rates + dividends + borrow",
+   "have": "none of the four",
+   "status": "INSUFFICIENT_DATA",
+   "binding": "no cash index, no ETF quotes, no rates, no dividends"
+  },
+  "N3 realized vs option-implied": {
+   "needs": "option chains with genuine bid/ask + synchronized underlying",
+   "have": "none",
+   "status": "INSUFFICIENT_DATA",
+   "binding": "no option data of any kind; model values prohibited as prices"
+  },
+  "N4 volatility term structure / VRP": {
+   "needs": "VXN/VIX spot+futures curve or option term structure",
+   "have": "none",
+   "status": "INSUFFICIENT_DATA",
+   "binding": "no volatility instrument data"
+  },
+  "N5 authenticated economic surprise": {
+   "needs": "licensed release timestamps + consensus + first print + revisions",
+   "have": "none",
+   "status": "INSUFFICIENT_DATA",
+   "binding": "no authenticated calendar; scraping prohibited"
+  },
+  "N6 cross-asset regime transition": {
+   "needs": "ES/YM/RTY + rates + dollar + vol curve + tech ETF, synchronized",
+   "have": "ES 42 days only",
+   "status": "INSUFFICIENT_DATA",
+   "binding": "4 of 5 asset classes absent; ES span far below 200-day floor"
+  }
+ },
+ "families_ready": []
+}
