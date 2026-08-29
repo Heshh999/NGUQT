@@ -1,0 +1,88 @@
+MTNAD-V1 one-shot  DEV 2019-07-04..2026-08-17  bars 2503622
+S1 features 16254
+S2 features 16254
+S1V features 16254
+S3 daily features 1812
+
+============================================================================================
+CONFIRMATORY CELLS  (continuation toward the fresh extreme)
+============================================================================================
+C1_S1_fresh_hi_L   n  1248 days  766  gross +0.372 base -0.498 stressed -0.933  PF 0.969/0.943  win 43.7%  payoff 1.22
+    CI[-3.249,+1.427]  perm p 0.3779  years+ 4/8  dom nan  dropBest -1.227  dropTop1 -2.942  incr[-0.968|+2.692]
+    freq: 3.58/wk med 3.0  zero 4.9%  >=1 95.1%  (349 complete weeks)  years: 2019:-0.30 2020:-3.90 2021:+0.84 2022:-4.13 2023:+2.91 2024:+3.43 2025:+2.36 2026:-12.31
+C2_S1_fresh_lo_S   n  1175 days  736  gross -0.270 base -1.140 stressed -1.575  PF 0.952/0.934  win 39.1%  payoff 1.46
+    CI[-4.939,+1.881]  perm p 0.5599  years+ 3/7  dom nan  dropBest -2.115  dropTop1 -4.482  incr[+1.452|-1.663]
+    freq: 3.36/wk med 3.0  zero 8.3%  >=1 91.7%  (349 complete weeks)  years: 2020:-1.69 2021:-4.79 2022:+2.43 2023:-5.56 2024:+0.49 2025:-3.94 2026:+3.35
+C3_S2_fresh_hi_L   n  1251 days  795  gross +0.537 base -0.333 stressed -0.768  PF 0.979/0.953  win 44.5%  payoff 1.19
+    CI[-3.039,+1.516]  perm p 0.3202  years+ 5/8  dom nan  dropBest -1.062  dropTop1 -2.555  incr[-0.908|+11.630]
+    freq: 3.58/wk med 3.0  zero 3.4%  >=1 96.6%  (349 complete weeks)  years: 2019:+0.28 2020:-0.93 2021:+0.48 2022:-3.34 2023:+3.16 2024:+1.99 2025:+1.71 2026:-13.37
+C4_S2_fresh_lo_S   n  1171 days  758  gross +1.184 base +0.314 stressed -0.121  PF 1.014/0.995  win 39.8%  payoff 1.51
+    CI[-3.696,+3.477]  perm p 0.2601  years+ 3/7  dom nan  dropBest -0.657  dropTop1 -3.041  incr[-1.842|-0.072]
+    freq: 3.35/wk med 3.0  zero 8.3%  >=1 91.7%  (349 complete weeks)  years: 2020:-1.54 2021:-2.34 2022:+3.44 2023:-2.26 2024:+1.08 2025:-3.29 2026:+5.65
+C5_S1V_fresh_hi_L  n  1219 days  745  gross +0.106 base -0.764 stressed -1.199  PF 0.950/0.923  win 44.1%  payoff 1.17
+    CI[-3.461,+1.030]  perm p 0.4672  years+ 4/8  dom nan  dropBest -1.438  dropTop1 -2.568  incr[-1.225|+1.200]
+    freq: 3.49/wk med 3.0  zero 6.9%  >=1 93.1%  (349 complete weeks)  years: 2019:-0.30 2020:-2.99 2021:+0.16 2022:-6.33 2023:+2.53 2024:+4.19 2025:+1.19 2026:-11.38
+C6_S1V_fresh_lo_S  n  1165 days  716  gross +0.350 base -0.520 stressed -0.955  PF 0.978/0.959  win 39.1%  payoff 1.49
+    CI[-4.349,+2.580]  perm p 0.4149  years+ 4/7  dom nan  dropBest -1.497  dropTop1 -3.905  incr[-2.490|-0.900]
+    freq: 3.33/wk med 3.0  zero 8.0%  >=1 92.0%  (349 complete weeks)  years: 2020:+0.23 2021:-4.11 2022:+2.58 2023:-4.44 2024:+0.07 2025:-3.36 2026:+3.23
+C7_S3_fresh_hi_L   n   390 days  390  gross +17.022 base +16.152 stressed +15.717  PF 1.384/1.372  win 53.3%  payoff 1.20
+    CI[+2.669,+28.654]  perm p 0.0066  years+ 5/7  dom 0.46  dropBest +14.574  dropTop1 +12.802  incr[+15.784|+10.545]
+    freq: 1.11/wk med 0.0  zero 58.5%  >=1 41.5%  (349 complete weeks)  years: 2020:-8.65 2021:+3.28 2022:+26.79 2023:+35.50 2024:-10.87 2025:+4.76 2026:+80.83
+C8_S3_fresh_lo_S   n   336 days  336  gross +0.965 base +0.095 stressed -0.340  PF 1.001/0.996  win 47.6%  payoff 1.10
+    CI[-29.750,+27.758]  perm p 0.4797  years+ 4/7  dom nan  dropBest -3.543  dropTop1 -8.498  incr[+44.366|-6.041]
+    freq: 0.96/wk med 0.0  zero 69.9%  >=1 30.1%  (349 complete weeks)  years: 2020:+12.11 2021:-5.97 2022:-0.36 2023:+0.66 2024:+18.04 2025:+5.18 2026:-21.82
+
+BH: C1_S1_fresh_hi_L q=0.5482  C2_S1_fresh_lo_S q=0.5599  C3_S2_fresh_hi_L q=0.5482  C4_S2_fresh_lo_S q=0.5482  C5_S1V_fresh_hi_L q=0.5482  C6_S1V_fresh_lo_S q=0.5482  C7_S3_fresh_hi_L q=0.0528  C8_S3_fresh_lo_S q=0.5482
+
+NEIGHBORS + DELAY + EXITS (stressed mean, diagnostics):
+  C1_q85                 n  1665  -0.450
+  C1_q95                 n   750  -0.680
+  C2_q15                 n  1560  -0.236
+  C2_q05                 n   671  -1.864
+  C3_q85                 n  1690  -0.659
+  C3_q95                 n   734  -0.888
+  C4_q15                 n  1584  +0.175
+  C4_q05                 n   676  -1.060
+  C5_q85                 n  1638  -0.285
+  C5_q95                 n   751  -0.753
+  C6_q15                 n  1551  -0.827
+  C6_q05                 n   684  -2.559
+  C7_q75                 n   432  +13.194
+  C7_q85                 n   364  +12.104
+  C8_q25                 n   425  -0.584
+  C8_q15                 n   267  +1.812
+  C1_S1_fresh_hi_L delay+1 n  1248  -0.420
+  C1_S1_fresh_hi_L exit 45m n  1248  -1.745
+  C1_S1_fresh_hi_L exit 90m n  1248  -1.071
+  C2_S1_fresh_lo_S delay+1 n  1175  -2.388
+  C2_S1_fresh_lo_S exit 45m n  1175  -1.412
+  C2_S1_fresh_lo_S exit 90m n  1175  -1.976
+  C3_S2_fresh_hi_L delay+1 n  1251  -0.135
+  C3_S2_fresh_hi_L exit 45m n  1251  -1.539
+  C3_S2_fresh_hi_L exit 90m n  1251  -0.747
+  C4_S2_fresh_lo_S delay+1 n  1171  -1.467
+  C4_S2_fresh_lo_S exit 45m n  1171  -0.120
+  C4_S2_fresh_lo_S exit 90m n  1171  +0.498
+  C5_S1V_fresh_hi_L delay+1 n  1219  -0.653
+  C5_S1V_fresh_hi_L exit 45m n  1219  -1.545
+  C5_S1V_fresh_hi_L exit 90m n  1219  -0.500
+  C6_S1V_fresh_lo_S delay+1 n  1165  -1.460
+  C6_S1V_fresh_lo_S exit 45m n  1165  -0.491
+  C6_S1V_fresh_lo_S exit 90m n  1165  -1.700
+  C7_S3_fresh_hi_L open+30m n   390  +14.303
+  C8_S3_fresh_lo_S open+30m n   336  +4.398
+
+============================================================================================
+GATE EVALUATION
+============================================================================================
+C1_S1_fresh_hi_L   FAIL: base>0 stressed>0 PF_base>=1.30 PF_stressed>=1.15 EV_base>=+0.10R EV_stressed>=+0.05R CI_LB>0 p<=0.05 q<=0.05 years_pos>=7 domination<=0.50 drop_best_day>0 drop_top1pct>0 incrementality_both_strata delay_positive neighbors_majority_positive
+C2_S1_fresh_lo_S   FAIL: base>0 stressed>0 PF_base>=1.30 PF_stressed>=1.15 EV_base>=+0.10R EV_stressed>=+0.05R CI_LB>0 p<=0.05 q<=0.05 years_pos>=6 domination<=0.50 drop_best_day>0 drop_top1pct>0 incrementality_both_strata delay_positive neighbors_majority_positive
+C3_S2_fresh_hi_L   FAIL: base>0 stressed>0 PF_base>=1.30 PF_stressed>=1.15 EV_base>=+0.10R EV_stressed>=+0.05R CI_LB>0 p<=0.05 q<=0.05 years_pos>=7 domination<=0.50 drop_best_day>0 drop_top1pct>0 incrementality_both_strata delay_positive neighbors_majority_positive
+C4_S2_fresh_lo_S   FAIL: stressed>0 PF_base>=1.30 PF_stressed>=1.15 EV_base>=+0.10R EV_stressed>=+0.05R CI_LB>0 p<=0.05 q<=0.05 years_pos>=6 domination<=0.50 drop_best_day>0 drop_top1pct>0 incrementality_both_strata delay_positive neighbors_majority_positive
+C5_S1V_fresh_hi_L  FAIL: base>0 stressed>0 PF_base>=1.30 PF_stressed>=1.15 EV_base>=+0.10R EV_stressed>=+0.05R CI_LB>0 p<=0.05 q<=0.05 years_pos>=7 domination<=0.50 drop_best_day>0 drop_top1pct>0 incrementality_both_strata delay_positive neighbors_majority_positive
+C6_S1V_fresh_lo_S  FAIL: base>0 stressed>0 PF_base>=1.30 PF_stressed>=1.15 EV_base>=+0.10R EV_stressed>=+0.05R CI_LB>0 p<=0.05 q<=0.05 years_pos>=6 domination<=0.50 drop_best_day>0 drop_top1pct>0 incrementality_both_strata delay_positive neighbors_majority_positive
+C7_S3_fresh_hi_L   FAIL: q<=0.05 years_pos>=6 weeks_ge1>=60%
+C8_S3_fresh_lo_S   FAIL: stressed>0 PF_base>=1.30 PF_stressed>=1.15 CI_LB>0 p<=0.05 q<=0.05 years_pos>=6 domination<=0.50 drop_best_day>0 drop_top1pct>0 incrementality_both_strata neighbors_majority_positive freq>=1.0/wk weeks_ge1>=60%
+
+passers: NONE
+done in 128s

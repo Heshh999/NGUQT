@@ -60,6 +60,22 @@
   ],
   "protected": true
  },
+ "DURATION_HAZARD_RENEWAL": {
+  "information_set_tokens": [
+   "event_age_clock",
+   "extreme_refresh_drought",
+   "renewal_hazard_state"
+  ],
+  "trigger_granularity": "state",
+  "members": [
+   "MTNAD-DHR-DAILY",
+   "MTNAD-DHR-INTRADAY"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
  "EXECUTION_REFINEMENT": {
   "information_set_tokens": [
    "subminute_timing",
