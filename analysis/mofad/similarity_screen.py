@@ -62,6 +62,8 @@ CLASS_DEF = {
     'DAY_TYPE_TAXONOMY':         {'tokens': ['daily_range_structure', 'day_classification', 'next_day_response'], 'granularity': 'state'},
     'REALIZED_MOMENT_ASYMMETRY': {'tokens': ['semivariance_composition', 'realized_skew', 'variance_asymmetry_state'], 'granularity': 'state'},
     'DURATION_HAZARD_RENEWAL':   {'tokens': ['event_age_clock', 'extreme_refresh_drought', 'renewal_hazard_state'], 'granularity': 'state'},
+    'ROUND_NUMBER_GRID':         {'tokens': ['exogenous_price_grid', 'round_level_first_touch', 'stop_cluster_break'], 'granularity': 'event'},
+    'VOLUME_TIME_PARTICIPATION': {'tokens': ['total_volume_surprise', 'participation_timing', 'information_day_state'], 'granularity': 'state'},
 }
 
 

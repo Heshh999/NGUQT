@@ -436,6 +436,21 @@
   ],
   "protected": false
  },
+ "ROUND_NUMBER_GRID": {
+  "information_set_tokens": [
+   "exogenous_price_grid",
+   "round_level_first_touch",
+   "stop_cluster_break"
+  ],
+  "trigger_granularity": "event",
+  "members": [
+   "RNVP-RNL"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
+  ],
+  "protected": false
+ },
  "SESSION_ANCHOR_DISPLACEMENT": {
   "information_set_tokens": [
    "1m_price",
@@ -469,6 +484,21 @@
   ],
   "dispositions": [
    "DESCRIPTIVE_ONLY_SPENT"
+  ],
+  "protected": false
+ },
+ "VOLUME_TIME_PARTICIPATION": {
+  "information_set_tokens": [
+   "total_volume_surprise",
+   "participation_timing",
+   "information_day_state"
+  ],
+  "trigger_granularity": "state",
+  "members": [
+   "RNVP-VTP"
+  ],
+  "dispositions": [
+   "DEAD_FROZEN"
   ],
   "protected": false
  }

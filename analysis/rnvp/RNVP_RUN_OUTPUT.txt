@@ -1,0 +1,88 @@
+RNVP-V1 one-shot  DEV 2019-07-04..2026-08-17  bars 2503622
+RNL raw triggers (W=60): 2232
+VTP eligible days 1798 (thresholded 1598)
+
+============================================================================================
+CONFIRMATORY CELLS
+============================================================================================
+R1                 n   769 days  685  gross +1.897 base +1.027 stressed +0.592  PF 1.051/1.029  win 37.6%  payoff 1.71
+    CI[-3.600,+4.903]  perm p 0.1952  years+ 4/8  dom 1.86  dropBest -0.117  dropTop1 -2.492  incr[+0.857|-39.939]
+    freq: 2.07/wk med 2.0  zero 14.6%  >=1 85.4%  (371 wks)  years: 2019:-5.10 2020:-4.43 2021:-2.54 2022:+3.61 2023:-6.88 2024:+0.39 2025:+6.00 2026:+5.83
+R2                 n   784 days  657  gross +2.607 base +1.737 stressed +1.302  PF 1.071/1.053  win 42.1%  payoff 1.45
+    CI[-3.425,+6.136]  perm p 0.1417  years+ 5/8  dom 0.82  dropBest +0.681  dropTop1 -1.339  incr[-21.702|+1.449]
+    freq: 2.11/wk med 2.0  zero 15.4%  >=1 84.6%  (371 wks)  years: 2019:-0.38 2020:+2.45 2021:+0.69 2022:+3.24 2023:+0.98 2024:-2.03 2025:+6.56 2026:-3.72
+R3                 n   205 days  189  gross +3.086 base +2.216 stressed +1.781  PF 1.076/1.061  win 44.9%  payoff 1.30
+    CI[-8.585,+12.541]  perm p 0.2929  years+ 5/8  dom 2.09  dropBest +0.327  dropTop1 -0.966  incr[+1.781|+nan]
+    freq: 0.55/wk med 0.0  zero 63.1%  >=1 36.9%  (371 wks)  years: 2019:+21.95 2020:-34.21 2021:+3.73 2022:+15.25 2023:+12.60 2024:-6.90 2025:-21.41 2026:+13.37
+R4                 n   317 days  291  gross +5.246 base +4.376 stressed +3.941  PF 1.152/1.135  win 40.4%  payoff 1.68
+    CI[-6.313,+15.274]  perm p 0.1655  years+ 5/8  dom 0.61  dropBest +1.626  dropTop1 -0.244  incr[-161.523|+4.465]
+    freq: 0.85/wk med 1.0  zero 46.4%  >=1 53.6%  (371 wks)  years: 2019:+8.52 2020:-7.23 2021:+0.89 2022:+6.69 2023:-1.51 2024:+7.31 2025:+10.43 2026:-0.72
+V1_hivol_am_up_L   n   174 days  174  gross +0.864 base -0.006 stressed -0.441  PF 1.000/0.990  win 56.3%  payoff 0.77
+    CI[-17.383,+15.895]  perm p 0.4568  years+ 4/7  dom nan  dropBest -2.857  dropTop1 -2.857  incr[+10.261|-15.967]
+    freq: 0.54/wk med 0.0  zero 60.6%  >=1 39.4%  (325 wks)  years: 2020:+27.50 2021:-13.68 2022:+34.78 2023:+3.26 2024:-13.38 2025:+12.42 2026:-48.36
+V2_hivol_am_dn_S   n   297 days  297  gross -0.971 base -1.841 stressed -2.276  PF 0.966/0.958  win 47.5%  payoff 1.06
+    CI[-19.543,+15.236]  perm p 0.5472  years+ 3/7  dom nan  dropBest -4.908  dropTop1 -6.985  incr[+2.586|-11.572]
+    freq: 0.91/wk med 1.0  zero 44.6%  >=1 55.4%  (325 wks)  years: 2020:-11.28 2021:-19.93 2022:+14.47 2023:+11.72 2024:-17.30 2025:+32.60 2026:-54.98
+V3_lovol_am_up_S   n   298 days  298  gross -6.294 base -7.164 stressed -7.599  PF 0.810/0.800  win 38.9%  payoff 1.26
+    CI[-19.178,+4.490]  perm p 0.8513  years+ 2/7  dom nan  dropBest -10.330  dropTop1 -11.624  incr[-11.164|-4.220]
+    freq: 0.91/wk med 1.0  zero 43.7%  >=1 56.3%  (325 wks)  years: 2020:-15.25 2021:-10.69 2022:-21.17 2023:-17.53 2024:-4.40 2025:+11.32 2026:+0.96
+V4_lovol_am_dn_L   n   161 days  161  gross -5.413 base -6.283 stressed -6.718  PF 0.835/0.825  win 45.3%  payoff 0.99
+    CI[-23.703,+9.851]  perm p 0.7379  years+ 2/7  dom nan  dropBest -10.314  dropTop1 -10.314  incr[-16.799|-3.044]
+    freq: 0.50/wk med 0.0  zero 64.3%  >=1 35.7%  (325 wks)  years: 2020:-38.30 2021:-18.07 2022:-18.25 2023:+17.18 2024:-13.84 2025:+24.95 2026:-22.81
+V-HI               n   471  stressed -1.599  freq 1.45/wk  >=1 65.5%
+V-LO               n   459  stressed -7.290  freq 1.41/wk  >=1 67.1%
+
+BH: R1 q=0.5205  R2 q=0.5205  R3 q=0.5857  R4 q=0.5205  V1_hivol_am_up_L q=0.7297  V2_hivol_am_dn_S q=0.7297  V3_lovol_am_up_S q=0.8513  V4_lovol_am_dn_L q=0.8433
+
+NEIGHBORS + DELAY + EXITS (stressed mean, diagnostics):
+  R1_W30                   n  1077  +3.214
+  R1_W120                  n   526  +0.107
+  R1_delay                 n   769  +0.269
+  R1_exit45                n   769  -0.452
+  R1_exit90                n   769  +0.563
+  R2_W30                   n  1097  -1.246
+  R2_W120                  n   554  -0.229
+  R2_delay                 n   783  +1.070
+  R2_exit45                n   784  +0.560
+  R2_exit90                n   784  +2.383
+  R3_W30                   n   311  +0.191
+  R3_W120                  n   143  -9.908
+  R3_eps2.5                n   360  +1.852
+  R3_eps10                 n    97  -7.649
+  R3_delay                 n   205  +3.018
+  R3_exit45                n   205  +1.145
+  R3_exit90                n   205  +0.371
+  R4_W30                   n   438  +0.021
+  R4_W120                  n   234  +4.723
+  R4_eps2.5                n   491  +4.499
+  R4_eps10                 n   159  +4.097
+  R4_delay                 n   317  +2.713
+  R4_exit45                n   317  +1.106
+  R4_exit90                n   317  +5.234
+  V1_q60                   n   263  -0.392
+  V1_q80                   n    99  -0.446
+  V2_q60                   n   379  +1.402
+  V2_q80                   n   221  -9.297
+  V3_q40                   n   399  -12.130
+  V3_q20                   n   193  -3.341
+  V4_q40                   n   220  -8.224
+  V4_q20                   n   109  -13.190
+  V1_hivol_am_up_L_delay   n   174  -1.829
+  V2_hivol_am_dn_S_delay   n   297  +0.105
+  V3_lovol_am_up_S_delay   n   298  -7.783
+  V4_lovol_am_dn_L_delay   n   161  -7.266
+
+============================================================================================
+GATE EVALUATION
+============================================================================================
+R1                 FAIL: PF_base>=1.30 PF_stressed>=1.15 EV_base>=+0.10R EV_stressed>=+0.05R CI_LB>0 p<=0.05 q<=0.05 years_pos>=7 domination<=0.50 drop_best_day>0 drop_top1pct>0 incrementality_both_strata
+R2                 FAIL: PF_base>=1.30 PF_stressed>=1.15 EV_base>=+0.10R EV_stressed>=+0.05R CI_LB>0 p<=0.05 q<=0.05 years_pos>=7 domination<=0.50 drop_top1pct>0 incrementality_both_strata neighbors_majority_positive
+R3                 FAIL: PF_base>=1.30 PF_stressed>=1.15 EV_base>=+0.10R EV_stressed>=+0.05R CI_LB>0 p<=0.05 q<=0.05 years_pos>=7 domination<=0.50 drop_top1pct>0 incrementality_both_strata neighbors_majority_positive freq>=1.0/wk weeks_ge1>=60%
+R4                 FAIL: PF_base>=1.30 PF_stressed>=1.15 CI_LB>0 p<=0.05 q<=0.05 years_pos>=7 domination<=0.50 drop_top1pct>0 incrementality_both_strata freq>=1.0/wk weeks_ge1>=60%
+V1_hivol_am_up_L   FAIL: n>=200 base>0 stressed>0 PF_base>=1.30 PF_stressed>=1.15 CI_LB>0 p<=0.05 q<=0.05 years_pos>=6 domination<=0.50 drop_best_day>0 drop_top1pct>0 incrementality_both_strata delay_positive neighbors_majority_positive
+V2_hivol_am_dn_S   FAIL: base>0 stressed>0 PF_base>=1.30 PF_stressed>=1.15 CI_LB>0 p<=0.05 q<=0.05 years_pos>=6 domination<=0.50 drop_best_day>0 drop_top1pct>0 incrementality_both_strata neighbors_majority_positive
+V3_lovol_am_up_S   FAIL: base>0 stressed>0 PF_base>=1.30 PF_stressed>=1.15 CI_LB>0 p<=0.05 q<=0.05 years_pos>=6 domination<=0.50 drop_best_day>0 drop_top1pct>0 incrementality_both_strata delay_positive neighbors_majority_positive
+V4_lovol_am_dn_L   FAIL: n>=200 base>0 stressed>0 PF_base>=1.30 PF_stressed>=1.15 CI_LB>0 p<=0.05 q<=0.05 years_pos>=6 domination<=0.50 drop_best_day>0 drop_top1pct>0 incrementality_both_strata delay_positive neighbors_majority_positive
+
+passers: NONE
+done in 116s
