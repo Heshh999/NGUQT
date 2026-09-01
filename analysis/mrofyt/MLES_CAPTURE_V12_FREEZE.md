@@ -323,3 +323,69 @@ does NOT prove: that any market data is captured, that depth arrives,
 that rotation survives a live 18:00 ET roll, or anything whatsoever
 about expected value. Classification unchanged:
 **INSUFFICIENT_DATA — ZERO GENUINE RECORDED SESSIONS.**
+
+### Amendment A4 — FIRST GENUINE LIVE CAPTURE (2026-09-01)
+
+A 2 m 13 s live NQ capture was recorded on the user's machine
+(`captureInstanceId 20260901141246409-c9f38b1f`, contract `NQ SEP26`,
+14:12:46–14:14:59 UTC) and its manifest, quotes, trades and quality
+files were supplied for verification.
+
+**Integrity verified against genuine recorder output — first time
+ever possible:**
+
+| Check | Result |
+|---|---|
+| SHA-256 of quotes/trades/quality vs manifest | **MATCH (all 3)** |
+| byte counts vs manifest | MATCH (1697479 / 571458 / 3494) |
+| row counts vs manifest | MATCH (7699 / 2373 / 14) |
+| v1.2 adapter parse | 10,086 events, **zero** enum/header/schema errors |
+| gaps / duplicates / reversals | 0 / 0 / 0 |
+| queueOverflows / droppedRows / writeErrors | 0 / 0 / 0 |
+| queue high-water vs capacity | 230 / 250,000 (0.09%) |
+| closeReason | `SHUTDOWN` (orderly) |
+
+**Depth capture CONFIRMED LIVE:** 195,048 depth rows / 41.2 MB in
+2 m 13 s; `depthAdd/Update/Remove` = 94,544 / 6,020 / 94,484;
+`depthBid + depthAsk` = 98,724 + 96,324 = 195,048 (consistent).
+
+**A2's `.ToString()` depth-operation fix is now validated in
+production**: all three action values are present and correctly
+spelled, so `e.Operation.ToString()` returns exactly Add/Update/Remove
+on the real NT8 API. No `UnknownEnumError` was raised.
+
+**Field observations (not defects):**
+
+- Feed delivers **30 depth levels per side**, not the declared 10
+  (`maxBid/AskLevelSeen = 30`). All 30 are captured; `declaredDepth`
+  only gates when `BOOK_READY` fires, and the auditor compares
+  observed levels to the manifest's own value, not to `declaredDepth`,
+  so this does NOT fail an audit.
+- NT8 emits `DISCONNECTED` before the connection is established, so
+  every capture opens with one benign DISCONNECT→RECONNECT and
+  `segId` 1→2. The pre-`BOOK_READY` window was ~150 ms: only **2 of
+  7,699** quote rows carried `DATA_SUPPRESSED` (0.026%).
+- `crossed` = 134 (1.74% of quote rows strictly bid>ask; a further
+  271 rows locked bid==ask). Expected for an MBP feed whose bid and
+  ask update as separate events. Measured and recorded rather than
+  silently corrected, so the research layer can filter on it.
+
+**Blocked-step status after A4:**
+
+1. Real NinjaTrader F5 compile — **COMPLETE** (A3)
+2. Five-minute NQ+MNQ Market Replay smoke test — **superseded for NQ
+   by a live capture** (stronger evidence than replay); **NOT yet
+   done for MNQ**
+3. Stop → finalize → audit — **finalize COMPLETE** (orderly SHUTDOWN,
+   manifest written, hashes verified); full `audit_capture` still
+   pending because it requires the NQ+MNQ pair
+4. Restart → finalize → audit — NOT RUN
+5. First genuine 18:00 ET rollover audit — NOT RUN
+
+**No MNQ run was supplied.** Until NQ and MNQ are captured over the
+same session, `audit_capture` fails by design with
+`MISSING_REQUIRED_INSTRUMENT` / `NQ_MNQ_SESSION_MISMATCH`.
+
+Classification remains **INSUFFICIENT_DATA — ZERO GENUINE RECORDED
+SESSIONS**: a 2-minute fragment is not a session, and none of this
+speaks to expected value.
