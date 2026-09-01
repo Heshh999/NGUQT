@@ -783,10 +783,13 @@ namespace Mles.Capture.V12
 }
 
 // ======================================================================
-// NinjaTrader host: thin wrapper over the core, REAL NT8 namespaces.
-// Depth operations in NT8 are NinjaTrader.Data.Operation.Add/Update/
-// Remove; connection updates expose BOTH Status and PriceStatus
-// (NinjaTrader.Cbi.ConnectionStatus).
+// NinjaTrader host: thin wrapper over the core.
+// Namespace facts CORRECTED against a real F5 compile (2026-09-01):
+// the depth-operation enum is NOT NinjaTrader.Data.Operation, so this
+// host never names that type - it reads e.Operation and passes the
+// member name through (the ingest adapter validates it and raises on
+// anything unknown). ConnectionStatus lives in NinjaTrader.Cbi, and
+// connection updates expose BOTH Status and PriceStatus.
 // ======================================================================
 namespace NinjaTrader.NinjaScript.Indicators
 {
@@ -874,9 +877,13 @@ namespace NinjaTrader.NinjaScript.Indicators
         protected override void OnMarketDepth(MarketDepthEventArgs e)
         {
             if (core == null) return;
-            string act = e.Operation == Operation.Add ? "ADD" :
-                         e.Operation == Operation.Update ? "UPDATE" :
-                         "REMOVE";
+            // The depth-operation ENUM TYPE is deliberately never named:
+            // its namespace differs across NT8 builds and a wrong guess
+            // either fails F5 or silently mis-maps. e.Operation resolves,
+            // so its member name is passed through verbatim. The ingest
+            // adapter normalizes ADD/INSERT, UPDATE/CHANGE, REMOVE/DELETE
+            // and RAISES on anything unknown - loud, never silent.
+            string act = e.Operation.ToString().ToUpperInvariant();
             core.OnDepth(SessionOf(DateTime.UtcNow), Contract(), act,
                 e.MarketDataType == MarketDataType.Bid ? "BID" : "ASK",
                 e.Position, e.Price, e.Volume,
@@ -884,7 +891,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         }
 
         protected override void OnConnectionStatusUpdate(
-            ConnectionStatusEventArgs e)
+            NinjaTrader.Cbi.ConnectionStatusEventArgs e)
         {
             if (core == null) return;
             core.OnConnection(SessionOf(DateTime.UtcNow), Contract(),

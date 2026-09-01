@@ -239,3 +239,65 @@ checks, the ≥20-session verification checkpoint and the ≥60-session
 State-C threshold). It states the same five user-side blocked steps
 listed in §7 and the same classification. It contains no outcome,
 return or P&L content.
+
+---
+
+## 10. Amendment A2 — REAL F5 COMPILE EVIDENCE (namespace defect fixed)
+
+The user ran §7 step 1 (the genuine NinjaTrader F5 compile). **It
+failed with three errors**, disproving a §3 item-9 claim:
+
+```
+CS0246  line 887 col 13  type or namespace 'ConnectionStatusEventArgs' not found
+CS0103  line 877 col 41  the name 'Operation' does not exist in the current context
+CS0103  line 878 col 41  the name 'Operation' does not exist in the current context
+```
+
+### Root cause
+
+`nt8_stubs_v12.cs` declared BOTH `Operation` and
+`ConnectionStatusEventArgs` inside `NinjaTrader.Data`. The host was
+written against that stub, and the stub was written against the host —
+so `mcs` validated a closed fiction. This is exactly the failure mode
+the original §3 item 9 asserted had been avoided; **that assertion was
+wrong** and is corrected here rather than quietly amended.
+
+### What the compiler actually proved
+
+- `e.Operation` resolves → the property is real; only the bare enum
+  TYPE name is unresolvable.
+- `NinjaTrader.Cbi.ConnectionStatus.Connected` resolves (no error on
+  lines 890/893) → the Cbi namespace and that enum are correct.
+- The types are NOT in `NinjaTrader.Data` (the `using` was present),
+  nor in `NinjaTrader.NinjaScript`/`NinjaTrader` root (both are
+  auto-searched as enclosing namespaces of the host class).
+
+### Fix
+
+1. **Depth operation — type never named.** The host now reads
+   `e.Operation.ToString().ToUpperInvariant()` and passes the member
+   name through. The ingest adapter already normalizes ADD/INSERT,
+   UPDATE/CHANGE and REMOVE/DELETE and RAISES `UnknownEnumError` on
+   anything else, so an unexpected member fails loudly at intake
+   instead of silently mis-mapping to `REMOVE` (which the previous
+   ternary chain would have done).
+2. **`NinjaTrader.Cbi.ConnectionStatusEventArgs`** fully qualified in
+   the override signature. Still INFERRED, not yet F5-confirmed.
+3. **Stubs corrected** so they can no longer mask this: the
+   depth-operation enum is now declared OUTSIDE every namespace the
+   host imports, making any future bare reference fail in the harness
+   too.
+
+### Re-verification
+
+mcs exit 0; suite 31/31; full battery 356/356 unchanged.
+
+```
+ae0bd74a4eda2dbf9cafe4e7a88e8c15604f690cef95d9b45b3b6915fb848438  src/MlesV12CaptureHost.cs
+be29c36a62624ab5e18e67d104eb4e9323abcda4bf5faf1c88c54486fc446f4a  analysis/mrofyt/nt8_stubs_v12.cs
+4a6391a0870a7c63420f4eae4299fa01818b3e87011c663af9dc230a27a9d325  analysis/mrofyt/MROF_V1_Engine_v12.zip
+```
+
+**Standing lesson: a stub compile is not an API validation.** Only the
+user-side F5 compile can confirm NT8 namespaces, and item 2 above is
+still unconfirmed until the next F5 run.
