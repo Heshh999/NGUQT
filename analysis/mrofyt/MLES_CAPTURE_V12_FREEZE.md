@@ -217,3 +217,25 @@ None of these were performed and none are claimed.
 **INSUFFICIENT_DATA — ZERO GENUINE RECORDED SESSIONS.** Passing
 software tests proves recorder behavior only. It does not prove
 positive expected value.
+
+---
+
+## 9. Amendment A1 (packaging only — no code change)
+
+`OPERATING_RUNBOOK.md` was added to the repository and to the delivered
+package after the freeze above. **No recorder, adapter, auditor, test
+or research file changed**; `src/MlesV12CaptureHost.cs` remains
+`611b6319…c6b97076` and the suite remains 31/31 (356/356 overall).
+
+Only the zip hash moves, because the archive gained one document:
+
+```
+3b2ec6b4bc6ed7aef81906ab8abe66f532adc85c5e86df9844119a1fc773c1ca  (freeze zip, 20 files)
+d6c801ba3b9260861b73056c1abaef97e04f367818471a6fa03cad4ae6104733  (current zip, 21 files: + OPERATING_RUNBOOK.md)
+```
+
+The runbook is operating procedure for the user (install, weekly
+checks, the ≥20-session verification checkpoint and the ≥60-session
+State-C threshold). It states the same five user-side blocked steps
+listed in §7 and the same classification. It contains no outcome,
+return or P&L content.
