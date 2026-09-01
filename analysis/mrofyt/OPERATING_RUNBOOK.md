@@ -84,6 +84,53 @@ is not a fault.
 
 ---
 
+## PHASE 0.5 — Smoke capture (ONE hour, do this before Phase 1)
+
+Do not go straight from "it compiles" to "leave it running for three
+months". A compile proves the code loads; it proves nothing about
+whether data actually arrives. One hour now prevents discovering an
+empty depth stream after 60 sessions.
+
+1. Attach to NQ and MNQ during **active hours** (RTH, 09:30–16:00 ET,
+   is ideal — you want real trade flow).
+2. Let it run for roughly an hour.
+3. **Check the depth file has content.** Open
+   `..._depth.csv` and confirm it has thousands of rows, not just a
+   header. This is the single most important check you will do:
+   - Rows present → your CME Level 2 entitlement is working.
+   - Header only → you are on Level 1. **Stop and fix the
+     subscription before capturing anything else**, because every
+     row of every session would otherwise be flagged
+     `DATA_SUPPRESSED` and fail the audit.
+4. Check `..._quality.csv` for `BOOK_READY`. If you see
+   `BOOK_RESYNC_START` but never `BOOK_READY`, the book is not
+   reaching the declared 10 levels — send me the file and I will
+   expose the depth level as a chart setting.
+5. **Stop cleanly**: remove the indicator from both charts. Wait a few
+   seconds and confirm a `..._manifest.json` appears for each run and
+   that no `.csv.partial` files are left behind.
+6. **Audit it** (this exercises blocked steps 2–3 in one go):
+
+```
+python3 -c "import sys; sys.path.insert(0,'2_Analysis_Engine'); \
+import mles_v12_audit as AU; \
+r=AU.audit_capture('<your capture folder>'); \
+print(r['ok'], r['failures'])"
+```
+
+Expect `True []`. Anything else — send me the exact codes before
+starting Phase 1. A one-hour batch that audits clean is strong
+evidence the pipeline is sound end to end.
+
+7. Optionally restart NinjaTrader and repeat steps 1–6 once. That
+   covers blocked step 4 (restart → finalize → audit) and proves
+   restarts mint clean, non-colliding runs.
+
+This hour is throwaway data. It is engineering validation, never a
+research sample.
+
+---
+
 ## PHASE 1 — Passive capture (weeks to months)
 
 Your job in this phase is almost nothing. Leave NinjaTrader running.

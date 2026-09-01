@@ -299,5 +299,27 @@ be29c36a62624ab5e18e67d104eb4e9323abcda4bf5faf1c88c54486fc446f4a  analysis/mrofy
 ```
 
 **Standing lesson: a stub compile is not an API validation.** Only the
-user-side F5 compile can confirm NT8 namespaces, and item 2 above is
-still unconfirmed until the next F5 run.
+user-side F5 compile can confirm NT8 namespaces.
+
+### Amendment A3 — F5 COMPILE PASSED (2026-09-01)
+
+The user re-ran the genuine NinjaTrader F5 compile on the corrected
+host: **zero errors.**
+
+This resolves the open inference in A2 item 2:
+`NinjaTrader.Cbi.ConnectionStatusEventArgs` is **CONFIRMED** correct,
+as is the `.ToString()` approach to the depth-operation enum.
+
+**§7 blocked-step 1 (real NinjaTrader F5 compilation) is now
+COMPLETE.** Steps 2–5 remain outstanding:
+
+2. Five-minute NQ + MNQ Market Replay smoke test — NOT RUN
+3. Stop → finalize → audit — NOT RUN
+4. Restart → finalize → audit — NOT RUN
+5. First genuine 18:00 ET rollover audit — NOT RUN
+
+What F5 proves: the host compiles against the real NT8 API. What it
+does NOT prove: that any market data is captured, that depth arrives,
+that rotation survives a live 18:00 ET roll, or anything whatsoever
+about expected value. Classification unchanged:
+**INSUFFICIENT_DATA — ZERO GENUINE RECORDED SESSIONS.**
