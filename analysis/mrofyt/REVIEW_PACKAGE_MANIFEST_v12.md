@@ -9,7 +9,7 @@ THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
 
 ```
 95b9380f2ff423c3d550083fb365da3ffce8b9ece72a0b437e3d7d6231405aef  src/MlesV12CaptureHost.cs
-2fa364b3350bece8c7cc86a6bd693118620f79a197748dfa1c454311f47396ff  analysis/mrofyt/MROF_V1_Engine_v12.zip (delivered artifact, 28 files, build 1.2.1; recorder inside byte-identical to src/MlesV12CaptureHost.cs — proved by tests T22. Supersedes freeze-time zip 3b2ec6b4… by the addition of OPERATING_RUNBOOK.md only — see MLES_CAPTURE_V12_FREEZE.md §9)
+2fa364b3350bece8c7cc86a6bd693118620f79a197748dfa1c454311f47396ff  analysis/mrofyt/MROF_V1_Engine_v12.zip (delivered artifact, 28 files, build 1.2.1; recorder inside byte-identical to src/MlesV12CaptureHost.cs — proved by tests T22. Supersedes freeze-time zip 3b2ec6b4… (20 files) — build 1.2.1 recorder, streaming auditor, outcome-blind runner, runbook; see MLES_CAPTURE_V12_FREEZE.md §9 and §11)
 dab3abec22e16255cd27d198200125c5cd6a44192e7ff07d53ce798c755dd63d  src/MlesV1CaptureHost.cs (immutable archive lineage — do not install)
 17a8c347d39e7187f81d7ca1fd6c7161440a8d1bfdc49823f23d1553c419815e  src/MlesV11CaptureHost.cs (immutable archive lineage — do not install)
 ```
