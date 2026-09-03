@@ -53,13 +53,28 @@ book readiness. Disconnects invalidate the book; reconnects increment
 `segId`, force a full resync to the declared depth, and every interval
 before `BOOK_READY` is flagged `DATA_SUPPRESSED`.
 
+## 3a. Build 1.2.1 (manifest-field repair; row schema unchanged)
+
+The first genuine sessions showed `maxBid/AskLevelSeen` being RESET on
+every reconnect (a run closed after a reconnect with a shallower book
+reported `0` beside 10.9M depth rows). Build 1.2.1 keeps those fields
+with their legacy meaning and adds run-lifetime `maxBidLevelRun` /
+`maxAskLevelRun` plus `recorderBuild`. Sessions captured by 1.2.0 stay
+valid: the auditor recognises both builds. To move to 1.2.1, paste the
+new `MlesV12CaptureHost.cs` over the old one, **F5**, then remove and
+re-add the indicator on both charts (a normal restart: the running run
+finalises cleanly and a new capture instance starts). Do it at the
+contract roll when both charts are being touched anyway.
+
 ## 4. Verify a session
 
 ```
-python3 -c "import sys; sys.path.insert(0,'2_Analysis_Engine');
-import mles_v12_audit as AU;
-r=AU.audit_capture('<capture folder>'); print(r['ok'], r['failures'])"
+python3 2_Analysis_Engine/mles_v12_audit.py "<capture folder>"
 ```
+
+Streaming (build 1.2.1): a 5 GB depth file audits in minutes at flat
+memory. The 1.2.0 auditor materialised every row and could not audit a
+real session.
 
 ## 5. User-side steps still blocked (NOT performed by Claude)
 

@@ -389,3 +389,99 @@ same session, `audit_capture` fails by design with
 Classification remains **INSUFFICIENT_DATA — ZERO GENUINE RECORDED
 SESSIONS**: a 2-minute fragment is not a session, and none of this
 speaks to expected value.
+
+---
+
+## 11. Amendment A5 — BUILD 1.2.1: three repairs exposed by the first genuine sessions
+
+Source of evidence: five manifests from live capture on 2026-09-01/02
+(two full 22:00Z→11:33Z runs, two 11:33Z→22:00Z runs, one 16:54Z→22:00Z
+run; 18:00 ET rotation R001→R002 inside one capture instance
+CONFIRMED; 100M+ events with gaps/duplicates/reversals/overflows/
+drops/write-errors all zero).
+
+### Defects and repairs
+
+1. **Recorder manifest field reset on reconnect.** `maxBid/AskLevelSeen`
+   were reset with the book on every reconnect, so a run that closed
+   after a reconnect with a shallower book reported `0/0` beside
+   10.9M depth rows (MNQ `f3e484fc-R002`). Build **1.2.1** keeps those
+   fields with their legacy meaning and adds run-lifetime
+   `maxBidLevelRun` / `maxAskLevelRun` and `recorderBuild`. Row schema
+   unchanged (`MLES-CAPTURE-1.2`). Proved by the new harness scenario
+   `lvlrun` (book to 3 levels → reconnect → rebuild to 2 → shutdown:
+   seen 2/2, run 3/3, `BOOK_READY` once).
+2. **Auditor could not audit a real session.** `parse_file` materialised
+   every row; a 5.2 GB / 25M-row depth file needs > 15 GB RAM. The
+   auditor is now ONE streaming pass over the eventSeq heap-merged
+   union of the four files (`iter_file` / `merge_run`, fast fixed-format
+   epoch path verified equal to `parse_iso` on every row). Instance seq
+   contiguity is reconciled from `(first, last, count, holes)` per run;
+   the level check is strict on 1.2.1 manifests and uses the only
+   valid inequality (observed ≥ post-reconnect value) on legacy ones;
+   a per-run recv−exch latency histogram (1 ms bins) is reported.
+3. **Pairing used the first run per instrument.** A mid-session restart
+   permanently reported zero NQ/MNQ overlap. Pairing now uses the union
+   coverage of every run per instrument (identical to 1.2.0 when there
+   is one run per side).
+
+Plus the Phase-2 tool that did not exist: **MROF-YT-RUNNER-1.2.1**, an
+outcome-blind streaming ingest runner (BBO / 10-level MBP book / tape /
+1-minute bars; frozen level hierarchy; 20-session `BaselineStore`;
+causal features where fully specified in frozen code; wall state
+machine; RVMR-V1 regime tag via streaming forms proven equal to
+`rvmr_spec`; frozen A1–A6 detectors on completed 10 s windows; A3 on
+the 2.5 s grid). `compute_outcomes()` is locked behind
+`research_unlocked()`. Two frozen inputs are NOT WIRED and passed as
+`None` so their detectors disqualify by design: `resid_tail_5pct`
+(A4 expected-response residual model) and `trend_dir` (A5 frozen
+multi-timeframe state). The ledger names them on every run.
+
+### Files (SHA-256 at freeze)
+
+```
+95b9380f2ff423c3d550083fb365da3ffce8b9ece72a0b437e3d7d6231405aef  src/MlesV12CaptureHost.cs           (build 1.2.1)
+be29c36a62624ab5e18e67d104eb4e9323abcda4bf5faf1c88c54486fc446f4a  analysis/mrofyt/nt8_stubs_v12.cs    (unchanged)
+ff2cb79e2ac64c80f84a4dce8ca6ee3c255b7137a21903e777774ab2db3dbeb7  analysis/mrofyt/mles_v12_harness.cs (+lvlrun)
+12ab264bb466bbf1f48943c95b65ae524d9a142a249c94c3337ca186a3d23861  analysis/mrofyt/mles_v12_adapter.py (streaming)
+b9188f4d6186bf9d4acf0c9185e86a2a4cc865a1c341732f56efbaef47100110  analysis/mrofyt/mles_v12_audit.py   (streaming)
+f8e20194dba22f02ea67b0b9b0dc3aab4be62f55c938e15c6f84f093cfb3fb2d  analysis/mrofyt/mles_v12_synth.py   (NEW, fixtures)
+b1086f7e2af17abb469c13efc2df3f4e332ade6d8840f2dbc2d8e7dcb579c6f2  analysis/mrofyt/mrofyt_runner.py    (NEW)
+a2b0ed03d4ea4e64e95dd879304f4414bde2665b7364ebf95f9172bc3a675dbf  analysis/mrofyt/tests_mles_v12.py   (37 tests)
+f8889e5c25bac9b5aae13231d6c4c0d8ce2535445ac2f2f34183832da7c9cff0  analysis/mrofyt/tests_mrofyt_runner.py (NEW, 11 tests)
+1635f0391449260d1a15c0780a54728523834f3df4505e755ad400d63a510812  analysis/mrofyt/RECORDER_DEPLOYMENT_V12.md
+65b2948c0b7877d70d71aa7a12cac2326d740ad9c0aa98d4f1b608e4f12e33a0  analysis/mrofyt/DATA_HANDOFF_V12.md
+1ef388e1347e47fd54186d29e45c94b22c785865147e039e98d4b52e4a340c14  analysis/mrofyt/OPERATING_RUNBOOK.md
+2fa364b3350bece8c7cc86a6bd693118620f79a197748dfa1c454311f47396ff  analysis/mrofyt/MROF_V1_Engine_v12.zip (28 files)
+```
+
+### Evidence (exact commands, unabridged counts)
+
+| Command (cwd analysis/mrofyt unless noted) | Result |
+|---|---|
+| `python3 tests_mles_v12.py` (mcs + mono harness incl. `lvlrun`; T23–T28 new) | **37/37** |
+| `python3 tests_mrofyt_runner.py` | **11/11** |
+| `python3 tests_mrofyt.py` … `tests_mrofyt_v01_5.py`, `tests_mles_v11.py` | 59/59 56/56 31/31 32/32 25/25 36/36 29/29 (unchanged) |
+| `python3 tests_mrof.py` (analysis/mrof) · `python3 tests_closure.py` (analysis/mofad) | 42/42 · 15/15 |
+| **Total** | **373/373** (33 lineage hashes re-verified) |
+| `mcs -warn:4 … nt8_stubs_v12.cs MlesV12CaptureHost.cs mles_v12_harness.cs` | exit 0 (one benign CS0649) |
+| `mono mles12_harness.exe` | exit 0; `HARNESS lvlrun runs=1`; all scenarios audit clean |
+| unzipped package: `2_Analysis_Engine/tests_mrofyt_runner.py` | 11/11 from the delivered tree |
+
+Measured on genuine data: the real MNQ run (45,314 events) audits in
+6.8 s at 2.1 MB Python peak (1.2.0: whole-file materialisation); adapter
+throughput ≈ 11 µs/row streaming (a 25M-row depth file ≈ 4.5 min);
+300k-row synthetic run audit < 40 MB peak; runner on 780k synthetic
+events 9.7 MB peak. Latency p50 for the real MNQ run: 259 ms recv−exch
+(clock-sync confound unresolved; recorded, not interpreted).
+
+### Blocked-step status
+
+1–5 of §7 complete (A3, A4). New user-side items from this amendment,
+NOT performed here: real NT8 **F5 compile of build 1.2.1**; **reinstall**
+(remove/re-add on both charts, scheduled for the contract roll); the
+**first 1.2.1 session audited** with `level_semantics = run`.
+
+Classification unchanged: **INSUFFICIENT_DATA — ZERO GENUINE RECORDED
+SESSIONS opened for outcomes.** Sessions now exist on disk; none has
+been, or can be, read for outcomes by any tool in this repository.

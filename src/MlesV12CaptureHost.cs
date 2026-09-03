@@ -72,6 +72,10 @@ namespace Mles.Capture.V12
     public sealed class MlesV12Core
     {
         public const string SchemaVersion = "MLES-CAPTURE-1.2";
+        // Row schema is unchanged (1.2). The build stamps manifests so
+        // sessions captured before/after a manifest-field repair stay
+        // distinguishable. 1.2.1: adds maxBid/AskLevelRun.
+        public const string RecorderBuild = "1.2.1";
         private const string TsFmt = "yyyy-MM-ddTHH:mm:ss.fffffffZ";
 
         private readonly string dir, instrument, captureInstanceId;
@@ -119,7 +123,12 @@ namespace Mles.Capture.V12
             public double BidPx = double.NaN, BidSz = double.NaN,
                           AskPx = double.NaN, AskSz = double.NaN;
             public bool Connected = true, BookReady;
+            // post-reconnect maxima: RESET on every reconnect because
+            // they gate BOOK_READY for the resynchronised book
             public int MaxBidLvl = -1, MaxAskLvl = -1;
+            // run-lifetime maxima: NEVER reset inside a run (build 1.2.1;
+            // the field a real session exposed as missing)
+            public int RunMaxBidLvl = -1, RunMaxAskLvl = -1;
         }
 
         private sealed class ClosedRun
@@ -508,11 +517,13 @@ namespace Mles.Capture.V12
             {
                 run.DepthBid++;
                 if (ev.Level > run.MaxBidLvl) run.MaxBidLvl = ev.Level;
+                if (ev.Level > run.RunMaxBidLvl) run.RunMaxBidLvl = ev.Level;
             }
             else
             {
                 run.DepthAsk++;
                 if (ev.Level > run.MaxAskLvl) run.MaxAskLvl = ev.Level;
+                if (ev.Level > run.RunMaxAskLvl) run.RunMaxAskLvl = ev.Level;
             }
             if (ev.Action == "ADD") run.DepthAdd++;
             else if (ev.Action == "UPDATE") run.DepthUpd++;
@@ -691,8 +702,14 @@ namespace Mles.Capture.V12
             sb.Append(" \"reconnects\": " + r.NReconnect + ",\n");
             sb.Append(" \"crossed\": " + r.NCrossed + ",\n");
             sb.Append(" \"bookResets\": " + r.NBookReset + ",\n");
+            // LEGACY SEMANTICS, kept for continuity with sessions captured
+            // by build 1.2.0: maxima SINCE THE LAST RECONNECT (they are
+            // reset with the book). Run-lifetime maxima follow.
             sb.Append(" \"maxBidLevelSeen\": " + (r.MaxBidLvl + 1) + ",\n");
             sb.Append(" \"maxAskLevelSeen\": " + (r.MaxAskLvl + 1) + ",\n");
+            sb.Append(" \"maxBidLevelRun\": " + (r.RunMaxBidLvl + 1) + ",\n");
+            sb.Append(" \"maxAskLevelRun\": " + (r.RunMaxAskLvl + 1) + ",\n");
+            sb.Append(" \"recorderBuild\": \"" + RecorderBuild + "\",\n");
             sb.Append(" \"depthBid\": " + r.DepthBid + ",\n");
             sb.Append(" \"depthAsk\": " + r.DepthAsk + ",\n");
             sb.Append(" \"depthAdd\": " + r.DepthAdd + ",\n");

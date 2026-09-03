@@ -205,6 +205,38 @@ public static class MlesV12Harness
             Report("disco", "runs=" + c.RunsFinalized);
         }
 
+        // ---- lvlrun: run-lifetime depth maxima survive a reconnect ---
+        // (build 1.2.1 repair: a real session closed after a reconnect
+        // with a shallower book and reported maxBidLevelSeen=0 beside
+        // 10.9M depth rows). Book reaches 3 levels, reconnect, rebuild
+        // to only 2 levels, shutdown: post-reconnect field = 2, run
+        // field = 3, BOOK_READY fires exactly once.
+        {
+            var c = new MlesV12Core(Dir(root, "lvlrun"), "NQ",
+                                    250000, 3, 0.05, 0.5);
+            c.Start();
+            string s = "20260901", k = "NQ 12-26";
+            DateTime ex = DateTime.UtcNow;
+            for (int l = 0; l < 3; l++)
+            {
+                c.OnDepth(s, k, "ADD", "BID", l, 15000 - 0.25 * l, 10, ex);
+                c.OnDepth(s, k, "ADD", "ASK", l, 15000.25 + 0.25 * l, 9, ex);
+            }
+            c.OnTrade(s, k, 15000.25, 1, ex);
+            c.OnConnection(s, k, "DISCONNECTED", "DISCONNECTED");
+            c.OnConnection(s, k, "CONNECTED", "CONNECTED");
+            for (int l = 0; l < 2; l++)                // shallower rebuild
+            {
+                c.OnDepth(s, k, "ADD", "BID", l, 15000 - 0.25 * l, 10, ex);
+                c.OnDepth(s, k, "ADD", "ASK", l, 15000.25 + 0.25 * l, 9, ex);
+            }
+            c.OnDepth(s, k, "UPDATE", "BID", 0, 15000.0, 8, ex);
+            c.OnDepth(s, k, "REMOVE", "ASK", 1, 15000.50, 0, ex);
+            c.OnTrade(s, k, 15000.25, 1, ex);
+            c.Shutdown();
+            Report("lvlrun", "runs=" + c.RunsFinalized);
+        }
+
         // ---- NQ + MNQ paired capture for overlap auditing -----------
         {
             string d = Dir(root, "pair");

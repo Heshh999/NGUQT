@@ -174,11 +174,11 @@ t('T3: contract roll isolates both contracts (two clean runs, one '
   ['NQ 03-27', 'NQ 12-26'])
 
 conc = runs_of('conc')
-seqs = conc[0]['info']['event_seqs']
+ci = conc[0]['info']
 t('T7: concurrent randomized producers preserve assignment order - '
   'clean audit, gapless 1..N union',
-  len(conc) == 1 and conc[0]['ok'] and seqs[0] == 1 and
-  seqs == list(range(1, len(seqs) + 1)))
+  len(conc) == 1 and conc[0]['ok'] and ci['seq_first'] == 1 and
+  ci['seq_count'] == ci['seq_last'] and not ci['seq_holes'])
 mkt_rows = sum(conc[0]['manifest'][s]['rows']
                for s in ('quotes', 'trades', 'depth'))
 t('T7b: all 2400 produced + 14 preamble market events written',
@@ -315,6 +315,97 @@ t('T20: collision manifests ARE discovered and audited (duplicate '
   len(AU.discover_manifests(os.path.join(H, 'pair'))) + 1 and
   'RESTART_COLLISION' in {c for c, _ in cap4['failures']} and
   not glob.glob(os.path.join(H, '*', '*.json.collision-*')))
+
+# ---- build 1.2.1 repairs (exposed by the first genuine sessions) ----
+# 23: run-lifetime depth maxima survive a reconnect
+lv = runs_of('lvlrun')[0]
+lvm = lv['manifest']
+t('T23: run-lifetime depth maxima survive a reconnect (seen 2/2 post-'
+  'reconnect, run 3/3, build 1.2.1, BOOK_READY once, audit clean)',
+  lv['ok'] and lvm.get('recorderBuild') == '1.2.1' and
+  lvm['maxBidLevelSeen'] == 2 and lvm['maxAskLevelSeen'] == 2 and
+  lvm['maxBidLevelRun'] == 3 and lvm['maxAskLevelRun'] == 3 and
+  lv['info']['level_semantics'] == 'run' and
+  lv['info']['book_ready'] == 1 and lv['info']['depth_max_bid_obs'] == 3)
+
+# 24: legacy 1.2.0 manifests are judged by the only inequality that
+# holds (observed >= post-reconnect value); 1.2.1 fields stay strict
+res24 = []
+for seen, expect in ((2, True), (3, True), (5, False)):
+    d24 = os.path.join(WORK, 'legacy%d' % seen)
+    shutil.copytree(os.path.join(H, 'lvlrun'), d24)
+    mp = AU.discover_manifests(d24)[0]
+    m24 = json.load(open(mp))
+    for k in ('maxBidLevelRun', 'maxAskLevelRun', 'recorderBuild'):
+        m24.pop(k, None)
+    m24['maxBidLevelSeen'] = m24['maxAskLevelSeen'] = seen
+    json.dump(m24, open(mp, 'w'))
+    r24 = AU.audit_run(mp)
+    res24.append(r24['ok'] == expect and
+                 r24['info']['level_semantics'] == 'legacy_post_reconnect')
+d24 = os.path.join(WORK, 'strict')
+shutil.copytree(os.path.join(H, 'lvlrun'), d24)
+mp = AU.discover_manifests(d24)[0]
+m24 = json.load(open(mp))
+m24['maxBidLevelRun'] = 9
+json.dump(m24, open(mp, 'w'))
+r24 = AU.audit_run(mp)
+t('T24: legacy manifests tolerated (observed >= post-reconnect) and '
+  'rejected when observed < claimed; 1.2.1 run field checked strictly',
+  all(res24) and not r24['ok'] and
+  'DEPTH_LEVEL_MISMATCH' in {c for c, _ in r24['failures']})
+
+# 25: instance contiguity from (first, last, count, holes) - no seq list
+R1 = dict(seq_first=1, seq_last=608, seq_count=605, seq_holes=[605, 606, 607])
+R2 = dict(seq_first=605, seq_last=1000, seq_count=395, seq_holes=[608])
+R2g = dict(seq_first=605, seq_last=1000, seq_count=394, seq_holes=[608, 700])
+R2d = dict(seq_first=600, seq_last=1000, seq_count=401, seq_holes=[])
+t('T25: rotation interleave reconciles across runs; a genuine gap and a '
+  'cross-run duplicate both fail (no per-seq list kept)',
+  AU.instance_seq_contiguous([R1, R2])[0] and
+  not AU.instance_seq_contiguous([R1, R2g])[0] and
+  not AU.instance_seq_contiguous([R1, R2d])[0] and
+  'event_seqs' not in conc[0]['info'])
+
+# 26: pairing over union coverage - a mid-session restart no longer
+# reports zero overlap
+import datetime as _dt  # noqa: E402
+_T = lambda h, m=0: _dt.datetime(2026, 9, 2, h, m, tzinfo=_dt.timezone.utc)
+_mk = lambda i, a, b: dict(ok=True, failures=[], info=dict(
+    instrument=i, session='20260902', first_recv=a, last_recv=b))
+f26, o26 = AU.pair_sessions([_mk('NQ', _T(0), _T(11, 30)),
+                             _mk('NQ', _T(11, 34), _T(22)),
+                             _mk('MNQ', _T(0), _T(22))])
+f26b, _ = AU.pair_sessions([_mk('NQ', _T(0), _T(2)), _mk('MNQ', _T(12), _T(22))])
+t('T26: NQ/MNQ pairing uses the union of each instrument\'s runs '
+  '(restart -> overlap 0.99+), disjoint windows still fail',
+  not f26 and o26['20260902']['overlap_frac'] > 0.99 and
+  o26['20260902']['nq_runs'] == 2 and
+  [c for c, _ in f26b] == ['NQ_MNQ_INSUFFICIENT_OVERLAP'])
+
+
+# 27: streaming audit of a session-shaped run stays flat in memory
+from mles_v12_synth import synth_run  # noqa: E402
+
+
+import tracemalloc  # noqa: E402
+mp27 = synth_run(os.path.join(WORK, 'synth'), 300000)
+tracemalloc.start()
+r27 = AU.audit_run(mp27)
+_, peak27 = tracemalloc.get_traced_memory()
+tracemalloc.stop()
+t('T27: streaming audit of a 300k-depth-row synthetic run is clean with '
+  'Python peak allocation < 40 MB (1.2.0 materialised every row)',
+  r27['ok'] and r27['info']['events'] > 300000 and peak27 < 40e6 and
+  not r27['info']['seq_holes'])
+
+# 28: recv-exch latency is summarised from a fixed 1 ms histogram
+pr = runs_of('pair')[0]['info']
+t('T28: per-run recv-exch latency summary present (p50/p95/n) without '
+  'storing per-event values',
+  isinstance(pr.get('latency_ms'), dict) and
+  all(k in pr['latency_ms'] for k in ('p50', 'p95', 'n')) and
+  pr['latency_ms']['n'] > 0)
 
 # 21: deployment documents name only v1.2 as the install target
 docs = ''

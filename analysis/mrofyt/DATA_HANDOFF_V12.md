@@ -16,11 +16,18 @@ recorder's bytes exactly. `.csv.partial` files are never sent: a
 partial next to no manifest means the run did not close cleanly; send
 the `_RECOVERY.json` artifact instead if one exists.
 
-## 2. Intake (manifest-authoritative)
+## 2. Intake (manifest-authoritative, streaming)
 
 ```
-python3 analysis/mrofyt/mles_v12_audit.py   # via audit_capture(<dir>)
+python3 2_Analysis_Engine/mles_v12_audit.py "<capture folder>"
+python3 2_Analysis_Engine/mrofyt_runner.py "<capture folder>" --out ledger.json
 ```
+
+Both stream: a full-session 5 GB depth file is processed at flat
+memory. What moves to research is the audit summary, the manifests and
+the runner's ledger (all KB); raw CSVs never move. The runner is
+outcome-blind (no fill/stop/target/R/P&L; `--outcomes` raises
+`STATE-C LOCKED`).
 
 `audit_capture` verifies every hash/byte/row count, identity on every
 row, sequence monotonicity, per-run counter resets, segment ranges,

@@ -167,20 +167,43 @@ Your job in this phase is almost nothing. Leave NinjaTrader running.
 This is a verification checkpoint, **not** a strategy test. No market
 outcome, return or P&L is computed or looked at.
 
-### The audit command
+### The audit command (streaming — safe on 5 GB files)
 
 Open a terminal in the unzipped `MROF_V1_Engine` folder:
 
 ```
-python3 -c "import sys; sys.path.insert(0,'2_Analysis_Engine'); \
-import mles_v12_audit as AU; \
-r=AU.audit_capture('<your capture folder>'); \
-print(r['ok'], r['failures'])"
+python3 2_Analysis_Engine/mles_v12_audit.py "<your capture folder>"
 ```
 
-- `True []` → the batch is clean.
-- `False [...]` → send me the exact failure codes. The batch is
+It streams every file (about 4–5 minutes per full-session depth file,
+flat memory) and prints one line per run plus the NQ/MNQ pairing:
+
+- `audit ok=True failures=0` → the batch is clean.
+- any `FAIL <CODE>` line → send me the exact codes. The batch is
   quarantined; files are never repaired in place.
+
+Restarts inside a session are fine: pairing uses the union of every
+run, and sequence continuity is reconciled across the runs of one
+capture instance.
+
+### The pipeline-verification runner (outcome-blind)
+
+```
+python3 2_Analysis_Engine/mrofyt_runner.py "<your capture folder>" --out ledger.json
+```
+
+Streams the same files, reconstructs BBO / book / tape / 1-minute bars,
+builds the frozen level hierarchy and 20-session baselines, and
+evaluates the six frozen detectors on completed 10-second windows. It
+prints a compact summary (approaches, windows, wall states, which
+features are still `None`, RVMR regime, latency) and writes a small
+`ledger.json`. Send me the summary text and the ledger — a few KB.
+
+It computes **no outcome**: no fill, stop, target, R or P&L exists in
+it, and `--outcomes` raises `STATE-C LOCKED` until the readiness
+freeze. Two frozen inputs it cannot construct from frozen code are
+passed as `None` and named in the output (`resid_tail_5pct`,
+`trend_dir`); their detectors disqualify by design.
 
 ### What you send me
 
