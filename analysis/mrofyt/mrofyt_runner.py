@@ -103,7 +103,9 @@ _dst_cache = {}
 
 def et_offset(epoch):
     """Seconds to ADD to UTC epoch to get US Eastern local time."""
-    year = _dt.datetime.utcfromtimestamp(epoch).year
+    # timezone-aware: utcfromtimestamp is deprecated in 3.12+ and warns
+    # on every call, which floods a long run's output
+    year = _dt.datetime.fromtimestamp(epoch, _dt.timezone.utc).year
     w = _dst_cache.get(year)
     if w is None:
         w = _dst_cache[year] = _dst_window(year)

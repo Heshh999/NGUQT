@@ -28,8 +28,9 @@ def _sha(path):
 
 def _iso(t):
     s = int(t)
-    return '%s.%07dZ' % (_dt.datetime.utcfromtimestamp(s).strftime(
-        '%Y-%m-%dT%H:%M:%S'), int(round((t - s) * 1e7)))
+    return '%s.%07dZ' % (_dt.datetime.fromtimestamp(
+        s, _dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S'),
+        int(round((t - s) * 1e7)))
 
 
 def synth_run(d, n_depth=300000, instrument='NQ', session='20260902',

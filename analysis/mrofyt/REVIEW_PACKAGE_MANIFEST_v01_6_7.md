@@ -25,7 +25,7 @@ Modified (one file, additively — a skip path, an observation hook and a
 run-id field):
 
 ```
-8332ca65df963d02e6d27786e9569d04590330bb5e8c71f16a369dab2fd359a2  mrofyt_runner.py
+3a765f3c304b0c23c5efbaaf3aaead7b66d6b67aaa385dbe9bb153d34f28bfc4  mrofyt_runner.py
 ```
 
 Archived source directive:

@@ -34,8 +34,8 @@ a2b0ed03d4ea4e64e95dd879304f4414bde2665b7364ebf95f9172bc3a675dbf  analysis/mrofy
 15c3ef12b43cb0e059eb317da9c7ddd976971965009252aaa4357cc7a6195361  analysis/mrofyt/SETUP_WALKTHROUGH_V12.md
 cf42022369fe3133c2725d8a8e10c69914d889945c0b99d2da280e1a46315f2c  analysis/mrofyt/OPERATING_RUNBOOK.md (supersedes 1ef388e1… — status header updated once genuine sessions existed; points to NT8_RECORDING_RUNBOOK.md)
 964cdc661df578e6681d36fdef335366a56013efa7cd0d9f857a3cfa60b5a0e9  analysis/mrofyt/NT8_RECORDING_RUNBOOK.md (beginner-readable NT8 procedure)
-f8e20194dba22f02ea67b0b9b0dc3aab4be62f55c938e15c6f84f093cfb3fb2d  analysis/mrofyt/mles_v12_synth.py (build 1.2.1 fixtures)
-8332ca65df963d02e6d27786e9569d04590330bb5e8c71f16a369dab2fd359a2  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
+8df2f02245d51c95a48236e55511490aad0cd1edd676ce1c3db50c0868bf1180  analysis/mrofyt/mles_v12_synth.py (build 1.2.1 fixtures; supersedes f8e20194… — timezone-aware timestamp)
+3a765f3c304b0c23c5efbaaf3aaead7b66d6b67aaa385dbe9bb153d34f28bfc4  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
 f8889e5c25bac9b5aae13231d6c4c0d8ce2535445ac2f2f34183832da7c9cff0  analysis/mrofyt/tests_mrofyt_runner.py (11 tests)
 ```
 
