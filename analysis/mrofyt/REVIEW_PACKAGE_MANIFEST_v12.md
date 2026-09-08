@@ -34,7 +34,7 @@ a2b0ed03d4ea4e64e95dd879304f4414bde2665b7364ebf95f9172bc3a675dbf  analysis/mrofy
 15c3ef12b43cb0e059eb317da9c7ddd976971965009252aaa4357cc7a6195361  analysis/mrofyt/SETUP_WALKTHROUGH_V12.md
 1ef388e1347e47fd54186d29e45c94b22c785865147e039e98d4b52e4a340c14  analysis/mrofyt/OPERATING_RUNBOOK.md
 f8e20194dba22f02ea67b0b9b0dc3aab4be62f55c938e15c6f84f093cfb3fb2d  analysis/mrofyt/mles_v12_synth.py (build 1.2.1 fixtures)
-b1086f7e2af17abb469c13efc2df3f4e332ade6d8840f2dbc2d8e7dcb579c6f2  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1)
+8332ca65df963d02e6d27786e9569d04590330bb5e8c71f16a369dab2fd359a2  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
 f8889e5c25bac9b5aae13231d6c4c0d8ce2535445ac2f2f34183832da7c9cff0  analysis/mrofyt/tests_mrofyt_runner.py (11 tests)
 ```
 
