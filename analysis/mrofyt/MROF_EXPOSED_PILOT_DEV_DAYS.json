@@ -1,0 +1,36 @@
+{
+ "label": "EXPOSED_PILOT_DEV",
+ "rule": "These days may remain in later DEV/training where the governing protocol permits. They can never become untouched prospective validation.",
+ "exposed_days": [
+  {
+   "session": "20260901",
+   "label": "EXPOSED_PILOT_DEV",
+   "exposed_by": "MROF-YT-PILOT-1.0",
+   "bulk_csv_present": true
+  },
+  {
+   "session": "20260902",
+   "label": "EXPOSED_PILOT_DEV",
+   "exposed_by": "MROF-YT-PILOT-1.0",
+   "bulk_csv_present": false
+  },
+  {
+   "session": "20260903",
+   "label": "EXPOSED_PILOT_DEV",
+   "exposed_by": "MROF-YT-PILOT-1.0",
+   "bulk_csv_present": false
+  },
+  {
+   "session": "20260904",
+   "label": "EXPOSED_PILOT_DEV",
+   "exposed_by": "MROF-YT-PILOT-1.0",
+   "bulk_csv_present": false
+  },
+  {
+   "session": "20260905",
+   "label": "EXPOSED_PILOT_DEV",
+   "exposed_by": "MROF-YT-PILOT-1.0",
+   "bulk_csv_present": false
+  }
+ ]
+}

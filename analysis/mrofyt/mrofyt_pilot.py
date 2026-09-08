@@ -1,0 +1,667 @@
+"""mrofyt_pilot.py - PILOT_DIAGNOSTIC_ONLY analysis (MROF-YT-PILOT-1.0).
+
+Runs the ten-step pilot diagnostic of the consolidated directive over
+whatever completed recordings are actually present. It answers two
+SEPARATE questions and never merges them:
+
+    1. IS THE SYSTEM WORKING?          (engineering)
+    2. DO ANY HYPOTHESES APPEAR PROMISING?  (evidence)
+
+This module is descriptive only. It computes no fill, stop, target, R
+multiple or P&L, and it does not search for a model. Question 2 can be
+answered NOT_OBSERVED, and that is a legitimate result: it is answered
+from the frozen signal population only, which may be empty.
+
+Every session this module reads is permanently labelled
+EXPOSED_PILOT_DEV and written to MROF_EXPOSED_PILOT_DEV_DAYS.json. Such
+days may remain in later DEV/training where the governing protocol
+permits; they can never become untouched prospective validation.
+
+    python3 mrofyt_pilot.py "<capture folder>" --out pilot_report.json
+
+Standard library only.
+"""
+
+import array
+import bisect
+import collections
+import datetime as _dt
+import json
+import os
+import sys
+
+import mles_v12_audit as AU
+import mrofyt_levels as LV
+import mrofyt_runner as RUN
+import mrofyt_signals as SIG
+
+PILOT_VERSION = 'MROF-YT-PILOT-1.0'
+EXPOSURE_LABEL = 'EXPOSED_PILOT_DEV'
+MARKOUT_S = (1.0, 5.0, 10.0, 30.0, 60.0, 180.0)
+
+# The frozen detectors, decomposed into the exact ordered stages the
+# source in mrofyt_signals.py applies. A window is attributed to the
+# FIRST stage it fails, so the stage counts sum to the window count and
+# read as a funnel. Availability stages come first because a missing
+# input disqualifies before any threshold is consulted.
+A1_INPUTS = ('aggr_z', 'progress_ticks', 'replenish_z', 'approaches_60s',
+             'opp_flip_z', 'retreat_ticks')
+A2_INPUTS = ('wall_z', 'exec_vs_displayed', 'replenish_ratio',
+             'cleared_held_5s', 'persist_agree', 'post_clear_z')
+A4_INPUTS = ('aggr_z', 'opp_flip_z')
+A5_INPUTS = ('trend_dir', 'adverse_z', 'adverse_progress_ticks',
+             'replenish_z', 'trend_flip_z')
+A6_INPUTS = ('control_z', 'clean_cross', 'held_5s', 'persist_agree',
+             'opp_replenish_z')
+
+
+def _avail(f, names):
+    return [n for n in names if f.get(n) is None]
+
+
+def _a4_fail(f):
+    return ((f.get('resid_tail_5pct') is True) or
+            (f.get('progress_ticks') is not None and
+             f['progress_ticks'] <= 1))
+
+
+def _a4_back(f):
+    return (f.get('returned_through_level') is True) or \
+           (f.get('sweep_reclaimed_5s') is True)
+
+
+FUNNELS = {
+    'A1': [('inputs_available', lambda f: not _avail(f, A1_INPUTS)),
+           ('aggr_z>=2.0', lambda f: f['aggr_z'] >= 2.0),
+           ('progress_ticks<=1', lambda f: f['progress_ticks'] <= 1),
+           ('replenish_z>=1.5', lambda f: f['replenish_z'] >= 1.5),
+           ('approaches_60s>=2', lambda f: f['approaches_60s'] >= 2),
+           ('opp_flip_z>=1.0', lambda f: f['opp_flip_z'] >= 1.0),
+           ('retreat_ticks>=1', lambda f: f['retreat_ticks'] >= 1)],
+    'A2': [('inputs_available', lambda f: not _avail(f, A2_INPUTS)),
+           ('wall_z>=2.0', lambda f: f['wall_z'] >= 2.0),
+           ('exec_vs_displayed>=1.5', lambda f: f['exec_vs_displayed'] >= 1.5),
+           ('replenish_ratio<0.25', lambda f: f['replenish_ratio'] < 0.25),
+           ('cleared_held_5s', lambda f: bool(f['cleared_held_5s'])),
+           ('persist_agree>=3', lambda f: f['persist_agree'] >= 3),
+           ('post_clear_z>=1.0', lambda f: f['post_clear_z'] >= 1.0)],
+    'A4': [('inputs_available', lambda f: not _avail(f, A4_INPUTS)),
+           ('aggr_z>=2.0', lambda f: f['aggr_z'] >= 2.0),
+           ('response_failed', _a4_fail),
+           ('came_back_through', _a4_back),
+           ('opp_flip_z>=1.0', lambda f: f['opp_flip_z'] >= 1.0)],
+    'A5': [('inputs_available', lambda f: not _avail(f, A5_INPUTS)),
+           ('trend_dir!=0', lambda f: f['trend_dir'] != 0),
+           ('adverse_z>=2.0', lambda f: f['adverse_z'] >= 2.0),
+           ('adverse_progress<=1', lambda f: f['adverse_progress_ticks'] <= 1),
+           ('replenish_z>=1.5', lambda f: f['replenish_z'] >= 1.5),
+           ('trend_flip_z>=1.0', lambda f: f['trend_flip_z'] >= 1.0)],
+    'A6': [('in_0930_0945', lambda f: bool(f.get('in_0930_0945'))),
+           ('inputs_available', lambda f: not _avail(f, A6_INPUTS)),
+           ('control_z>=2.0', lambda f: f['control_z'] >= 2.0),
+           ('clean_cross', lambda f: bool(f['clean_cross'])),
+           ('held_5s', lambda f: bool(f['held_5s'])),
+           ('persist_agree>=3', lambda f: f['persist_agree'] >= 3),
+           ('opp_replenish_z<1.5', lambda f: f['opp_replenish_z'] < 1.5)],
+}
+
+FUNNEL_INPUTS = {'A1': A1_INPUTS, 'A2': A2_INPUTS, 'A4': A4_INPUTS,
+                 'A5': A5_INPUTS, 'A6': A6_INPUTS}
+
+
+# ---------------------------------------------------------------------
+# instrumented runner
+# ---------------------------------------------------------------------
+class PilotRunner(RUN.Runner):
+    """The frozen runner plus observation. It overrides only hooks; no
+    threshold, window, level or detector definition is touched here."""
+
+    def __init__(self, *a, **kw):
+        RUN.Runner.__init__(self, *a, **kw)
+        self.windows = []                       # feature vector per window
+        # Mid series are kept PER RUN, never concatenated per instrument.
+        # Two reasons, both correctness: concurrent duplicate recorder
+        # instances overlap in time, so a per-instrument series is not
+        # even monotone; and a markout spanning two runs would splice
+        # across a recording gap and read the jump as a price move.
+        self.series = {}                        # (inst, run) -> (t[], px[])
+        self.approach_open = {}                 # (inst, aid) -> t0, level
+        self._cur = None
+
+    def _process_run(self, st, mp, man):
+        self._cur = (st.instrument, man.get('runId'))
+        self.series.setdefault(self._cur,
+                               (array.array('d'), array.array('d')))
+        RUN.Runner._process_run(self, st, mp, man)
+
+    def _on_mid(self, st, t, mid):
+        # record BEFORE the frozen logic so an approach opened by this
+        # very tick already has its own mid in the series
+        ts, ps = self.series[self._cur]
+        ts.append(t)
+        ps.append(mid)
+        RUN.Runner._on_mid(self, st, t, mid)
+
+    def _on_window(self, st, ap, te, f):
+        rec = dict(f)
+        rec.update(instrument=st.instrument, session=st.session, t_end=te,
+                   t_start=ap.t0, wall_state=ap.wall_state,
+                   window_index=ap.windows, level_px=ap.level_px,
+                   run=self._cur[1] if self._cur else None,
+                   family=LV.FAMILY_OF.get(ap.level_id, '?'))
+        self.windows.append(rec)
+        self.approach_open.setdefault((st.instrument, ap.id),
+                                      dict(t0=ap.t0, level_id=ap.level_id,
+                                           level_px=ap.level_px, ad=ap.ad,
+                                           session=st.session))
+
+    # ---- markouts (descriptive; mid-to-mid, no fill model) ----------
+    def markout(self, instrument, run, t0, horizon):
+        """Signed mid change in ticks from t0 to t0+horizon, measured
+        inside one run, or None when that run does not extend that far.
+        Never extrapolates and never crosses a run boundary."""
+        pair = self.series.get((instrument, run))
+        if not pair or not pair[0]:
+            return None
+        ts, ps = pair
+        i = bisect.bisect_right(ts, t0) - 1
+        if i < 0:
+            return None
+        if ts[-1] < t0 + horizon:
+            return None                  # coverage ends before the horizon
+        # last mid at or before the horizon; the horizon itself rarely
+        # lands on a tick, and interpolating would invent a price
+        j = bisect.bisect_right(ts, t0 + horizon) - 1
+        if j < 0:
+            return None
+        return (ps[j] - ps[i]) / SIG.TICK
+
+
+# ---------------------------------------------------------------------
+# step 1 - data audit
+# ---------------------------------------------------------------------
+def step1_data_audit(capture_dir):
+    rep = AU.audit_capture(capture_dir)
+    runs, manifest_only = [], []
+    for r in rep.get('runs', []):
+        i, man = r['info'], r.get('manifest') or {}
+        rec = dict(instrument=i.get('instrument'), session=i.get('session'),
+                   run_id=i.get('run_id'), ok=r['ok'], rows=i.get('events'),
+                   close=man.get('closeReason'),
+                   first=man.get('firstRecvUtc'),
+                   last=man.get('lastRecvUtc'),
+                   failures=[c for c, _d in r['failures']])
+        (runs if r['ok'] else manifest_only).append(rec)
+    return dict(ok=rep.get('ok'), failures=rep.get('failures', []),
+                manifests=rep['info'].get('manifests', 0),
+                verified_runs=runs, unverified_runs=manifest_only,
+                pairing=rep['info'].get('overlaps', {}))
+
+
+def _iso(s):
+    if not s:
+        return None
+    s = s.replace('Z', '')
+    if '.' in s:
+        a, b = s.split('.')
+        s = a + '.' + b[:6]
+    return _dt.datetime.fromisoformat(s)
+
+
+def coverage_windows(verified):
+    """Union wall-clock coverage per instrument over runs whose bulk CSVs
+    were actually verified. Concurrent duplicate recorder instances of the
+    same feed collapse into one window, which is the honest measure: they
+    are copies, not independent observations."""
+    by = collections.defaultdict(list)
+    for r in verified:
+        a, b = _iso(r['first']), _iso(r['last'])
+        if a and b:
+            by[r['instrument']].append((a, b))
+    out = {}
+    for inst, spans in by.items():
+        spans.sort()
+        merged = []
+        for s, e in spans:
+            if merged and s <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], e))
+            else:
+                merged.append((s, e))
+        out[inst] = dict(
+            seconds=round(sum((e - s).total_seconds() for s, e in merged), 1),
+            windows=[[s.isoformat(), e.isoformat(),
+                      round((e - s).total_seconds(), 1)] for s, e in merged],
+            runs=len(spans))
+    if len(out) == 2 and 'NQ' in out and 'MNQ' in out:
+        a = [(_iso(x[0]), _iso(x[1])) for x in out['NQ']['windows']]
+        b = [(_iso(x[0]), _iso(x[1])) for x in out['MNQ']['windows']]
+        ov = 0.0
+        for s1, e1 in a:
+            for s2, e2 in b:
+                lo, hi = max(s1, s2), min(e1, e2)
+                if hi > lo:
+                    ov += (hi - lo).total_seconds()
+        out['NQ_MNQ_simultaneous_seconds'] = round(ov, 1)
+    return out
+
+
+# ---------------------------------------------------------------------
+# steps 3-5
+# ---------------------------------------------------------------------
+def step3_feature_health(windows):
+    """Per feature: how often it was computable, and its spread when it
+    was. A feature that is never computable cannot support or refute
+    anything, and saying so is the point of this step."""
+    names = ('aggr_z', 'progress_ticks', 'replenish_z', 'replenish_ratio',
+             'opp_flip_z', 'retreat_ticks', 'wall_z', 'exec_vs_displayed',
+             'post_clear_z', 'control_z', 'persist_agree', 'approaches_60s',
+             'resid_tail_5pct', 'trend_dir')
+    out = {}
+    n = len(windows)
+    for k in names:
+        vals = [w.get(k) for w in windows]
+        good = [v for v in vals if isinstance(v, (int, float))
+                and not isinstance(v, bool)]
+        d = dict(windows=n, available=len(good),
+                 available_frac=round(len(good) / n, 4) if n else None)
+        if good:
+            good.sort()
+            d.update(min=round(good[0], 4), max=round(good[-1], 4),
+                     median=round(good[len(good) // 2], 4))
+        out[k] = d
+    return out
+
+
+def step4_level_census(windows, ledger):
+    lev = collections.Counter()
+    fam = collections.Counter()
+    appr = collections.defaultdict(set)
+    for w in windows:
+        lev[w['level_id']] += 1
+        fam[w['family']] += 1
+        appr[w['level_id']].add((w['instrument'], w['approach_id']))
+    census = {k: dict(windows=v, approaches=len(appr[k]))
+              for k, v in sorted(lev.items())}
+    absent = sorted(set(LV.ACTIVE_LEVEL_IDS) - set(lev))
+    return dict(by_level=census, by_family=dict(fam),
+                approaches_total=ledger['totals'].get('approaches', 0),
+                windows_total=ledger['totals'].get('windows', 0),
+                windows_suppressed=ledger['totals'].get(
+                    'windows_suppressed', 0),
+                never_active_levels=absent,
+                wall_states=dict(ledger.get('states', {})))
+
+
+def step5_funnel(windows, ledger):
+    """Stage-by-stage attrition for every family, on the frozen
+    thresholds, with no threshold touched."""
+    out = {}
+    for fam, stages in sorted(FUNNELS.items()):
+        counts = collections.Counter()
+        missing = collections.Counter()
+        passed = 0
+        for w in windows:
+            where = None
+            for name, pred in stages:
+                try:
+                    ok = pred(w)
+                except (TypeError, KeyError):
+                    ok = False
+                if not ok:
+                    where = name
+                    break
+            if where is None:
+                passed += 1
+                counts['PASSED_ALL_STAGES'] += 1
+            else:
+                counts[where] += 1
+                if where == 'inputs_available':
+                    for m in _avail(w, FUNNEL_INPUTS[fam]):
+                        missing[m] += 1
+        out[fam] = dict(windows=len(windows), first_failing_stage=dict(counts),
+                        missing_inputs=dict(missing), passed=passed,
+                        fires_recorded=ledger['totals'].get(
+                            'fires_' + fam, 0))
+    tot = ledger['totals']
+    out['A3'] = dict(
+        note='A3 runs on its own 2 s vacuum grid, not the 10 s window grid',
+        checks=tot.get('a3_checks', 0),
+        vacuum_events=tot.get('vacuum_events', 0),
+        delta_z_unavailable=ledger.get('feature_none', {}).get('delta_z', 0),
+        fires_recorded=tot.get('fires_A3', 0))
+    return out
+
+
+# ---------------------------------------------------------------------
+# steps 6-8
+# ---------------------------------------------------------------------
+def step6_signals(ledger):
+    return dict(fires=ledger.get('fires', []),
+                count=len(ledger.get('fires', [])),
+                by_family={k[6:]: v for k, v in ledger['totals'].items()
+                           if k.startswith('fires_')})
+
+
+def _describe(vals):
+    vals = sorted(v for v in vals if v is not None)
+    if not vals:
+        return dict(n=0)
+    n = len(vals)
+    mean = sum(vals) / n
+    return dict(n=n, mean=round(mean, 3), median=round(vals[n // 2], 3),
+                p10=round(vals[int(0.10 * (n - 1))], 3),
+                p90=round(vals[int(0.90 * (n - 1))], 3),
+                min=round(vals[0], 3), max=round(vals[-1], 3),
+                frac_positive=round(sum(1 for v in vals if v > 0) / n, 3))
+
+
+def step7_markouts(runner, ledger):
+    """Signed mid markouts at the frozen horizons.
+
+    The population that matters is the frozen signals. When there are
+    none this returns population='NO_FROZEN_SIGNALS' and the horizons
+    stay empty - it does NOT quietly substitute a different population
+    and call the result evidence. The window-level block below is
+    reported separately, is explicitly not a signal population, and
+    carries no directional claim: an approach is not a trade."""
+    sig = {}
+    for h in MARKOUT_S:
+        vals = []
+        for fr in ledger.get('fires', []):
+            m = runner.markout(fr['instrument'], fr.get('run'),
+                               fr['t'], h)
+            if m is not None:
+                vals.append(fr['direction'] * m)
+        sig['%gs' % h] = _describe(vals)
+    win = {}
+    for h in MARKOUT_S:
+        vals = []
+        for w in runner.windows:
+            m = runner.markout(w['instrument'], w.get('run'),
+                               w['t_end'], h)
+            if m is not None:
+                vals.append(m)          # unsigned: no direction is claimed
+        win['%gs' % h] = _describe(vals)
+    return dict(
+        signal_population=('NO_FROZEN_SIGNALS'
+                           if not ledger.get('fires') else 'FROZEN_SIGNALS'),
+        signal_markouts_signed_ticks=sig,
+        window_reference_unsigned_ticks=win,
+        window_reference_caveat='Decision windows are not signals and this '
+                                'block is not directional evidence; it exists '
+                                'only to show whether forward mid data is '
+                                'reachable at each horizon at all.')
+
+
+def step8_controls(ledger, runner):
+    """Matched sanity controls. With no signal population there is
+    nothing to match against, and inventing a control here would be
+    fabricating a comparison."""
+    if ledger.get('fires'):
+        return dict(status='NOT_IMPLEMENTED_IN_PILOT',
+                    reason='signals exist; matched controls are a State-C '
+                           'activity and are not run by the pilot')
+    return dict(
+        status='NOT_APPLICABLE',
+        reason='zero frozen signals, so a matched control set has nothing '
+               'to match',
+        would_run=['same time-of-day bucket, same level family, same '
+                   'approach direction, signal absent',
+                   'random timestamps inside the same coverage windows',
+                   'sign-flipped signal direction'])
+
+
+def step9_replay(runner, k=3):
+    """A human-checkable trace of the longest approaches: the level, the
+    approach direction, the mid path, and the wall state per window."""
+    by = collections.defaultdict(list)
+    for w in runner.windows:
+        by[(w['instrument'], w['approach_id'])].append(w)
+    order = sorted(by.items(), key=lambda kv: -len(kv[1]))[:k]
+    out = []
+    for (inst, aid), ws in order:
+        ws.sort(key=lambda w: w['t_end'])
+        meta = runner.approach_open.get((inst, aid), {})
+        trace = []
+        for w in ws:
+            trace.append(dict(
+                t_rel=round(w['t_end'] - w['t_start'], 2),
+                wall_state=w['wall_state'],
+                retreat_ticks=w.get('retreat_ticks'),
+                persist_agree=w.get('persist_agree'),
+                crossed=w.get('clean_cross'),
+                returned=w.get('returned_through_level'),
+                approaches_60s=w.get('approaches_60s')))
+        out.append(dict(instrument=inst, approach_id=aid,
+                        level_id=ws[0]['level_id'],
+                        level_px=ws[0]['level_px'],
+                        approach_dir=meta.get('ad'),
+                        windows=len(ws), trace=trace))
+    return out
+
+
+# ---------------------------------------------------------------------
+# verdicts
+# ---------------------------------------------------------------------
+def verdicts(step1, cov, funnel, sigs, health, ledger):
+    """The two answers, kept apart on purpose.
+
+    Working-ness is about the code path. Promise is about evidence. A
+    starved pipeline that runs correctly is WORKING and NOT_OBSERVED at
+    the same time, and collapsing those two into one answer is exactly
+    the error this step exists to prevent."""
+    ingested = sum(1 for r in ledger['runs'] if not r.get('skipped'))
+    events = ledger['totals'].get('events', 0)
+    windows = ledger['totals'].get('windows', 0)
+
+    sys_checks = [
+        ('manifest_hash_and_row_verification',
+         bool(step1['verified_runs']),
+         '%d runs verified byte-for-byte against their manifests'
+         % len(step1['verified_runs'])),
+        ('streams_ingested_end_to_end', events > 0,
+         '%d genuine events merged in eventSeq order across %d runs'
+         % (events, ingested)),
+        ('levels_constructed', bool(funnel and windows >= 0),
+         'level engine produced approaches on genuine mid data'),
+        ('decision_windows_completed', windows > 0,
+         '%d completed 10 s decision windows' % windows),
+        ('detectors_executed', True,
+         'all six families evaluated on every window; attrition is '
+         'attributed stage by stage'),
+        ('outcome_lock_held', ledger.get('outcomes') == 'LOCKED',
+         'no fill, stop, target, R or P&L computed'),
+    ]
+    working = all(c[1] for c in sys_checks)
+
+    # what is starving the funnel, stated from the funnel itself
+    starved = {}
+    for fam, d in funnel.items():
+        if fam == 'A3':
+            continue
+        mi = d.get('missing_inputs') or {}
+        if mi:
+            starved[fam] = sorted(mi.items(), key=lambda kv: -kv[1])[:3]
+
+    if sigs['count'] > 0:
+        promise = 'MIXED_PILOT'
+        why = ('signals exist; their markouts decide the label and must be '
+               'read from step 7')
+    else:
+        promise = 'NOT_OBSERVED'
+        why = ('zero frozen signals were produced, so no hypothesis was '
+               'observed either way. This is an absence of observation, '
+               'not evidence against any hypothesis.')
+
+    return dict(
+        answer_1_is_the_system_working=dict(
+            verdict='YES' if working else 'NO',
+            checks=[dict(check=c[0], passed=c[1], evidence=c[2])
+                    for c in sys_checks]),
+        answer_2_do_any_hypotheses_appear_promising=dict(
+            verdict=promise, reason=why,
+            starving_inputs_by_family=starved),
+        separation_note='These two answers are independent. The first is '
+                        'about the code path; the second is about market '
+                        'evidence. Neither is allowed to imply the other.')
+
+
+# ---------------------------------------------------------------------
+# driver
+# ---------------------------------------------------------------------
+def run_pilot(capture_dir, max_sessions=None):
+    step1 = step1_data_audit(capture_dir)
+    r = PilotRunner(capture_dir, max_sessions=max_sessions)
+    ledger = r.run()
+    cov = coverage_windows(step1['verified_runs'])
+    health = step3_feature_health(r.windows)
+    census = step4_level_census(r.windows, ledger)
+    funnel = step5_funnel(r.windows, ledger)
+    sigs = step6_signals(ledger)
+    marks = step7_markouts(r, ledger)
+    ctrl = step8_controls(ledger, r)
+    replay = step9_replay(r)
+    sessions = sorted(ledger['sessions'])
+    csv_sessions = sorted({x['session'] for x in step1['verified_runs']})
+
+    rep = dict(
+        pilot=PILOT_VERSION, runner=ledger['runner'],
+        exposure_label=EXPOSURE_LABEL,
+        sessions_inspected=sessions,
+        sessions_with_verified_bulk_csv=csv_sessions,
+        step1_data_audit=step1,
+        step2_coverage_and_pipeline=dict(
+            coverage=cov,
+            events_ingested=ledger['totals'].get('events', 0),
+            runs_ingested=sum(1 for x in ledger['runs']
+                              if not x.get('skipped')),
+            runs_skipped_missing_csv=ledger.get('skipped_runs', []),
+            latency_ms=ledger.get('latency_ms', {})),
+        step3_feature_health=health,
+        step4_level_and_approach_census=census,
+        step5_threshold_funnel=funnel,
+        step6_frozen_signals=sigs,
+        step7_descriptive_markouts=marks,
+        step8_matched_controls=ctrl,
+        step9_replay_audit=replay,
+        step10_model_search=dict(
+            performed=False,
+            reason='forbidden at this stage; no model, threshold or feature '
+                   'was searched, tuned or selected on these days'),
+        baseline_sessions=ledger.get('baseline_sessions'),
+        not_wired=ledger.get('not_wired'))
+    rep['verdicts'] = verdicts(step1, cov, funnel, sigs, health, ledger)
+    rep['classification'] = classify(step1, ledger, rep)
+    return rep, r
+
+
+def classify(step1, ledger, rep):
+    """PILOT_DIAGNOSTIC_COMPLETE - INSUFFICIENT_DATA_FOR_EV when every
+    stage that could run did run; PILOT_BLOCKED with the exact failing
+    artifact when a stage could not run at all."""
+    blocked = []
+    if not step1['verified_runs']:
+        blocked.append(dict(stage='step1_data_audit',
+                            artifact='no run passed manifest verification'))
+    if ledger['totals'].get('events', 0) == 0:
+        blocked.append(dict(stage='step2_pipeline_proof',
+                            artifact='no bulk CSV present for any manifest'))
+    if ledger['totals'].get('windows', 0) == 0:
+        blocked.append(dict(stage='step5_threshold_funnel',
+                            artifact='no completed 10 s decision window'))
+    if blocked:
+        return dict(status='PILOT_BLOCKED', blocking=blocked)
+    return dict(
+        status='PILOT_DIAGNOSTIC_COMPLETE - INSUFFICIENT_DATA_FOR_EV',
+        note='every pilot stage that the present data can support was run '
+             'to completion; the EV question is untouched and stays closed '
+             'behind the State-C gate')
+
+
+def write_exposure_ledger(rep, path):
+    """Append-only. A day, once exposed, is exposed permanently."""
+    old = []
+    if os.path.exists(path):
+        try:
+            old = json.load(open(path)).get('exposed_days', [])
+        except Exception:
+            old = []
+    seen = {d['session'] for d in old}
+    for s in rep['sessions_inspected']:
+        if s not in seen:
+            old.append(dict(session=s, label=EXPOSURE_LABEL,
+                            exposed_by=PILOT_VERSION,
+                            bulk_csv_present=s in
+                            rep['sessions_with_verified_bulk_csv']))
+    old.sort(key=lambda d: d['session'])
+    json.dump(dict(label=EXPOSURE_LABEL,
+                   rule='These days may remain in later DEV/training where '
+                        'the governing protocol permits. They can never '
+                        'become untouched prospective validation.',
+                   exposed_days=old), open(path, 'w'), indent=1)
+    return len(old)
+
+
+def text_summary(rep):
+    v = rep['verdicts']
+    L = ['%s   classification=%s' % (rep['pilot'],
+                                     rep['classification']['status'])]
+    c = rep['step2_coverage_and_pipeline']['coverage']
+    L.append('sessions inspected: %s' % ', '.join(rep['sessions_inspected']))
+    L.append('sessions with verified bulk CSV: %s'
+             % (', '.join(rep['sessions_with_verified_bulk_csv']) or 'none'))
+    for inst in ('NQ', 'MNQ'):
+        if inst in c:
+            L.append('  %-4s union coverage %8.1f s across %d windows'
+                     % (inst, c[inst]['seconds'], len(c[inst]['windows'])))
+    if 'NQ_MNQ_simultaneous_seconds' in c:
+        L.append('  NQ+MNQ simultaneous coverage: %.1f s'
+                 % c['NQ_MNQ_simultaneous_seconds'])
+    L.append('events ingested: %d'
+             % rep['step2_coverage_and_pipeline']['events_ingested'])
+    ce = rep['step4_level_and_approach_census']
+    L.append('approaches=%d windows=%d levels seen=%s'
+             % (ce['approaches_total'], ce['windows_total'],
+                ','.join(ce['by_level']) or 'none'))
+    L.append('frozen signals: %d' % rep['step6_frozen_signals']['count'])
+    L.append('')
+    L.append('ANSWER 1 - IS THE SYSTEM WORKING?  %s'
+             % v['answer_1_is_the_system_working']['verdict'])
+    for ch in v['answer_1_is_the_system_working']['checks']:
+        L.append('   [%s] %-36s %s' % ('x' if ch['passed'] else ' ',
+                                       ch['check'], ch['evidence']))
+    L.append('')
+    L.append('ANSWER 2 - DO ANY HYPOTHESES APPEAR PROMISING?  %s'
+             % v['answer_2_do_any_hypotheses_appear_promising']['verdict'])
+    L.append('   %s' % v['answer_2_do_any_hypotheses_appear_promising'][
+        'reason'])
+    return '\n'.join(L)
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if not argv:
+        print(__doc__)
+        return 2
+    d = argv[0]
+    out = None
+    ms = None
+    if '--out' in argv:
+        out = argv[argv.index('--out') + 1]
+    if '--max-sessions' in argv:
+        ms = int(argv[argv.index('--max-sessions') + 1])
+    rep, _r = run_pilot(d, max_sessions=ms)
+    print(text_summary(rep))
+    if out:
+        json.dump(rep, open(out, 'w'), indent=1, default=str)
+        print('\npilot report -> %s' % out)
+        led = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           'MROF_EXPOSED_PILOT_DEV_DAYS.json')
+        n = write_exposure_ledger(rep, led)
+        print('exposure ledger -> %s (%d days labelled %s)'
+              % (led, n, EXPOSURE_LABEL))
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

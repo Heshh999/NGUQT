@@ -235,6 +235,7 @@ class Approach:
 class InstrumentState:
     def __init__(self, instrument):
         self.instrument = instrument
+        self.run_id = None
         self.baseline = SIG.BaselineStore(20)
         self.baseline_sessions = 0
         self.rng_ratio = RollingTrailingRatio()
@@ -298,7 +299,7 @@ class Runner:
                            feature_none=collections.Counter(),
                            fires=[], states=collections.Counter(),
                            regime_at_window=collections.Counter(),
-                           latency_ms={}, runs=[])
+                           latency_ms={}, runs=[], skipped_runs=[])
         self.lat = {i: Hist() for i in self.instruments}
 
     # ---- discovery ------------------------------------------------
@@ -373,13 +374,31 @@ class Runner:
     def _process_run(self, st, mp, man):
         base = os.path.dirname(os.path.abspath(mp))
         paths = AD.run_paths(man, base)
+        rec = dict(instrument=st.instrument, session=st.session,
+                   run_id=man.get('runId'), build=man.get('recorderBuild',
+                                                          '1.2.0'))
+        # A manifest declares its bulk CSVs; the documented handoff sends
+        # manifests first and the CSVs later, so a declared-but-absent file
+        # is an ordinary state, not a crash. It is never a licence to ingest
+        # the streams that DID arrive: a run missing any declared stream is
+        # skipped whole, because partial ingestion would silently compute
+        # features from an incomplete book or tape.
+        absent = sorted(os.path.basename(p) for p in paths.values()
+                        if not os.path.exists(p))
+        if absent:
+            rec.update(skipped='MISSING_STREAM_FILES', missing=absent,
+                       events=0)
+            self.ledger['runs'].append(rec)
+            self.ledger['totals']['runs_skipped_missing_files'] += 1
+            self.ledger['skipped_runs'].append(
+                dict(instrument=st.instrument, session=st.session,
+                     run_id=man.get('runId'), missing=absent))
+            return
+        st.run_id = man.get('runId')
         st.reset_run()
         n = 0
         crossed = 0
         quotes = 0
-        rec = dict(instrument=st.instrument, session=st.session,
-                   run_id=man.get('runId'), build=man.get('recorderBuild',
-                                                          '1.2.0'))
         self._rebuild_levels(st)
         for e in AD.merge_run(paths, lite=True):
             n += 1
@@ -808,6 +827,12 @@ class Runner:
             d = SIG.DETECTORS[fam](f)
             if d:
                 self._fire(st, fam, d, te, ap)
+        self._on_window(st, ap, te, f)
+
+    def _on_window(self, st, ap, te, f):
+        """Observation hook. The runner itself records nothing here; the
+        pilot diagnostic overrides it to keep per-window feature vectors
+        for the funnel report. Overriding must not mutate st, ap or f."""
 
     def _evaluate_a3(self, st, ap, now):
         if len(st.d3) < 2:
@@ -848,6 +873,7 @@ class Runner:
         if len(self.ledger['fires']) < 5000:
             self.ledger['fires'].append(dict(
                 instrument=st.instrument, session=st.session, family=fam,
+                run=st.run_id,
                 direction=direction, t=round(t, 3), level=ap.level_id,
                 approach=ap.id, regime=dict(st.regime),
                 state=ap.wall_state))
@@ -864,8 +890,11 @@ class Runner:
 def summary(ledger):
     tot = ledger['totals']
     lines = ['%s  outcomes=%s' % (ledger['runner'], ledger['outcomes']),
-             'sessions=%d runs=%d events=%d'
+             'sessions=%d runs=%d (ingested %d, skipped-missing-files %d) '
+             'events=%d'
              % (len(ledger['sessions']), len(ledger['runs']),
+                len(ledger['runs']) - len(ledger.get('skipped_runs', [])),
+                len(ledger.get('skipped_runs', [])),
                 tot.get('events', 0)),
              'baseline sessions: %s' % ledger.get('baseline_sessions'),
              'approaches=%d windows=%d (suppressed %d) fires=%d '
