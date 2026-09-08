@@ -4,7 +4,14 @@ Plain operating procedure for the MROF capture → research programme.
 Everything here is capture and verification only.
 THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
 
-Current status: **INSUFFICIENT_DATA — ZERO GENUINE RECORDED SESSIONS.**
+Current status: **INSUFFICIENT_DATA.** Genuine sessions now exist
+(2026-09-01 → 2026-09-04), but only one date arrived with its bulk CSVs
+and capture has been stopped since 2026-09-04 22:35 UTC. See
+`MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md`.
+
+For a beginner-readable NinjaTrader procedure — install, F5, contract and
+Level II checks, smoke test, stop/verify/transfer, roll and restart,
+ingestion, Market Replay — see `NT8_RECORDING_RUNBOOK.md`.
 
 ---
 

@@ -34,11 +34,11 @@ Archived source directive:
 55d598a3c2e5453b9c47675f76932455dca8689084fddfd4535e5b4907def942  ../../docs/prompts/MROF_ONE_COMPLETE_CLAUDE_PROMPT_1.md
 ```
 
-Delivered package (93 files, repo layout preserved so every suite runs
+Delivered package (94 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-0db8de7a90c2ee43d764e83b31d48b99dddf4dbd2b7c64aff2c29ad46b158069  MROF_V1_Engine_v01_6_7.zip
+aaf152161199f6b2f7a46d17c04f04911fe18b88283a30dfc700cb05933084d2  MROF_V1_Engine_v01_6_7.zip
 ```
 
 ```

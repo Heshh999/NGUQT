@@ -32,7 +32,8 @@ a2b0ed03d4ea4e64e95dd879304f4414bde2665b7364ebf95f9172bc3a675dbf  analysis/mrofy
 1635f0391449260d1a15c0780a54728523834f3df4505e755ad400d63a510812  analysis/mrofyt/RECORDER_DEPLOYMENT_V12.md
 65b2948c0b7877d70d71aa7a12cac2326d740ad9c0aa98d4f1b608e4f12e33a0  analysis/mrofyt/DATA_HANDOFF_V12.md
 15c3ef12b43cb0e059eb317da9c7ddd976971965009252aaa4357cc7a6195361  analysis/mrofyt/SETUP_WALKTHROUGH_V12.md
-1ef388e1347e47fd54186d29e45c94b22c785865147e039e98d4b52e4a340c14  analysis/mrofyt/OPERATING_RUNBOOK.md
+cf42022369fe3133c2725d8a8e10c69914d889945c0b99d2da280e1a46315f2c  analysis/mrofyt/OPERATING_RUNBOOK.md (supersedes 1ef388e1… — status header updated once genuine sessions existed; points to NT8_RECORDING_RUNBOOK.md)
+964cdc661df578e6681d36fdef335366a56013efa7cd0d9f857a3cfa60b5a0e9  analysis/mrofyt/NT8_RECORDING_RUNBOOK.md (beginner-readable NT8 procedure)
 f8e20194dba22f02ea67b0b9b0dc3aab4be62f55c938e15c6f84f093cfb3fb2d  analysis/mrofyt/mles_v12_synth.py (build 1.2.1 fixtures)
 8332ca65df963d02e6d27786e9569d04590330bb5e8c71f16a369dab2fd359a2  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
 f8889e5c25bac9b5aae13231d6c4c0d8ce2535445ac2f2f34183832da7c9cff0  analysis/mrofyt/tests_mrofyt_runner.py (11 tests)
@@ -65,10 +66,19 @@ validation.
 
 ## NOT performed here
 
-Real NinjaTrader F5 compile; five-minute NQ+MNQ Market Replay smoke
-test; stop/finalize/audit; restart/finalize/audit; first genuine
-18:00 ET rollover audit. All user-side
-(`RECORDER_DEPLOYMENT_V12.md` §5).
+Real NinjaTrader F5 compile and the five-minute NQ+MNQ Market Replay
+smoke test remain **user-side**; this environment has no NT8, Windows or
+live feed, and a stub compile is not an API validation.
 
-Classification: **INSUFFICIENT_DATA — ZERO GENUINE RECORDED
-SESSIONS.**
+Since this manifest was first written, several of its blocked items have
+been closed by genuine user-side work: **F5 PASSED** after the namespace
+repair; stop/finalize/audit and restart/finalize/audit were exercised;
+and **six 18:00 ET rollovers were audited clean** (millisecond gaps,
+`SESSION_ROLL`, same instance, R001 → R002). See
+`MLES_CAPTURE_V12_FREEZE.md` §10 and its amendments.
+
+Classification: **INSUFFICIENT_DATA.** Genuine recorded sessions now
+exist (2026-09-01 → 2026-09-04; 15 runs verified byte-for-byte,
+1,351,398 events ingested end to end), but only one date arrived with
+its bulk CSVs, and that date carries **zero seconds of simultaneous
+NQ+MNQ coverage**. See `MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md`.
