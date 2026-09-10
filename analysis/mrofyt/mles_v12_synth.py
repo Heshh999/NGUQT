@@ -36,7 +36,8 @@ def _iso(t):
 def synth_run(d, n_depth=300000, instrument='NQ', session='20260902',
               cid='synth-cid', run_no=1, t0=None, dt_step=0.0005,
               price_path=None, trade_every=40, quote_every=25,
-              contract=None, seed=0, extra_book_ready=0):
+              contract=None, seed=0, extra_book_ready=0,
+              seq_start=1):
     """price_path(i) -> mid price (default flat 15000). Trades alternate
     aggressor; depth cycles ADD/UPDATE/REMOVE over levels 0..9 on both
     sides around the current mid. Returns the manifest path."""
@@ -55,7 +56,7 @@ def synth_run(d, n_depth=300000, instrument='NQ', session='20260902',
         t0 = (_dt.datetime(2026, 9, 2, 13, 30, tzinfo=_dt.timezone.utc)
               - _dt.datetime(1970, 1, 1, tzinfo=_dt.timezone.utc)
               ).total_seconds()
-    seq = 0
+    seq = seq_start - 1
     ss = dict(quotes=0, trades=0, depth=0, quality=0)
     state = dict(t=t0)
 
@@ -126,7 +127,7 @@ def synth_run(d, n_depth=300000, instrument='NQ', session='20260902',
                declaredDepth=10, flushPolicySeconds=30,
                aggressorSource='ABSENT-feed; inferred QUOTE_TEST_v1',
                firstRecvUtc=_iso(t0), lastRecvUtc=_iso(t),
-               lastExchUtc=_iso(t - 0.25), firstEventSeq=1,
+               lastExchUtc=_iso(t - 0.25), firstEventSeq=seq_start,
                lastEventSeq=seq, firstSegId=1, lastSegId=1,
                connectionSegments=1,
                firstQuoteSeq=1, lastQuoteSeq=ss['quotes'],

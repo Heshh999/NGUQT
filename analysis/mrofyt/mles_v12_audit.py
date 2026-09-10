@@ -29,6 +29,7 @@
 import glob
 import json
 import os
+import re
 
 import mles_v11_audit as AU11
 import mles_v12_adapter as AD
@@ -523,9 +524,13 @@ def audit_capture(directory, min_overlap=MIN_OVERLAP_FRAC):
     for r in runs:
         for f in r['info'].get('referenced_files', []):
             referenced.add(f)
+    open_instances = set()
     for p in sorted(os.listdir(directory)):
         if p.endswith('.csv.partial'):
             _fail(fails, 'ORPHAN_PARTIAL', p)
+            m = re.search(r'_(\d{17}-[0-9a-f]{8})-R\d{3}_', p)
+            if m:
+                open_instances.add(m.group(1))
         elif p.endswith('.csv') and p not in referenced:
             _fail(fails, 'ORPHAN_FINALIZED_CSV', p)
         elif p.endswith('_RECOVERY.json'):
@@ -549,7 +554,19 @@ def audit_capture(directory, min_overlap=MIN_OVERLAP_FRAC):
                           []).append(r['info'])
     for cid, rs in by_cid.items():
         ok, why = instance_seq_contiguous(rs)
-        if not ok:
+        if ok:
+            continue
+        # An instance whose later run is still an unfinalized .csv.partial
+        # has rows that carry a published seq but reach no manifest, so the
+        # union is SHORT by exactly those rows. That is an unverifiable
+        # union, not a detected gap, and calling it a gap points at the
+        # wrong cause. Only the count/span shortfall is reclassified: a
+        # hole or an overlap is never explained by an open run.
+        if cid in open_instances and why.startswith('count '):
+            _fail(fails, 'INSTANCE_SEQ_UNVERIFIABLE_OPEN_RUN',
+                  '%s: %s (instance has an unfinalized run; re-audit once '
+                  'it closes)' % (cid, why))
+        else:
             _fail(fails, 'INSTANCE_SEQ_GAP', '%s: %s' % (cid, why))
 
     insts_present = {r['info'].get('instrument') for r in runs}

@@ -467,6 +467,40 @@ t('T29b: the allowance is tied to firstEventSeq == 1, so a continuation '
   json.load(open(m1))['firstEventSeq'] == 1 and
   r0['info']['book_ready_allowed'] == r0['info']['book_resync_starts'] + 1)
 
+# T30: an instance whose later run is still an unfinalized .csv.partial
+# leaves a SHORT union - those rows carry a published seq but reach no
+# manifest. That is unverifiable, not a detected gap, and calling it a
+# gap names the wrong cause. The real 2026-09-09 capture showed exactly
+# this on build 1.2.1, which is how the misdiagnosis surfaced.
+CID30 = '20260908224314916-aa4a2af2'
+
+
+def _two_run_instance(dirname, cid, partial):
+    dd = os.path.join(WORK, dirname)
+    SY.synth_run(dd, n_depth=1500, cid=cid, run_no=1, session='20260909')
+    m1 = json.load(open(glob.glob(os.path.join(dd, '*R001_manifest.json'))[0]))
+    # R002 resumes 3 seqs later: the two in between are the rows that a
+    # still-open rotation is holding
+    SY.synth_run(dd, n_depth=1500, cid=cid, run_no=2, session='20260909',
+                 seq_start=m1['lastEventSeq'] + 3)
+    if partial:
+        open(os.path.join(dd, 'MLES12_NQ_NQ_SEP26_20260910_%s-R003_'
+                              'depth.csv.partial' % cid), 'w').write('x')
+    return [c for c, _ in AU.audit_capture(dd)['failures']]
+
+
+c30 = _two_run_instance('openrun', CID30, True)
+c30b = _two_run_instance('closedrun', '20260908224314916-bbbbbbbb', False)
+t('T30: a short union on an instance with an unfinalized run reports '
+  'UNVERIFIABLE_OPEN_RUN, not a gap, and the orphan partial is still '
+  'reported separately',
+  'INSTANCE_SEQ_UNVERIFIABLE_OPEN_RUN' in c30 and
+  'INSTANCE_SEQ_GAP' not in c30 and 'ORPHAN_PARTIAL' in c30)
+t('T30b: the identical shortfall with NO unfinalized run stays a genuine '
+  'INSTANCE_SEQ_GAP, so the reclassification cannot hide one',
+  'INSTANCE_SEQ_GAP' in c30b and
+  'INSTANCE_SEQ_UNVERIFIABLE_OPEN_RUN' not in c30b)
+
 # adapter honesty checks
 t('adapter: v1.2 schema requires captureInstanceId column',
   AD.HEADER_COMMON[1] == 'captureInstanceId')
