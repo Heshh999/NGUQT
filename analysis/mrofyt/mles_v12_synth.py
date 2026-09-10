@@ -36,7 +36,7 @@ def _iso(t):
 def synth_run(d, n_depth=300000, instrument='NQ', session='20260902',
               cid='synth-cid', run_no=1, t0=None, dt_step=0.0005,
               price_path=None, trade_every=40, quote_every=25,
-              contract=None, seed=0):
+              contract=None, seed=0, extra_book_ready=0):
     """price_path(i) -> mid price (default flat 15000). Trades alternate
     aggressor; depth cycles ADD/UPDATE/REMOVE over levels 0..9 on both
     sides around the current mid. Returns the manifest path."""
@@ -98,6 +98,11 @@ def synth_run(d, n_depth=300000, instrument='NQ', session='20260902',
         if i == 19:
             row('quality', 'QUALITY', t,
                 'BOOK_READY,bidLevels=10 askLevels=10')
+            # extra readies with NO preceding resync, for the auditor's
+            # first-run allowance test
+            for _k in range(extra_book_ready):
+                row('quality', 'QUALITY', t,
+                    'BOOK_READY,bidLevels=10 askLevels=10')
         if i % quote_every == 0:
             row('quotes', 'QUOTE', t, 'BID,%.2f,12,%.2f,12,%.2f,9,'
                 % (bid, bid, ask))

@@ -107,6 +107,7 @@ t('lineage f99c521..97d2bc1 immutable (%d pinned hashes)' % len(PINNED),
 
 import mles_v12_adapter as AD    # noqa: E402
 import mles_v12_audit as AU      # noqa: E402
+import mles_v12_synth as SY      # noqa: E402
 
 # ---- compile the recorder + harness with mcs (stub syntax proof) ----
 WORK = tempfile.mkdtemp(prefix='mles12t_', dir='/tmp')
@@ -435,6 +436,36 @@ zr = zf.read('MROF_V1_Engine/README.txt').decode()
 t('T22b: ZIP README names v1.2 as the install and marks older '
   'recorders as archive',
   'MlesV12CaptureHost' in zr and 'archive_immutable_lineage' in zr)
+
+# T29: BOOK_READY_WITHOUT_RESYNC is an off-by-one on the run that BEGINS
+# an instance. Such a run builds its book from nothing, so one
+# un-preceded BOOK_READY is legitimate; the allowance is exactly one and
+# never more. The first genuine multi-session captures failed every R001
+# and passed every R002 - the signature of a bad rule, not of bad data.
+def _ready_fails(dirname, extra):
+    dd = os.path.join(WORK, dirname)
+    mp = SY.synth_run(dd, n_depth=3000, cid='br%d' % extra,
+                      session='20260902', extra_book_ready=extra)
+    r = AU.audit_run(mp)
+    return ([c for c, _ in r['failures']
+             if c == 'BOOK_READY_WITHOUT_RESYNC'], r, mp)
+
+
+f0, r0, m0 = _ready_fails('br0', 0)      # ready 1, resync 1
+f1, r1, m1 = _ready_fails('br1', 1)      # ready 2, resync 1  <- the R001 case
+f2, r2, _m = _ready_fails('br2', 2)      # ready 3, resync 1  <- genuinely wrong
+t('T29: a first run of an instance may carry ONE BOOK_READY with no '
+  'preceding resync, and the allowance is exactly one - a second '
+  'un-preceded ready still fails',
+  not f0 and not f1 and len(f2) == 1 and
+  r1['info']['book_ready'] == 2 and
+  r1['info']['book_ready_allowed'] == 2 and
+  r2['info']['book_ready_allowed'] == 2)
+
+t('T29b: the allowance is tied to firstEventSeq == 1, so a continuation '
+  'run gets no free ready',
+  json.load(open(m1))['firstEventSeq'] == 1 and
+  r0['info']['book_ready_allowed'] == r0['info']['book_resync_starts'] + 1)
 
 # adapter honesty checks
 t('adapter: v1.2 schema requires captureInstanceId column',

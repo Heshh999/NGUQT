@@ -372,8 +372,19 @@ def audit_run(manifest_path, lite=True):
     info['book_resync_starts'] = kinds.count('BOOK_RESYNC_START')
     info['book_ready'] = kinds.count('BOOK_READY')
     info['suppressed_rows'] = suppressed
-    if info['book_ready'] > info['book_resync_starts']:
-        _fail(fails, 'BOOK_READY_WITHOUT_RESYNC', '')
+    # A run that BEGINS an instance builds its book from nothing, so its
+    # first BOOK_READY is legitimately not preceded by a resync. Later
+    # runs of the same instance inherit an already-built book, so every
+    # BOOK_READY there must follow a BOOK_RESYNC_START. The first genuine
+    # multi-session captures exposed this: every R001 failed and every
+    # R002 passed, which is the signature of an off-by-one rule, not of
+    # bad data.
+    first_of_instance = man.get('firstEventSeq') == 1
+    allowed = info['book_resync_starts'] + (1 if first_of_instance else 0)
+    info['book_ready_allowed'] = allowed
+    if info['book_ready'] > allowed:
+        _fail(fails, 'BOOK_READY_WITHOUT_RESYNC',
+              '%d ready > %d allowed' % (info['book_ready'], allowed))
     info['latency_ms'] = _lat_summary(lat_hist, lat_n)
 
     return dict(ok=not fails, failures=fails, info=info,

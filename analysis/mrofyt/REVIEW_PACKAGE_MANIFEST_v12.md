@@ -27,14 +27,14 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|Account\.|EnterLong|EnterShort" sr
 be29c36a62624ab5e18e67d104eb4e9323abcda4bf5faf1c88c54486fc446f4a  analysis/mrofyt/nt8_stubs_v12.cs
 ff2cb79e2ac64c80f84a4dce8ca6ee3c255b7137a21903e777774ab2db3dbeb7  analysis/mrofyt/mles_v12_harness.cs
 12ab264bb466bbf1f48943c95b65ae524d9a142a249c94c3337ca186a3d23861  analysis/mrofyt/mles_v12_adapter.py
-b9188f4d6186bf9d4acf0c9185e86a2a4cc865a1c341732f56efbaef47100110  analysis/mrofyt/mles_v12_audit.py
-a2b0ed03d4ea4e64e95dd879304f4414bde2665b7364ebf95f9172bc3a675dbf  analysis/mrofyt/tests_mles_v12.py
+136ccd398fa32fc0f39d7c95ddf31e80a616fe07233ede94bf6b6c9991d45f09  analysis/mrofyt/mles_v12_audit.py
+6ebba5301acb019dafe70a5677a480e32e9eb15547065103027c1ef4e97f9091  analysis/mrofyt/tests_mles_v12.py
 1635f0391449260d1a15c0780a54728523834f3df4505e755ad400d63a510812  analysis/mrofyt/RECORDER_DEPLOYMENT_V12.md
 65b2948c0b7877d70d71aa7a12cac2326d740ad9c0aa98d4f1b608e4f12e33a0  analysis/mrofyt/DATA_HANDOFF_V12.md
 15c3ef12b43cb0e059eb317da9c7ddd976971965009252aaa4357cc7a6195361  analysis/mrofyt/SETUP_WALKTHROUGH_V12.md
 cf42022369fe3133c2725d8a8e10c69914d889945c0b99d2da280e1a46315f2c  analysis/mrofyt/OPERATING_RUNBOOK.md (supersedes 1ef388e1… — status header updated once genuine sessions existed; points to NT8_RECORDING_RUNBOOK.md)
 964cdc661df578e6681d36fdef335366a56013efa7cd0d9f857a3cfa60b5a0e9  analysis/mrofyt/NT8_RECORDING_RUNBOOK.md (beginner-readable NT8 procedure)
-8df2f02245d51c95a48236e55511490aad0cd1edd676ce1c3db50c0868bf1180  analysis/mrofyt/mles_v12_synth.py (build 1.2.1 fixtures; supersedes f8e20194… — timezone-aware timestamp)
+054f9e58af5322a334d0c19caeb3e16225873365f4b0ba16bd898c014b901219  analysis/mrofyt/mles_v12_synth.py (build 1.2.1 fixtures; supersedes f8e20194… — timezone-aware timestamp)
 3a765f3c304b0c23c5efbaaf3aaead7b66d6b67aaa385dbe9bb153d34f28bfc4  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
 f8889e5c25bac9b5aae13231d6c4c0d8ce2535445ac2f2f34183832da7c9cff0  analysis/mrofyt/tests_mrofyt_runner.py (11 tests)
 ```
@@ -43,7 +43,7 @@ Reproduce the entire proof (mcs + mono lifecycle harness + audits +
 adversarial fixtures + package byte-identity):
 
 ```
-cd analysis/mrofyt && python3 tests_mles_v12.py      # 37/37
+cd analysis/mrofyt && python3 tests_mles_v12.py      # 39/39
 cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 11/11
 ```
 
@@ -54,7 +54,7 @@ restart, disconnect/reconnect, NQ+MNQ pairing), audits the genuine
 output and then attacks the auditor with falsified fixtures.
 
 Predecessor suites (byte-identical, re-run at freeze): 59+56+31+32+
-25+36+29+42+15 = 325, all passing; grand total 373/373 (build 1.2.1: 37 + 11 new-suite tests).
+25+36+29+42+15 = 325, all passing; grand total 372/372 across twelve suites at this revision.
 
 ## Correction of record
 
@@ -77,8 +77,19 @@ and **six 18:00 ET rollovers were audited clean** (millisecond gaps,
 `SESSION_ROLL`, same instance, R001 → R002). See
 `MLES_CAPTURE_V12_FREEZE.md` §10 and its amendments.
 
-Classification: **INSUFFICIENT_DATA.** Genuine recorded sessions now
-exist (2026-09-01 → 2026-09-04; 15 runs verified byte-for-byte,
-1,351,398 events ingested end to end), but only one date arrived with
-its bulk CSVs, and that date carries **zero seconds of simultaneous
-NQ+MNQ coverage**. See `MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md`.
+Classification: **INSUFFICIENT_DATA.** Seven sessions now exist
+(2026-09-01 → 2026-09-09), 483,738,362 events ingested across 20 runs,
+78,776 s of simultaneous NQ+MNQ coverage, and the first 11 frozen signals
+have fired. Still far below every readiness gate. See
+`MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md`.
+
+## Auditor correction (found by genuine multi-session data)
+
+`BOOK_READY_WITHOUT_RESYNC` was off by one. A run that BEGINS an instance
+builds its book from nothing, so its first `BOOK_READY` legitimately has
+no preceding `BOOK_RESYNC_START`; a later run of the same instance
+inherits a built book and must resync before every ready. The rule
+compared `book_ready > book_resync_starts` unconditionally, so every
+R001 failed and every R002 passed — the signature of a bad rule, not of
+bad data. The allowance is now exactly one, only when
+`firstEventSeq == 1`, and is pinned by T29/T29b.
