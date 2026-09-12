@@ -275,3 +275,82 @@ absences, in priority order:
 
 Until (1) and (2) exist, answer 2 will keep returning `NOT_OBSERVED`, and
 that answer will keep being correct.
+
+---
+
+# Amendment 1 — MROF-YT-PILOT-1.1: event de-duplication and the primary horizon
+
+Registered **2026-09-12**, before the data these measurements will be
+read on exists. Both changes are **measurement only**. No threshold,
+level, window, stop, target, exit, feature definition, baseline or
+detector was touched, and the runner's raw `fires` list is byte-identical
+to what 1.0 produced. Verified by the full battery: **383/383**.
+
+## Why raw firing counts were not a signal count
+
+`Runner._fire` records every non-zero detector return. The runner has no
+position model and no consumption, so a single market event is recorded
+once per qualifying window and once per coincident approach. In the
+seven-session pilot the 11 raw firings were approximately **3 distinct
+events**:
+
+- six MNQ firings inside 7.4 s across approaches 3551–3559 — one event;
+- approach 3307 firing twice 10 s apart — one event;
+- 7 of the 11 came from MNQ, which is not a signal source under the
+  NQ-signal / MNQ-execution topology.
+
+Reporting 11 would have inflated the population ~3.7×, and — the more
+serious fault — would have entered one event several times into a
+median, understating its variance.
+
+## The de-duplication rule (frozen)
+
+Two firings belong to the same **event** when they share instrument,
+session, family and direction, and the later one starts within
+`EVENT_COOLDOWN_S` of the event's **first** firing.
+
+- The default cooldown is **60 s**, matching A1's already-frozen
+  `approaches_60s` lookback rather than introducing a new constant.
+- Anchoring on the first firing rather than the previous one bounds
+  every event at the cooldown, so a dense burst cannot chain into one
+  arbitrarily long event.
+- **Approach id is deliberately not part of the key.** Coincident
+  approaches to nearby levels produce different ids for what is plainly
+  one market event.
+- Sensitivity at 10 / 60 / 300 s is reported alongside, so the choice of
+  cooldown is visible rather than hidden.
+- An event whose firings straddle a run rotation is flagged
+  `spans_runs`, because a markout is only valid inside one run.
+
+MNQ firings are **labelled**, never discarded: `is_signal_source` marks
+NQ, and both populations are reported.
+
+Pinned by P9, P9b, P9c, P9d, P9e, P9f, P9g, P9h.
+
+## Markout horizons
+
+Added **300 s, 600 s, 1800 s**; every horizon the 1.0 report carried is
+retained. **300 s is primary.** Rationale, registered now: the operator's
+own recorded discretionary trading averages a ~4-minute hold (longest
+8 min 3 s), so 5 minutes is the horizon at which this would actually be
+traded. 600 and 1800 bracket the frozen `MAX_HOLD_S = 1800` cap.
+
+Markouts are now computed on the **event** population and reported per
+family. The raw-firing markouts are retained under
+`raw_fire_markouts_signed_ticks` for continuity with the 1.0 report and
+are explicitly captioned as the population *not* to read.
+
+Pinned by P9i.
+
+## Operator friction, for the record
+
+From the operator's NinjaTrader account report (a period of discretionary
+trading, not this system): `Trade Fees & Comm. $52.78` over 58 contract
+sides — **$0.91 per side, $1.82 per contract round trip**. Limit-in /
+limit-out, so no spread is crossed. In points: **≈0.91 on MNQ, ≈0.09 on
+NQ.**
+
+This is recorded as context for reading markouts. It is **not** computed
+by any module here, and the outcome lock is untouched: the pilot still
+produces no fill, stop, target, R or P&L. Confirm the figure from the
+Fills tab or the exported CSV before using it as a threshold.

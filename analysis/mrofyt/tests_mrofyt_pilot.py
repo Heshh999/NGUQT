@@ -154,7 +154,9 @@ t('P4b: with zero frozen signals the signal markouts stay EMPTY and the '
   rep['step7_descriptive_markouts']['signal_population'] ==
   'NO_FROZEN_SIGNALS' and
   all(d['n'] == 0 for d in rep['step7_descriptive_markouts']
-      ['signal_markouts_signed_ticks'].values()) and
+      ['raw_fire_markouts_signed_ticks'].values()) and
+  all(d['n'] == 0 for d in rep['step7_descriptive_markouts']
+      ['event_markouts_signed_ticks'].values()) and
   'not directional evidence' in
   rep['step7_descriptive_markouts']['window_reference_caveat'])
 
@@ -247,6 +249,77 @@ t('P8: the pilot module calls no fill/stop/target/simulate/P&L function '
   'and compute_outcomes still raises STATE-C LOCKED',
   locked and not re.search(r'\b(entry_fill|structural_stop|simulate|'
                            r'y_dollars|compute_outcomes)\s*\(', src))
+
+# ---------------------------------------------------------------------
+# P9: de-duplication of raw firings into distinct events.
+# Fixture reproduces the exact pattern the seven-session pilot showed:
+# an MNQ burst of six firings inside 7.4 s spread across five coincident
+# approach ids, plus one NQ approach firing twice 10 s apart.
+# ---------------------------------------------------------------------
+def _f(inst, fam, d, t_, run, ap, lvl='PP', ses='20260909'):
+    return dict(instrument=inst, session=ses, family=fam, direction=d,
+                t=t_, run=run, approach=ap, level=lvl, state='NONE')
+
+
+BURST = [_f('MNQ', 'A3', 1, 100.0, 'r1', 3551),
+         _f('MNQ', 'A3', 1, 101.2, 'r1', 3553),
+         _f('MNQ', 'A3', 1, 103.9, 'r1', 3555),
+         _f('MNQ', 'A3', 1, 105.0, 'r1', 3557),
+         _f('MNQ', 'A3', 1, 106.4, 'r1', 3559),
+         _f('MNQ', 'A3', 1, 107.4, 'r1', 3559),
+         _f('NQ', 'A3', -1, 500.0, 'r2', 3307, 'YDAY_HIGH'),
+         _f('NQ', 'A3', -1, 510.0, 'r2', 3307, 'YDAY_HIGH'),
+         _f('NQ', 'A3', -1, 900.0, 'r2', 3400)]
+EV = PI.dedup_fires(BURST)
+
+t('P9: six MNQ firings across five coincident approach ids inside 7.4 s '
+  'collapse to ONE event; approach id is not part of the key',
+  len(EV) == 3 and
+  [e for e in EV if e['instrument'] == 'MNQ'][0]['n_fires'] == 6 and
+  len([e for e in EV if e['instrument'] == 'MNQ'][0]['approaches']) == 5)
+
+t('P9b: the same approach firing twice 10 s apart is one event, and a '
+  'later firing beyond the cooldown is a separate one',
+  sum(1 for e in EV if e['instrument'] == 'NQ') == 2 and
+  sorted(e['n_fires'] for e in EV if e['instrument'] == 'NQ') == [1, 2])
+
+t('P9c: events are anchored on the FIRST firing, so a dense burst cannot '
+  'chain into one arbitrarily long event',
+  all(e['span_s'] <= PI.EVENT_COOLDOWN_S for e in EV) and
+  # 0,30,60 | 90,120,150 | 180,210,240 | 270 -> 4, each capped at 60 s.
+  # Chaining on the PREVIOUS firing would have produced a single
+  # 270-second "event" out of the same ten firings.
+  len(PI.dedup_fires([_f('NQ', 'A1', 1, 30.0 * i, 'r', 1)
+                      for i in range(10)])) == 4)
+
+t('P9d: opposite directions at the same instant are never merged',
+  len(PI.dedup_fires([_f('NQ', 'A1', 1, 5.0, 'r', 1),
+                      _f('NQ', 'A1', -1, 5.0, 'r', 1)])) == 2)
+
+t('P9e: different families at the same instant are never merged',
+  len(PI.dedup_fires([_f('NQ', 'A1', 1, 5.0, 'r', 1),
+                      _f('NQ', 'A2', 1, 5.0, 'r', 1)])) == 2)
+
+t('P9f: a burst straddling a run rotation is flagged, because a markout '
+  'is only valid inside one run',
+  PI.dedup_fires([_f('NQ', 'A1', 1, 5.0, 'rA', 1),
+                  _f('NQ', 'A1', 1, 6.0, 'rB', 1)])[0]['spans_runs'] is True)
+
+t('P9g: only the NQ signal source is labelled as such; MNQ firings are '
+  'labelled, never discarded',
+  sum(1 for e in EV if e['is_signal_source']) == 2 and
+  sum(1 for e in EV if not e['is_signal_source']) == 1 and
+  len(EV) == 3)
+
+t('P9h: de-duplication never mutates the frozen raw fires list',
+  BURST[0]['t'] == 100.0 and len(BURST) == 9 and
+  all('n_fires' not in fr for fr in BURST))
+
+t('P9i: the primary markout horizon is 300 s and every horizon the 1.0 '
+  'report carried is still present',
+  PI.PRIMARY_MARKOUT_S == 300.0 and
+  set((1.0, 5.0, 10.0, 30.0, 60.0, 180.0)) <= set(PI.MARKOUT_S) and
+  {300.0, 600.0, 1800.0} <= set(PI.MARKOUT_S))
 
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)

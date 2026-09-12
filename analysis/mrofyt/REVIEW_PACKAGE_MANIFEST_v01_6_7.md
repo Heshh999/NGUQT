@@ -15,9 +15,9 @@ cb1ac7fa10b59955a467d140e7c17b9318eea525adb29b42c07cb15f64de1057  mrofyt_swings_
 b6bd0b05f48a6e26871df69c97fde97112a19d3f4b17da7edf280caa5bdc354d  mrofyt_exits_v017.py
 0df5357cce0d0c77c6f38759c757086a067ea90aef8efc1d373a766bbc8fe7f9  tests_mrofyt_v01_7.py
 cbd25e6df806db216cf480a3445f1628fc56dff95ea0d903dc197b91ac7b4791  MROF_YT_OF01_7_EXIT_FREEZE.md
-a6504d0f991271b6fe9af7f8ddf1d2686700bd91669792bfd0f89079d5ebe3d9  mrofyt_pilot.py
-acf033b6bb49367fe347f1a133c5821d98c24c73f8941bdcdb421a763e9a459c  tests_mrofyt_pilot.py
-8ab588facfbade92b6be20943dc1888cff2e52f7333f7291f85ed73684e2dd7c  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md
+3bd2b115aa219bf14420a2e536e867689fd782db1168574c306d3918c6ae1367  mrofyt_pilot.py (MROF-YT-PILOT-1.1; supersedes a6504d0f… — event de-duplication and the 300/600/1800 s horizons, measurement only; see FINDINGS Amendment 1)
+a1b5cf762d06bec44ffa74fa373adb2ba832d850d688acaf5cfb7451cb16be6a  tests_mrofyt_pilot.py (27 tests; supersedes acf033b6…)
+4624b199298935b72a2f906663ce7fd9b0b40f0d59be8e06f026b4771e6ac1d4  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md (supersedes 8ab588fa… — Amendment 1)
 50d0ddc78814725011714faf01b1da0d45053d3612cb08095230496ac641c1a2  MROF_ACTUAL_STATE_INVENTORY.md
 ```
 
@@ -34,16 +34,16 @@ Archived source directive:
 55d598a3c2e5453b9c47675f76932455dca8689084fddfd4535e5b4907def942  ../../docs/prompts/MROF_ONE_COMPLETE_CLAUDE_PROMPT_1.md
 ```
 
-Delivered package (94 files, repo layout preserved so every suite runs
+Delivered package (85 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-aaf152161199f6b2f7a46d17c04f04911fe18b88283a30dfc700cb05933084d2  MROF_V1_Engine_v01_6_7.zip
+39b4736d25973f4ae42c4a4148d0ba98720eedaad89c1218811cae514e41a3a4  MROF_V1_Engine_v01_6_7.zip (supersedes aaf15216… — pilot 1.1)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
-# run from inside the unzipped package: 370/370, identical to the repo
+# run from inside the unzipped package: 383/383, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -67,9 +67,9 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | suite | result |
 | --- | --- |
 | `tests_mles_v11.py` | 29/29 |
-| `tests_mles_v12.py` | 37/37 |
+| `tests_mles_v12.py` | 41/41 |
 | `tests_mrofyt.py` | 59/59 |
-| `tests_mrofyt_pilot.py` | 18/18 |
+| `tests_mrofyt_pilot.py` | 27/27 |
 | `tests_mrofyt_runner.py` | 11/11 |
 | `tests_mrofyt_v01_1.py` | 56/56 |
 | `tests_mrofyt_v01_2.py` | 31/31 |
@@ -78,7 +78,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| **total** | **370/370** |
+| **total** | **383/383** |
 
 ## Runnable research commands
 

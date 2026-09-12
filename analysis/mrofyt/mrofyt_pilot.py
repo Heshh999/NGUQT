@@ -35,9 +35,31 @@ import mrofyt_levels as LV
 import mrofyt_runner as RUN
 import mrofyt_signals as SIG
 
-PILOT_VERSION = 'MROF-YT-PILOT-1.0'
+PILOT_VERSION = 'MROF-YT-PILOT-1.1'
 EXPOSURE_LABEL = 'EXPOSED_PILOT_DEV'
-MARKOUT_S = (1.0, 5.0, 10.0, 30.0, 60.0, 180.0)
+
+# Horizons. 300 s is PRIMARY: the operator's own recorded discretionary
+# holding period averages ~4 min (longest 8 min 3 s), so 5 min is the
+# horizon that matches how this would actually be traded. 600/1800 are
+# secondary and bracket the frozen MAX_HOLD_S=1800 cap. Registered here
+# BEFORE the data that will be read at these horizons exists.
+MARKOUT_S = (1.0, 5.0, 10.0, 30.0, 60.0, 180.0, 300.0, 600.0, 1800.0)
+PRIMARY_MARKOUT_S = 300.0
+
+# De-duplication. The runner has no position model and no consumption:
+# _fire records EVERY non-zero detector return, so one market event can
+# be recorded many times - by the same approach on consecutive windows,
+# and by several coincident approaches to nearby levels. Counting those
+# as separate signals inflates the population and, worse, weights one
+# event several times inside a median. The raw fires list is never
+# modified; this is a derived view.
+EVENT_COOLDOWN_S = 60.0          # default: matches A1's frozen approaches_60s lookback
+COOLDOWN_GRID = (10.0, 60.0, 300.0)
+
+# Under the operator's own NQ-signal / MNQ-execution topology only NQ is
+# a signal source. The runner evaluates both instruments and that stays
+# true; this labels which fires are signals rather than discarding any.
+SIGNAL_SOURCE_INSTRUMENT = 'NQ'
 
 # The frozen detectors, decomposed into the exact ordered stages the
 # source in mrofyt_signals.py applies. A window is attributed to the
@@ -335,11 +357,101 @@ def step5_funnel(windows, ledger):
 # ---------------------------------------------------------------------
 # steps 6-8
 # ---------------------------------------------------------------------
+def dedup_fires(fires, cooldown=EVENT_COOLDOWN_S):
+    """Collapse raw firings into DISTINCT EVENTS.
+
+    Two firings belong to the same event when they share instrument,
+    session, family and direction and the later one starts within
+    `cooldown` of the event's FIRST firing. Anchoring on the first
+    firing - not on the previous one - bounds every event at `cooldown`
+    seconds, so a dense burst cannot chain into one arbitrarily long
+    event.
+
+    The approach id is deliberately NOT part of the key. Coincident
+    approaches to nearby levels produce different approach ids for what
+    is plainly one market event (six MNQ firings inside 7.4 s across
+    approaches 3551-3559 in the seven-session pilot), and keying on the
+    approach would leave those uncollapsed.
+
+    Returns events in time order. Each carries the first firing's run
+    and timestamp, which is what a markout must be measured from.
+    """
+    by = collections.defaultdict(list)
+    for fr in fires:
+        by[(fr['instrument'], fr['session'], fr['family'],
+            fr['direction'])].append(fr)
+    events = []
+    for (inst, ses, fam, d), lst in by.items():
+        lst.sort(key=lambda f: f['t'])
+        cur = None
+        for fr in lst:
+            if cur is None or fr['t'] - cur['t'] > cooldown:
+                cur = dict(instrument=inst, session=ses, family=fam,
+                           direction=d, t=fr['t'], t_last=fr['t'],
+                           run=fr.get('run'), n_fires=1,
+                           approaches=[fr.get('approach')],
+                           levels=[fr.get('level')],
+                           runs=[fr.get('run')],
+                           state=fr.get('state'),
+                           is_signal_source=(
+                               inst == SIGNAL_SOURCE_INSTRUMENT))
+                events.append(cur)
+            else:
+                cur['t_last'] = fr['t']
+                cur['n_fires'] += 1
+                cur['approaches'].append(fr.get('approach'))
+                cur['levels'].append(fr.get('level'))
+                cur['runs'].append(fr.get('run'))
+    for e in events:
+        e['approaches'] = sorted(set(e['approaches']))
+        e['levels'] = sorted(set(x for x in e['levels'] if x is not None))
+        e['span_s'] = round(e['t_last'] - e['t'], 3)
+        # a markout is measured inside ONE run; if a burst straddled a
+        # rotation say so rather than silently using the first run
+        e['spans_runs'] = len(set(e['runs'])) > 1
+        del e['runs']
+    events.sort(key=lambda e: (e['session'], e['t']))
+    return events
+
+
 def step6_signals(ledger):
-    return dict(fires=ledger.get('fires', []),
-                count=len(ledger.get('fires', [])),
-                by_family={k[6:]: v for k, v in ledger['totals'].items()
-                           if k.startswith('fires_')})
+    fires = ledger.get('fires', [])
+    events = dedup_fires(fires, EVENT_COOLDOWN_S)
+    sig = [e for e in events if e['is_signal_source']]
+
+    def _fam(evs):
+        c = collections.Counter(e['family'] for e in evs)
+        return dict(sorted(c.items()))
+
+    sensitivity = {}
+    for cd in COOLDOWN_GRID:
+        evs = dedup_fires(fires, cd)
+        sensitivity['%gs' % cd] = dict(
+            distinct_events=len(evs),
+            signal_source_only=sum(1 for e in evs if e['is_signal_source']))
+
+    return dict(
+        fires=fires,
+        count=len(fires),
+        by_family={k[6:]: v for k, v in ledger['totals'].items()
+                   if k.startswith('fires_')},
+        raw_fire_caveat='count is RAW firings. The runner has no position '
+                        'model and no consumption, so one market event can '
+                        'be recorded many times. Use distinct_events.',
+        dedup=dict(
+            cooldown_s=EVENT_COOLDOWN_S,
+            signal_source_instrument=SIGNAL_SOURCE_INSTRUMENT,
+            distinct_events=len(events),
+            distinct_events_by_family=_fam(events),
+            distinct_events_by_instrument=dict(sorted(
+                collections.Counter(e['instrument']
+                                    for e in events).items())),
+            signal_source_events=len(sig),
+            signal_source_events_by_family=_fam(sig),
+            inflation_ratio=(round(len(fires) / len(events), 2)
+                             if events else None),
+            events=events,
+            cooldown_sensitivity=sensitivity))
 
 
 def _describe(vals):
@@ -364,15 +476,30 @@ def step7_markouts(runner, ledger):
     and call the result evidence. The window-level block below is
     reported separately, is explicitly not a signal population, and
     carries no directional claim: an approach is not a trade."""
-    sig = {}
-    for h in MARKOUT_S:
-        vals = []
-        for fr in ledger.get('fires', []):
-            m = runner.markout(fr['instrument'], fr.get('run'),
-                               fr['t'], h)
-            if m is not None:
-                vals.append(fr['direction'] * m)
-        sig['%gs' % h] = _describe(vals)
+    def _marks(pop):
+        out = {}
+        for h in MARKOUT_S:
+            vals = []
+            for e in pop:
+                m = runner.markout(e['instrument'], e.get('run'), e['t'], h)
+                if m is not None:
+                    vals.append(e['direction'] * m)
+            out['%gs' % h] = _describe(vals)
+        return out
+
+    events = dedup_fires(ledger.get('fires', []), EVENT_COOLDOWN_S)
+    sig_src = [e for e in events if e['is_signal_source']]
+    # RAW firings, kept only for continuity with the 1.0 report. A
+    # duplicated event enters this median several times, so it is not
+    # the population to read.
+    sig = _marks(ledger.get('fires', []))
+    by_family = {}
+    for fam in sorted(set(e['family'] for e in events)):
+        by_family[fam] = dict(
+            all_instruments=_marks([e for e in events
+                                    if e['family'] == fam]),
+            signal_source_only=_marks([e for e in sig_src
+                                       if e['family'] == fam]))
     win = {}
     for h in MARKOUT_S:
         vals = []
@@ -385,7 +512,19 @@ def step7_markouts(runner, ledger):
     return dict(
         signal_population=('NO_FROZEN_SIGNALS'
                            if not ledger.get('fires') else 'FROZEN_SIGNALS'),
-        signal_markouts_signed_ticks=sig,
+        primary_horizon_s=PRIMARY_MARKOUT_S,
+        primary_horizon_rationale='matches the operator recorded average '
+                                  'holding period (~4 min); registered '
+                                  'before the data read at it exists',
+        event_markouts_signed_ticks=_marks(events),
+        event_markouts_signal_source_only=_marks(sig_src),
+        event_markouts_by_family=by_family,
+        event_population=dict(distinct_events=len(events),
+                              signal_source_events=len(sig_src),
+                              cooldown_s=EVENT_COOLDOWN_S),
+        raw_fire_markouts_signed_ticks=sig,
+        raw_fire_caveat='RAW firings; a duplicated event enters this median '
+                        'several times. Read event_markouts_* instead.',
         window_reference_unsigned_ticks=win,
         window_reference_caveat='Decision windows are not signals and this '
                                 'block is not directional evidence; it exists '
@@ -484,9 +623,15 @@ def verdicts(step1, cov, funnel, sigs, health, ledger):
             starved[fam] = sorted(mi.items(), key=lambda kv: -kv[1])[:3]
 
     if sigs['count'] > 0:
+        dd = sigs['dedup']
         promise = 'MIXED_PILOT'
-        why = ('signals exist; their markouts decide the label and must be '
-               'read from step 7')
+        why = ('%d raw firings collapse to %d distinct events (%d from the '
+               '%s signal source); their markouts decide the label and must '
+               'be read from step 7 at the primary horizon, on the EVENT '
+               'population, not the raw firings'
+               % (sigs['count'], dd['distinct_events'],
+                  dd['signal_source_events'],
+                  dd['signal_source_instrument']))
     else:
         promise = 'NOT_OBSERVED'
         why = ('zero frozen signals were produced, so no hypothesis was '
@@ -623,7 +768,31 @@ def text_summary(rep):
     L.append('approaches=%d windows=%d levels seen=%s'
              % (ce['approaches_total'], ce['windows_total'],
                 ','.join(ce['by_level']) or 'none'))
-    L.append('frozen signals: %d' % rep['step6_frozen_signals']['count'])
+    s6 = rep['step6_frozen_signals']
+    dd = s6['dedup']
+    L.append('frozen signals: %d raw firings -> %d distinct events '
+             '(cooldown %gs%s)'
+             % (s6['count'], dd['distinct_events'], dd['cooldown_s'],
+                (', inflation %.2fx' % dd['inflation_ratio'])
+                if dd['inflation_ratio'] else ''))
+    L.append('   distinct events by family:     %s'
+             % (dd['distinct_events_by_family'] or 'none'))
+    L.append('   distinct events by instrument: %s'
+             % (dd['distinct_events_by_instrument'] or 'none'))
+    L.append('   signal-source (%s) events:     %d   %s'
+             % (dd['signal_source_instrument'], dd['signal_source_events'],
+                dd['signal_source_events_by_family'] or 'none'))
+    L.append('   cooldown sensitivity: %s'
+             % {k: v['distinct_events']
+                for k, v in sorted(dd['cooldown_sensitivity'].items())})
+    m7 = rep['step7_descriptive_markouts']
+    pk = '%gs' % m7['primary_horizon_s']
+    pm = m7['event_markouts_signal_source_only'].get(pk, {})
+    L.append('primary markout %s (signal-source events): %s'
+             % (pk, ('n=%d median=%+.2f ticks frac_positive=%.3f'
+                     % (pm['n'], pm['median'], pm['frac_positive']))
+                if pm.get('n') else 'n=0 (no forward coverage at this '
+                                    'horizon)'))
     L.append('')
     L.append('ANSWER 1 - IS THE SYSTEM WORKING?  %s'
              % v['answer_1_is_the_system_working']['verdict'])
