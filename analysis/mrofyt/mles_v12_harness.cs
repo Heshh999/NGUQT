@@ -191,6 +191,15 @@ public static class MlesV12Harness
             c.OnTrade(s, k, 15000.25, 1, ex);          // ready interval
             c.OnConnection(s, k, "DISCONNECTED", "DISCONNECTED");
             c.OnTrade(s, k, 15000.25, 1, ex);          // suppressed
+            // A depth row INSIDE the disconnect gap. Real disconnects
+            // always have these (rows already queued keep draining), and
+            // their absence here is exactly why the spurious-BOOK_READY
+            // defect survived this suite: before the repair the gate
+            // maxima were not reset on disconnect, so this single row
+            // re-emitted BOOK_READY with no resync and no rebuild, and
+            // the research runner re-armed on a book the recorder had
+            // just declared invalid. It must produce NO ready.
+            c.OnDepth(s, k, "UPDATE", "BID", 0, 15000.0, 7, ex);
             c.OnConnection(s, k, "CONNECTED", "CONNECTED");
             c.OnTrade(s, k, 15000.25, 1, ex);          // still suppressed
             for (int l = 0; l < 3; l++)                // full resync

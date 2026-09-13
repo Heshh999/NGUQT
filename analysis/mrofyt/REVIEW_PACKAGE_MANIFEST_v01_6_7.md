@@ -38,12 +38,12 @@ Delivered package (85 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-39b4736d25973f4ae42c4a4148d0ba98720eedaad89c1218811cae514e41a3a4  MROF_V1_Engine_v01_6_7.zip (supersedes aaf15216… — pilot 1.1)
+474c15d967fef4252e4fd6f076d45700149aa3ca8d0f27f72a564f6d0f7af3cb  MROF_V1_Engine_v01_6_7.zip (supersedes 39b4736d… — pilot 1.1, recorder BOOK_READY repair, depth-completeness guard. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
-# run from inside the unzipped package: 383/383, identical to the repo
+# run from inside the unzipped package: 386/386, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -67,7 +67,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | suite | result |
 | --- | --- |
 | `tests_mles_v11.py` | 29/29 |
-| `tests_mles_v12.py` | 41/41 |
+| `tests_mles_v12.py` | 44/44 |
 | `tests_mrofyt.py` | 59/59 |
 | `tests_mrofyt_pilot.py` | 27/27 |
 | `tests_mrofyt_runner.py` | 11/11 |
@@ -78,7 +78,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| **total** | **383/383** |
+| **total** | **386/386** |
 
 ## Runnable research commands
 
@@ -110,3 +110,28 @@ feed. **A stub compile is not an API validation.**
 
 Classification: **`IMPLEMENTATION_COMPLETE` / `INSUFFICIENT_DATA` /
 `MARKET_RESEARCH_NOT_RUN` / `PROSPECTIVE_VALIDATION_NOT_STARTED`.**
+
+## Amendment: two integrity repairs (2026-09-13)
+
+Recorded in full in `REVIEW_PACKAGE_MANIFEST_v12.md`; summarised here
+because both change files this package ships.
+
+```
+72f0ac2943f16d1431020db3d96a8d74d81b5b71ea7d456a7218dd96a9f66809  ../../src/MlesV12CaptureHost.cs
+b0a2c0266015aeabed8855801afbdca89ba9ecc2232a91e397890e6fcffc1021  mles_v12_audit.py
+3d8812b9d286b754bdd01050f4714c3dea1de13c5d59e27a5274903fc180c405  mles_v12_harness.cs
+729c34f05887c7b7913604edc50ed25c43d8436fe57f3d51f1825ecc53ade78b  tests_mles_v12.py
+```
+
+1. **Recorder: spurious `BOOK_READY` after a disconnect.** The gate
+   maxima were not reset when the book was invalidated, so the next
+   depth row re-emitted `BOOK_READY` with no resync — and
+   `mrofyt_runner.py` re-armed on it. Pinned by `T31`. **Needs a real
+   NinjaTrader F5 recompile to take effect.**
+2. **Auditor: `MISSING_DEPTH_ACTION` had no minimum-row guard**, so
+   near-empty runs (a closed market, a few seconds before shutdown)
+   failed a completeness claim they could not support. Pinned by `T32`
+   and `T32b`. Analysis-side only, no recompile.
+
+The lifecycle harness gained a depth row inside the disconnect gap —
+its absence is precisely why defect 1 survived the suite.

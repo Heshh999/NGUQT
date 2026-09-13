@@ -561,9 +561,33 @@ namespace Mles.Capture.V12
             {
                 run.Connected = false;
                 run.BookReady = false;        // stale book is invalid
+                // The BOOK_READY gate in HandleDepth is
+                //   !BookReady && MaxBidLvl+1 >= declaredDepth && ...
+                // and those maxima never decrease. Clearing BookReady
+                // alone re-satisfies the gate on the very next depth
+                // row, re-emitting BOOK_READY with no resync and no
+                // actual rebuild -- and the research runner treats
+                // BOOK_READY as permission to re-arm, so it would then
+                // evaluate decision windows against a book this line
+                // has just declared invalid. Reset the gate maxima with
+                // it. RunMaxBidLvl/RunMaxAskLvl are the run-lifetime
+                // figures reported in the manifest: left untouched.
+                run.MaxBidLvl = run.MaxAskLvl = -1;
                 run.NBookReset++;
                 Quality(ev.RecvUtc, "DISCONNECT",
                         "seg=" + run.SegId + " book invalidated");
+                // The resync is required from THIS instant, not from
+                // the reconnect: rows already queued can rebuild the
+                // book before the reconnect event lands. Emitting the
+                // marker here keeps "every BOOK_READY is preceded by a
+                // BOOK_RESYNC_START" true by construction. The
+                // reconnect path emits its own, so a cycle yields two
+                // resyncs for at most one ready -- the conservative
+                // direction, which can never cause a false audit
+                // failure.
+                Quality(ev.RecvUtc, "BOOK_RESYNC_START",
+                        "declaredDepth=" +
+                        declaredDepth.ToString(CultureInfo.InvariantCulture));
             }
             else if (up && !run.Connected)
             {

@@ -244,14 +244,34 @@ man = disco['manifest']
 t('T13: disconnect invalidates the book (DISCONNECT logged; '
   'suppressed intervals flagged; bookResets not zero)',
   disco['ok'] and man['bookResets'] == 1 and
-  disco['info']['suppressed_rows'] == 14 and
+  disco['info']['suppressed_rows'] == 15 and
   any(e['stream'] == 'QUALITY' and e['kind'] == 'DISCONNECT'
       for e in disco['events']))
-t('T14: reconnect requires COMPLETE resynchronization (segId 2, two '
-  'resync starts, two BOOK_READY)',
+t('T14: reconnect requires COMPLETE resynchronization (segId 2, a '
+  'resync marker at BOTH the disconnect and the reconnect, two '
+  'BOOK_READY)',
   man['connectionSegments'] == 2 and man['reconnects'] == 1 and
-  disco['info']['book_resync_starts'] == 2 and
+  disco['info']['book_resync_starts'] == 3 and
   disco['info']['book_ready'] == 2)
+# The defect this pins: on disconnect the recorder cleared BookReady but
+# left the gate maxima (MaxBidLvl/MaxAskLvl) at full depth, and those
+# never decrease -- so the next depth row re-satisfied the gate and
+# re-emitted BOOK_READY with no resync and no rebuild. The research
+# runner treats BOOK_READY as permission to re-arm, so it would evaluate
+# decision windows against a book the recorder had just invalidated. It
+# went unseen because the harness sent only trades inside the gap; it
+# now sends a depth row there (harness line ~193).
+_dq = [e for e in disco['events'] if e['stream'] == 'QUALITY']
+_kinds = [e['kind'] for e in _dq]
+_i_dis = _kinds.index('DISCONNECT')
+_i_rec = _kinds.index('RECONNECT')
+t('T31: a depth row inside the disconnect gap produces NO BOOK_READY, '
+  'and the disconnect emits its own BOOK_RESYNC_START so every ready '
+  'stays preceded by a resync',
+  'BOOK_READY' not in _kinds[_i_dis:_i_rec] and
+  _kinds[_i_dis + 1] == 'BOOK_RESYNC_START' and
+  disco['info']['book_ready'] <= disco['info']['book_resync_starts'] and
+  disco['ok'])
 # CONN control events must not consume published seqs: the instance
 # union stays gapless and every file stays monotone even with
 # disconnect/reconnect traffic; the occurrence instant survives in the
@@ -514,6 +534,48 @@ try:
 except AD.UnknownEnumError:
     bad = True
 t('adapter: unknown stream enum rejected, never silently ignored', bad)
+
+
+# ---- T32: depth completeness needs enough depth rows to assert -------
+# Two genuine runs tripped MISSING_DEPTH_ACTION in the first nine
+# recorded sessions -- 20260905 (608 rows; the market was shut at 18:04
+# ET Friday) and 20260908 (70 rows). A run that small legitimately never
+# sees a REMOVE, so failing it is a false positive. The rule now needs
+# 20 * declaredDepth depth rows before it asserts anything; a live NQ
+# run carries tens of millions, so no feed defect can hide behind it.
+def _strip_removes(d):
+    """Drop every REMOVE depth row and re-stamp the manifest so the run
+    is self-consistent apart from the genuinely absent action."""
+    mp = glob.glob(os.path.join(d, '*_manifest.json'))[0]
+    man = json.load(open(mp))
+    dp = os.path.join(d, man['depth']['file'])
+    rows = open(dp).read().splitlines(True)
+    keep = [rows[0]] + [r for r in rows[1:] if ',REMOVE,' not in r]
+    open(dp, 'w').writelines(keep)
+    man['depth'].update(rows=len(keep) - 1, bytes=os.path.getsize(dp),
+                        sha256=sha(dp))
+    json.dump(man, open(mp, 'w'))
+    return mp
+
+
+_small = os.path.join(WORK, 'dsmall')
+_big = os.path.join(WORK, 'dbig')
+SY.synth_run(_small, n_depth=60, cid='dsmall')     # 60 < 20*10
+SY.synth_run(_big, n_depth=4000, cid='dbig')       # 4000 >= 20*10
+_rs = AU.audit_run(_strip_removes(_small))
+_rb = AU.audit_run(_strip_removes(_big))
+_cs = {c for c, _ in _rs['failures']}
+_cb = {c for c, _ in _rb['failures']}
+t('T32: a near-empty run with a genuinely absent REMOVE does NOT raise '
+  'MISSING_DEPTH_ACTION, and says the check was skipped',
+  'MISSING_DEPTH_ACTION' not in _cs and
+  _rs['info']['depth_completeness_checked'] is False and
+  'depth_completeness_skipped' in _rs['info'])
+t('T32b: the identical absence in a run with enough depth rows STILL '
+  'fails, so the guard cannot hide a real feed defect',
+  'MISSING_DEPTH_ACTION' in _cb and
+  _rb['info']['depth_completeness_checked'] is True and
+  'REMOVE' not in _rb['info']['depth_actions'])
 
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)

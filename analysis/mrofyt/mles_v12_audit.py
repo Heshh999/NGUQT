@@ -333,12 +333,31 @@ def audit_run(manifest_path, lite=True):
     # ---- depth sides, actions, levels --------------------------------
     info['depth_sides'] = sorted(depth_sides)
     info['depth_actions'] = sorted(depth_actions)
-    for need in ('BID', 'ASK'):
-        if need not in depth_sides:
-            _fail(fails, 'MISSING_DEPTH_SIDE', need)
-    for need in ('ADD', 'UPDATE', 'REMOVE'):
-        if need not in depth_actions:
-            _fail(fails, 'MISSING_DEPTH_ACTION', need)
+    # Completeness of sides/actions is only assertable on a run that
+    # carried enough depth activity to expect them. A near-empty run --
+    # a closed-market fragment, or a few seconds before an orderly
+    # shutdown -- legitimately never sees a REMOVE, and failing it for
+    # that is a false positive, not a detection. Two genuine runs in the
+    # first nine recorded sessions tripped this: 20260905 (608 rows; the
+    # market was shut, 18:04 ET Friday) and 20260908 (70 rows). The
+    # floor is deliberately far below any real session -- a live NQ/MNQ
+    # run carries tens of millions of depth rows -- so no feed defect
+    # can hide behind it.
+    n_depth = n_bid + n_ask
+    min_rows = 20 * (man.get('declaredDepth') or 10)
+    info['depth_rows'] = n_depth
+    info['depth_completeness_checked'] = n_depth >= min_rows
+    if n_depth >= min_rows:
+        for need in ('BID', 'ASK'):
+            if need not in depth_sides:
+                _fail(fails, 'MISSING_DEPTH_SIDE', need)
+        for need in ('ADD', 'UPDATE', 'REMOVE'):
+            if need not in depth_actions:
+                _fail(fails, 'MISSING_DEPTH_ACTION', need)
+    else:
+        info['depth_completeness_skipped'] = (
+            '%d depth rows < %d; sides/actions are not assertable on a '
+            'run this small' % (n_depth, min_rows))
     mb, ma = max_bid + 1, max_ask + 1
     info['depth_max_bid_obs'] = mb
     info['depth_max_ask_obs'] = ma

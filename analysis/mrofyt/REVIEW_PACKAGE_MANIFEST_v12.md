@@ -8,8 +8,8 @@ THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
 ## Authoritative recorder (MLES-CAPTURE-1.2)
 
 ```
-95b9380f2ff423c3d550083fb365da3ffce8b9ece72a0b437e3d7d6231405aef  src/MlesV12CaptureHost.cs
-2fa364b3350bece8c7cc86a6bd693118620f79a197748dfa1c454311f47396ff  analysis/mrofyt/MROF_V1_Engine_v12.zip (delivered artifact, 28 files, build 1.2.1; recorder inside byte-identical to src/MlesV12CaptureHost.cs — proved by tests T22. Supersedes freeze-time zip 3b2ec6b4… (20 files) — build 1.2.1 recorder, streaming auditor, outcome-blind runner, runbook; see MLES_CAPTURE_V12_FREEZE.md §9 and §11)
+72f0ac2943f16d1431020db3d96a8d74d81b5b71ea7d456a7218dd96a9f66809  src/MlesV12CaptureHost.cs (supersedes 95b9380f… — spurious BOOK_READY after a disconnect; REQUIRES an F5 recompile, see §Amendment below)
+ba2704adaf4d67898ccfd4678863d961639fbd2326b2f06b4bfc449d7f837223  analysis/mrofyt/MROF_V1_Engine_v12.zip (delivered artifact, 28 files, build 1.2.1; recorder inside byte-identical to src/MlesV12CaptureHost.cs — proved by tests T22. Supersedes freeze-time zip 3b2ec6b4… (20 files) — build 1.2.1 recorder, streaming auditor, outcome-blind runner, runbook; see MLES_CAPTURE_V12_FREEZE.md §9 and §11)
 dab3abec22e16255cd27d198200125c5cd6a44192e7ff07d53ce798c755dd63d  src/MlesV1CaptureHost.cs (immutable archive lineage — do not install)
 17a8c347d39e7187f81d7ca1fd6c7161440a8d1bfdc49823f23d1553c419815e  src/MlesV11CaptureHost.cs (immutable archive lineage — do not install)
 ```
@@ -25,10 +25,10 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|Account\.|EnterLong|EnterShort" sr
 
 ```
 be29c36a62624ab5e18e67d104eb4e9323abcda4bf5faf1c88c54486fc446f4a  analysis/mrofyt/nt8_stubs_v12.cs
-ff2cb79e2ac64c80f84a4dce8ca6ee3c255b7137a21903e777774ab2db3dbeb7  analysis/mrofyt/mles_v12_harness.cs
+3d8812b9d286b754bdd01050f4714c3dea1de13c5d59e27a5274903fc180c405  analysis/mrofyt/mles_v12_harness.cs (supersedes ff2cb79e… — the disconnect gap now carries a depth row, which is what the old fixture was missing)
 12ab264bb466bbf1f48943c95b65ae524d9a142a249c94c3337ca186a3d23861  analysis/mrofyt/mles_v12_adapter.py
-b17a47325acf73cb596dd1d7c899496b4923a793069e0ac294b72fc88ab3c92a  analysis/mrofyt/mles_v12_audit.py
-4014a8d3fbff29ceee9c47357bc72f0e711e26dd9cadf68c70a8fac80d9ec186  analysis/mrofyt/tests_mles_v12.py
+b0a2c0266015aeabed8855801afbdca89ba9ecc2232a91e397890e6fcffc1021  analysis/mrofyt/mles_v12_audit.py (supersedes b17a4732… — depth completeness needs enough depth rows to assert)
+729c34f05887c7b7913604edc50ed25c43d8436fe57f3d51f1825ecc53ade78b  analysis/mrofyt/tests_mles_v12.py (44 tests; supersedes 4014a8d3…)
 1635f0391449260d1a15c0780a54728523834f3df4505e755ad400d63a510812  analysis/mrofyt/RECORDER_DEPLOYMENT_V12.md
 65b2948c0b7877d70d71aa7a12cac2326d740ad9c0aa98d4f1b608e4f12e33a0  analysis/mrofyt/DATA_HANDOFF_V12.md
 15c3ef12b43cb0e059eb317da9c7ddd976971965009252aaa4357cc7a6195361  analysis/mrofyt/SETUP_WALKTHROUGH_V12.md
@@ -43,7 +43,7 @@ Reproduce the entire proof (mcs + mono lifecycle harness + audits +
 adversarial fixtures + package byte-identity):
 
 ```
-cd analysis/mrofyt && python3 tests_mles_v12.py      # 41/41
+cd analysis/mrofyt && python3 tests_mles_v12.py      # 44/44
 cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 11/11
 ```
 
@@ -54,7 +54,7 @@ restart, disconnect/reconnect, NQ+MNQ pairing), audits the genuine
 output and then attacks the auditor with falsified fixtures.
 
 Predecessor suites (byte-identical, re-run at freeze): 59+56+31+32+
-25+36+29+42+15 = 325, all passing; grand total 374/374 across twelve suites at this revision.
+25+36+29+42+15 = 325, all passing; grand total 386/386 across twelve suites at this revision.
 
 ## Correction of record
 
@@ -110,3 +110,70 @@ when the instance has an open run, and keeps `INSTANCE_SEQ_GAP` for
 everything else - a hole or an overlap is never explained by an open run.
 Pinned by T30/T30b, which build the two-run fixture with a genuine seq
 offset rather than a hand-edited manifest.
+
+## Amendment: spurious BOOK_READY after a disconnect (recorder defect)
+
+Found 2026-09-13 by the `BOOK_READY_WITHOUT_RESYNC` failures on sessions
+2026-09-10 and 2026-09-11 — the two sessions carrying 61 of the 66
+de-duplicated signal events. The auditor rule was **right**; the
+recorder was wrong.
+
+On disconnect (`HandleConn`) the recorder cleared `BookReady` but left
+`MaxBidLvl`/`MaxAskLvl` at full depth, and those maxima never decrease.
+The gate in `HandleDepth` is
+
+```csharp
+if (!run.BookReady && run.MaxBidLvl + 1 >= declaredDepth &&
+    run.MaxAskLvl + 1 >= declaredDepth)
+```
+
+so the **next depth row after any disconnect re-emitted `BOOK_READY`**
+with no resync and no rebuild. Each disconnect/reconnect cycle therefore
+produced two readies for one resync — 5 resyncs and 9 readies on
+2026-09-10 is exactly four cycles.
+
+It is not cosmetic. `mrofyt_runner.py` treats `BOOK_READY` as permission
+to re-arm (`st.ready = True`), and `DISCONNECT` as the disarm. The
+spurious ready **re-armed the research runner on a book the recorder had
+just declared invalid**, so some decision windows in those runs were
+evaluated against a stale book.
+
+Repair, both in `HandleConn`'s disconnect branch:
+
+1. reset the gate maxima with `BookReady`. `RunMaxBidLvl`/`RunMaxAskLvl`
+   are the run-lifetime manifest figures and stay untouched.
+2. emit `BOOK_RESYNC_START` at the disconnect as well. The resync is
+   required from that instant, not from the reconnect — rows already
+   queued can rebuild the book before the reconnect event lands — so
+   this makes "every `BOOK_READY` is preceded by a `BOOK_RESYNC_START`"
+   true by construction. A cycle now yields two resyncs for at most one
+   ready: the conservative direction, which can never cause a false
+   audit failure.
+
+**Why the suite missed it.** The lifecycle harness sent only trades
+inside the disconnect gap, never a depth row — so the gate was never
+re-tested while the book was invalid. Real disconnects always have depth
+rows. The harness now sends one there, and `T31` asserts that it
+produces no ready. `T14` moves from 2 resyncs to 3.
+
+**This repair requires a real NinjaTrader F5 recompile.** Until the
+operator recompiles, sessions recorded by the old build keep the
+spurious readies, and the affected windows keep the caveat.
+
+## Amendment: depth completeness needs enough depth rows to assert
+
+`MISSING_DEPTH_ACTION` was asserted unconditionally. Two genuine runs
+tripped it: 2026-09-05 (608 rows — the market was shut, 18:04 ET Friday)
+and 2026-09-08 (70 rows). A run that small legitimately never sees a
+`REMOVE`, so the failure was a false positive, not a detection — the
+same class of defect as the `BOOK_READY` off-by-one.
+
+Sides and actions are now asserted only above `20 * declaredDepth` depth
+rows (200 for a 10-level book), and `depth_completeness_checked` /
+`depth_completeness_skipped` record which happened. A live NQ/MNQ run
+carries tens of millions of depth rows, so no feed defect can hide
+behind the floor. `T32` pins the skip; `T32b` pins that the identical
+absence in a large run still fails.
+
+Together these clear 4 of the 10 `RUN_AUDIT_FAILED` entries as false
+positives and explain the other 6.
