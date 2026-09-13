@@ -25,7 +25,7 @@ Modified (one file, additively — a skip path, an observation hook and a
 run-id field):
 
 ```
-3a765f3c304b0c23c5efbaaf3aaead7b66d6b67aaa385dbe9bb153d34f28bfc4  mrofyt_runner.py
+99c9b2778809d5ab0b93b6374e2db772312cb61a764ca839ee8244eb8d2867a5  mrofyt_runner.py (supersedes 3a765f3c… — retroactive disconnect-gap correction, see REVIEW_PACKAGE_MANIFEST_v12.md)
 ```
 
 Archived source directive:
@@ -38,12 +38,12 @@ Delivered package (85 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-474c15d967fef4252e4fd6f076d45700149aa3ca8d0f27f72a564f6d0f7af3cb  MROF_V1_Engine_v01_6_7.zip (supersedes 39b4736d… — pilot 1.1, recorder BOOK_READY repair, depth-completeness guard. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+61e670036c411965befd5bbc121d64bcd87848c293d9c69614467433de09e00f  MROF_V1_Engine_v01_6_7.zip (supersedes 474c15d9… — pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
-# run from inside the unzipped package: 386/386, identical to the repo
+# run from inside the unzipped package: 390/390, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -70,7 +70,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mles_v12.py` | 44/44 |
 | `tests_mrofyt.py` | 59/59 |
 | `tests_mrofyt_pilot.py` | 27/27 |
-| `tests_mrofyt_runner.py` | 11/11 |
+| `tests_mrofyt_runner.py` | 15/15 |
 | `tests_mrofyt_v01_1.py` | 56/56 |
 | `tests_mrofyt_v01_2.py` | 31/31 |
 | `tests_mrofyt_v01_3.py` | 32/32 |
@@ -78,7 +78,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| **total** | **386/386** |
+| **total** | **390/390** |
 
 ## Runnable research commands
 
@@ -135,3 +135,9 @@ b0a2c0266015aeabed8855801afbdca89ba9ecc2232a91e397890e6fcffc1021  mles_v12_audit
 
 The lifecycle harness gained a depth row inside the disconnect gap —
 its absence is precisely why defect 1 survived the suite.
+
+3. **Runner: pre-repair recordings corrected retroactively.** The old
+   recordings still carry `DISCONNECTED` on every gap row and no resync
+   before the spurious ready; the runner now honours both, counts what it
+   ignored, and prints the counts in its summary. Analysis-side only.
+   Pinned by `R12`–`R12d`. Nothing captured is missing or altered.

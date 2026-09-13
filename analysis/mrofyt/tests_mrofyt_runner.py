@@ -176,6 +176,146 @@ s = RN.summary(led)
 t('R10: summary states outcomes=LOCKED and lists NOT WIRED inputs',
   'outcomes=LOCKED' in s and 'resid_tail_5pct' in s and 'trend_dir' in s)
 
+
+# ---------------------------------------------------------------------
+# R12: disconnect gaps in OLD recordings are corrected retroactively.
+# Recorder builds before the 2026-09-13 repair re-emitted BOOK_READY on
+# the first depth row after a DISCONNECT (gate maxima were not reset with
+# BookReady). That cleared DATA_SUPPRESSED on the rows that followed, so
+# the runner re-armed and evaluated windows against a book the recorder
+# had just declared invalid. Two things in those recordings are still
+# correct and are what the runner now honours: every row inside the gap
+# carries DISCONNECTED, and the spurious ready has no BOOK_RESYNC_START
+# before it. The fixture below reproduces the old layout exactly.
+# ---------------------------------------------------------------------
+import hashlib                    # noqa: E402
+import mles_v12_adapter as AD     # noqa: E402
+
+T0 = E(2026, 9, 2, 13, 30)
+
+
+def _gap_fixture(d, new_build):
+    os.makedirs(d, exist_ok=True)
+    cid, rid, ses, inst, con = 'gapcid', 'gapcid-R001', '20260902', 'NQ', \
+        'NQ SEP26'
+    com = 'MLES-CAPTURE-1.2,%s,%s,1,%s,%s,%s,' % (cid, rid, ses, inst, con)
+    base = 'MLES12_NQ_NQ_SEP26_%s_%s' % (ses, rid)
+    paths = {k: os.path.join(d, base + '_%s.csv' % k) for k in AD.STREAMS}
+    fh = {k: open(paths[k], 'w') for k in AD.STREAMS}
+    for k in AD.STREAMS:
+        fh[k].write(','.join(AD.HEADERS[k]) + '\n')
+    seq = [0]
+    ss = dict(quotes=0, trades=0, depth=0, quality=0)
+    clock = [T0]
+
+    def row(k, stream, rest, dt_=0.01):
+        clock[0] += dt_
+        seq[0] += 1
+        ss[k] += 1
+        t = clock[0]
+        fh[k].write(com + '%s,%d,%d,%s,%s,%d,%s\n'
+                    % (stream, seq[0], ss[k], SY._iso(t), SY._iso(t - 0.25),
+                       int((t - T0) * 1e7), rest))
+        return t
+
+    def q(kind, detail=''):
+        return row('quality', 'QUALITY', '%s,%s' % (kind, detail))
+
+    def book(flags):
+        for l in range(10):
+            row('depth', 'DEPTH', 'MBP,ADD,BID,%d,%.2f,10,%s'
+                % (l, 15000 - 0.25 * l, flags))
+            row('depth', 'DEPTH', 'MBP,ADD,ASK,%d,%.2f,9,%s'
+                % (l, 15000.25 + 0.25 * l, flags))
+
+    def quotes(n, flags):
+        return [row('quotes', 'QUOTE',
+                    'BID,15000.00,12,15000.00,12,15000.25,9,%s' % flags,
+                    dt_=1.0) for _ in range(n)]
+
+    q('SESSION_START', 'runId=' + rid)
+    q('BOOK_RESYNC_START', 'declaredDepth=10')
+    book('DATA_SUPPRESSED')
+    q('BOOK_READY', 'bidLevels=10 askLevels=10')
+    pre = quotes(5, '')
+    t_disc = q('DISCONNECT', 'seg=1 book invalidated')
+    if new_build:
+        q('BOOK_RESYNC_START', 'declaredDepth=10')
+        row('depth', 'DEPTH', 'MBP,UPDATE,BID,0,15000.00,7,'
+            'DISCONNECTED|DATA_SUPPRESSED')
+        gap = quotes(5, 'DISCONNECTED|DATA_SUPPRESSED')
+    else:
+        # OLD build: the depth row re-satisfies the gate -> spurious
+        # ready -> BookReady true -> later rows lose DATA_SUPPRESSED
+        row('depth', 'DEPTH', 'MBP,UPDATE,BID,0,15000.00,7,'
+            'DISCONNECTED|DATA_SUPPRESSED')
+        q('BOOK_READY', 'bidLevels=10 askLevels=10')       # spurious
+        gap = quotes(5, 'DISCONNECTED')
+    t_recon = q('RECONNECT', 'seg=2')
+    q('BOOK_RESYNC_START', 'declaredDepth=10')
+    book('DATA_SUPPRESSED')
+    q('BOOK_READY', 'bidLevels=10 askLevels=10')
+    post = quotes(5, '')
+    t_end = q('SHUTDOWN', 'orderly')
+    for k in AD.STREAMS:
+        fh[k].close()
+    man = dict(schema='MLES-CAPTURE-1.2', captureInstanceId=cid, runId=rid,
+               session=ses, instrument=inst, contract=con,
+               recorderBuild='1.2.1', closeReason='SHUTDOWN',
+               firstRecvUtc=SY._iso(T0), lastRecvUtc=SY._iso(t_end),
+               firstEventSeq=1, lastEventSeq=seq[0], declaredDepth=10)
+    for k in AD.STREAMS:
+        man[k] = dict(present=True, file=os.path.basename(paths[k]),
+                      rows=ss[k], bytes=os.path.getsize(paths[k]),
+                      sha256=hashlib.sha256(
+                          open(paths[k], 'rb').read()).hexdigest())
+    json.dump(man, open(os.path.join(d, base + '_manifest.json'), 'w'))
+    return dict(pre=pre, gap=gap, post=post, t_disc=t_disc,
+                t_recon=t_recon)
+
+
+class _MidSpy(RN.Runner):
+    def __init__(self, *a, **kw):
+        RN.Runner.__init__(self, *a, **kw)
+        self.seen = []                          # (t, st.ready)
+
+    def _on_mid(self, st, t, mid):
+        self.seen.append((t, st.ready))
+        RN.Runner._on_mid(self, st, t, mid)
+
+
+d12 = os.path.join(WORK, 'r12_old')
+fx = _gap_fixture(d12, new_build=False)
+r12 = _MidSpy(d12)
+led12 = r12.run()
+in_gap = [x for x in r12.seen if fx['t_disc'] <= x[0] <= fx['t_recon']]
+before = [x for x in r12.seen if x[0] < fx['t_disc']]
+after = [x for x in r12.seen if x[0] > fx['t_recon']]
+t('R12: OLD-build gap -- the spurious BOOK_READY (no resync before it) '
+  'does NOT re-arm and is counted; every DISCONNECTED row is suppressed; '
+  'no mid inside the gap reaches the runner',
+  led12['totals']['spurious_book_ready_ignored'] == 1 and
+  led12['totals']['rows_disconnected_suppressed'] == 6 and
+  not in_gap and len(before) == 5 and all(rd for _, rd in before))
+t('R12b: after the genuine RECONNECT -> BOOK_RESYNC_START -> BOOK_READY '
+  'the runner re-arms and post-gap mids are processed with ready=True',
+  len(after) == 5 and all(rd for _, rd in after))
+
+d12n = os.path.join(WORK, 'r12_new')
+fxn = _gap_fixture(d12n, new_build=True)
+r12n = _MidSpy(d12n)
+led12n = r12n.run()
+in_gap_n = [x for x in r12n.seen if fxn['t_disc'] <= x[0] <= fxn['t_recon']]
+after_n = [x for x in r12n.seen if x[0] > fxn['t_recon']]
+t('R12c: NEW-build gap (resync at BOTH disconnect and reconnect, no '
+  'spurious ready) -- nothing is counted as spurious, the gap is still '
+  'suppressed, and the post-reconnect ready re-arms',
+  led12n['totals']['spurious_book_ready_ignored'] == 0 and
+  not in_gap_n and len(after_n) == 5 and all(rd for _, rd in after_n))
+t('R12d: summary reports the two book-integrity counters',
+  'spurious BOOK_READY ignored=1' in RN.summary(led12) and
+  'suppressed=6' in RN.summary(led12))
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

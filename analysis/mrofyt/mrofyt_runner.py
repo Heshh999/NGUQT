@@ -272,6 +272,11 @@ class InstrumentState:
         self.bid = self.ask = self.bsz = self.asz = None
         self.prev_q = None
         self.ready = False
+        # A BOOK_READY may only re-arm the runner if a BOOK_RESYNC_START
+        # has been seen since the last disarm. True at run open because
+        # the recorder emits a resync at every OpenRun, so the run's
+        # first ready is always legitimately preceded.
+        self.resync_pending = True
         self.trades = collections.deque()          # (t, px, sz, sign)
         self.mids = collections.deque()            # (t, mid)
         self.ofi = collections.deque()             # (t, e)
@@ -408,12 +413,34 @@ class Runner:
             t = e['t_recv']
             if t is None:
                 continue
-            suppressed = 'DATA_SUPPRESSED' in e['flags']
+            # DISCONNECTED is the recorder's own statement that the feed
+            # was down when this row was written. Recorder builds before
+            # the 2026-09-13 repair could re-emit BOOK_READY inside a
+            # disconnect gap (gate maxima were not reset with BookReady),
+            # which cleared DATA_SUPPRESSED on the rows that followed --
+            # but DISCONNECTED was stamped independently of that bug, so
+            # honouring it here corrects those recordings retroactively.
+            flags = e['flags']
+            suppressed = 'DATA_SUPPRESSED' in flags or 'DISCONNECTED' in flags
+            if 'DISCONNECTED' in flags:
+                self.ledger['totals']['rows_disconnected_suppressed'] += 1
             if k == 'QUALITY':
-                if e['kind'] == 'BOOK_READY':
-                    st.ready = True
-                elif e['kind'] in ('DISCONNECT', 'RECONNECT',
-                                   'BOOK_RESYNC_START'):
+                kind = e['kind']
+                if kind == 'BOOK_READY':
+                    if st.resync_pending:
+                        st.ready = True
+                        st.resync_pending = False
+                    else:
+                        # a ready with no resync since the last disarm is
+                        # the spurious post-disconnect ready: it does NOT
+                        # re-arm, and it is counted so the ledger shows
+                        # how many the recording carried
+                        self.ledger['totals'][
+                            'spurious_book_ready_ignored'] += 1
+                elif kind == 'BOOK_RESYNC_START':
+                    st.ready = False
+                    st.resync_pending = True
+                elif kind in ('DISCONNECT', 'RECONNECT'):
                     st.ready = False
                 continue
             if e['t_exch'] is not None:
@@ -912,6 +939,10 @@ def summary(ledger):
     lines.append('approaches by family: %s' % (app or 'none'))
     lines.append('wall states: %s' % dict(ledger['states']))
     lines.append('feature None counts: %s' % dict(ledger['feature_none']))
+    lines.append('book integrity: spurious BOOK_READY ignored=%d, '
+                 'rows inside disconnect gaps suppressed=%d'
+                 % (tot.get('spurious_book_ready_ignored', 0),
+                    tot.get('rows_disconnected_suppressed', 0)))
     lines.append('regime at windows: %s' % dict(ledger['regime_at_window']))
     lines.append('latency ms: %s' % ledger['latency_ms'])
     lines.append('NOT WIRED (detectors disqualify by design): %s'

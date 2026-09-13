@@ -9,7 +9,7 @@ THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
 
 ```
 72f0ac2943f16d1431020db3d96a8d74d81b5b71ea7d456a7218dd96a9f66809  src/MlesV12CaptureHost.cs (supersedes 95b9380f… — spurious BOOK_READY after a disconnect; REQUIRES an F5 recompile, see §Amendment below)
-ba2704adaf4d67898ccfd4678863d961639fbd2326b2f06b4bfc449d7f837223  analysis/mrofyt/MROF_V1_Engine_v12.zip (delivered artifact, 28 files, build 1.2.1; recorder inside byte-identical to src/MlesV12CaptureHost.cs — proved by tests T22. Supersedes freeze-time zip 3b2ec6b4… (20 files) — build 1.2.1 recorder, streaming auditor, outcome-blind runner, runbook; see MLES_CAPTURE_V12_FREEZE.md §9 and §11)
+3921631230e8c3dfc70cb7feaf3e4524a102708184c028c0166027b9b19d003b  analysis/mrofyt/MROF_V1_Engine_v12.zip (supersedes ba2704ad… — ships the repaired recorder, the guarded auditor and the retroactively-correct runner) (delivered artifact, 28 files, build 1.2.1; recorder inside byte-identical to src/MlesV12CaptureHost.cs — proved by tests T22. Supersedes freeze-time zip 3b2ec6b4… (20 files) — build 1.2.1 recorder, streaming auditor, outcome-blind runner, runbook; see MLES_CAPTURE_V12_FREEZE.md §9 and §11)
 dab3abec22e16255cd27d198200125c5cd6a44192e7ff07d53ce798c755dd63d  src/MlesV1CaptureHost.cs (immutable archive lineage — do not install)
 17a8c347d39e7187f81d7ca1fd6c7161440a8d1bfdc49823f23d1553c419815e  src/MlesV11CaptureHost.cs (immutable archive lineage — do not install)
 ```
@@ -35,8 +35,8 @@ b0a2c0266015aeabed8855801afbdca89ba9ecc2232a91e397890e6fcffc1021  analysis/mrofy
 cf42022369fe3133c2725d8a8e10c69914d889945c0b99d2da280e1a46315f2c  analysis/mrofyt/OPERATING_RUNBOOK.md (supersedes 1ef388e1… — status header updated once genuine sessions existed; points to NT8_RECORDING_RUNBOOK.md)
 964cdc661df578e6681d36fdef335366a56013efa7cd0d9f857a3cfa60b5a0e9  analysis/mrofyt/NT8_RECORDING_RUNBOOK.md (beginner-readable NT8 procedure)
 c070e41e83cc5bb3ade42e9ba853001e5ed1145ae0ed6162d55c777377b212c8  analysis/mrofyt/mles_v12_synth.py (build 1.2.1 fixtures; supersedes f8e20194… — timezone-aware timestamp)
-3a765f3c304b0c23c5efbaaf3aaead7b66d6b67aaa385dbe9bb153d34f28bfc4  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
-f8889e5c25bac9b5aae13231d6c4c0d8ce2535445ac2f2f34183832da7c9cff0  analysis/mrofyt/tests_mrofyt_runner.py (11 tests)
+99c9b2778809d5ab0b93b6374e2db772312cb61a764ca839ee8244eb8d2867a5  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes 3a765f3c… — honours DISCONNECTED and requires a resync before re-arming, which corrects pre-repair recordings retroactively, see §Amendment; earlier supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
+c0e3796327c7db817aea14eef005d4758644befc4fc78ef00342da985504d0c1  analysis/mrofyt/tests_mrofyt_runner.py (15 tests; supersedes f8889e5c…)
 ```
 
 Reproduce the entire proof (mcs + mono lifecycle harness + audits +
@@ -44,7 +44,7 @@ adversarial fixtures + package byte-identity):
 
 ```
 cd analysis/mrofyt && python3 tests_mles_v12.py      # 44/44
-cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 11/11
+cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 15/15
 ```
 
 The suite itself compiles the recorder with mcs against the stubs,
@@ -54,7 +54,7 @@ restart, disconnect/reconnect, NQ+MNQ pairing), audits the genuine
 output and then attacks the auditor with falsified fixtures.
 
 Predecessor suites (byte-identical, re-run at freeze): 59+56+31+32+
-25+36+29+42+15 = 325, all passing; grand total 386/386 across twelve suites at this revision.
+25+36+29+42+15 = 325, all passing; grand total 390/390 across twelve suites at this revision.
 
 ## Correction of record
 
@@ -177,3 +177,34 @@ absence in a large run still fails.
 
 Together these clear 4 of the 10 `RUN_AUDIT_FAILED` entries as false
 positives and explain the other 6.
+
+## Amendment: the runner corrects pre-repair recordings retroactively
+
+The recorder repair above only helps sessions recorded AFTER the
+operator recompiles. Sessions already on disk — including 2026-09-10 and
+2026-09-11, which carry 61 of the 66 de-duplicated signal events — keep
+their spurious readies. Two things in those recordings are still
+correct, and the runner now honours both:
+
+1. **Every row inside a disconnect gap carries `DISCONNECTED`.** The
+   recorder stamped it from `run.Connected` independently of the
+   `BookReady` bug (`Flags()`, line 462). The runner now treats it as
+   suppression alongside `DATA_SUPPRESSED`, so no mid inside a gap
+   reaches approach detection.
+2. **The spurious ready has no `BOOK_RESYNC_START` before it.** The
+   runner now re-arms on `BOOK_READY` only when a resync has been seen
+   since the last disarm (`resync_pending`, true at run open because
+   every `OpenRun` emits a resync). A ready without one is ignored and
+   counted as `spurious_book_ready_ignored`.
+
+Both counters print in the runner summary, so a re-run over the existing
+folder shows exactly how many spurious readies and how many
+disconnect-gap rows the recordings carried — the measure of how much of
+the earlier `ledger2.json` was evaluated against a stale book.
+
+**No captured data is missing or altered.** Every row the feed delivered
+was written, sequenced and hashed; the defect was one wrong status label
+in the quality stream, and the labels needed to undo it were always
+present. `R12` reproduces the old gap layout byte-for-byte and pins the
+correction; `R12c` pins that a post-repair recording (two resyncs per
+cycle, no spurious ready) is handled identically with nothing counted.
