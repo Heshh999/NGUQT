@@ -38,12 +38,12 @@ Delivered package (85 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-61e670036c411965befd5bbc121d64bcd87848c293d9c69614467433de09e00f  MROF_V1_Engine_v01_6_7.zip (supersedes 474c15d9… — pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+d6c00abb18217514530c8815cbdcd0578facb8788be6cdf274dcc6fb99c20e11  MROF_V1_Engine_v01_6_7.zip (supersedes 61e67003… — pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
-# run from inside the unzipped package: 390/390, identical to the repo
+# run from inside the unzipped package: 392/392, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -67,7 +67,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | suite | result |
 | --- | --- |
 | `tests_mles_v11.py` | 29/29 |
-| `tests_mles_v12.py` | 44/44 |
+| `tests_mles_v12.py` | 46/46 |
 | `tests_mrofyt.py` | 59/59 |
 | `tests_mrofyt_pilot.py` | 27/27 |
 | `tests_mrofyt_runner.py` | 15/15 |
@@ -78,7 +78,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| **total** | **390/390** |
+| **total** | **392/392** |
 
 ## Runnable research commands
 
@@ -117,7 +117,7 @@ Recorded in full in `REVIEW_PACKAGE_MANIFEST_v12.md`; summarised here
 because both change files this package ships.
 
 ```
-72f0ac2943f16d1431020db3d96a8d74d81b5b71ea7d456a7218dd96a9f66809  ../../src/MlesV12CaptureHost.cs
+ce1e475a37bcad14e4e7ea10228feaea9a561c6ea4d0181e54077774fdebc060  ../../src/MlesV12CaptureHost.cs (build 1.2.2)
 b0a2c0266015aeabed8855801afbdca89ba9ecc2232a91e397890e6fcffc1021  mles_v12_audit.py
 3d8812b9d286b754bdd01050f4714c3dea1de13c5d59e27a5274903fc180c405  mles_v12_harness.cs
 729c34f05887c7b7913604edc50ed25c43d8436fe57f3d51f1825ecc53ade78b  tests_mles_v12.py
@@ -141,3 +141,13 @@ its absence is precisely why defect 1 survived the suite.
    before the spurious ready; the runner now honours both, counts what it
    ignored, and prints the counts in its summary. Analysis-side only.
    Pinned by `R12`–`R12d`. Nothing captured is missing or altered.
+
+4. **`RecorderBuild` bumped to 1.2.2.** The disconnect repair changes
+   which quality events a run emits, so it had to be distinguishable in
+   the manifest; it was first committed without the bump. `T33` now binds
+   the repair and the build together. A `1.2.1` manifest means "may carry
+   spurious post-disconnect `BOOK_READY`, runner correction applies".
+
+   **Installing the recorder is two steps:** copy the `.cs` into
+   `Documents/NinjaTrader 8/bin/Custom/Indicators/`, *then* press F5.
+   F5 alone recompiles whatever is already there.

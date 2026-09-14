@@ -8,8 +8,8 @@ THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
 ## Authoritative recorder (MLES-CAPTURE-1.2)
 
 ```
-72f0ac2943f16d1431020db3d96a8d74d81b5b71ea7d456a7218dd96a9f66809  src/MlesV12CaptureHost.cs (supersedes 95b9380f… — spurious BOOK_READY after a disconnect; REQUIRES an F5 recompile, see §Amendment below)
-3921631230e8c3dfc70cb7feaf3e4524a102708184c028c0166027b9b19d003b  analysis/mrofyt/MROF_V1_Engine_v12.zip (supersedes ba2704ad… — ships the repaired recorder, the guarded auditor and the retroactively-correct runner) (delivered artifact, 28 files, build 1.2.1; recorder inside byte-identical to src/MlesV12CaptureHost.cs — proved by tests T22. Supersedes freeze-time zip 3b2ec6b4… (20 files) — build 1.2.1 recorder, streaming auditor, outcome-blind runner, runbook; see MLES_CAPTURE_V12_FREEZE.md §9 and §11)
+ce1e475a37bcad14e4e7ea10228feaea9a561c6ea4d0181e54077774fdebc060  src/MlesV12CaptureHost.cs (BUILD 1.2.2; supersedes 72f0ac29… — spurious BOOK_READY after a disconnect, plus the build bump that makes the two behaviours distinguishable in every manifest. REQUIRES an F5 recompile AND the file physically copied into NinjaTrader 8/bin/Custom/Indicators — see §Amendment below)
+2f36ce293acbdf412f052d862be5c4becf98ec4a0b6f76adcc598acd5e0ca231  analysis/mrofyt/MROF_V1_Engine_v12.zip (supersedes 39216312… — ships build 1.2.2) (delivered artifact, 28 files, build 1.2.1; recorder inside byte-identical to src/MlesV12CaptureHost.cs — proved by tests T22. Supersedes freeze-time zip 3b2ec6b4… (20 files) — build 1.2.1 recorder, streaming auditor, outcome-blind runner, runbook; see MLES_CAPTURE_V12_FREEZE.md §9 and §11)
 dab3abec22e16255cd27d198200125c5cd6a44192e7ff07d53ce798c755dd63d  src/MlesV1CaptureHost.cs (immutable archive lineage — do not install)
 17a8c347d39e7187f81d7ca1fd6c7161440a8d1bfdc49823f23d1553c419815e  src/MlesV11CaptureHost.cs (immutable archive lineage — do not install)
 ```
@@ -28,13 +28,13 @@ be29c36a62624ab5e18e67d104eb4e9323abcda4bf5faf1c88c54486fc446f4a  analysis/mrofy
 3d8812b9d286b754bdd01050f4714c3dea1de13c5d59e27a5274903fc180c405  analysis/mrofyt/mles_v12_harness.cs (supersedes ff2cb79e… — the disconnect gap now carries a depth row, which is what the old fixture was missing)
 12ab264bb466bbf1f48943c95b65ae524d9a142a249c94c3337ca186a3d23861  analysis/mrofyt/mles_v12_adapter.py
 b0a2c0266015aeabed8855801afbdca89ba9ecc2232a91e397890e6fcffc1021  analysis/mrofyt/mles_v12_audit.py (supersedes b17a4732… — depth completeness needs enough depth rows to assert)
-729c34f05887c7b7913604edc50ed25c43d8436fe57f3d51f1825ecc53ade78b  analysis/mrofyt/tests_mles_v12.py (44 tests; supersedes 4014a8d3…)
+b7bc3921a2d03bf133b91ce727d01c7c2f838e51b3c3ea87db964b26d08c3749  analysis/mrofyt/tests_mles_v12.py (46 tests; supersedes 729c34f0…)
 1635f0391449260d1a15c0780a54728523834f3df4505e755ad400d63a510812  analysis/mrofyt/RECORDER_DEPLOYMENT_V12.md
 65b2948c0b7877d70d71aa7a12cac2326d740ad9c0aa98d4f1b608e4f12e33a0  analysis/mrofyt/DATA_HANDOFF_V12.md
 15c3ef12b43cb0e059eb317da9c7ddd976971965009252aaa4357cc7a6195361  analysis/mrofyt/SETUP_WALKTHROUGH_V12.md
 cf42022369fe3133c2725d8a8e10c69914d889945c0b99d2da280e1a46315f2c  analysis/mrofyt/OPERATING_RUNBOOK.md (supersedes 1ef388e1… — status header updated once genuine sessions existed; points to NT8_RECORDING_RUNBOOK.md)
 964cdc661df578e6681d36fdef335366a56013efa7cd0d9f857a3cfa60b5a0e9  analysis/mrofyt/NT8_RECORDING_RUNBOOK.md (beginner-readable NT8 procedure)
-c070e41e83cc5bb3ade42e9ba853001e5ed1145ae0ed6162d55c777377b212c8  analysis/mrofyt/mles_v12_synth.py (build 1.2.1 fixtures; supersedes f8e20194… — timezone-aware timestamp)
+3231659ff5dad33c1c4c2ba7ada5d813d229dd2cbf4437d0ffde9c0a1c0ffec9  analysis/mrofyt/mles_v12_synth.py (stamps 1.2.1 deliberately: synthetic runs carry no disconnect, so they model a PRE-repair recording; supersedes c070e41e…)
 99c9b2778809d5ab0b93b6374e2db772312cb61a764ca839ee8244eb8d2867a5  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes 3a765f3c… — honours DISCONNECTED and requires a resync before re-arming, which corrects pre-repair recordings retroactively, see §Amendment; earlier supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
 c0e3796327c7db817aea14eef005d4758644befc4fc78ef00342da985504d0c1  analysis/mrofyt/tests_mrofyt_runner.py (15 tests; supersedes f8889e5c…)
 ```
@@ -43,7 +43,7 @@ Reproduce the entire proof (mcs + mono lifecycle harness + audits +
 adversarial fixtures + package byte-identity):
 
 ```
-cd analysis/mrofyt && python3 tests_mles_v12.py      # 44/44
+cd analysis/mrofyt && python3 tests_mles_v12.py      # 46/46
 cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 15/15
 ```
 
@@ -54,7 +54,7 @@ restart, disconnect/reconnect, NQ+MNQ pairing), audits the genuine
 output and then attacks the auditor with falsified fixtures.
 
 Predecessor suites (byte-identical, re-run at freeze): 59+56+31+32+
-25+36+29+42+15 = 325, all passing; grand total 390/390 across twelve suites at this revision.
+25+36+29+42+15 = 325, all passing; grand total 392/392 across twelve suites at this revision.
 
 ## Correction of record
 
@@ -208,3 +208,35 @@ in the quality stream, and the labels needed to undo it were always
 present. `R12` reproduces the old gap layout byte-for-byte and pins the
 correction; `R12c` pins that a post-repair recording (two resyncs per
 cycle, no spurious ready) is handled identically with nothing counted.
+
+## Amendment: RecorderBuild bumped to 1.2.2 (and why it had to be)
+
+The disconnect repair above was first committed **without bumping
+`RecorderBuild`**. That was a defect in its own right: the repair changes
+*which quality events a run emits*, so a manifest written by the repaired
+recorder was byte-indistinguishable from one written by the broken one —
+defeating the entire purpose of a field whose own comment says builds
+exist "so sessions captured before/after a repair stay distinguishable."
+
+`RecorderBuild` is now **1.2.2**, and the two are bound together by
+`T33`: if the disconnect repair is present in the source, the build must
+be at least 1.2.2. `T33b` asserts the live harness run stamps it, so real
+captures are attributable.
+
+Reading a manifest from here on:
+
+| `recorderBuild` | what it means |
+| --- | --- |
+| `1.2.0` | pre-1.2.1; `maxBidLevelSeen` has post-reconnect semantics |
+| `1.2.1` | **may carry spurious post-disconnect `BOOK_READY`**; the runner's retroactive correction applies |
+| `1.2.2` | disconnect resets the gate maxima and emits its own resync; no spurious readies |
+
+`mles_v12_synth.py` deliberately keeps stamping 1.2.1: synthetic runs
+contain no disconnect, so they model a pre-repair recording. The R12
+fixtures in `tests_mrofyt_runner.py` build both layouts explicitly.
+
+**Operational note.** Installing this is two steps, not one. The `.cs`
+must be **copied into `Documents/NinjaTrader 8/bin/Custom/Indicators/`**,
+*then* F5 pressed. Pressing F5 alone recompiles whatever file is already
+there — which is how a recorder dated 2026-09-08 stayed live through
+three rounds of repairs.

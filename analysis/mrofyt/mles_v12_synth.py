@@ -137,6 +137,10 @@ def synth_run(d, n_depth=300000, instrument='NQ', session='20260902',
                gaps=0, duplicates=0, reversals=0, queueOverflows=0,
                droppedRows=0, writeErrors=0, reconnects=0, crossed=0,
                bookResets=0, maxBidLevelSeen=10, maxAskLevelSeen=10,
+               # 1.2.1 deliberately: synthetic runs contain no
+               # disconnect, so they model a PRE-repair recording. The
+               # live recorder stamps 1.2.2 (see T33) and the R12
+               # fixtures build both layouts explicitly.
                maxBidLevelRun=10, maxAskLevelRun=10, recorderBuild='1.2.1',
                depthBid=nbid, depthAsk=nask, depthAdd=nadd,
                depthUpdate=nupd, depthRemove=nrem)

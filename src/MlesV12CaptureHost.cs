@@ -73,9 +73,16 @@ namespace Mles.Capture.V12
     {
         public const string SchemaVersion = "MLES-CAPTURE-1.2";
         // Row schema is unchanged (1.2). The build stamps manifests so
-        // sessions captured before/after a manifest-field repair stay
-        // distinguishable. 1.2.1: adds maxBid/AskLevelRun.
-        public const string RecorderBuild = "1.2.1";
+        // sessions captured before/after a repair stay distinguishable.
+        //   1.2.1  adds maxBid/AskLevelRun.
+        //   1.2.2  disconnect no longer leaves the BOOK_READY gate armed
+        //          (MaxBid/AskLvl reset with BookReady) and emits its own
+        //          BOOK_RESYNC_START. This CHANGES THE QUALITY STREAM a
+        //          run emits, so it must be distinguishable from 1.2.1 --
+        //          a 1.2.1 manifest means the recording may carry
+        //          spurious post-disconnect BOOK_READY events and the
+        //          runner's retroactive correction applies to it.
+        public const string RecorderBuild = "1.2.2";
         private const string TsFmt = "yyyy-MM-ddTHH:mm:ss.fffffffZ";
 
         private readonly string dir, instrument, captureInstanceId;

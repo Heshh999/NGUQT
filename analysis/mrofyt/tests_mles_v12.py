@@ -342,8 +342,8 @@ t('T20: collision manifests ARE discovered and audited (duplicate '
 lv = runs_of('lvlrun')[0]
 lvm = lv['manifest']
 t('T23: run-lifetime depth maxima survive a reconnect (seen 2/2 post-'
-  'reconnect, run 3/3, build 1.2.1, BOOK_READY once, audit clean)',
-  lv['ok'] and lvm.get('recorderBuild') == '1.2.1' and
+  'reconnect, run 3/3, build 1.2.2, BOOK_READY once, audit clean)',
+  lv['ok'] and lvm.get('recorderBuild') == '1.2.2' and
   lvm['maxBidLevelSeen'] == 2 and lvm['maxAskLevelSeen'] == 2 and
   lvm['maxBidLevelRun'] == 3 and lvm['maxAskLevelRun'] == 3 and
   lv['info']['level_semantics'] == 'run' and
@@ -576,6 +576,30 @@ t('T32b: the identical absence in a run with enough depth rows STILL '
   'MISSING_DEPTH_ACTION' in _cb and
   _rb['info']['depth_completeness_checked'] is True and
   'REMOVE' not in _rb['info']['depth_actions'])
+
+
+# ---- T33: the build stamp and the quality-stream repair travel together
+# The 2026-09-13 repair changed WHICH QUALITY EVENTS a run emits (gate
+# maxima reset on disconnect, plus a BOOK_RESYNC_START there) but was
+# first committed without bumping RecorderBuild -- so a manifest written
+# by the repaired recorder was indistinguishable from one written by the
+# broken one. That defeats the entire purpose of the field, whose own
+# comment says builds exist so sessions captured before/after a repair
+# stay distinguishable. This test binds them: if the repair is in the
+# source, the build must be at least 1.2.2.
+_rec = open(os.path.join(ROOT, 'src', 'MlesV12CaptureHost.cs')).read()
+_bm = re.search(r'RecorderBuild\s*=\s*"([0-9.]+)"', _rec)
+_build = tuple(int(x) for x in _bm.group(1).split('.')) if _bm else ()
+_disco = re.search(r'run\.BookReady = false;.*?Quality\(ev\.RecvUtc,\s*'
+                   r'"DISCONNECT"', _rec, re.S)
+_has_repair = bool(_disco) and 'run.MaxBidLvl = run.MaxAskLvl = -1;' in \
+    _disco.group(0)
+t('T33: the disconnect BOOK_READY repair is present AND RecorderBuild '
+  'is >= 1.2.2, so a manifest always says which behaviour produced it',
+  _has_repair and _build >= (1, 2, 2))
+t('T33b: the live harness run stamps the bumped build, so real captures '
+  'are attributable',
+  lvm.get('recorderBuild') == _bm.group(1))
 
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
