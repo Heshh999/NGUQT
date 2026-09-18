@@ -4,6 +4,7 @@
 # fixtures. Synthetic events verify CODE BEHAVIOR only, never market
 # evidence. P1 and P2 pin the two defects that the first genuine
 # recordings exposed. No outcome, R or P&L exists anywhere.
+import hashlib
 import json
 import math
 import os
@@ -320,6 +321,49 @@ t('P9i: the primary markout horizon is 300 s and every horizon the 1.0 '
   PI.PRIMARY_MARKOUT_S == 300.0 and
   set((1.0, 5.0, 10.0, 30.0, 60.0, 180.0)) <= set(PI.MARKOUT_S) and
   {300.0, 600.0, 1800.0} <= set(PI.MARKOUT_S))
+
+
+# ---------------------------------------------------------------------
+# P10: the wave-two registration cannot go stale silently.
+# MROF_YT_WAVE2_REGISTRATION.md names specific constants and states. If
+# any of them drift, the registered design describes something that no
+# longer exists -- and a registration nobody can reproduce is worse than
+# none, because it still LOOKS pre-committed. These assertions bind the
+# document to the code it references.
+# ---------------------------------------------------------------------
+import mrofyt_swings_v016 as SW    # noqa: E402
+
+REG = os.path.join(HERE, 'MROF_YT_WAVE2_REGISTRATION.md')
+_reg = open(REG).read() if os.path.exists(REG) else ''
+
+t('P10: the wave-two registration document exists and still declares '
+  'itself pending sign-off rather than silently frozen',
+  bool(_reg) and 'PENDING OPERATOR SIGN-OFF' in _reg)
+
+t('P10b: the horizons, cooldown and primary metric it registers are the '
+  'ones the pilot actually implements',
+  PI.PRIMARY_MARKOUT_S == 300.0 and PI.EVENT_COOLDOWN_S == 60.0 and
+  {300.0, 600.0, 1800.0} <= set(PI.MARKOUT_S) and
+  '300 s' in _reg and 'de-duplicated at 60 s' in _reg)
+
+t('P10c: the swing timeframes and eligible lifecycle states it registers '
+  'match mrofyt_swings_v016',
+  SW.ACTIVE_TF == ('5m', '15m', '60m') and
+  SW.RETIRED_STATES == (SW.ACCEPTED_BROKEN, SW.ROLLED_OFF) and
+  all(s in _reg for s in (SW.CONFIRMED_UNTOUCHED, SW.ACTIVE_TESTED,
+                          SW.BROKEN_PENDING, SW.RECLAIMED_BEFORE)) and
+  SW.ACCEPTANCE_CLOSES == 2)
+
+t('P10d: registering wave two changed NO wave-one detector -- the frozen '
+  'signal module is still the hash tests_mles_v12 pins',
+  hashlib.sha256(open(os.path.join(HERE, 'mrofyt_signals.py'),
+                      'rb').read()).hexdigest() ==
+  '06ce854a40717a2398231eb8c5120d8e709c18fd8f7cb8d1ac2cc4ecc640a8e1')
+
+t('P10e: the document states the exposure split, so which sessions may '
+  'inform the design and which may judge it is not left to memory',
+  'EXPOSED_PILOT_DEV' in _reg and '20260921' in _reg and
+  'Validation (untouched)' in _reg)
 
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
