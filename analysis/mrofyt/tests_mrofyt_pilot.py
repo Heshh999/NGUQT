@@ -60,7 +60,7 @@ t('P1: a manifest with absent bulk CSVs is skipped whole (never crashes, '
 
 t('P1b: the skipped run contributes no events and the summary reports '
   'ingested and skipped counts separately',
-  'skipped-missing-files 1' in RN.summary(led1))
+  'missing-files 1' in RN.summary(led1))
 
 # ---------------------------------------------------------------------
 # P2: markouts. The horizon almost never lands exactly on a tick, so the

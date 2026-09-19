@@ -401,12 +401,62 @@ class Runner:
                 dict(instrument=st.instrument, session=st.session,
                      run_id=man.get('runId'), missing=absent))
             return
+        # A file whose size differs from the size its own manifest
+        # declares is truncated or partially copied. This must be caught
+        # BEFORE ingest, not during: the streams are merged in eventSeq
+        # order, so a depth file that stops early while quotes continue
+        # leaves the book frozen at the truncation point and every
+        # feature after it is computed against a stale book. The check
+        # costs one stat() per file. The auditor has always reported
+        # this as BYTE_SIZE_MISMATCH; the runner ignored it.
+        truncated = sorted(
+            '%s (%d bytes on disk, manifest declares %s)'
+            % (os.path.basename(p), os.path.getsize(p),
+               (man.get(k) or {}).get('bytes'))
+            for k, p in paths.items()
+            if isinstance(man.get(k), dict)
+            and man[k].get('bytes') is not None
+            and os.path.getsize(p) != man[k]['bytes'])
+        if truncated:
+            rec.update(skipped='STREAM_SIZE_MISMATCH', truncated=truncated,
+                       events=0)
+            self.ledger['runs'].append(rec)
+            self.ledger['totals']['runs_skipped_truncated'] += 1
+            self.ledger['skipped_runs'].append(
+                dict(instrument=st.instrument, session=st.session,
+                     run_id=man.get('runId'), truncated=truncated))
+            return
         st.run_id = man.get('runId')
         st.reset_run()
         n = 0
         crossed = 0
         quotes = 0
         self._rebuild_levels(st)
+        try:
+            n, crossed, quotes = self._stream_run(st, paths)
+        except (AD.MalformedHeaderError, AD.UnknownEnumError) as exc:
+            # Safety net for corruption that does NOT change the file
+            # size, so the stat() pre-flight above could not see it. The
+            # stream is abandoned at the bad row -- there is no way to
+            # know what the rest of the file would have contained, and
+            # guessing is how a stale book gets treated as a live one.
+            # Everything this run fed in before the bad row is discarded
+            # by resetting the run state, and the run is reported, never
+            # silently dropped.
+            st.reset_run()
+            rec.update(skipped='CORRUPT_STREAM', error=str(exc), events=0)
+            self.ledger['runs'].append(rec)
+            self.ledger['totals']['runs_skipped_corrupt'] += 1
+            self.ledger['skipped_runs'].append(
+                dict(instrument=st.instrument, session=st.session,
+                     run_id=man.get('runId'), corrupt=str(exc)))
+            return
+        rec.update(events=n, quotes=quotes, crossed_quotes=crossed)
+        self.ledger['runs'].append(rec)
+        self.ledger['totals']['events'] += n
+
+    def _stream_run(self, st, paths):
+        n = crossed = quotes = 0
         for e in AD.merge_run(paths, lite=True):
             n += 1
             k = e['stream']
@@ -484,9 +534,7 @@ class Runner:
                               st.book.depth('ask', 3)))
             self._evict(st, t)
             self._grid(st, t)
-        rec.update(events=n, quotes=quotes, crossed_quotes=crossed)
-        self.ledger['runs'].append(rec)
-        self.ledger['totals']['events'] += n
+        return n, crossed, quotes
 
     # ---- eviction of bounded deques ----------------------------------
     @staticmethod
@@ -919,11 +967,13 @@ class Runner:
 def summary(ledger):
     tot = ledger['totals']
     lines = ['%s  outcomes=%s' % (ledger['runner'], ledger['outcomes']),
-             'sessions=%d runs=%d (ingested %d, skipped-missing-files %d) '
-             'events=%d'
+             'sessions=%d runs=%d (ingested %d, skipped: missing-files %d, '
+             'truncated %d, corrupt %d) events=%d'
              % (len(ledger['sessions']), len(ledger['runs']),
                 len(ledger['runs']) - len(ledger.get('skipped_runs', [])),
-                len(ledger.get('skipped_runs', [])),
+                tot.get('runs_skipped_missing_files', 0),
+                tot.get('runs_skipped_truncated', 0),
+                tot.get('runs_skipped_corrupt', 0),
                 tot.get('events', 0)),
              'baseline sessions: %s' % ledger.get('baseline_sessions'),
              'approaches=%d windows=%d (suppressed %d) fires=%d '

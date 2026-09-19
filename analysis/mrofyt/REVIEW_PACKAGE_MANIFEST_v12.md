@@ -35,8 +35,8 @@ b7bc3921a2d03bf133b91ce727d01c7c2f838e51b3c3ea87db964b26d08c3749  analysis/mrofy
 cf42022369fe3133c2725d8a8e10c69914d889945c0b99d2da280e1a46315f2c  analysis/mrofyt/OPERATING_RUNBOOK.md (supersedes 1ef388e1… — status header updated once genuine sessions existed; points to NT8_RECORDING_RUNBOOK.md)
 964cdc661df578e6681d36fdef335366a56013efa7cd0d9f857a3cfa60b5a0e9  analysis/mrofyt/NT8_RECORDING_RUNBOOK.md (beginner-readable NT8 procedure)
 3231659ff5dad33c1c4c2ba7ada5d813d229dd2cbf4437d0ffde9c0a1c0ffec9  analysis/mrofyt/mles_v12_synth.py (stamps 1.2.1 deliberately: synthetic runs carry no disconnect, so they model a PRE-repair recording; supersedes c070e41e…)
-99c9b2778809d5ab0b93b6374e2db772312cb61a764ca839ee8244eb8d2867a5  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes 3a765f3c… — honours DISCONNECTED and requires a resync before re-arming, which corrects pre-repair recordings retroactively, see §Amendment; earlier supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
-c0e3796327c7db817aea14eef005d4758644befc4fc78ef00342da985504d0c1  analysis/mrofyt/tests_mrofyt_runner.py (15 tests; supersedes f8889e5c…)
+50c1de80b13a1ec6dfc88d037320dcc4337190a9331d84a2c848c4afae4bf257  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes 99c9b277… — truncated/corrupt streams are skipped whole instead of killing the pass, see §Amendment; earlier supersedes 3a765f3c… — honours DISCONNECTED and requires a resync before re-arming, which corrects pre-repair recordings retroactively, see §Amendment; earlier supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
+4656e0a8d6445689de01a5eb17e7939f6fb16cfcbf2071d2c48df63ebabff863  analysis/mrofyt/tests_mrofyt_runner.py (21 tests; supersedes c0e37963…)
 ```
 
 Reproduce the entire proof (mcs + mono lifecycle harness + audits +
@@ -44,7 +44,7 @@ adversarial fixtures + package byte-identity):
 
 ```
 cd analysis/mrofyt && python3 tests_mles_v12.py      # 46/46
-cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 15/15
+cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 21/21
 ```
 
 The suite itself compiles the recorder with mcs against the stubs,
@@ -54,7 +54,7 @@ restart, disconnect/reconnect, NQ+MNQ pairing), audits the genuine
 output and then attacks the auditor with falsified fixtures.
 
 Predecessor suites (byte-identical, re-run at freeze): 59+56+31+32+
-25+36+29+42+15 = 325, all passing; grand total 392/392 across twelve suites at this revision.
+25+36+29+42+15 = 325, all passing; grand total 403/403 across twelve suites at this revision.
 
 ## Correction of record
 
@@ -240,3 +240,42 @@ must be **copied into `Documents/NinjaTrader 8/bin/Custom/Indicators/`**,
 *then* F5 pressed. Pressing F5 alone recompiles whatever file is already
 there — which is how a recorder dated 2026-09-08 stayed live through
 three rounds of repairs.
+
+## Amendment: the runner survives a truncated or corrupt stream
+
+Found on the first fourteen-session capture, 2026-09-19. Two DEC26 files
+had been copied to the external drive while the recorder was still
+writing them and ended mid-row. The adapter raised
+
+    MalformedHeaderError: ...: expected 20 columns, got N
+
+from inside the merge loop. The runner had exactly two `except` clauses
+in the whole module, both in `plan()`, so the exception escaped and a
+multi-hour pass would have died with **no ledger written at all**. The
+auditor had reported both files as `BYTE_SIZE_MISMATCH` and
+`MALFORMED_HEADER` all along; the runner ignored the manifest's declared
+byte counts entirely.
+
+Two layers, both mirroring the existing skip-whole philosophy:
+
+1. **Pre-flight, before any event is read.** A file whose on-disk size
+   differs from the size its own manifest declares is truncated or
+   partially copied. The run is skipped whole as `STREAM_SIZE_MISMATCH`,
+   naming the file and both byte counts. One `stat()` per file. This is
+   the layer that matters: the four streams are merged in eventSeq
+   order, so a depth file that stops early while quotes continue leaves
+   the book frozen at the truncation point and every feature after it
+   is computed against a stale book. A mid-stream skip alone cannot
+   prevent that.
+2. **Safety net inside the merge.** Corruption that leaves the byte
+   count unchanged is caught at the bad row, the run state is reset so
+   nothing it fed in survives, and the run is reported as
+   `CORRUPT_STREAM` with the adapter's message.
+
+The summary now reports the three skip reasons separately
+(`missing-files`, `truncated`, `corrupt`) so "skipped" never hides which
+kind of problem the capture has. Pinned by `R13`-`R13e`; `R13e` proves
+one bad run does not poison the clean run beside it.
+
+**Operator rule this encodes:** never copy the capture folder while the
+recorder is running. Stop NinjaTrader, copy, restart.

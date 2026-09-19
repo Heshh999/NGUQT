@@ -316,6 +316,98 @@ t('R12d: summary reports the two book-integrity counters',
   'spurious BOOK_READY ignored=1' in RN.summary(led12) and
   'suppressed=6' in RN.summary(led12))
 
+
+# ---------------------------------------------------------------------
+# R13: a truncated or corrupt stream never crashes the runner and is
+# never partially ingested.
+#
+# Found on real capture 2026-09-19: two DEC26 files copied while the
+# recorder was still writing them ended mid-row, and the adapter raised
+#     MalformedHeaderError: ...: expected 20 columns, got N
+# from INSIDE the merge loop. The runner had exactly two except clauses
+# in the whole module, both in plan(), so the exception escaped and the
+# entire multi-hour pass died with no ledger written at all.
+#
+# Why a mid-stream skip is not enough on its own: the four streams are
+# merged in eventSeq order, so a depth file that stops early while
+# quotes keep going leaves the book frozen at the truncation point and
+# every feature after it is computed against a stale book. So the size
+# check must run BEFORE ingest (R13), and the exception handler exists
+# only for corruption that leaves the byte count unchanged (R13b).
+# ---------------------------------------------------------------------
+d13 = os.path.join(WORK, 'trunc')
+mp13 = SY.synth_run(d13, n_depth=40000, price_path=path, trade_every=10,
+                    quote_every=5, cid='trunc', session='20260902')
+man13 = json.load(open(mp13))
+dp13 = os.path.join(d13, man13['depth']['file'])
+with open(dp13, 'r+') as _fh:                 # lop off the tail
+    _fh.truncate(man13['depth']['bytes'] - 5000)
+led13 = RN.Runner(d13, ('NQ',)).run()
+t('R13: a file smaller than its own manifest declares is caught by the '
+  'stat() pre-flight and the run is skipped WHOLE, before any event of '
+  'it is ingested',
+  led13['totals'].get('runs_skipped_truncated') == 1 and
+  led13['totals'].get('events', 0) == 0 and
+  len(led13['skipped_runs']) == 1 and
+  'truncated' in led13['skipped_runs'][0])
+
+t('R13a: the skip names the file and both byte counts, so the operator '
+  'can tell a truncated copy from a corrupt recording',
+  man13['depth']['file'] in led13['skipped_runs'][0]['truncated'][0] and
+  'manifest declares' in led13['skipped_runs'][0]['truncated'][0])
+
+# corruption that does NOT change the byte count: overwrite a row in
+# place with one that has too few columns. The pre-flight cannot see
+# this, so the exception handler has to.
+d13b = os.path.join(WORK, 'corrupt')
+mp13b = SY.synth_run(d13b, n_depth=40000, price_path=path, trade_every=10,
+                     quote_every=5, cid='corrupt', session='20260902')
+man13b = json.load(open(mp13b))
+dp13b = os.path.join(d13b, man13b['depth']['file'])
+_rows = open(dp13b).read().splitlines(True)
+_bad = len(_rows) // 2
+_orig = _rows[_bad]
+_rows[_bad] = ',' * 3 + ' ' * (len(_orig) - 4) + '\n'   # same byte length
+assert len(''.join(_rows)) == man13b['depth']['bytes']
+open(dp13b, 'w').writelines(_rows)
+led13b = RN.Runner(d13b, ('NQ',)).run()
+t('R13b: a corrupt row that leaves the byte count unchanged raises from '
+  'inside the merge loop, is CAUGHT, and the run is reported skipped '
+  'instead of killing the whole pass',
+  led13b['totals'].get('runs_skipped_corrupt') == 1 and
+  led13b['totals'].get('events', 0) == 0 and
+  'corrupt' in led13b['skipped_runs'][0] and
+  'columns' in led13b['skipped_runs'][0]['corrupt'])
+
+t('R13c: neither skip contributes events, windows or fires -- a partly '
+  'read run leaves nothing behind',
+  led13b['totals'].get('windows', 0) == 0 and
+  led13b['totals'].get('fires', 0) == 0 and
+  led13['totals'].get('windows', 0) == 0)
+
+t('R13d: the summary reports the three skip reasons separately, so '
+  '"skipped" never hides which kind of problem the capture has',
+  'missing-files' in RN.summary(led13) and
+  'truncated 1' in RN.summary(led13) and
+  'corrupt 1' in RN.summary(led13b))
+
+# a clean run in the same folder must still be ingested normally
+d13e = os.path.join(WORK, 'mixed')
+SY.synth_run(d13e, n_depth=40000, price_path=path, trade_every=10,
+             quote_every=5, cid='good', session='20260902')
+mpx = SY.synth_run(d13e, n_depth=40000, price_path=path, trade_every=10,
+                   quote_every=5, cid='bad', session='20260902', run_no=2)
+manx = json.load(open(mpx))
+dpx = os.path.join(d13e, manx['depth']['file'])
+with open(dpx, 'r+') as _fh:
+    _fh.truncate(manx['depth']['bytes'] - 5000)
+led13e = RN.Runner(d13e, ('NQ',)).run()
+t('R13e: one bad run does not poison the folder -- the clean run beside '
+  'it is still ingested in full',
+  led13e['totals'].get('runs_skipped_truncated') == 1 and
+  led13e['totals'].get('events', 0) > 0 and
+  sum(1 for r in led13e['runs'] if not r.get('skipped')) == 1)
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

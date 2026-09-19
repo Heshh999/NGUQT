@@ -16,7 +16,7 @@ b6bd0b05f48a6e26871df69c97fde97112a19d3f4b17da7edf280caa5bdc354d  mrofyt_exits_v
 0df5357cce0d0c77c6f38759c757086a067ea90aef8efc1d373a766bbc8fe7f9  tests_mrofyt_v01_7.py
 cbd25e6df806db216cf480a3445f1628fc56dff95ea0d903dc197b91ac7b4791  MROF_YT_OF01_7_EXIT_FREEZE.md
 3bd2b115aa219bf14420a2e536e867689fd782db1168574c306d3918c6ae1367  mrofyt_pilot.py (MROF-YT-PILOT-1.1; supersedes a6504d0f… — event de-duplication and the 300/600/1800 s horizons, measurement only; see FINDINGS Amendment 1)
-d9bd514af587b93b91d21e8317c2ad38a0f3ee3175a4b19c2b44798822523d67  tests_mrofyt_pilot.py (32 tests; supersedes a1b5cf76…)
+417282fdc1d7bfadef7c0da85df60994d73ccdd87a8924c5be1aa48fb5077408  tests_mrofyt_pilot.py (32 tests; supersedes d9bd514a… — P1b tracks the runner summary wording)
 01d5f381df774b373302f5d8867892c3403d6f7ac2a49eed09cac9d50915a4e9  MROF_YT_WAVE2_REGISTRATION.md (DRAFT — pending operator sign-off; re-hash on sign-off)
 4624b199298935b72a2f906663ce7fd9b0b40f0d59be8e06f026b4771e6ac1d4  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md (supersedes 8ab588fa… — Amendment 1)
 50d0ddc78814725011714faf01b1da0d45053d3612cb08095230496ac641c1a2  MROF_ACTUAL_STATE_INVENTORY.md
@@ -26,7 +26,7 @@ Modified (one file, additively — a skip path, an observation hook and a
 run-id field):
 
 ```
-99c9b2778809d5ab0b93b6374e2db772312cb61a764ca839ee8244eb8d2867a5  mrofyt_runner.py (supersedes 3a765f3c… — retroactive disconnect-gap correction, see REVIEW_PACKAGE_MANIFEST_v12.md)
+50c1de80b13a1ec6dfc88d037320dcc4337190a9331d84a2c848c4afae4bf257  mrofyt_runner.py (supersedes 99c9b277… — truncated/corrupt streams skipped whole; earlier: retroactive disconnect-gap correction. See REVIEW_PACKAGE_MANIFEST_v12.md)
 ```
 
 Archived source directive:
@@ -39,12 +39,12 @@ Delivered package (86 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-1ba494da4e4a89533287d3861e7c40d95ee0c8446b519a8ccc3f903d41b4a157  MROF_V1_Engine_v01_6_7.zip (supersedes d6c00abb… — pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+2d9e341f8a4b08ce44357036e5b5d938afdbe83ef621aef17a9c167922d8a7f2  MROF_V1_Engine_v01_6_7.zip (supersedes 1ba494da… — adds the truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
-# run from inside the unzipped package: 397/397, identical to the repo
+# run from inside the unzipped package: 403/403, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -71,7 +71,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mles_v12.py` | 46/46 |
 | `tests_mrofyt.py` | 59/59 |
 | `tests_mrofyt_pilot.py` | 32/32 |
-| `tests_mrofyt_runner.py` | 15/15 |
+| `tests_mrofyt_runner.py` | 21/21 |
 | `tests_mrofyt_v01_1.py` | 56/56 |
 | `tests_mrofyt_v01_2.py` | 31/31 |
 | `tests_mrofyt_v01_3.py` | 32/32 |
@@ -79,7 +79,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| **total** | **397/397** |
+| **total** | **403/403** |
 
 ## Runnable research commands
 
@@ -176,3 +176,12 @@ reasons from the funnel, not from outcomes.
 `P10`–`P10e` bind the document to the code it references, so the
 registration cannot go stale silently, and `P10d` re-pins the wave-one
 detector hash so registering wave two provably changed nothing.
+
+5. **Runner: a truncated or corrupt stream no longer kills the pass.**
+   Two files copied while the recorder was writing ended mid-row and
+   would have crashed a multi-hour run with no ledger written. The
+   runner now checks each file's size against its manifest before
+   ingest (skip whole as `STREAM_SIZE_MISMATCH`) and catches in-stream
+   corruption as `CORRUPT_STREAM`, resetting run state so nothing
+   partial survives. Pinned by `R13`-`R13e`. Never copy the capture
+   folder while recording.
