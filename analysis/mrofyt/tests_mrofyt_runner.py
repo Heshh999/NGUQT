@@ -408,6 +408,140 @@ t('R13e: one bad run does not poison the folder -- the clean run beside '
   led13e['totals'].get('events', 0) > 0 and
   sum(1 for r in led13e['runs'] if not r.get('skipped')) == 1)
 
+
+# ---------------------------------------------------------------------
+# R13f-R13i: the two holes the 2026-09-19 guards still had.
+#
+# R13b only ever exercised ONE flavour of same-size corruption: a row
+# with the wrong column count, which the adapter reports as
+# MalformedHeaderError. The handler caught that pair of adapter
+# exceptions and nothing else -- but the adapter's numeric and timestamp
+# primitives raise a BARE ValueError, so a row that keeps all twenty
+# columns and garbles a price, a sequence number or a timestamp went
+# straight past the handler and killed the pass, which is the failure
+# the handler exists to prevent. And a run abandoned mid-stream left its
+# prefix's windows, states and latency samples in a ledger that reports
+# the run as never read; R13c missed it only because its bad row sits
+# halfway through the file, before the first window completes.
+# ---------------------------------------------------------------------
+def _same_size_corrupt(tag, col, cell):
+    """One depth cell rewritten in place, byte count unchanged."""
+    d = os.path.join(WORK, tag)
+    mp = SY.synth_run(d, n_depth=40000, price_path=path, trade_every=10,
+                      quote_every=5, cid=tag, session='20260902')
+    man = json.load(open(mp))
+    dp = os.path.join(d, man['depth']['file'])
+    rows = open(dp).read().splitlines(True)
+    bad = len(rows) // 2
+    cells = rows[bad].rstrip('\n').split(',')
+    cells[col] = cell(cells[col])
+    rows[bad] = ','.join(cells) + '\n'
+    assert len(''.join(rows)) == man['depth']['bytes'], tag
+    open(dp, 'w').writelines(rows)
+    return man, RN.Runner(d, ('NQ',)).run()
+
+
+_flavours = [
+    ('px', 17, lambda v: v[:-1] + 'x'),          # float() ValueError
+    ('seq', 8, lambda v: v[:-1] + 'O'),          # int() ValueError
+    ('ts', 10, lambda v: 'X' * len(v)),          # parse_iso ValueError
+]
+_led13f = dict((tag, _same_size_corrupt(tag, col, fn))
+               for tag, col, fn in _flavours)
+t('R13f: same-byte-count corruption that keeps all 20 columns -- a '
+  'garbled price, sequence number or timestamp -- is caught and skipped '
+  'too, not just a wrong column count',
+  all(led['totals'].get('runs_skipped_corrupt') == 1 and
+      led['totals'].get('events', 0) == 0 and
+      len(led['skipped_runs']) == 1
+      for _man, led in _led13f.values()))
+
+t('R13g: the skip names the file and how far the stream decoded, so the '
+  'operator can find the bad row in a 25M-row file',
+  all(man['depth']['file'] in led['skipped_runs'][0]['corrupt'] and
+      'decoded rows' in led['skipped_runs'][0]['corrupt']
+      for man, led in _led13f.values()))
+
+# A truncation that lands exactly on a row boundary is the quiet one:
+# every row that remains decodes perfectly, so NOTHING inside the merge
+# can see it. Only the manifest's byte count can.
+d13h = os.path.join(WORK, 'rowtrunc')
+mp13h = SY.synth_run(d13h, n_depth=40000, price_path=path, trade_every=10,
+                     quote_every=5, cid='rowtrunc', session='20260902')
+man13h = json.load(open(mp13h))
+dp13h = os.path.join(d13h, man13h['depth']['file'])
+_rows13h = open(dp13h).read().splitlines(True)
+open(dp13h, 'w').writelines(_rows13h[:-100])        # whole rows only
+_decodes_clean = True
+try:
+    for _ in RN.AD.iter_file(dp13h, 'depth', True):
+        pass
+except ValueError:
+    _decodes_clean = False
+led13h = RN.Runner(d13h, ('NQ',)).run()
+t('R13h: a truncation on an exact row boundary leaves a file that parses '
+  'perfectly and is still short -- the pre-flight is the only guard that '
+  'can see it, and it does',
+  _decodes_clean and
+  led13h['totals'].get('runs_skipped_truncated') == 1 and
+  led13h['totals'].get('events', 0) == 0)
+
+# The prefix of an abandoned run must leave NOTHING behind. Corrupt a
+# row at 90% of the file, where the same fixture run clean records
+# windows, wall states and 46k latency samples.
+d13i = os.path.join(WORK, 'clean_ref')
+SY.synth_run(d13i, n_depth=40000, price_path=path, trade_every=10,
+             quote_every=5, cid='clean_ref', session='20260902')
+led_clean = RN.Runner(d13i, ('NQ',)).run()
+d13j = os.path.join(WORK, 'late')
+mp13j = SY.synth_run(d13j, n_depth=40000, price_path=path, trade_every=10,
+                     quote_every=5, cid='late', session='20260902')
+man13j = json.load(open(mp13j))
+dp13j = os.path.join(d13j, man13j['depth']['file'])
+_rows13j = open(dp13j).read().splitlines(True)
+_late = int(len(_rows13j) * 0.9)
+_orig13j = _rows13j[_late]
+_rows13j[_late] = ',' * 3 + ' ' * (len(_orig13j) - 4) + '\n'
+assert len(''.join(_rows13j)) == man13j['depth']['bytes']
+open(dp13j, 'w').writelines(_rows13j)
+led13j = RN.Runner(d13j, ('NQ',)).run()
+t('R13i: a run abandoned LATE is wound back whole -- the windows, wall '
+  'states, latency samples and open approaches its prefix produced are '
+  'gone from a ledger that reports events=0 (the clean fixture records '
+  'all of them, so this is not vacuous)',
+  led_clean['totals']['windows'] > 0 and
+  led_clean['latency_ms']['NQ']['n'] > 0 and
+  led_clean['totals']['approaches'] > 0 and
+  led13j['totals'].get('runs_skipped_corrupt') == 1 and
+  led13j['totals'].get('windows', 0) == 0 and
+  led13j['totals'].get('approaches', 0) == 0 and
+  led13j['totals'].get('windows_incomplete_at_close', 0) == 0 and
+  led13j['latency_ms']['NQ']['n'] == 0 and
+  not led13j['fires'] and not led13j['states'] and
+  not led13j['feature_none'])
+
+# The guard wraps the DECODING of a row and nothing else. A ValueError
+# from the runner's own per-event work must still propagate as the bug
+# it is, or a detector fault would be filed as a corrupt recording and
+# the capture blamed for it.
+
+
+class _BrokenRunner(RN.Runner):
+    def _on_mid(self, st, t, mid):
+        raise ValueError('detector bug, not a corrupt capture')
+
+
+_own_bug_escapes = False
+try:
+    _BrokenRunner(d13i, ('NQ',)).run()
+except ValueError as _exc:
+    _own_bug_escapes = 'detector bug' in str(_exc)
+t('R13j: the guard covers row decoding only -- a ValueError raised by '
+  "the runner's own per-event work still propagates instead of being "
+  'reported as a corrupt stream',
+  _own_bug_escapes)
+
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

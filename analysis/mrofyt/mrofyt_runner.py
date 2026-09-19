@@ -26,6 +26,7 @@
 # THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING. SUBMITS NO ORDERS.
 # ======================================================================
 import collections
+import copy
 import datetime as _dt
 import json
 import math
@@ -171,6 +172,19 @@ class RollingATR20:
         self.tr.append(tr)
         self.prev_close = c
         return sum(self.tr) / 20.0 if len(self.tr) == 20 else None
+
+
+# ---------------------------------------------------------------------
+# row decoding
+# ---------------------------------------------------------------------
+class CorruptStream(Exception):
+    """A recorder CSV row could not be decoded.
+
+    Raised ONLY at the decoding boundary (Runner._decoded), never from
+    the runner's own per-event work, so a ValueError escaping a detector
+    still surfaces as the bug it is instead of being filed as a corrupt
+    recording.
+    """
 
 
 class Hist:
@@ -432,18 +446,20 @@ class Runner:
         crossed = 0
         quotes = 0
         self._rebuild_levels(st)
+        mark = self._mark_run(st)
         try:
             n, crossed, quotes = self._stream_run(st, paths)
-        except (AD.MalformedHeaderError, AD.UnknownEnumError) as exc:
+        except CorruptStream as exc:
             # Safety net for corruption that does NOT change the file
             # size, so the stat() pre-flight above could not see it. The
             # stream is abandoned at the bad row -- there is no way to
             # know what the rest of the file would have contained, and
             # guessing is how a stale book gets treated as a live one.
-            # Everything this run fed in before the bad row is discarded
-            # by resetting the run state, and the run is reported, never
-            # silently dropped.
-            st.reset_run()
+            # The run is reported skipped with events=0, so everything
+            # its prefix fed in is wound back to the mark: a ledger that
+            # states a run was never read must not carry that run's
+            # windows, fires or latency samples either.
+            self._unwind_run(st, mark)
             rec.update(skipped='CORRUPT_STREAM', error=str(exc), events=0)
             self.ledger['runs'].append(rec)
             self.ledger['totals']['runs_skipped_corrupt'] += 1
@@ -455,9 +471,93 @@ class Runner:
         self.ledger['runs'].append(rec)
         self.ledger['totals']['events'] += n
 
+    # ---- winding back a run abandoned mid-stream ---------------------
+    # A run reported as skipped states events=0, and that has to be true
+    # of the whole ledger, not just of its events line: the windows,
+    # fires, wall states, regime tags, feature-availability counts,
+    # latency samples, approaches and baseline observations produced by
+    # the prefix before the bad row must not survive either, or the
+    # totals describe data the ledger says was never read. The streaming
+    # loop writes to a dozen places, so rather than unwind them one by
+    # one the objects that hold ALL of it are marked once per run --
+    # after reset_run() has emptied the book and the tape, before the
+    # first event is pulled. The mark is about a session of baselines
+    # and 1440 bars of rolling ratios; nothing is copied per event.
+    _LEDGER_ACCUMULATORS = ('totals', 'feature_none', 'states',
+                            'regime_at_window')
+
+    def _mark_run(self, st):
+        return dict(
+            state=copy.deepcopy(st),
+            counters=dict((k, dict(self.ledger[k]))
+                          for k in self._LEDGER_ACCUMULATORS),
+            fires=len(self.ledger['fires']),
+            lat=dict((i, (list(h.h), h.n)) for i, h in self.lat.items()))
+
+    def _unwind_run(self, st, mark):
+        # st is restored IN PLACE: run() holds its own reference to the
+        # state for the length of the session, so rebinding self.states
+        # would not reach it.
+        st.__dict__.clear()
+        st.__dict__.update(mark['state'].__dict__)
+        for k in self._LEDGER_ACCUMULATORS:
+            self.ledger[k].clear()
+            self.ledger[k].update(mark['counters'][k])
+        del self.ledger['fires'][mark['fires']:]
+        for i, (bins, n) in mark['lat'].items():
+            self.lat[i].h[:] = bins
+            self.lat[i].n = n
+
+    # ---- decoding boundary -------------------------------------------
+    @staticmethod
+    def _decoded(paths):
+        """merge_run(), with every row-decoding failure raised as
+        CorruptStream.
+
+        The adapter raises MalformedHeaderError for a row whose column
+        count is wrong and UnknownEnumError for an unrecognized enum,
+        but its numeric and timestamp primitives (_num, _int, parse_iso)
+        raise a BARE ValueError. A row that keeps all twenty columns and
+        garbles a price, a sequence number or a timestamp -- which is
+        what in-place corruption looks like when the byte count does NOT
+        change, the one case the stat() pre-flight cannot see -- used to
+        escape the handler in _process_run and kill the whole pass: the
+        exact failure that handler exists to prevent. Every decode
+        failure is the same fact about the capture, so all of them are
+        caught here, at the row, where the file that produced them is
+        still known.
+
+        The guard wraps ONLY the pull from the adapter. The runner's own
+        per-event work runs in the consumer's frame, outside the try, so
+        it is never mistaken for a corrupt recording.
+        """
+        def rows(path, kind):
+            it = AD.iter_file(path, kind, lite=True)
+            n = 0
+            while True:
+                try:
+                    ev = next(it)
+                except StopIteration:
+                    return
+                except ValueError as exc:
+                    msg = str(exc)
+                    for pre in (path + ': ',
+                                os.path.basename(path) + ': '):
+                        if msg.startswith(pre):
+                            msg = msg[len(pre):]
+                            break
+                    raise CorruptStream(
+                        '%s: %s (after %d decoded rows)'
+                        % (os.path.basename(path), msg, n))
+                n += 1
+                yield ev
+
+        return AD.merge_streams([rows(paths[k], k) for k in AD.STREAMS
+                                 if k in paths])
+
     def _stream_run(self, st, paths):
         n = crossed = quotes = 0
-        for e in AD.merge_run(paths, lite=True):
+        for e in self._decoded(paths):
             n += 1
             k = e['stream']
             t = e['t_recv']

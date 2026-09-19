@@ -15,7 +15,7 @@ cb1ac7fa10b59955a467d140e7c17b9318eea525adb29b42c07cb15f64de1057  mrofyt_swings_
 b6bd0b05f48a6e26871df69c97fde97112a19d3f4b17da7edf280caa5bdc354d  mrofyt_exits_v017.py
 0df5357cce0d0c77c6f38759c757086a067ea90aef8efc1d373a766bbc8fe7f9  tests_mrofyt_v01_7.py
 cbd25e6df806db216cf480a3445f1628fc56dff95ea0d903dc197b91ac7b4791  MROF_YT_OF01_7_EXIT_FREEZE.md
-b955ea9db2e9956c0f433036e1af3f5bb66ce793ff690253f46101c58bf71d09  mrofyt_pilot.py (MROF-YT-PILOT-1.2; supersedes 3bd2b115… — validation blind (BLIND_FROM=20260921, markouts withheld, monotone exposure ledger), seeded bootstrap 95% intervals, skip reasons + book-integrity counters in the report; 1.1 supersedes a6504d0f… — event de-duplication and the 300/600/1800 s horizons, measurement only; see FINDINGS Amendment 1)
+13a540da355edd0f36a7988e7e048e8d82f57ad97628ad71a03679c3d1d69e09  mrofyt_pilot.py (MROF-YT-PILOT-1.2; supersedes b955ea9d… — winds its own observation buffers back when a run is abandoned mid-stream; earlier supersedes 3bd2b115… — validation blind (BLIND_FROM=20260921, markouts withheld, monotone exposure ledger), seeded bootstrap 95% intervals, skip reasons + book-integrity counters in the report; 1.1 supersedes a6504d0f… — event de-duplication and the 300/600/1800 s horizons, measurement only; see FINDINGS Amendment 1)
 a9bacd646e6ce57e89406745db9ca2a182820a0f9196efe409c48ebe5995a640  tests_mrofyt_pilot.py (43 tests; supersedes 417282fd… — P1b tracks the runner summary wording)
 4e398285cf52c193beb8a1a8a44eed02c733ff94a0f73992725aa0dc978f7b29  MROF_YT_WAVE2_REGISTRATION.md (DRAFT — pending operator sign-off; §8.1 interim-monitoring rule added; re-hash on sign-off)
 6b0eb7ea4a9bc5deb48eec7e461b03c36d509defeb9a28023b104b489f929538  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md (supersedes 4624b199… — Amendment 2: the validation blind; Amendment 1 supersedes 8ab588fa…)
@@ -26,7 +26,7 @@ Modified (one file, additively — a skip path, an observation hook and a
 run-id field):
 
 ```
-50c1de80b13a1ec6dfc88d037320dcc4337190a9331d84a2c848c4afae4bf257  mrofyt_runner.py (supersedes 99c9b277… — truncated/corrupt streams skipped whole; earlier: retroactive disconnect-gap correction. See REVIEW_PACKAGE_MANIFEST_v12.md)
+8b0fe33132aa8b153df018cbc349fd8cc9fdac30919fcf341400cbfd0e02f745  mrofyt_runner.py (supersedes 50c1de80… — every row-decoding failure is caught, not just two adapter exceptions, and an abandoned run is wound back whole; earlier: truncated/corrupt streams skipped whole, retroactive disconnect-gap correction. See REVIEW_PACKAGE_MANIFEST_v12.md)
 ```
 
 Archived source directive:
@@ -39,12 +39,12 @@ Delivered package (86 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-5e41b4dcd62cb43ecdc9e848892c260d0ed3ba50250e4c3d08b2c636b882507d  MROF_V1_Engine_v01_6_7.zip (supersedes 2d9e341f… — pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+da5616fa9e5c5809e03a85955a8849d49811b8f763cd55cae4d57a5d7cbc7690  MROF_V1_Engine_v01_6_7.zip (supersedes 5e41b4dc… — the truncated-stream guard extended to every decode failure and the whole-run wind-back; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
-# run from inside the unzipped package: 416/416, identical to the repo
+# run from inside the unzipped package: 421/421, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -71,7 +71,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mles_v12.py` | 48/48 |
 | `tests_mrofyt.py` | 59/59 |
 | `tests_mrofyt_pilot.py` | 43/43 |
-| `tests_mrofyt_runner.py` | 21/21 |
+| `tests_mrofyt_runner.py` | 26/26 |
 | `tests_mrofyt_v01_1.py` | 56/56 |
 | `tests_mrofyt_v01_2.py` | 31/31 |
 | `tests_mrofyt_v01_3.py` | 32/32 |
@@ -79,7 +79,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| **total** | **416/416** |
+| **total** | **421/421** |
 
 ## Runnable research commands
 
@@ -206,3 +206,16 @@ detector hash so registering wave two provably changed nothing.
    are now counted after the run's first `BOOK_READY`; a run that never
    reached it built no book and can support no completeness claim.
    Pinned by `T32c`/`T32d`.
+
+6. **Runner: the truncated-stream guard covers every decode failure,
+   and an abandoned run leaves nothing behind.** The 2026-09-19 handler
+   caught `MalformedHeaderError` and `UnknownEnumError`, but the
+   adapter's numeric and timestamp primitives raise a bare `ValueError`,
+   so a same-byte-count row that kept all twenty columns and garbled a
+   price, a sequence number or a timestamp still killed the pass. Row
+   decoding now raises `CorruptStream` for any of them, and the skip
+   names the file and how far the stream got. Separately, a run reported
+   `events=0` was still leaving its prefix's windows, wall states,
+   latency samples and open approaches in the ledger; the run is now
+   wound back to a mark taken before its first event. Pinned by
+   `R13f`-`R13j`.

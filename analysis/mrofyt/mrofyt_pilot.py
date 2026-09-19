@@ -177,6 +177,33 @@ class PilotRunner(RUN.Runner):
                                (array.array('d'), array.array('d')))
         RUN.Runner._process_run(self, st, mp, man)
 
+    # The pilot's observation buffers are part of what a run abandoned
+    # mid-stream must not leave behind: a window recorded from a prefix
+    # the ledger reports as never read would be a feature vector with no
+    # run behind it.
+    def _mark_run(self, st):
+        mark = RUN.Runner._mark_run(self, st)
+        mark['pilot'] = dict(
+            windows=len(self.windows),
+            opens=set(self.approach_open),
+            series=dict((k, len(v[0])) for k, v in self.series.items()))
+        return mark
+
+    def _unwind_run(self, st, mark):
+        RUN.Runner._unwind_run(self, st, mark)
+        p = mark['pilot']
+        del self.windows[p['windows']:]
+        for k in list(self.approach_open):
+            if k not in p['opens']:
+                del self.approach_open[k]
+        for k, pair in list(self.series.items()):
+            keep = p['series'].get(k)
+            if keep is None:
+                del self.series[k]
+            else:
+                del pair[0][keep:]
+                del pair[1][keep:]
+
     def _on_mid(self, st, t, mid):
         # record BEFORE the frozen logic so an approach opened by this
         # very tick already has its own mid in the series
