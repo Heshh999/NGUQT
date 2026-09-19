@@ -365,6 +365,161 @@ t('P10e: the document states the exposure split, so which sessions may '
   'EXPOSED_PILOT_DEV' in _reg and '20260921' in _reg and
   'Validation (untouched)' in _reg)
 
+
+# ---------------------------------------------------------------------
+# P11: the validation blind. MROF_YT_WAVE2_REGISTRATION.md declares
+# sessions >= 20260921 untouched, and W2-A4r is A4 exactly as it ran --
+# so a wave-one markout on one of those sessions IS a wave-two outcome.
+# The pilot is run weekly for recording health, so it must be able to
+# count events on validation sessions without reading any markout for
+# them. These tests build a two-session fixture (one DEV, one blind) and
+# check that the blind session's events are counted and its markouts
+# never computed, on every population and every horizon.
+# ---------------------------------------------------------------------
+import array as _arr           # noqa: E402
+import tempfile as _tf         # noqa: E402
+
+DEV, VAL = '20260918', '20260921'
+
+
+def _series(t0, span_s):
+    ts, ps = _arr.array('d'), _arr.array('d')
+    n = int(span_s / 0.5)
+    for i in range(n):
+        ts.append(t0 + i * 0.5)
+        ps.append(15000.0 + (i % 40) * 0.25)     # non-degenerate mids
+    return ts, ps
+
+
+_bl = PI.PilotRunner.__new__(PI.PilotRunner)
+_bl.series = {('NQ', 'R_DEV'): _series(1000.0, 4000.0),
+              ('NQ', 'R_VAL'): _series(9000.0, 4000.0)}
+_bl.windows = (
+    [dict(instrument='NQ', session=DEV, run='R_DEV', t_end=1100.0 + i * 50)
+     for i in range(4)] +
+    [dict(instrument='NQ', session=VAL, run='R_VAL', t_end=9100.0 + i * 50)
+     for i in range(4)])
+
+
+def _fire(ses, run, t):
+    return dict(instrument='NQ', session=ses, family='A4', direction=1,
+                t=t, run=run, approach=int(t), level='PP', state='NONE')
+
+
+_led = dict(fires=[_fire(DEV, 'R_DEV', 1100.0 + i * 100) for i in range(6)] +
+                  [_fire(VAL, 'R_VAL', 9100.0 + i * 100) for i in range(6)])
+
+m_blind = PI.step7_markouts(_bl, _led)                    # default blind
+m_open = PI.step7_markouts(_bl, _led, blind_from=None)    # unblinded
+
+
+def _max_n(block):
+    return max((d.get('n', 0) for d in block.values()), default=0)
+
+
+t('P11: under the default blind the validation session\'s 6 events are '
+  'COUNTED as withheld and no markout population contains them',
+  m_blind['blind']['events_withheld'] == 6 and
+  m_blind['blind']['signal_source_events_withheld'] == 6 and
+  m_blind['blind']['sessions_withheld'] == [VAL] and
+  m_blind['event_population']['distinct_events'] == 6 and
+  m_blind['event_population']['distinct_events_including_withheld'] == 12
+  and _max_n(m_blind['event_markouts_signed_ticks']) <= 6 and
+  _max_n(m_blind['event_markouts_signal_source_only']) <= 6 and
+  _max_n(m_blind['raw_fire_markouts_signed_ticks']) <= 6 and
+  _max_n(m_blind['event_markouts_by_family']['A4']['all_instruments'])
+  <= 6)
+
+t('P11b: the window-reference block is blinded too -- only the 4 DEV '
+  'windows are read, never the 4 validation windows',
+  _max_n(m_blind['window_reference_unsigned_ticks']) == 4)
+
+t('P11c: the same fixture unblinded (--blind-from none) reads all 12 '
+  'events and all 8 windows, so the blind is the only thing withholding',
+  m_open['blind']['blind_from'] is None and
+  m_open['blind']['events_withheld'] == 0 and
+  m_open['event_population']['distinct_events'] == 12 and
+  _max_n(m_open['event_markouts_signed_ticks']) == 12 and
+  _max_n(m_open['window_reference_unsigned_ticks']) == 8)
+
+t('P11d: the boundary is inclusive at BLIND_FROM, a missing session is '
+  'never blind, and blind_from=None blinds nothing',
+  PI._is_blind('20260921', '20260921') and
+  PI._is_blind('20261201', '20260921') and
+  not PI._is_blind('20260918', '20260921') and
+  not PI._is_blind(None, '20260921') and
+  not PI._is_blind('20260921', None))
+
+# exposure ledger: blind label, monotone upgrade, never a downgrade
+_lp = os.path.join(_tf.mkdtemp(prefix='mrofyt_expo_'), 'expo.json')
+_rep_b = dict(sessions_inspected=[DEV, VAL], sessions_blind=[VAL],
+              sessions_with_verified_bulk_csv=[DEV, VAL])
+_rep_o = dict(_rep_b, sessions_blind=[])
+PI.write_exposure_ledger(_rep_b, _lp)
+_l1 = {d['session']: d for d in json.load(open(_lp))['exposed_days']}
+PI.write_exposure_ledger(_rep_b, _lp)                    # re-run, blind
+_l2 = {d['session']: d for d in json.load(open(_lp))['exposed_days']}
+PI.write_exposure_ledger(_rep_o, _lp)                    # checkpoint read
+_l3 = {d['session']: d for d in json.load(open(_lp))['exposed_days']}
+PI.write_exposure_ledger(_rep_b, _lp)                    # blind run AFTER
+_l4 = {d['session']: d for d in json.load(open(_lp))['exposed_days']}
+t('P11e: the exposure ledger labels a blind session %s and a DEV session '
+  '%s, and a repeated blind run changes nothing' % (PI.BLIND_LABEL[:16],
+                                                    PI.EXPOSURE_LABEL),
+  _l1[DEV]['label'] == PI.EXPOSURE_LABEL and
+  _l1[VAL]['label'] == PI.BLIND_LABEL and _l1 == _l2)
+t('P11f: an explicit unblinding upgrades BLIND -> EXPOSED and records '
+  'previously_blind; a later blind run can never downgrade it back',
+  _l3[VAL]['label'] == PI.EXPOSURE_LABEL and
+  _l3[VAL].get('previously_blind') is True and
+  _l4[VAL]['label'] == PI.EXPOSURE_LABEL and
+  'previously_blind' not in _l4[DEV])
+shutil.rmtree(os.path.dirname(_lp), ignore_errors=True)
+
+_pb = PI.parse_blind_from
+try:
+    _pb('2026')
+    _bad_rejected = False
+except SystemExit:
+    _bad_rejected = True
+t('P11g: --blind-from parses YYYYMMDD, treats none/off as an explicit '
+  'unblind, and rejects anything else instead of silently unblinding',
+  _pb('20260921') == '20260921' and _pb('none') is None and
+  _pb('OFF') is None and _bad_rejected)
+
+# bootstrap interval for the registered kill criterion
+_d8 = PI._describe([-3.0, -1.0, 0.5, 1.0, 2.0, 2.5, 4.0, 6.0])
+_d8b = PI._describe([-3.0, -1.0, 0.5, 1.0, 2.0, 2.5, 4.0, 6.0])
+_d4 = PI._describe([1.0, 2.0, 3.0, 4.0])
+t('P11h: with >= %d values _describe reports a seeded 95%% bootstrap on '
+  'median and mean that brackets the sample, says whether it includes '
+  'zero, and is identical on a second call' % PI.BOOTSTRAP_MIN_N,
+  'ci95_median' in _d8 and 'ci95_mean' in _d8 and
+  _d8['ci95_median'][0] <= _d8['median'] <= _d8['ci95_median'][1] and
+  _d8['ci95_mean'][0] <= _d8['mean'] <= _d8['ci95_mean'][1] and
+  isinstance(_d8['ci95_median_includes_zero'], bool) and _d8 == _d8b)
+t('P11i: below %d values no interval is reported at all -- none would '
+  'be honest' % PI.BOOTSTRAP_MIN_N,
+  'ci95_median' not in _d4 and 'ci95_mean' not in _d4)
+
+# the report and summary carry the promised counters (rep is the P4
+# run_pilot over d1, which has exactly one run skipped for missing files)
+_s2 = rep['step2_coverage_and_pipeline']
+_txt = PI.text_summary(rep)
+t('P11j: the pilot report carries skip reasons and the book-integrity '
+  'counters, and the summary prints both plus the blind line',
+  _s2['runs_skipped_by_reason']['missing_files'] == 1 and
+  set(_s2['book_integrity']) == {'spurious_book_ready_ignored',
+                                 'rows_disconnected_suppressed'} and
+  'runs_skipped' in _s2 and 'runs_skipped_missing_csv' not in _s2 and
+  'book integrity:' in _txt and 'VALIDATION BLIND from' in _txt and
+  rep['blind_from'] == PI.BLIND_FROM and rep['sessions_blind'] == [])
+
+t('P11k: the blind date and label the code enforces are the ones the '
+  'registration document names, so the two cannot drift apart',
+  PI.BLIND_FROM == '20260921' and PI.BLIND_FROM in _reg and
+  PI.BLIND_LABEL in _reg and '8.1' in _reg and 'ci95_median' in _reg)
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

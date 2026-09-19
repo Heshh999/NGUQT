@@ -15,10 +15,10 @@ cb1ac7fa10b59955a467d140e7c17b9318eea525adb29b42c07cb15f64de1057  mrofyt_swings_
 b6bd0b05f48a6e26871df69c97fde97112a19d3f4b17da7edf280caa5bdc354d  mrofyt_exits_v017.py
 0df5357cce0d0c77c6f38759c757086a067ea90aef8efc1d373a766bbc8fe7f9  tests_mrofyt_v01_7.py
 cbd25e6df806db216cf480a3445f1628fc56dff95ea0d903dc197b91ac7b4791  MROF_YT_OF01_7_EXIT_FREEZE.md
-3bd2b115aa219bf14420a2e536e867689fd782db1168574c306d3918c6ae1367  mrofyt_pilot.py (MROF-YT-PILOT-1.1; supersedes a6504d0f… — event de-duplication and the 300/600/1800 s horizons, measurement only; see FINDINGS Amendment 1)
-417282fdc1d7bfadef7c0da85df60994d73ccdd87a8924c5be1aa48fb5077408  tests_mrofyt_pilot.py (32 tests; supersedes d9bd514a… — P1b tracks the runner summary wording)
-01d5f381df774b373302f5d8867892c3403d6f7ac2a49eed09cac9d50915a4e9  MROF_YT_WAVE2_REGISTRATION.md (DRAFT — pending operator sign-off; re-hash on sign-off)
-4624b199298935b72a2f906663ce7fd9b0b40f0d59be8e06f026b4771e6ac1d4  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md (supersedes 8ab588fa… — Amendment 1)
+b955ea9db2e9956c0f433036e1af3f5bb66ce793ff690253f46101c58bf71d09  mrofyt_pilot.py (MROF-YT-PILOT-1.2; supersedes 3bd2b115… — validation blind (BLIND_FROM=20260921, markouts withheld, monotone exposure ledger), seeded bootstrap 95% intervals, skip reasons + book-integrity counters in the report; 1.1 supersedes a6504d0f… — event de-duplication and the 300/600/1800 s horizons, measurement only; see FINDINGS Amendment 1)
+a9bacd646e6ce57e89406745db9ca2a182820a0f9196efe409c48ebe5995a640  tests_mrofyt_pilot.py (43 tests; supersedes 417282fd… — P1b tracks the runner summary wording)
+4e398285cf52c193beb8a1a8a44eed02c733ff94a0f73992725aa0dc978f7b29  MROF_YT_WAVE2_REGISTRATION.md (DRAFT — pending operator sign-off; §8.1 interim-monitoring rule added; re-hash on sign-off)
+6b0eb7ea4a9bc5deb48eec7e461b03c36d509defeb9a28023b104b489f929538  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md (supersedes 4624b199… — Amendment 2: the validation blind; Amendment 1 supersedes 8ab588fa…)
 50d0ddc78814725011714faf01b1da0d45053d3612cb08095230496ac641c1a2  MROF_ACTUAL_STATE_INVENTORY.md
 ```
 
@@ -39,12 +39,12 @@ Delivered package (86 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-2d9e341f8a4b08ce44357036e5b5d938afdbe83ef621aef17a9c167922d8a7f2  MROF_V1_Engine_v01_6_7.zip (supersedes 1ba494da… — adds the truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+5e41b4dcd62cb43ecdc9e848892c260d0ed3ba50250e4c3d08b2c636b882507d  MROF_V1_Engine_v01_6_7.zip (supersedes 2d9e341f… — pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
-# run from inside the unzipped package: 403/403, identical to the repo
+# run from inside the unzipped package: 416/416, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -68,9 +68,9 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | suite | result |
 | --- | --- |
 | `tests_mles_v11.py` | 29/29 |
-| `tests_mles_v12.py` | 46/46 |
+| `tests_mles_v12.py` | 48/48 |
 | `tests_mrofyt.py` | 59/59 |
-| `tests_mrofyt_pilot.py` | 32/32 |
+| `tests_mrofyt_pilot.py` | 43/43 |
 | `tests_mrofyt_runner.py` | 21/21 |
 | `tests_mrofyt_v01_1.py` | 56/56 |
 | `tests_mrofyt_v01_2.py` | 31/31 |
@@ -79,7 +79,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| **total** | **403/403** |
+| **total** | **416/416** |
 
 ## Runnable research commands
 
@@ -119,9 +119,9 @@ because both change files this package ships.
 
 ```
 ce1e475a37bcad14e4e7ea10228feaea9a561c6ea4d0181e54077774fdebc060  ../../src/MlesV12CaptureHost.cs (build 1.2.2)
-b0a2c0266015aeabed8855801afbdca89ba9ecc2232a91e397890e6fcffc1021  mles_v12_audit.py
+4bfaccfafadbf169ebffdfad4e5abbbc7b774cd840d049c7cdc81742f14a56eb  mles_v12_audit.py
 3d8812b9d286b754bdd01050f4714c3dea1de13c5d59e27a5274903fc180c405  mles_v12_harness.cs
-729c34f05887c7b7913604edc50ed25c43d8436fe57f3d51f1825ecc53ade78b  tests_mles_v12.py
+665b0a06d3079c23fd55691f9e361e64573d62ee434f1d277ac5896b94da56fa  tests_mles_v12.py
 ```
 
 1. **Recorder: spurious `BOOK_READY` after a disconnect.** The gate
@@ -185,3 +185,24 @@ detector hash so registering wave two provably changed nothing.
    corruption as `CORRUPT_STREAM`, resetting run state so nothing
    partial survives. Pinned by `R13`-`R13e`. Never copy the capture
    folder while recording.
+
+6. **Pilot 1.2: the validation blind, and the interval the kill criterion
+   needs.** Registering wave two created a hole: the weekly wave-one
+   pilot would have read markouts on -- and labelled `EXPOSED_PILOT_DEV`
+   -- the very sessions the registration declares untouched, and
+   `W2-A4r` is A4 as it ran. The pilot now withholds every markout for
+   sessions `>= BLIND_FROM = 20260921` by default (events are counted so
+   accrual stays visible), labels them `VALIDATION_BLIND_MARKOUTS_WITHHELD`,
+   and unblinds only on an explicit, loud, permanent `--blind-from none`.
+   Exposure is monotone: blind may become exposed, never the reverse.
+   Also added: a seeded percentile-bootstrap 95% interval on every
+   markout population (what §7's "interval includes zero" reads; none
+   below five events), and the skip-reason and book-integrity counters
+   in the report and summary. Pinned by `P11`-`P11k`; `P11k` binds the
+   date and label to the registration text.
+7. **Auditor: depth completeness is asserted on churn after `BOOK_READY`.**
+   A 228-row restart stub still tripped the first floor because ~60 of
+   its rows were the book being built, when only ADDs can occur. Rows
+   are now counted after the run's first `BOOK_READY`; a run that never
+   reached it built no book and can support no completeness claim.
+   Pinned by `T32c`/`T32d`.

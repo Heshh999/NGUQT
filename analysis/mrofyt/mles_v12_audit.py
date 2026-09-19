@@ -159,6 +159,12 @@ def audit_run(manifest_path, lite=True):
     max_bid = max_ask = -1
     n_bid = n_ask = 0
     n_act = dict(ADD=0, UPDATE=0, REMOVE=0)
+    # depth rows AFTER the book was first built. Before BOOK_READY the
+    # recorder is still constructing the book and only ADDs are expected,
+    # so completeness of sides/actions can only be asserted on rows that
+    # came after it (see the completeness check below).
+    book_ready_seen = False
+    n_depth_after_ready = 0
     suppressed = 0
     lat_hist = [0] * (LAT_BINS_MS + 1)
     lat_n = 0
@@ -244,8 +250,12 @@ def audit_run(manifest_path, lite=True):
                         max_ask = lvl
                 if act in n_act:
                     n_act[act] += 1
+                if book_ready_seen:
+                    n_depth_after_ready += 1
             elif k == 'quality':
                 quality.append(e)
+                if e['kind'] == 'BOOK_READY':
+                    book_ready_seen = True
             elif k in ('trades', 'quotes'):
                 te = e['t_exch']
                 if te is not None and tr is not None:
@@ -343,21 +353,36 @@ def audit_run(manifest_path, lite=True):
     # floor is deliberately far below any real session -- a live NQ/MNQ
     # run carries tens of millions of depth rows -- so no feed defect
     # can hide behind it.
+    # The first floor counted depth rows from row one, and a 228-row
+    # restart stub (20260913, NQ) still tripped it: ~60 of those rows
+    # were the book being BUILT, during which only ADDs can occur.
+    # Completeness of actions is a claim about churn on a built book, so
+    # it is asserted only on rows after the run's first BOOK_READY. A run
+    # that never reached BOOK_READY built no book and can support no
+    # such claim at all. Any live session has millions of post-ready
+    # rows, so no feed defect can hide behind this.
     n_depth = n_bid + n_ask
     min_rows = 20 * (man.get('declaredDepth') or 10)
     info['depth_rows'] = n_depth
-    info['depth_completeness_checked'] = n_depth >= min_rows
-    if n_depth >= min_rows:
+    info['depth_rows_after_book_ready'] = n_depth_after_ready
+    checked = book_ready_seen and n_depth_after_ready >= min_rows
+    info['depth_completeness_checked'] = checked
+    if checked:
         for need in ('BID', 'ASK'):
             if need not in depth_sides:
                 _fail(fails, 'MISSING_DEPTH_SIDE', need)
         for need in ('ADD', 'UPDATE', 'REMOVE'):
             if need not in depth_actions:
                 _fail(fails, 'MISSING_DEPTH_ACTION', need)
+    elif not book_ready_seen:
+        info['depth_completeness_skipped'] = (
+            'run never reached BOOK_READY (%d depth rows); no built book, '
+            'so sides/actions are not assertable' % n_depth)
     else:
         info['depth_completeness_skipped'] = (
-            '%d depth rows < %d; sides/actions are not assertable on a '
-            'run this small' % (n_depth, min_rows))
+            '%d depth rows after BOOK_READY < %d; sides/actions are not '
+            'assertable on this little churn (%d rows total)'
+            % (n_depth_after_ready, min_rows, n_depth))
     mb, ma = max_bid + 1, max_ask + 1
     info['depth_max_bid_obs'] = mb
     info['depth_max_ask_obs'] = ma

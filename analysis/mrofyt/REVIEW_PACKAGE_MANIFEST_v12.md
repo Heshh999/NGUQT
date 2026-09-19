@@ -27,8 +27,8 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|Account\.|EnterLong|EnterShort" sr
 be29c36a62624ab5e18e67d104eb4e9323abcda4bf5faf1c88c54486fc446f4a  analysis/mrofyt/nt8_stubs_v12.cs
 3d8812b9d286b754bdd01050f4714c3dea1de13c5d59e27a5274903fc180c405  analysis/mrofyt/mles_v12_harness.cs (supersedes ff2cb79e… — the disconnect gap now carries a depth row, which is what the old fixture was missing)
 12ab264bb466bbf1f48943c95b65ae524d9a142a249c94c3337ca186a3d23861  analysis/mrofyt/mles_v12_adapter.py
-b0a2c0266015aeabed8855801afbdca89ba9ecc2232a91e397890e6fcffc1021  analysis/mrofyt/mles_v12_audit.py (supersedes b17a4732… — depth completeness needs enough depth rows to assert)
-b7bc3921a2d03bf133b91ce727d01c7c2f838e51b3c3ea87db964b26d08c3749  analysis/mrofyt/tests_mles_v12.py (46 tests; supersedes 729c34f0…)
+4bfaccfafadbf169ebffdfad4e5abbbc7b774cd840d049c7cdc81742f14a56eb  analysis/mrofyt/mles_v12_audit.py (supersedes b0a2c026… — completeness asserted on churn AFTER BOOK_READY; a run that never built a book asserts nothing. Earlier b17a4732…: minimum-row guard)
+665b0a06d3079c23fd55691f9e361e64573d62ee434f1d277ac5896b94da56fa  analysis/mrofyt/tests_mles_v12.py (48 tests; supersedes b7bc3921…)
 1635f0391449260d1a15c0780a54728523834f3df4505e755ad400d63a510812  analysis/mrofyt/RECORDER_DEPLOYMENT_V12.md
 65b2948c0b7877d70d71aa7a12cac2326d740ad9c0aa98d4f1b608e4f12e33a0  analysis/mrofyt/DATA_HANDOFF_V12.md
 15c3ef12b43cb0e059eb317da9c7ddd976971965009252aaa4357cc7a6195361  analysis/mrofyt/SETUP_WALKTHROUGH_V12.md
@@ -43,7 +43,7 @@ Reproduce the entire proof (mcs + mono lifecycle harness + audits +
 adversarial fixtures + package byte-identity):
 
 ```
-cd analysis/mrofyt && python3 tests_mles_v12.py      # 46/46
+cd analysis/mrofyt && python3 tests_mles_v12.py      # 48/48
 cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 21/21
 ```
 
@@ -54,7 +54,7 @@ restart, disconnect/reconnect, NQ+MNQ pairing), audits the genuine
 output and then attacks the auditor with falsified fixtures.
 
 Predecessor suites (byte-identical, re-run at freeze): 59+56+31+32+
-25+36+29+42+15 = 325, all passing; grand total 403/403 across twelve suites at this revision.
+25+36+29+42+15 = 325, all passing; grand total 416/416 across twelve suites at this revision.
 
 ## Correction of record
 
@@ -279,3 +279,20 @@ one bad run does not poison the clean run beside it.
 
 **Operator rule this encodes:** never copy the capture folder while the
 recorder is running. Stop NinjaTrader, copy, restart.
+
+## Amendment: depth completeness is a claim about a BUILT book
+
+The minimum-row guard (above) still let a 228-row restart stub through:
+`NQ/20260913131032651-adf647ac-R001`, `MISSING_DEPTH_ACTION UPDATE`.
+Roughly 60 of those rows were the book being constructed, and during
+construction only `ADD` can occur -- so counting from row one measured
+the wrong thing. The rule was left visible rather than tuned to silence
+the failure, and reconsidered on mechanism: completeness of sides and
+actions is a claim about churn on a built book. The auditor now counts
+depth rows after the run's first `BOOK_READY` (`depth_rows_after_book_
+ready`), asserts only above `20 x declaredDepth` of those, and skips
+with the reason `never reached BOOK_READY` for a run that built no book.
+A live session has millions of post-ready rows, so nothing real can hide
+behind it. `T32c` pins the no-book case; `T32d` pins that the post-ready
+count is strictly below the total and the check still runs on a normal
+run.

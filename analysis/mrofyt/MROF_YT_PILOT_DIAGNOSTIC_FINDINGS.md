@@ -354,3 +354,57 @@ This is recorded as context for reading markouts. It is **not** computed
 by any module here, and the outcome lock is untouched: the pilot still
 produces no fill, stop, target, R or P&L. Confirm the figure from the
 Fills tab or the exported CSV before using it as a threshold.
+
+---
+
+# Amendment 2 — MROF-YT-PILOT-1.2: the validation blind
+
+Registered **2026-09-19**. Measurement and protocol only; no threshold,
+level, window, feature, baseline or detector changed, and the raw
+`fires` list is still byte-identical to what 1.0 produced.
+
+## The hole Amendment 1 and the wave-two registration created together
+
+`MROF_YT_WAVE2_REGISTRATION.md` declares every session `>= 20260921`
+untouched validation. This pilot is run weekly for recording health, it
+labels every session it touches `EXPOSED_PILOT_DEV`, and it prints
+markouts. `W2-A4r` is A4 exactly as it ran. So the weekly run would have
+unblinded wave two's primary population one Friday at a time, and by
+December there would have been no validation set left.
+
+## What 1.2 does
+
+- **Withholds every markout** — signal, raw, window-reference, every
+  horizon — for sessions `>= BLIND_FROM = '20260921'`. Events on those
+  sessions are **counted** (`blind.events_withheld`,
+  `signal_source_events_withheld`, `sessions_withheld`) so accrual is
+  visible. Knowing *N* does not reveal which way *N* went.
+- **Labels** those sessions `VALIDATION_BLIND_MARKOUTS_WITHHELD` in the
+  exposure ledger, not `EXPOSED_PILOT_DEV`. Exposure is **monotone**:
+  a blind session may later be unblinded (recorded as
+  `previously_blind`), an exposed one can never be re-blinded.
+- **Unblinds only explicitly** — `--blind-from none` — announced loudly
+  on stdout. That is the checkpoint read and it is permanent.
+- **Reports a seeded percentile-bootstrap 95% interval** on every
+  markout population (`ci95_median`, `ci95_mean`,
+  `ci95_median_includes_zero`), which is the quantity the registered
+  kill criterion reads. None below five events.
+- **Carries the runner's skip reasons and book-integrity counters** in
+  `step2` and the text summary — promised with the retroactive
+  correction and not delivered until now.
+
+Pinned by `P11`–`P11k`. `P11k` binds the date and label to the
+registration text so the two cannot drift apart.
+
+## What this means operationally
+
+The weekly Friday run is now safe: run it exactly as before. The
+summary will say
+
+```
+VALIDATION BLIND from 20260921: N events (M signal-source) on sessions ... -- counted, markouts WITHHELD.
+```
+
+and that line is the event-rate check. Nothing directional about those
+sessions is readable until the December checkpoint is run with
+`--blind-from none`.

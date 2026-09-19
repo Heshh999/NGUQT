@@ -578,6 +578,44 @@ t('T32b: the identical absence in a run with enough depth rows STILL '
   'REMOVE' not in _rb['info']['depth_actions'])
 
 
+# ---- T32c/d: completeness is a claim about churn on a BUILT book -----
+# A 228-row restart stub (NQ, 20260913) still tripped the first floor:
+# ~60 of its rows were the book being built, when only ADDs can occur.
+# So the floor now counts depth rows AFTER the run's first BOOK_READY,
+# and a run that never reached BOOK_READY can support no completeness
+# claim at all.
+def _strip_quality_kind(d, kind):
+    mp = glob.glob(os.path.join(d, '*_manifest.json'))[0]
+    man = json.load(open(mp))
+    qp = os.path.join(d, man['quality']['file'])
+    rows = open(qp).read().splitlines(True)
+    keep = [rows[0]] + [r for r in rows[1:] if (',%s,' % kind) not in r]
+    open(qp, 'w').writelines(keep)
+    man['quality'].update(rows=len(keep) - 1, bytes=os.path.getsize(qp),
+                          sha256=sha(qp))
+    json.dump(man, open(mp, 'w'))
+    return mp
+
+
+_noready = os.path.join(WORK, 'dnoready')
+SY.synth_run(_noready, n_depth=4000, cid='dnoready')
+_rn = AU.audit_run(_strip_quality_kind(_noready, 'BOOK_READY'))
+_cn = {c for c, _ in _rn['failures']}
+t('T32c: a run that never reached BOOK_READY built no book, so sides/'
+  'actions are not asserted even with thousands of depth rows, and the '
+  'skip says why',
+  'MISSING_DEPTH_ACTION' not in _cn and
+  _rn['info']['depth_completeness_checked'] is False and
+  'never reached BOOK_READY' in _rn['info']['depth_completeness_skipped']
+  and _rn['info']['depth_rows_after_book_ready'] == 0)
+t('T32d: on a normal run the post-ready count excludes the rows that '
+  'built the book, is still far above the floor, and the check runs',
+  0 < _rb['info']['depth_rows_after_book_ready'] <
+  _rb['info']['depth_rows'] and
+  _rb['info']['depth_completeness_checked'] is True and
+  _rs['info']['depth_rows_after_book_ready'] < _rs['info']['depth_rows'])
+
+
 # ---- T33: the build stamp and the quality-stream repair travel together
 # The 2026-09-13 repair changed WHICH QUALITY EVENTS a run emits (gate
 # maxima reset on disconnect, plus a BOOK_RESYNC_START there) but was

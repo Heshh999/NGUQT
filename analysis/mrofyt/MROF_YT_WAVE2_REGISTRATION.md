@@ -193,6 +193,34 @@ reported as untested and carried forward without modification.
   early is moved to DEV and labelled, permanently.
 - Wave one keeps its own exposure ledger; the two are never merged.
 
+### 8.1 Interim monitoring — what may be read weekly, and what may not
+
+The wave-one pilot is run weekly to verify recording health. `W2-A4r`
+is A4 exactly as it ran, so a wave-one *markout* on a validation session
+is a wave-two outcome. Therefore, on every session `>= 20260921`:
+
+| may be read weekly | withheld until the checkpoint |
+| --- | --- |
+| audit results, coverage, latency | signal markouts, every horizon |
+| feature availability, funnels | raw-fire markouts |
+| **fire and event counts** (accrual) | window-reference markouts |
+| build stamps, skip reasons | anything directional |
+
+Knowing *how many* events accrued does not reveal *which way* they went;
+this is the standard accrual-vs-outcome distinction. `mrofyt_pilot.py`
+enforces it: `BLIND_FROM = '20260921'` withholds every markout for those
+sessions by default and labels them `VALIDATION_BLIND_MARKOUTS_WITHHELD`
+in the exposure ledger instead of `EXPOSED_PILOT_DEV`. The checkpoint
+read is `--blind-from none`, which is announced loudly and relabels
+those sessions exposed **permanently** (exposure is monotone: blind may
+become exposed, never the reverse). Bound to the code by tests `P10` and
+`P11`.
+
+The pilot now also reports a seeded percentile-bootstrap 95% interval on
+each markout population (`ci95_median`, `ci95_mean`), which is the
+quantity §7's kill criterion reads. No interval is reported below five
+events, where one would be theatre.
+
 ## 9. Explicitly NOT registered
 
 So that a later "we should also…" is recognised as a new wave with its

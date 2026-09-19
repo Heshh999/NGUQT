@@ -35,8 +35,29 @@ import mrofyt_levels as LV
 import mrofyt_runner as RUN
 import mrofyt_signals as SIG
 
-PILOT_VERSION = 'MROF-YT-PILOT-1.1'
+PILOT_VERSION = 'MROF-YT-PILOT-1.2'
 EXPOSURE_LABEL = 'EXPOSED_PILOT_DEV'
+
+# Interim-monitoring blind. MROF_YT_WAVE2_REGISTRATION.md declares every
+# session >= BLIND_FROM untouched validation whose verdict may only be
+# read at the checkpoint. This pilot is meant to be run weekly to verify
+# recording health and event ACCRUAL -- and W2-A4r is literally A4 as it
+# ran, so reading wave-one markouts on those sessions would unblind wave
+# two. So by default the pilot withholds every markout (signal, raw and
+# window-reference, every horizon) for sessions >= BLIND_FROM, reports
+# how many events it withheld, and labels those sessions BLIND_LABEL
+# rather than EXPOSURE_LABEL. Fire counts, funnels and integrity checks
+# stay visible: knowing N does not reveal which way N went. Unblinding
+# is explicit (--blind-from none) and permanently relabels the sessions
+# exposed. Bound to the registration text by tests P10/P11.
+BLIND_FROM = '20260921'
+BLIND_LABEL = 'VALIDATION_BLIND_MARKOUTS_WITHHELD'
+
+# Percentile bootstrap for the registered kill criterion ("95% interval
+# includes zero"). Seeded so two runs of the same report agree exactly.
+BOOTSTRAP_N = 2000
+BOOTSTRAP_SEED = 20260918
+BOOTSTRAP_MIN_N = 5
 
 # Horizons. 300 s is PRIMARY: the operator's own recorded discretionary
 # holding period averages ~4 min (longest 8 min 3 s), so 5 min is the
@@ -454,20 +475,47 @@ def step6_signals(ledger):
             cooldown_sensitivity=sensitivity))
 
 
+def _bootstrap_ci(vals, stat, n_boot=BOOTSTRAP_N, seed=BOOTSTRAP_SEED):
+    """Seeded percentile bootstrap, 2.5/97.5. Standard library only."""
+    import random
+    rng = random.Random(seed)
+    n = len(vals)
+    draws = []
+    for _ in range(n_boot):
+        s = sorted(rng.choice(vals) for _ in range(n))
+        draws.append(stat(s))
+    draws.sort()
+    return (round(draws[int(0.025 * (n_boot - 1))], 3),
+            round(draws[int(0.975 * (n_boot - 1))], 3))
+
+
 def _describe(vals):
     vals = sorted(v for v in vals if v is not None)
     if not vals:
         return dict(n=0)
     n = len(vals)
     mean = sum(vals) / n
-    return dict(n=n, mean=round(mean, 3), median=round(vals[n // 2], 3),
-                p10=round(vals[int(0.10 * (n - 1))], 3),
-                p90=round(vals[int(0.90 * (n - 1))], 3),
-                min=round(vals[0], 3), max=round(vals[-1], 3),
-                frac_positive=round(sum(1 for v in vals if v > 0) / n, 3))
+    d = dict(n=n, mean=round(mean, 3), median=round(vals[n // 2], 3),
+             p10=round(vals[int(0.10 * (n - 1))], 3),
+             p90=round(vals[int(0.90 * (n - 1))], 3),
+             min=round(vals[0], 3), max=round(vals[-1], 3),
+             frac_positive=round(sum(1 for v in vals if v > 0) / n, 3))
+    if n >= BOOTSTRAP_MIN_N:
+        # the registered kill criterion reads these; below BOOTSTRAP_MIN_N
+        # an interval would be theatre, so none is reported
+        d['ci95_median'] = _bootstrap_ci(vals, lambda s: s[len(s) // 2])
+        d['ci95_mean'] = _bootstrap_ci(vals, lambda s: sum(s) / len(s))
+        d['ci95_median_includes_zero'] = (d['ci95_median'][0] <= 0.0
+                                          <= d['ci95_median'][1])
+    return d
 
 
-def step7_markouts(runner, ledger):
+def _is_blind(session, blind_from):
+    return blind_from is not None and session is not None and \
+        str(session) >= str(blind_from)
+
+
+def step7_markouts(runner, ledger, blind_from=BLIND_FROM):
     """Signed mid markouts at the frozen horizons.
 
     The population that matters is the frozen signals. When there are
@@ -475,7 +523,10 @@ def step7_markouts(runner, ledger):
     stay empty - it does NOT quietly substitute a different population
     and call the result evidence. The window-level block below is
     reported separately, is explicitly not a signal population, and
-    carries no directional claim: an approach is not a trade."""
+    carries no directional claim: an approach is not a trade.
+
+    Sessions >= blind_from are validation: every markout for them is
+    WITHHELD (see BLIND_FROM). They are counted, never read."""
     def _marks(pop):
         out = {}
         for h in MARKOUT_S:
@@ -487,12 +538,26 @@ def step7_markouts(runner, ledger):
             out['%gs' % h] = _describe(vals)
         return out
 
-    events = dedup_fires(ledger.get('fires', []), EVENT_COOLDOWN_S)
+    all_events = dedup_fires(ledger.get('fires', []), EVENT_COOLDOWN_S)
+    events = [e for e in all_events if not _is_blind(e['session'],
+                                                     blind_from)]
+    withheld = [e for e in all_events if _is_blind(e['session'],
+                                                   blind_from)]
     sig_src = [e for e in events if e['is_signal_source']]
+    blind_info = dict(
+        blind_from=blind_from,
+        events_withheld=len(withheld),
+        signal_source_events_withheld=sum(
+            1 for e in withheld if e['is_signal_source']),
+        sessions_withheld=sorted({e['session'] for e in withheld}),
+        rule='markouts for sessions >= blind_from are not computed; the '
+             'events are counted so accrual is visible without unblinding '
+             'the registered validation set')
     # RAW firings, kept only for continuity with the 1.0 report. A
     # duplicated event enters this median several times, so it is not
     # the population to read.
-    sig = _marks(ledger.get('fires', []))
+    sig = _marks([f for f in ledger.get('fires', [])
+                  if not _is_blind(f.get('session'), blind_from)])
     by_family = {}
     for fam in sorted(set(e['family'] for e in events)):
         by_family[fam] = dict(
@@ -504,12 +569,15 @@ def step7_markouts(runner, ledger):
     for h in MARKOUT_S:
         vals = []
         for w in runner.windows:
+            if _is_blind(w.get('session'), blind_from):
+                continue
             m = runner.markout(w['instrument'], w.get('run'),
                                w['t_end'], h)
             if m is not None:
                 vals.append(m)          # unsigned: no direction is claimed
         win['%gs' % h] = _describe(vals)
     return dict(
+        blind=blind_info,
         signal_population=('NO_FROZEN_SIGNALS'
                            if not ledger.get('fires') else 'FROZEN_SIGNALS'),
         primary_horizon_s=PRIMARY_MARKOUT_S,
@@ -521,6 +589,8 @@ def step7_markouts(runner, ledger):
         event_markouts_by_family=by_family,
         event_population=dict(distinct_events=len(events),
                               signal_source_events=len(sig_src),
+                              distinct_events_including_withheld=len(
+                                  all_events),
                               cooldown_s=EVENT_COOLDOWN_S),
         raw_fire_markouts_signed_ticks=sig,
         raw_fire_caveat='RAW firings; a duplicated event enters this median '
@@ -654,7 +724,7 @@ def verdicts(step1, cov, funnel, sigs, health, ledger):
 # ---------------------------------------------------------------------
 # driver
 # ---------------------------------------------------------------------
-def run_pilot(capture_dir, max_sessions=None):
+def run_pilot(capture_dir, max_sessions=None, blind_from=BLIND_FROM):
     step1 = step1_data_audit(capture_dir)
     r = PilotRunner(capture_dir, max_sessions=max_sessions)
     ledger = r.run()
@@ -663,24 +733,40 @@ def run_pilot(capture_dir, max_sessions=None):
     census = step4_level_census(r.windows, ledger)
     funnel = step5_funnel(r.windows, ledger)
     sigs = step6_signals(ledger)
-    marks = step7_markouts(r, ledger)
+    marks = step7_markouts(r, ledger, blind_from=blind_from)
     ctrl = step8_controls(ledger, r)
     replay = step9_replay(r)
     sessions = sorted(ledger['sessions'])
     csv_sessions = sorted({x['session'] for x in step1['verified_runs']})
+    tot = ledger['totals']
 
     rep = dict(
         pilot=PILOT_VERSION, runner=ledger['runner'],
         exposure_label=EXPOSURE_LABEL,
+        blind_from=blind_from,
         sessions_inspected=sessions,
+        sessions_blind=[s for s in sessions if _is_blind(s, blind_from)],
         sessions_with_verified_bulk_csv=csv_sessions,
         step1_data_audit=step1,
         step2_coverage_and_pipeline=dict(
             coverage=cov,
-            events_ingested=ledger['totals'].get('events', 0),
+            events_ingested=tot.get('events', 0),
             runs_ingested=sum(1 for x in ledger['runs']
                               if not x.get('skipped')),
-            runs_skipped_missing_csv=ledger.get('skipped_runs', []),
+            # every skipped run with its reason; the runner never
+            # partially ingests, so each entry is a whole run not read
+            runs_skipped=ledger.get('skipped_runs', []),
+            runs_skipped_by_reason=dict(
+                missing_files=tot.get('runs_skipped_missing_files', 0),
+                truncated=tot.get('runs_skipped_truncated', 0),
+                corrupt=tot.get('runs_skipped_corrupt', 0)),
+            # the two counters that say how much of a pre-1.2.2
+            # recording the runner had to correct retroactively
+            book_integrity=dict(
+                spurious_book_ready_ignored=tot.get(
+                    'spurious_book_ready_ignored', 0),
+                rows_disconnected_suppressed=tot.get(
+                    'rows_disconnected_suppressed', 0)),
             latency_ms=ledger.get('latency_ms', {})),
         step3_feature_health=health,
         step4_level_and_approach_census=census,
@@ -710,7 +796,9 @@ def classify(step1, ledger, rep):
                             artifact='no run passed manifest verification'))
     if ledger['totals'].get('events', 0) == 0:
         blocked.append(dict(stage='step2_pipeline_proof',
-                            artifact='no bulk CSV present for any manifest'))
+                            artifact='no ingestible bulk CSV for any '
+                                     'manifest (missing, truncated or '
+                                     'corrupt)'))
     if ledger['totals'].get('windows', 0) == 0:
         blocked.append(dict(stage='step5_threshold_funnel',
                             artifact='no completed 10 s decision window'))
@@ -724,27 +812,43 @@ def classify(step1, ledger, rep):
 
 
 def write_exposure_ledger(rep, path):
-    """Append-only. A day, once exposed, is exposed permanently."""
+    """Append-only, and exposure is MONOTONE: a session may go from blind
+    to exposed (an explicit unblinding at the checkpoint), never back.
+
+    A session run under the blind gets BLIND_LABEL: its fire counts were
+    seen, its markouts were not. A session run unblinded gets
+    EXPOSURE_LABEL. Once EXPOSURE_LABEL is on a session it stays,
+    whatever later runs do."""
     old = []
     if os.path.exists(path):
         try:
             old = json.load(open(path)).get('exposed_days', [])
         except Exception:
             old = []
-    seen = {d['session'] for d in old}
+    by = {d['session']: d for d in old}
+    blind = set(rep.get('sessions_blind', []))
     for s in rep['sessions_inspected']:
-        if s not in seen:
-            old.append(dict(session=s, label=EXPOSURE_LABEL,
-                            exposed_by=PILOT_VERSION,
-                            bulk_csv_present=s in
-                            rep['sessions_with_verified_bulk_csv']))
-    old.sort(key=lambda d: d['session'])
-    json.dump(dict(label=EXPOSURE_LABEL,
-                   rule='These days may remain in later DEV/training where '
-                        'the governing protocol permits. They can never '
-                        'become untouched prospective validation.',
-                   exposed_days=old), open(path, 'w'), indent=1)
-    return len(old)
+        label = BLIND_LABEL if s in blind else EXPOSURE_LABEL
+        cur = by.get(s)
+        if cur is None:
+            by[s] = dict(session=s, label=label, exposed_by=PILOT_VERSION,
+                         bulk_csv_present=s in
+                         rep['sessions_with_verified_bulk_csv'])
+        elif cur.get('label') == BLIND_LABEL and label == EXPOSURE_LABEL:
+            # explicit unblinding: upgrade, and say it was blind before
+            cur.update(label=EXPOSURE_LABEL, exposed_by=PILOT_VERSION,
+                       previously_blind=True)
+        # EXPOSURE_LABEL never downgrades; BLIND stays BLIND on re-run
+    days = sorted(by.values(), key=lambda d: d['session'])
+    json.dump(dict(label=EXPOSURE_LABEL, blind_label=BLIND_LABEL,
+                   rule='EXPOSED days may remain in later DEV/training where '
+                        'the governing protocol permits; they can never '
+                        'become untouched prospective validation. BLIND '
+                        'days had fire counts read and markouts withheld; '
+                        'they remain valid validation until explicitly '
+                        'unblinded, which is permanent.',
+                   exposed_days=days), open(path, 'w'), indent=1)
+    return len(days)
 
 
 def text_summary(rep):
@@ -785,14 +889,40 @@ def text_summary(rep):
     L.append('   cooldown sensitivity: %s'
              % {k: v['distinct_events']
                 for k, v in sorted(dd['cooldown_sensitivity'].items())})
+    s2 = rep['step2_coverage_and_pipeline']
+    sk = s2.get('runs_skipped_by_reason', {})
+    if any(sk.values()):
+        L.append('runs skipped whole: missing-files=%d truncated=%d corrupt=%d'
+                 % (sk.get('missing_files', 0), sk.get('truncated', 0),
+                    sk.get('corrupt', 0)))
+    bi = s2.get('book_integrity', {})
+    L.append('book integrity: spurious BOOK_READY ignored=%d, rows inside '
+             'disconnect gaps suppressed=%d'
+             % (bi.get('spurious_book_ready_ignored', 0),
+                bi.get('rows_disconnected_suppressed', 0)))
     m7 = rep['step7_descriptive_markouts']
     pk = '%gs' % m7['primary_horizon_s']
     pm = m7['event_markouts_signal_source_only'].get(pk, {})
-    L.append('primary markout %s (signal-source events): %s'
+    ci = ('  ci95_median=%s%s' % (pm['ci95_median'],
+                                  ' (includes 0)' if
+                                  pm['ci95_median_includes_zero'] else '')
+          if pm.get('ci95_median') else '')
+    L.append('primary markout %s (signal-source events): %s%s'
              % (pk, ('n=%d median=%+.2f ticks frac_positive=%.3f'
                      % (pm['n'], pm['median'], pm['frac_positive']))
                 if pm.get('n') else 'n=0 (no forward coverage at this '
-                                    'horizon)'))
+                                    'horizon)', ci))
+    b = m7.get('blind', {})
+    if b.get('blind_from'):
+        L.append('VALIDATION BLIND from %s: %d events (%d signal-source) on '
+                 'sessions %s -- counted, markouts WITHHELD. Unblind only at '
+                 'the checkpoint with --blind-from none (permanent).'
+                 % (b['blind_from'], b['events_withheld'],
+                    b['signal_source_events_withheld'],
+                    ', '.join(b['sessions_withheld']) or 'none'))
+    else:
+        L.append('UNBLINDED RUN: every session inspected is now labelled %s '
+                 'permanently.' % EXPOSURE_LABEL)
     L.append('')
     L.append('ANSWER 1 - IS THE SYSTEM WORKING?  %s'
              % v['answer_1_is_the_system_working']['verdict'])
@@ -815,11 +945,19 @@ def main(argv=None):
     d = argv[0]
     out = None
     ms = None
+    blind = BLIND_FROM
     if '--out' in argv:
         out = argv[argv.index('--out') + 1]
     if '--max-sessions' in argv:
         ms = int(argv[argv.index('--max-sessions') + 1])
-    rep, _r = run_pilot(d, max_sessions=ms)
+    if '--blind-from' in argv:
+        blind = parse_blind_from(argv[argv.index('--blind-from') + 1])
+    if blind is None:
+        print('*** UNBLINDED RUN: markouts will be computed for EVERY '
+              'session and every session inspected will be labelled %s '
+              'permanently. This is the checkpoint read. ***\n'
+              % EXPOSURE_LABEL)
+    rep, _r = run_pilot(d, max_sessions=ms, blind_from=blind)
     print(text_summary(rep))
     if out:
         json.dump(rep, open(out, 'w'), indent=1, default=str)
@@ -827,8 +965,22 @@ def main(argv=None):
         led = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            'MROF_EXPOSED_PILOT_DEV_DAYS.json')
         n = write_exposure_ledger(rep, led)
-        print('exposure ledger -> %s (%d days labelled %s)'
-              % (led, n, EXPOSURE_LABEL))
+        nb = len(rep.get('sessions_blind', []))
+        print('exposure ledger -> %s (%d days; %d of this run\'s %d '
+              'sessions labelled %s, %d labelled %s)'
+              % (led, n, len(rep['sessions_inspected']) - nb,
+                 len(rep['sessions_inspected']), EXPOSURE_LABEL, nb,
+                 BLIND_LABEL))
+
+
+def parse_blind_from(s):
+    """'YYYYMMDD' -> that date; 'none'/'off'/'' -> None (unblind)."""
+    s = (s or '').strip().lower()
+    if s in ('none', 'off', 'no', ''):
+        return None
+    if not (len(s) == 8 and s.isdigit()):
+        raise SystemExit('--blind-from wants YYYYMMDD or none, got %r' % s)
+    return s
     return 0
 
 
