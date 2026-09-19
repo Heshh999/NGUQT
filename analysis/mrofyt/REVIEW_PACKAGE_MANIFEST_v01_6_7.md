@@ -19,6 +19,8 @@ b955ea9db2e9956c0f433036e1af3f5bb66ce793ff690253f46101c58bf71d09  mrofyt_pilot.p
 a9bacd646e6ce57e89406745db9ca2a182820a0f9196efe409c48ebe5995a640  tests_mrofyt_pilot.py (43 tests; supersedes 417282fd… — P1b tracks the runner summary wording)
 4e398285cf52c193beb8a1a8a44eed02c733ff94a0f73992725aa0dc978f7b29  MROF_YT_WAVE2_REGISTRATION.md (DRAFT — pending operator sign-off; §8.1 interim-monitoring rule added; re-hash on sign-off)
 6b0eb7ea4a9bc5deb48eec7e461b03c36d509defeb9a28023b104b489f929538  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md (supersedes 4624b199… — Amendment 2: the validation blind; Amendment 1 supersedes 8ab588fa…)
+d7bbb9bb4ac9821a1fabe58b7fcb6dc51dd50ac62b5d3d92e2cf7b0482043aee  mrofyt_recover.py (MROF-YT-RECOVER-1.0 — manifest reconstruction for runs killed before finalizing)
+de36fb17be6e1f5f98ed7f3bfb35f69c792cb360bd0c68da4a405814da59452d  tests_mrofyt_recover.py (18 tests)
 50d0ddc78814725011714faf01b1da0d45053d3612cb08095230496ac641c1a2  MROF_ACTUAL_STATE_INVENTORY.md
 ```
 
@@ -35,16 +37,16 @@ Archived source directive:
 55d598a3c2e5453b9c47675f76932455dca8689084fddfd4535e5b4907def942  ../../docs/prompts/MROF_ONE_COMPLETE_CLAUDE_PROMPT_1.md
 ```
 
-Delivered package (86 files, repo layout preserved so every suite runs
+Delivered package (88 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-5e41b4dcd62cb43ecdc9e848892c260d0ed3ba50250e4c3d08b2c636b882507d  MROF_V1_Engine_v01_6_7.zip (supersedes 2d9e341f… — pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+3d34a1cb2b5468d9aa04c7a24e61d94fa935524ce081155bd4538b031d77c4a5  MROF_V1_Engine_v01_6_7.zip (supersedes 5e41b4dc… — adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
-# run from inside the unzipped package: 416/416, identical to the repo
+# run from inside the unzipped package: 434/434, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -79,7 +81,8 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| **total** | **416/416** |
+| `tests_mrofyt_recover.py` | 18/18 |
+| **total** | **434/434** |
 
 ## Runnable research commands
 
@@ -87,6 +90,8 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 python3 mles_v12_audit.py  "<capture folder>"                      # integrity
 python3 mrofyt_runner.py   "<capture folder>" --out ledger.json     # outcome-blind
 python3 mrofyt_pilot.py    "<capture folder>" --out pilot.json      # §8A diagnostic
+python3 mrofyt_recover.py  "<capture folder>" --dry-run             # orphaned runs
+python3 mrofyt_recover.py  "<capture folder>" --repair              # rebuild manifests
 ```
 
 All three stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -96,7 +101,8 @@ All three stream at flat memory. `mrofyt_runner.py --outcomes` and
 
 ```
 grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|ExitShort" \
-     mrofyt_swings_v016.py mrofyt_engine_v016.py mrofyt_exits_v017.py mrofyt_pilot.py
+     mrofyt_swings_v016.py mrofyt_engine_v016.py mrofyt_exits_v017.py \
+     mrofyt_pilot.py mrofyt_recover.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -119,7 +125,7 @@ because both change files this package ships.
 
 ```
 ce1e475a37bcad14e4e7ea10228feaea9a561c6ea4d0181e54077774fdebc060  ../../src/MlesV12CaptureHost.cs (build 1.2.2)
-4bfaccfafadbf169ebffdfad4e5abbbc7b774cd840d049c7cdc81742f14a56eb  mles_v12_audit.py
+1f264e3b54646c5d474107ed38c25072bed7fd95865bad2a669c00a8dfdb9a6f  mles_v12_audit.py
 3d8812b9d286b754bdd01050f4714c3dea1de13c5d59e27a5274903fc180c405  mles_v12_harness.cs
 665b0a06d3079c23fd55691f9e361e64573d62ee434f1d277ac5896b94da56fa  tests_mles_v12.py
 ```
@@ -206,3 +212,37 @@ detector hash so registering wave two provably changed nothing.
    are now counted after the run's first `BOOK_READY`; a run that never
    reached it built no book and can support no completeness claim.
    Pinned by `T32c`/`T32d`.
+
+8. **`mrofyt_recover.py`: manifest reconstruction for runs killed before
+   finalizing.** An ungraceful termination (power loss, forced reboot)
+   stops the recorder before its finalizer writes the manifest. The CSVs
+   survive, often complete, but the manifest IS the authoritative
+   entrypoint for both the auditor and the runner — so the data is
+   invisible to every downstream tool. The first fourteen-session
+   capture had one such run on **every day of a week**.
+
+   The tool rebuilds a manifest from the rows. Three refusals are built
+   in, and they are the point of it:
+
+   * **Originals are never modified.** A damaged stream is rewritten as
+     a new `_RECOVERED.csv`; the damaged file stays exactly as it is.
+   * **The recorder's self-reported integrity counters are never
+     invented.** `gaps`, `duplicates`, `droppedRows` and the rest are
+     the recorder's own account of what it saw; nothing in the rows can
+     reveal them. Writing `0` would assert "no rows were ever dropped",
+     the one claim that cannot be made, so they are **omitted**.
+   * **A reconstructed manifest cannot validate its own file.** Its
+     hashes, counts and sequence bounds are computed from that file and
+     match by construction. The auditor now says so —
+     `RECONSTRUCTED_RUN_NOT_SELF_VERIFYING` — instead of either a pile
+     of `MISSING_COUNTER` noise or an unearned clean pass.
+
+   A damaged run is truncated to one **common** eventSeq across all four
+   streams, constrained only by the damaged ones: rows beyond a cut-off
+   stream describe a world it can no longer account for, and merged they
+   would advance quotes past the last depth update and freeze the book.
+   An undamaged run is not cut at all — its streams legitimately end at
+   different sequences. Pinned by `V1`–`V6` (18 tests), including that
+   the recovered run becomes ingestible, that originals are unchanged by
+   hash, and that a run missing a whole stream is refused rather than
+   papered over.

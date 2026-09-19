@@ -333,12 +333,34 @@ def audit_run(manifest_path, lite=True):
                   % (seg_lo, seg_hi, man.get('firstSegId'),
                      man.get('lastSegId'), man.get('connectionSegments')))
 
-    for c in ZERO:
-        v = man.get(c)
-        if v is None:
-            _fail(fails, 'MISSING_COUNTER', c)
-        elif v:
-            _fail(fails, 'RECORDER_REPORTED_' + c.upper(), str(v))
+    # A manifest rebuilt by mrofyt_recover.py from the rows of a run
+    # whose recorder died before finalizing. Two things must be said
+    # about it, and exactly once each, instead of a pile of
+    # MISSING_COUNTER failures that look like ordinary corruption:
+    #   1. the recorder's self-reported counters are ABSENT, not zero --
+    #      nothing in the rows can reveal them, so their absence is
+    #      correct and inventing them would have been the defect;
+    #   2. its hashes, row counts and sequence bounds were computed from
+    #      the very files they describe, so they match by construction
+    #      and prove nothing about those files. That is NOT a clean pass
+    #      and is never reported as one.
+    info['reconstructed'] = bool(man.get('reconstructed'))
+    if info['reconstructed']:
+        info['reconstructed_by'] = man.get('reconstructedBy')
+        _fail(fails, 'RECONSTRUCTED_RUN_NOT_SELF_VERIFYING',
+              '%s rebuilt this manifest from the run\'s own rows; its '
+              'hashes/counts/seq bounds are tautological and the recorder '
+              'counters (%s) are absent by design. Cross-run instance '
+              'contiguity, pairing and row-shape checks above still apply.'
+              % (man.get('reconstructedBy') or 'a recovery tool',
+                 ', '.join(ZERO)))
+    else:
+        for c in ZERO:
+            v = man.get(c)
+            if v is None:
+                _fail(fails, 'MISSING_COUNTER', c)
+            elif v:
+                _fail(fails, 'RECORDER_REPORTED_' + c.upper(), str(v))
 
     # ---- depth sides, actions, levels --------------------------------
     info['depth_sides'] = sorted(depth_sides)
