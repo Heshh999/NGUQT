@@ -247,6 +247,81 @@ def _truncate_to(src, dst, kind, safe_ev):
     return kept
 
 
+def probe_stream(path, kind):
+    """Cheap end-check: is the header right, and does the file end on a
+    complete row? Reads the first line and the last few KB, never the
+    middle, so it costs the same on a 6 GB file as on a small one.
+
+    This is all a dry run needs. Reconstruction itself still does the
+    full scan_stream pass, because sequence bounds and row counts can
+    only come from every row."""
+    size = os.path.getsize(path)
+    names = AD.HEADERS[kind]
+    with open(path, 'rb') as fh:
+        head = fh.readline()
+        if not head:
+            return dict(size=size, ok=False, why='file is empty')
+        try:
+            cols = next(csv.reader([head.decode().rstrip('\r\n')]), None)
+        except UnicodeDecodeError:
+            return dict(size=size, ok=False, why='header is not text')
+        if cols != names:
+            return dict(size=size, ok=False,
+                        why='header does not match the %s schema' % kind)
+        if size <= len(head):
+            return dict(size=size, ok=False, rows_hint=0,
+                        why='header only, no rows')
+        fh.seek(max(len(head), size - 65536))
+        tail = fh.read()
+    if not tail.endswith(b'\n'):
+        return dict(size=size, ok=False,
+                    why='last line has no newline (write cut off)')
+    last = tail.rstrip(b'\n').rsplit(b'\n', 1)[-1]
+    try:
+        raw = next(csv.reader([last.decode()]), None)
+    except UnicodeDecodeError:
+        return dict(size=size, ok=False, why='last line is not text')
+    if raw is None or len(raw) != len(names):
+        return dict(size=size, ok=False,
+                    why='last row has %d columns, expected %d'
+                        % (0 if raw is None else len(raw), len(names)))
+    return dict(size=size, ok=True,
+                last_event_seq=int(raw[IDX[kind]['eventSeq']]))
+
+
+def probe_run(run):
+    """Dry-run verdict for one orphaned run, without reading the bulk."""
+    res = dict(base=run['base'], run_id=run['run_id'],
+               session=run['session'], partial=run['partial'],
+               written=[], notes=[])
+    if run['missing']:
+        res.update(status='SKIPPED_INCOMPLETE_RUN', missing=run['missing'],
+                   notes=['a run missing a whole stream is skipped by the '
+                          'runner anyway; reconstructing its manifest '
+                          'would only move the failure downstream'])
+        return res
+    probes = {k: probe_stream(p, k) for k, p in run['streams'].items()}
+    bad = {k: v['why'] for k, v in probes.items() if not v['ok']}
+    res['bytes_total'] = sum(v['size'] for v in probes.values())
+    res['streams'] = {k: dict(bytes=v['size'], ends_cleanly=v['ok'],
+                              why=v.get('why'))
+                      for k, v in sorted(probes.items())}
+    if any(v.get('rows_hint') == 0 for v in probes.values()):
+        res.update(status='SKIPPED_NO_USABLE_ROWS',
+                   empty_streams=sorted(k for k, v in probes.items()
+                                        if v.get('rows_hint') == 0))
+    elif bad:
+        res.update(status='WOULD_RECONSTRUCT_WITH_REPAIR', damaged_tail=bad,
+                   notes=['needs --repair: a damaged stream is rewritten '
+                          'as a new _RECOVERED.csv and the original is '
+                          'left untouched'])
+    else:
+        res.update(status='WOULD_RECONSTRUCT',
+                   notes=['every stream ends on a complete row; no repair '
+                          'needed, just the missing manifest'])
+    return res
+
+
 def reconstruct(directory, run, repair=False, dry_run=False):
     """Reconstruct one orphaned run. Returns a result dict; writes
     nothing when dry_run. `repair` permits rewriting a damaged stream to
@@ -406,18 +481,26 @@ def reconstruct(directory, run, repair=False, dry_run=False):
 
 
 def recover_directory(directory, repair=False, dry_run=False):
+    """A dry run PROBES (header + tail only, near-instant even on a 6 GB
+    depth file); a real run SCANS every row, because only every row can
+    give the sequence bounds and counts a manifest must carry."""
     runs = find_orphan_runs(directory)
+    if dry_run:
+        results = [probe_run(r) for r in runs]
+    else:
+        results = [reconstruct(directory, r, repair, False) for r in runs]
     return dict(recover=RECOVER_VERSION, directory=directory,
                 repair=repair, dry_run=dry_run,
-                orphan_runs=len(runs),
-                results=[reconstruct(directory, r, repair, dry_run)
-                         for r in runs])
+                orphan_runs=len(runs), results=results)
 
 
 def text_summary(rep):
     L = ['%s  %s' % (rep['recover'], rep['directory']),
          'orphan runs found: %d   (repair=%s, dry_run=%s)'
          % (rep['orphan_runs'], rep['repair'], rep['dry_run'])]
+    gb = sum(r.get('bytes_total') or 0 for r in rep['results']) / 1e9
+    if gb:
+        L.append('recoverable data in orphaned runs: %.2f GB' % gb)
     by = {}
     for r in rep['results']:
         by.setdefault(r['status'], []).append(r)
@@ -425,10 +508,15 @@ def text_summary(rep):
         L.append('')
         L.append('%s: %d' % (st, len(by[st])))
         for r in by[st]:
-            L.append('  %s %s%s' % (r['session'], r['run_id'],
-                                    '  [partial]' if r['partial'] else ''))
+            sz = (('  %.2f GB' % (r['bytes_total'] / 1e9))
+                  if r.get('bytes_total') else '')
+            L.append('  %s %s%s%s' % (r['session'], r['run_id'],
+                                      '  [partial]' if r['partial'] else '',
+                                      sz))
             for nt in r.get('notes', []):
                 L.append('      %s' % nt)
+            for d, why in sorted((r.get('damaged_tail') or {}).items()):
+                L.append('      %s ends badly: %s' % (d, why))
             for d, why in sorted((r.get('damaged') or {}).items()):
                 L.append('      %s damaged at row %s: %s'
                          % (d, why[0], why[1]))

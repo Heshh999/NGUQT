@@ -129,9 +129,11 @@ t('V2: a damaged stream is NOT silently rewritten -- without --repair '
   r2_no['status'] == 'NEEDS_REPAIR' and 'quotes' in r2_no['damaged'] and
   'no newline' in r2_no['damaged']['quotes'][1] and not r2_no['written'])
 
-r2_dry = RC.reconstruct(d2, f2[0], repair=True, dry_run=True)
-t('V2b: --dry-run reports what it would do and writes nothing',
-  r2_dry['status'] == 'WOULD_RECONSTRUCT' and not r2_dry['written'] and
+r2_dry = RC.recover_directory(d2, dry_run=True)['results'][0]
+t('V2b: --dry-run spots the damaged tail, says repair is needed, and '
+  'writes nothing',
+  r2_dry['status'] == 'WOULD_RECONSTRUCT_WITH_REPAIR' and
+  'quotes' in r2_dry['damaged_tail'] and not r2_dry['written'] and
   not any(x.endswith('_RECOVERED.csv') for x in os.listdir(d2)))
 
 r2 = RC.reconstruct(d2, f2[0], repair=True)
@@ -227,6 +229,85 @@ d7, mp7 = make_run('intact', cid='v7cid', session='20260915')
 t('V6: a run with a valid manifest is not an orphan and is left alone',
   RC.find_orphan_runs(d7) == [] and
   RC.recover_directory(d7)['orphan_runs'] == 0)
+
+# ---------------------------------------------------------------------
+# V7: a dry run must be CHEAP. It probes the header and the tail only,
+# never the middle, so listing what is recoverable costs the same on a
+# 6 GB depth file as on a small one. (The first implementation scanned
+# every row even for --dry-run, which made "just show me what's there"
+# a 30-minute operation on a real capture folder.)
+# ---------------------------------------------------------------------
+d8, mp8 = make_run('probe', cid='v8cid', session='20260915', n_depth=20000)
+man8 = json.load(open(mp8))
+orphan(d8, mp8)
+dp8 = os.path.join(d8, man8['depth']['file'])
+size8 = os.path.getsize(dp8)
+
+reads = {'n': 0}
+_real_open = open
+
+
+class _CountingFile(object):
+    """Counts every byte handed out. __enter__/__exit__/__iter__ are
+    spelled out because Python looks dunders up on the TYPE, so
+    __getattr__ never sees them."""
+
+    def __init__(self, f):
+        self._f = f
+
+    def _count(self, b):
+        reads['n'] += len(b) if b else 0
+        return b
+
+    def read(self, *a):
+        return self._count(self._f.read(*a))
+
+    def readline(self, *a):
+        return self._count(self._f.readline(*a))
+
+    def __iter__(self):
+        for line in self._f:
+            yield self._count(line)
+
+    def __enter__(self):
+        self._f.__enter__()
+        return self
+
+    def __exit__(self, *a):
+        return self._f.__exit__(*a)
+
+    def __getattr__(self, k):
+        return getattr(self._f, k)
+
+
+import builtins  # noqa: E402
+
+
+def _counting_open(path, *a, **kw):
+    f = _real_open(path, *a, **kw)
+    return _CountingFile(f) if str(path).endswith('.csv') else f
+
+
+builtins.open = _counting_open
+try:
+    pr = RC.recover_directory(d8, dry_run=True)
+finally:
+    builtins.open = _real_open
+
+t('V7: a dry run probes header+tail only -- it reads far less than the '
+  'depth file it reports on, instead of streaming every row',
+  reads['n'] < size8 / 2 and pr['orphan_runs'] == 1 and
+  pr['results'][0]['status'] == 'WOULD_RECONSTRUCT')
+
+t('V7b: and it still reports the size and per-stream verdict needed to '
+  'decide what is worth recovering',
+  pr['results'][0]['bytes_total'] > size8 and
+  all(v['ends_cleanly'] for v in pr['results'][0]['streams'].values()) and
+  'GB' in RC.text_summary(pr))
+
+t('V7c: the dry run wrote nothing -- no manifest, no _RECOVERED file',
+  not any(x.endswith(('_RECONSTRUCTED_manifest.json', '_RECOVERED.csv'))
+          for x in os.listdir(d8)))
 
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)

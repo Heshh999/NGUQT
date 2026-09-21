@@ -19,8 +19,8 @@ b955ea9db2e9956c0f433036e1af3f5bb66ce793ff690253f46101c58bf71d09  mrofyt_pilot.p
 a9bacd646e6ce57e89406745db9ca2a182820a0f9196efe409c48ebe5995a640  tests_mrofyt_pilot.py (43 tests; supersedes 417282fd… — P1b tracks the runner summary wording)
 4e398285cf52c193beb8a1a8a44eed02c733ff94a0f73992725aa0dc978f7b29  MROF_YT_WAVE2_REGISTRATION.md (DRAFT — pending operator sign-off; §8.1 interim-monitoring rule added; re-hash on sign-off)
 6b0eb7ea4a9bc5deb48eec7e461b03c36d509defeb9a28023b104b489f929538  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md (supersedes 4624b199… — Amendment 2: the validation blind; Amendment 1 supersedes 8ab588fa…)
-d7bbb9bb4ac9821a1fabe58b7fcb6dc51dd50ac62b5d3d92e2cf7b0482043aee  mrofyt_recover.py (MROF-YT-RECOVER-1.0 — manifest reconstruction for runs killed before finalizing)
-de36fb17be6e1f5f98ed7f3bfb35f69c792cb360bd0c68da4a405814da59452d  tests_mrofyt_recover.py (18 tests)
+a8b637a5ce4be0a7e4f2ae450c5be6af4389e6c1d561510488b1863c32c1a32c  mrofyt_recover.py (MROF-YT-RECOVER-1.0 — manifest reconstruction for runs killed before finalizing; --dry-run probes header+tail only, so listing what is recoverable is instant on a 6 GB file)
+086a0ed22a31143049c0ec9c42a172ea26ffe83796a522719b72ffe796fc7cf9  tests_mrofyt_recover.py (21 tests)
 50d0ddc78814725011714faf01b1da0d45053d3612cb08095230496ac641c1a2  MROF_ACTUAL_STATE_INVENTORY.md
 ```
 
@@ -41,12 +41,12 @@ Delivered package (88 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-3d34a1cb2b5468d9aa04c7a24e61d94fa935524ce081155bd4538b031d77c4a5  MROF_V1_Engine_v01_6_7.zip (supersedes 5e41b4dc… — adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+ae2569205ef0deba01e65415e00f53c578f60a78be5e592cbb0621f609b67558  MROF_V1_Engine_v01_6_7.zip (supersedes 3d34a1cb… — instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
-# run from inside the unzipped package: 434/434, identical to the repo
+# run from inside the unzipped package: 437/437, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -81,8 +81,8 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| `tests_mrofyt_recover.py` | 18/18 |
-| **total** | **434/434** |
+| `tests_mrofyt_recover.py` | 21/21 |
+| **total** | **437/437** |
 
 ## Runnable research commands
 
@@ -90,7 +90,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 python3 mles_v12_audit.py  "<capture folder>"                      # integrity
 python3 mrofyt_runner.py   "<capture folder>" --out ledger.json     # outcome-blind
 python3 mrofyt_pilot.py    "<capture folder>" --out pilot.json      # §8A diagnostic
-python3 mrofyt_recover.py  "<capture folder>" --dry-run             # orphaned runs
+python3 mrofyt_recover.py  "<capture folder>" --dry-run             # orphaned runs (instant)
 python3 mrofyt_recover.py  "<capture folder>" --repair              # rebuild manifests
 ```
 
@@ -246,3 +246,11 @@ detector hash so registering wave two provably changed nothing.
    the recovered run becomes ingestible, that originals are unchanged by
    hash, and that a run missing a whole stream is refused rather than
    papered over.
+
+   `--dry-run` probes only each file's header and last 64 KB, never the
+   middle, so answering "what is recoverable here?" costs the same on a
+   6 GB depth file as on a small one and reports total recoverable GB
+   plus a per-stream verdict. The first implementation scanned every row
+   even for a dry run, which made that question a 30-minute operation on
+   a real capture folder. `V7`-`V7c` pin the cheapness by counting bytes
+   actually read.
