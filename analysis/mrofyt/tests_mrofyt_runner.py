@@ -408,6 +408,45 @@ t('R13e: one bad run does not poison the folder -- the clean run beside '
   led13e['totals'].get('events', 0) > 0 and
   sum(1 for r in led13e['runs'] if not r.get('skipped')) == 1)
 
+
+# ---------------------------------------------------------------------
+# R14: the two additive event hooks. A successor wave that needs a field
+# the frozen path discards (aggr_conf) or every depth event (for a
+# market-wide baseline) must get them from a hook, never by duplicating
+# the ingest loop. These pin that the hooks exist, are no-ops on the
+# base runner, receive the FULL adapter event, and fire once per event.
+# ---------------------------------------------------------------------
+class _HookSpy(RN.Runner):
+    def __init__(self, *a, **kw):
+        RN.Runner.__init__(self, *a, **kw)
+        self.tr, self.dp = [], []
+
+    def _on_trade_event(self, st, t, e):
+        self.tr.append((t, e['stream'], e.get('aggr_conf'), e['px']))
+
+    def _on_depth_event(self, st, t, e):
+        self.dp.append((t, e['stream'], e['action'], e['level']))
+
+
+d14 = os.path.join(WORK, 'hooks')
+mp14 = SY.synth_run(d14, n_depth=3000, cid='hooks', session='20260902',
+                    trade_every=10, quote_every=5)
+m14 = json.load(open(mp14))
+h = _HookSpy(d14, ('NQ',))
+led14 = h.run()
+t('R14: _on_trade_event fires once per trade row with the full adapter '
+  'event (aggr_conf present) and _on_depth_event once per depth row',
+  len(h.tr) == m14['trades']['rows'] and
+  len(h.dp) == m14['depth']['rows'] and
+  all(s == 'TRADE' and c in ('HIGH', 'LOW') for _, s, c, _ in h.tr) and
+  all(s == 'DEPTH' and a in ('ADD', 'UPDATE', 'REMOVE')
+      for _, s, a, _ in h.dp))
+
+t('R14b: on the base runner both hooks are no-ops and change nothing in '
+  'the ledger versus a run without them',
+  json.dumps(RN.Runner(d14, ('NQ',)).run()['totals'], sort_keys=True) ==
+  json.dumps(led14['totals'], sort_keys=True))
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

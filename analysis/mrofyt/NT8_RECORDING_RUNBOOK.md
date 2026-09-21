@@ -215,9 +215,13 @@ Manifest-first, in this order:
 python3 analysis/mrofyt/mles_v12_audit.py  "<capture folder>"
 python3 analysis/mrofyt/mrofyt_runner.py   "<capture folder>" --out ledger.json
 python3 analysis/mrofyt/mrofyt_pilot.py    "<capture folder>" --out pilot.json
+python3 analysis/mrofyt/mrofyt_wave2.py    "<capture folder>" --both --out wave2.json
 ```
 
-All three stream at flat memory — a 5 GB depth file is fine.
+All four stream at flat memory — a 5 GB depth file is fine. The
+wave-two pass (`--both` = real levels plus the placebo arm) is a
+second full ingest, so budget about twice the pilot's wall time; it
+withholds validation-session markouts exactly as the pilot does.
 
 A healthy audit summary looks like:
 

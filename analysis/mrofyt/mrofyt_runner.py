@@ -525,11 +525,13 @@ class Runner:
                 self._on_trade(st, t, px, sz, sign)
                 if sign and st.approaches:
                     self._exec_at_levels(st, t, px, sz, sign)
+                self._on_trade_event(st, t, e)
             elif k == 'DEPTH':
                 st.book.apply(e['action'], e['side'].lower(), e['level'],
                               e['px'], e['sz'] or 0.0)
                 if st.approaches and e['action'] in ('ADD', 'UPDATE'):
                     self._add_at_levels(st, t, e)
+                self._on_depth_event(st, t, e)
                 st.d3.append((t, st.book.depth('bid', 3),
                               st.book.depth('ask', 3)))
             self._evict(st, t)
@@ -910,6 +912,20 @@ class Runner:
         """Observation hook. The runner itself records nothing here; the
         pilot diagnostic overrides it to keep per-window feature vectors
         for the funnel report. Overriding must not mutate st, ap or f."""
+
+    def _on_trade_event(self, st, t, e):
+        """Observation hook with the FULL adapter event, called after the
+        frozen trade handling. Exists because the frozen path deliberately
+        discards fields it does not use (aggr_conf among them), and a
+        successor wave that needs one must not be forced to duplicate the
+        ingest loop to get it. The runner itself does nothing here.
+        Overriding must not mutate st or e."""
+
+    def _on_depth_event(self, st, t, e):
+        """Same, for depth: called after the book has applied the event.
+        The frozen path only reaches _add_at_levels for ADD/UPDATE while
+        an approach exists; a wave that needs every depth event for a
+        market-wide baseline gets it here. Must not mutate st or e."""
 
     def _evaluate_a3(self, st, ap, now):
         if len(st.d3) < 2:

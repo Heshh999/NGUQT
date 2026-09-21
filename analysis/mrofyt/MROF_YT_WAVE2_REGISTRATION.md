@@ -19,8 +19,9 @@ Wave one (A1–A6 as frozen in `mrofyt_signals.py`, session/VWAP/pivot
 levels from `mrofyt_levels.py`) **continues unchanged**. It runs blind
 to the December checkpoint and is reported exactly as it is. Nothing in
 this file modifies a wave-one threshold, level, window, feature, baseline
-or exit. Wave-two code, when written, lives in new modules; the frozen
-detectors are never edited.
+or exit. Wave-two code lives in a new module (`mrofyt_wave2.py`,
+MROF-YT-WAVE2-1.0, written 2026-09-21 — see §11); the frozen detectors
+are never edited, and the wave-two suite re-pins their hash.
 
 This file exists because a hypothesis registered *after* its outcome is
 known is not a hypothesis. Nine exposed sessions were enough to show
@@ -95,6 +96,12 @@ contains the approach, at that bar's close.
 
 Two rules, both frozen here. Adding a third later is a new wave.
 
+Implementation precision (§11): "the bar's close" is stamped at the
+first print after the bar's minute ends — the earliest instant the
+closed bar is knowable — and the markout clock starts there, never at
+the bar's open. A registration whose bar never closes inside its session
+expires without firing.
+
 ### 4.2 Arm C — placebo levels (matched control)
 
 For every validation session, the full wave-two pipeline is re-run with
@@ -103,6 +110,13 @@ a per-session random offset, drawn once per session with a fixed seed
 (`seed = int(session)`), constrained so every placebo price is
 `>= 3 x proximity radius` from every real active level. Same detectors,
 same thresholds, same baselines, same de-duplication.
+
+Implementation precision (§11): the offset is `+/- U(6, 20)` proximity
+radii, drawn once per `(session, level_id)` from
+`seed = int(session) * 1000003 + crc32(level_id)` so a level that first
+appears mid-session (overnight high after 09:30) gets the same offset
+whatever order levels appear in; a placebo level that lands within 3
+radii of any real level is dropped for that bar rather than nudged.
 
 Arm C answers: does flow at *levels* predict, or does flow predict
 *everywhere* and the levels are decoration? Without it a positive result
@@ -246,3 +260,31 @@ own budget:
 
 On sign-off: hash this file, pin it in `REVIEW_PACKAGE_MANIFEST_v01_6_7.md`
 and in the test suite, and stop editing it.
+
+## 11. Implementation record — 2026-09-21
+
+`mrofyt_wave2.py` (MROF-YT-WAVE2-1.0), `tests_mrofyt_wave2.py` (28
+tests). Written **before** any validation session was inspected; the
+engineering verification ran on synthetic tape and is asserted by the
+suite, never by market evidence. The module subclasses the pilot runner
+and uses only the runner's observation hooks, so every wave-two family
+is evaluated on the very decision windows the frozen runner produces —
+paired by construction — and the wave-one ledger it emits is
+byte-identical to the pilot's (`W5c`).
+
+| registered | implemented as | precision / departure |
+| --- | --- | --- |
+| W2-A1 (§1.1) | frozen A1 with `replenish_z` replaced by `repl10_z`; `repl10` observed on every grid tick, baselined like `delta10` | none |
+| W2-A4r (§1) | frozen A4 with `resid_tail_5pct` forced `None` — provably A4 as it ran (`W1`, 2000 random inputs) | none |
+| W2-A4f (§1) | frozen A4 with the residual wired; **evaluated only on windows where the model can speak**, so its population is "windows with a fitted expectation", not A4r plus noise. Each fire records whether the tail alone triggered it (`resid_only`) | the residual model is the **first-wave minimal form**: per 5-min bucket, aggressor frame, `r = a + b·|D|`, Bartlett three-group robust slope, median intercept, fit on prior sessions only (20-session window, ≥ 20 obs), adverse tail = bottom 5 % of prior residuals. Intensity, BI3, realized vol and distance are **not** covariates in this version; every A4f fire says so |
+| W2-A4-OPEN (§2) | W2-A4r gated to 09:30–10:30 ET and `CASH_OPEN_0930` / `OVERNIGHT_HIGH` / `OVERNIGHT_LOW` | none |
+| W2-A4r-z15 (§3) | W2-A4r with `aggr_z >= 1.5`; the frozen `a4()` parameterised, pinned equal to A4 at 2.0 (`W1b`) | none |
+| W2-A4r-HC (§6) | W2-A4r with `aggr_z` computed from `aggrConf == HIGH` trades, own baseline `delta10_hc` | none |
+| Arm B (§4.1) | B1 / B2 on the same approaches, registered at the approach's first decision window | decision instant as stated in §4.1 |
+| Arm C (§4.2) | `mode='placebo'`: the whole pipeline re-run on offset levels; `--both` prints the paired real − placebo table | seed rule as stated in §4.2 |
+| §4.3 CAUSAL_SWING | **not in this version** — declared in the report as `not_in_this_version`; needs the v01.6 engine as a level provider and the frozen approach loop to accept ids outside `ACTIVE_LEVEL_IDS`. Its own build | — |
+| §5 labels | `wall_state`, `regime` carried on every fire via the pilot; `asia_inside` / `asia_ranged` **not yet computed** (Asia window needs the 18:00 ET prior-session bars, which the runner has) | pending |
+
+Blind: identical to the pilot's (`BLIND_FROM = 20260921`). Fires on
+validation sessions are counted (accrual) and their markouts withheld.
+Read-only: no order API, no fill, stop, target, R or P&L (`W7`).

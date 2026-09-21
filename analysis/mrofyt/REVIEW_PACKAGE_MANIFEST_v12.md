@@ -33,10 +33,10 @@ be29c36a62624ab5e18e67d104eb4e9323abcda4bf5faf1c88c54486fc446f4a  analysis/mrofy
 65b2948c0b7877d70d71aa7a12cac2326d740ad9c0aa98d4f1b608e4f12e33a0  analysis/mrofyt/DATA_HANDOFF_V12.md
 15c3ef12b43cb0e059eb317da9c7ddd976971965009252aaa4357cc7a6195361  analysis/mrofyt/SETUP_WALKTHROUGH_V12.md
 cf42022369fe3133c2725d8a8e10c69914d889945c0b99d2da280e1a46315f2c  analysis/mrofyt/OPERATING_RUNBOOK.md (supersedes 1ef388e1… — status header updated once genuine sessions existed; points to NT8_RECORDING_RUNBOOK.md)
-964cdc661df578e6681d36fdef335366a56013efa7cd0d9f857a3cfa60b5a0e9  analysis/mrofyt/NT8_RECORDING_RUNBOOK.md (beginner-readable NT8 procedure)
+1c47b9c9dd4a45369d68c0446cd00720dba845e74a6ab019606735732979f9a1  analysis/mrofyt/NT8_RECORDING_RUNBOOK.md (beginner-readable NT8 procedure; supersedes 964cdc66… — §8 lists the wave-two command)
 3231659ff5dad33c1c4c2ba7ada5d813d229dd2cbf4437d0ffde9c0a1c0ffec9  analysis/mrofyt/mles_v12_synth.py (stamps 1.2.1 deliberately: synthetic runs carry no disconnect, so they model a PRE-repair recording; supersedes c070e41e…)
-50c1de80b13a1ec6dfc88d037320dcc4337190a9331d84a2c848c4afae4bf257  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes 99c9b277… — truncated/corrupt streams are skipped whole instead of killing the pass, see §Amendment; earlier supersedes 3a765f3c… — honours DISCONNECTED and requires a resync before re-arming, which corrects pre-repair recordings retroactively, see §Amendment; earlier supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
-4656e0a8d6445689de01a5eb17e7939f6fb16cfcbf2071d2c48df63ebabff863  analysis/mrofyt/tests_mrofyt_runner.py (21 tests; supersedes c0e37963…)
+c48dfe9ea192b8b802ca7514b0076ac7f51d545fd5caab044d7362bf4d4d8705  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes 50c1de80… — two no-op observation hooks `_on_trade_event` / `_on_depth_event` for wave two, base ledger unchanged (`R14`/`R14b`); earlier supersedes 99c9b277… — truncated/corrupt streams are skipped whole instead of killing the pass, see §Amendment; earlier supersedes 3a765f3c… — honours DISCONNECTED and requires a resync before re-arming, which corrects pre-repair recordings retroactively, see §Amendment; earlier supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
+51e08e10e78aba0bdcad86f236658105885661505748aea2eabfecea69c1598a  analysis/mrofyt/tests_mrofyt_runner.py (23 tests; supersedes 4656e0a8… — R14/R14b pin the hooks; earlier c0e37963…)
 ```
 
 Reproduce the entire proof (mcs + mono lifecycle harness + audits +
@@ -44,7 +44,7 @@ adversarial fixtures + package byte-identity):
 
 ```
 cd analysis/mrofyt && python3 tests_mles_v12.py      # 48/48
-cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 21/21
+cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 23/23
 ```
 
 The suite itself compiles the recorder with mcs against the stubs,
@@ -54,7 +54,7 @@ restart, disconnect/reconnect, NQ+MNQ pairing), audits the genuine
 output and then attacks the auditor with falsified fixtures.
 
 Predecessor suites (byte-identical, re-run at freeze): 59+56+31+32+
-25+36+29+42+15 = 325, all passing; grand total 434/434 across thirteen suites at this revision.
+25+36+29+42+15 = 325, all passing; grand total 434/434 across thirteen suites at that revision. Current: 467/467 across fourteen suites (see REVIEW_PACKAGE_MANIFEST_v01_6_7.md).
 
 ## Correction of record
 
