@@ -21,8 +21,8 @@ a9bacd646e6ce57e89406745db9ca2a182820a0f9196efe409c48ebe5995a640  tests_mrofyt_p
 18ba3b831df49f9b0b1531a1c2fdfbd1c2176e4ad496e717ffff9f8fd0c0091b  mrofyt_wave2.py (MROF-YT-WAVE2-1.0 — the registration as running code: W2-A1, W2-A4r, W2-A4f, W2-A4-OPEN, W2-A4r-z15, W2-A4r-HC, arm B, arm C placebo; subclass of the pilot runner via the runner's observation hooks; wave one untouched; §4.3 CAUSAL_SWING declared not-in-this-version)
 fbeb2623e7d27443658a950dff7fd461de1a57b218d478bb542500859bc283c8  tests_mrofyt_wave2.py (28 tests)
 6b0eb7ea4a9bc5deb48eec7e461b03c36d509defeb9a28023b104b489f929538  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md (supersedes 4624b199… — Amendment 2: the validation blind; Amendment 1 supersedes 8ab588fa…)
-a8b637a5ce4be0a7e4f2ae450c5be6af4389e6c1d561510488b1863c32c1a32c  mrofyt_recover.py (MROF-YT-RECOVER-1.0 — manifest reconstruction for runs killed before finalizing; --dry-run probes header+tail only, so listing what is recoverable is instant on a 6 GB file)
-086a0ed22a31143049c0ec9c42a172ea26ffe83796a522719b72ffe796fc7cf9  tests_mrofyt_recover.py (21 tests)
+0e73abfb9f1dd9114cc41ae2b75436b9d51c1b027c3c924aa508befbd31a8c26  mrofyt_recover.py (MROF-YT-RECOVER-1.1; supersedes a8b637a5… — a run still being written is recognised (recent write, or session label not yet closed), counted apart and refused by every path; see Amendment 10. 1.0: manifest reconstruction for runs killed before finalizing; --dry-run probes header+tail only, so listing what is recoverable is instant on a 6 GB file)
+ed72a3fda0a65035cab8cc500c6f032b0c806b94bea9c7fd518d4f089dd194b3  tests_mrofyt_recover.py (25 tests; supersedes 086a0ed2… — V8–V8d, and every dead-run fixture is now aged explicitly because a fixture written seconds ago is what a live run looks like)
 f61a1f23fe31a479d04d4fd98cd59c66a9b018e0ef6c5f52459e2bea4094f84c  MROF_ACTUAL_STATE_INVENTORY.md (supersedes 50d0ddc7… — row 7 records the W2-A4f wiring, row 20 the wave-two module)
 ```
 
@@ -45,12 +45,12 @@ Delivered package (90 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-e48c813622b0a48f1dac230411c3a375b0b6e317a048f1d27570d6abc3d3631a  MROF_V1_Engine_v01_6_7.zip (supersedes ae256920… — wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+5b8e8cebf89ef0cd1354e32703d73555935e99803a818117becb0ad9edd4f4b2  MROF_V1_Engine_v01_6_7.zip (supersedes e48c8136… — recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
-# run from inside the unzipped package: 467/467, identical to the repo
+# run from inside the unzipped package: 471/471, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -85,9 +85,9 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| `tests_mrofyt_recover.py` | 21/21 |
+| `tests_mrofyt_recover.py` | 25/25 |
 | `tests_mrofyt_wave2.py` | 28/28 |
-| **total** | **467/467** |
+| **total** | **471/471** |
 
 ## Runnable research commands
 
@@ -95,8 +95,8 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 python3 mles_v12_audit.py  "<capture folder>"                      # integrity
 python3 mrofyt_runner.py   "<capture folder>" --out ledger.json     # outcome-blind
 python3 mrofyt_pilot.py    "<capture folder>" --out pilot.json      # §8A diagnostic
-python3 mrofyt_recover.py  "<capture folder>" --dry-run             # orphaned runs (instant)
-python3 mrofyt_recover.py  "<capture folder>" --repair              # rebuild manifests
+python3 mrofyt_recover.py  "<capture folder>" --dry-run             # orphaned runs (instant); live runs listed apart
+python3 mrofyt_recover.py  "<capture folder>" --repair              # rebuild manifests — recorder idle (weekend) only
 python3 mrofyt_wave2.py    "<capture folder>" --both --out wave2.json  # wave two, real + placebo, blind
 ```
 
@@ -294,3 +294,36 @@ detector hash so registering wave two provably changed nothing.
    tape is expected and is not evidence about anything. The first
    real-data run is user-side, on DEV sessions ≤ 20260918, and reads
    nothing from validation sessions: the blind is the pilot's.
+
+10. **`mrofyt_recover.py` 1.1: a run still being written is not an
+    orphan (2026-09-21).** The first `--dry-run` on the real capture
+    folder found 16 runs without a manifest, 84 GB — and listed the two
+    runs being recorded *at that moment* (today's NQ and MNQ, 8.76 and
+    7.79 GB, `.partial`, ending mid-flush) under `WOULD_RECONSTRUCT_
+    WITH_REPAIR`. They have no manifest because the recorder writes it
+    at close, and they end mid-row because a flush was in progress.
+    1.0 could not tell that from a crash. Had `--repair` been run, it
+    would have pinned a manifest declaring the session complete at
+    whatever byte the scan reached, the recorder's own manifest would
+    later have contradicted it, and the runner would have ingested a
+    truncated day as if it were whole — on a **validation** session.
+
+    1.1 recognises a live run by either of two independent signs and
+    refuses it under every flag, re-checking at write time so a direct
+    `reconstruct()` call cannot bypass discovery: a stream written
+    within `LIVE_MTIME_S = 600 s` (the recorder flushes every 30 s, so
+    a live file is never minutes stale), or a session label that is the
+    current CME session or later (a recorder alive but idle over a
+    weekend goes mtime-stale while its run is still open). Both err
+    toward refusing. Such runs are listed as `SKIPPED_LIVE_RUN`, counted
+    apart from orphans, and excluded from the recoverable total. Pinned
+    by `V8`–`V8d`; `V8c` proves the refusal is per run, so the dead
+    orphan beside a live run is still recovered.
+
+    The other fourteen runs on that folder are genuine: seven complete
+    sessions (14th–17th, 3–7 GB each) that need only a manifest, and
+    seven cut mid-write by the laptop's shutdowns (4th, 8th, 14th, 15th)
+    that need `--repair`. Operator rule added to the tool's usage text:
+    **run `--repair` only when the recorder is idle** — it rewrites
+    every stream of a damaged run as a new file on the drive the
+    recorder is writing to.

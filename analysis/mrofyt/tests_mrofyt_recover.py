@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-# MROF-YT-RECOVER-1.0 suite. Manifest reconstruction for runs whose
+# MROF-YT-RECOVER-1.1 suite. Manifest reconstruction for runs whose
 # recorder died before finalizing. Exercised on synthetic recorder-format
 # runs (mles_v12_synth) damaged in the specific ways a power loss causes.
 # Synthetic events verify CODE BEHAVIOR only, never market evidence.
+import glob
 import hashlib
 import json
 import os
 import shutil
 import sys
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -42,7 +44,19 @@ def make_run(sub, **kw):
     return d, mp
 
 
-def orphan(d, mp, rename_partial=()):
+OLD = time.time() - 2 * 86400
+
+
+def age(d):
+    """A real orphan is DAYS old. Fixtures are written seconds before
+    they are read, which is exactly what a run being recorded right now
+    looks like, so every dead-run fixture is aged explicitly and the
+    live-run tests (V8) are the only ones left fresh."""
+    for p in glob.glob(os.path.join(d, '*.csv*')):
+        os.utime(p, (OLD, OLD))
+
+
+def orphan(d, mp, rename_partial=(), age_files=True):
     """Delete the manifest (what an ungraceful death leaves behind) and
     optionally put some streams back into .partial form."""
     man = json.load(open(mp))
@@ -50,6 +64,8 @@ def orphan(d, mp, rename_partial=()):
     for k in rename_partial:
         p = os.path.join(d, man[k]['file'])
         os.rename(p, p + '.partial')
+    if age_files:
+        age(d)
     return man
 
 
@@ -120,6 +136,7 @@ orphan(d2, mp2, rename_partial=AD.STREAMS)
 qp = os.path.join(d2, orig2['quotes']['file'] + '.partial')
 with open(qp, 'a') as fh:
     fh.write('MLES-CAPTURE-1.2,v2cid,')          # a half-written row
+age(d2)
 before2 = sha(qp)
 
 f2 = RC.find_orphan_runs(d2)
@@ -177,6 +194,7 @@ d3, mp3 = make_run('incomplete', cid='v3cid', session='20260917')
 man3 = json.load(open(mp3))
 os.remove(mp3)
 os.remove(os.path.join(d3, man3['trades']['file']))
+age(d3)
 r3 = RC.reconstruct(d3, RC.find_orphan_runs(d3)[0])
 t('V3: a run missing a whole stream is refused, not papered over -- the '
   'runner would skip it anyway and a manifest would only hide that',
@@ -188,6 +206,7 @@ man4 = json.load(open(mp4))
 os.remove(mp4)
 dp = os.path.join(d4, man4['depth']['file'])
 open(dp, 'w').write(','.join(AD.HEADERS['depth']) + '\n')   # header only
+age(d4)
 r4 = RC.reconstruct(d4, RC.find_orphan_runs(d4)[0], repair=True)
 t('V4: a stream with a header but no rows yields no manifest at all',
   r4['status'] == 'SKIPPED_NO_USABLE_ROWS' and
@@ -308,6 +327,78 @@ t('V7b: and it still reports the size and per-stream verdict needed to '
 t('V7c: the dry run wrote nothing -- no manifest, no _RECOVERED file',
   not any(x.endswith(('_RECONSTRUCTED_manifest.json', '_RECOVERED.csv'))
           for x in os.listdir(d8)))
+
+# ---------------------------------------------------------------------
+# V8: a run STILL BEING WRITTEN has no manifest either. 1.0 listed
+# today's live NQ and MNQ runs (8.76 + 7.79 GB, .partial, ending
+# mid-flush) as "damaged, needs --repair" on the first real folder it
+# saw. A live run must be named, counted apart, and refused by every
+# path -- dry-run, plain, --repair, and a direct reconstruct() call.
+# ---------------------------------------------------------------------
+d9 = os.path.join(WORK, 'live')
+mp9 = SY.synth_run(d9, n_depth=6000, cid='livecid', session='20260915')
+man9 = orphan(d9, mp9, rename_partial=AD.STREAMS, age_files=False)
+live_paths = [os.path.join(d9, man9[k]['file'] + '.partial')
+              for k in AD.STREAMS]
+with open(live_paths[0], 'a') as fh:
+    fh.write('MLES-CAPTURE-1.2,livecid,')      # flush in progress
+live_sha = {p: sha(p) for p in live_paths}
+
+f9 = RC.find_orphan_runs(d9)
+pr9 = RC.recover_directory(d9, dry_run=True)
+s9 = RC.text_summary(pr9)
+t('V8: a run written seconds ago is reported SKIPPED_LIVE_RUN by the '
+  'dry run -- not as damaged -- counted apart from orphans, and its '
+  'bytes are NOT counted as recoverable',
+  len(f9) == 1 and f9[0]['live'] and 'still being written' in f9[0]['live']
+  and pr9['orphan_runs'] == 0 and pr9['live_runs'] == 1 and
+  pr9['results'][0]['status'] == 'SKIPPED_LIVE_RUN' and
+  'NOT orphans, left alone): 1' in s9 and 'recoverable data' not in s9)
+
+rr9 = RC.recover_directory(d9, repair=True)
+direct9 = RC.reconstruct(d9, f9[0], repair=True)
+t('V8b: --repair on a live run writes nothing and reads nothing in bulk, '
+  'and a direct reconstruct() call is refused the same way, so no path '
+  'can pin a manifest on a run the recorder still owns',
+  rr9['results'][0]['status'] == 'SKIPPED_LIVE_RUN' and
+  direct9['status'] == 'SKIPPED_LIVE_RUN' and not direct9['written'] and
+  not any(x.endswith(('_RECONSTRUCTED_manifest.json', '_RECOVERED.csv'))
+          for x in os.listdir(d9)) and
+  all(sha(p) == h for p, h in live_sha.items()))
+
+# a dead orphan beside the live run is still recovered
+mp9b = SY.synth_run(d9, n_depth=6000, cid='deadcid', session='20260915')
+orphan(d9, mp9b)                                 # aged
+os.utime(live_paths[0], None)                    # keep the live one fresh
+for p in live_paths[1:]:
+    os.utime(p, None)
+rr9b = RC.recover_directory(d9, repair=True)
+by9 = {r['run_id']: r['status'] for r in rr9b['results']}
+t('V8c: an aged orphan beside the live run is reconstructed while the '
+  'live run beside it is still left alone -- the refusal is per run, '
+  'not per folder',
+  by9.get('deadcid-R001') == 'RECONSTRUCTED' and
+  by9.get('livecid-R001') == 'SKIPPED_LIVE_RUN' and
+  rr9b['orphan_runs'] == 1 and rr9b['live_runs'] == 1 and
+  all(sha(p) == h for p, h in live_sha.items()))
+
+# the second sign: a run whose session label has not closed yet is live
+# even when its files are mtime-stale (recorder alive but idle)
+d10 = os.path.join(WORK, 'openses')
+cur_ses = RN.session_id(time.time())
+mp10 = SY.synth_run(d10, n_depth=6000, cid='opencid', session=cur_ses)
+orphan(d10, mp10)                                # aged -> mtime is stale
+f10_now = RC.find_orphan_runs(d10)
+f10_later = RC.find_orphan_runs(d10, now=time.time() + 30 * 86400)
+t('V8d: a stale-mtime run whose session label is the CURRENT CME session '
+  'is live by the second sign; the same files judged from a clock a '
+  'month later are a plain orphan -- the rule reads the clock, not the '
+  'label alone',
+  f10_now[0]['live'] and 'current CME session' in f10_now[0]['live'] and
+  f10_later[0]['live'] is None and
+  RC.reconstruct(d10, f10_now[0])['status'] == 'SKIPPED_LIVE_RUN' and
+  RC.reconstruct(d10, f10_later[0], now=time.time() + 30 * 86400)['status']
+  == 'RECONSTRUCTED')
 
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)

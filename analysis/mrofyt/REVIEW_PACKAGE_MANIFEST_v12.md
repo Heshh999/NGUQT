@@ -54,7 +54,7 @@ restart, disconnect/reconnect, NQ+MNQ pairing), audits the genuine
 output and then attacks the auditor with falsified fixtures.
 
 Predecessor suites (byte-identical, re-run at freeze): 59+56+31+32+
-25+36+29+42+15 = 325, all passing; grand total 434/434 across thirteen suites at that revision. Current: 467/467 across fourteen suites (see REVIEW_PACKAGE_MANIFEST_v01_6_7.md).
+25+36+29+42+15 = 325, all passing; grand total 434/434 across thirteen suites at that revision. Current: 471/471 across fourteen suites (see REVIEW_PACKAGE_MANIFEST_v01_6_7.md).
 
 ## Correction of record
 

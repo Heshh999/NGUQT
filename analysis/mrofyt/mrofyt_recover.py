@@ -24,6 +24,13 @@
 #     row counts and sequence bounds are computed FROM that file, so
 #     they match by construction. That check is tautological and the
 #     auditor says so rather than reporting a clean pass.
+#   * A RUN STILL BEING WRITTEN IS NOT AN ORPHAN. The recorder writes
+#     the manifest at close, so the run being recorded right now has
+#     none either, and its streams end mid-row because a flush is in
+#     progress. 1.0 listed today's live NQ and MNQ runs as "damaged,
+#     needs --repair" on the first real capture folder it saw. 1.1
+#     detects a live run (recent write, or session label not yet
+#     closed) and refuses to touch it under any flag.
 #
 # What still carries real assurance for a recovered run: cross-run
 # instance sequence contiguity (does its seq range fit its siblings?),
@@ -31,6 +38,17 @@
 #
 # THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
 # ======================================================================
+"""mrofyt_recover.py - MROF-YT-RECOVER-1.1
+
+    python3 mrofyt_recover.py "<capture folder>" --dry-run   # list, instant
+    python3 mrofyt_recover.py "<capture folder>"             # rebuild clean orphans
+    python3 mrofyt_recover.py "<capture folder>" --repair    # also rewrite damaged tails
+    ... --out recovery.json                                  # keep the report
+
+Run --repair only when the recorder is idle (weekend): it rewrites
+every stream of a damaged run as a new _RECOVERED.csv on the same
+drive the recorder is writing to.
+"""
 import csv
 import datetime as _dt
 import glob
@@ -39,11 +57,17 @@ import json
 import os
 import re
 import sys
+import time
 
 import mles_v12_adapter as AD
+import mrofyt_runner as RUN                 # session_id: the CME clock
 
-RECOVER_VERSION = 'MROF-YT-RECOVER-1.0'
+RECOVER_VERSION = 'MROF-YT-RECOVER-1.1'
 CLOSE_REASON = 'RECONSTRUCTED_NO_CLEAN_CLOSE'
+# a stream written more recently than this is being written NOW; the
+# recorder flushes every flushPolicySeconds = 30 s, so a live file is
+# never minutes stale and a dead one is never seconds fresh
+LIVE_MTIME_S = 600
 # the recorder's own account of what it observed; unknowable from rows
 NEVER_INVENTED = ('gaps', 'duplicates', 'reversals', 'queueOverflows',
                   'droppedRows', 'writeErrors', 'reconnects', 'crossed',
@@ -80,13 +104,41 @@ def _iso(dt):
 # ---------------------------------------------------------------------
 # discovery
 # ---------------------------------------------------------------------
-def find_orphan_runs(directory):
+def live_check(run, now=None):
+    """Why this run must be left alone, or None if it is a true orphan.
+
+    Two independent signs that the run is still open; either suffices:
+      * a stream written within LIVE_MTIME_S of now
+      * the run's session label is the current CME session or later --
+        a recorder that is alive but idle (weekend, feed down) goes
+        mtime-stale while its run is still open, and the recorder will
+        write the real manifest when it closes
+    Both err toward refusing, which is the only safe direction: a
+    manifest pinned on a live run would declare the session complete at
+    whatever byte the scan reached, and the runner would later ingest a
+    truncated day as if it were the whole one."""
+    now = time.time() if now is None else now
+    newest = max(os.path.getmtime(p) for p in run['streams'].values())
+    age = now - newest
+    if age < LIVE_MTIME_S:
+        return 'still being written (last write %d s ago)' % max(age, 0)
+    cur = RUN.session_id(now)
+    if run['session'] >= cur:
+        return ('its session %s is the current CME session (%s) or later; '
+                'the recorder writes the manifest at close'
+                % (run['session'], cur))
+    return None
+
+
+def find_orphan_runs(directory, now=None):
     """Group CSVs by run and return only the runs with NO manifest.
 
     Each entry: dict(base, session, run_id, partial, streams={kind:path},
-    missing=[kinds absent]). A run missing a stream entirely is reported
-    but never reconstructed: the runner skips such a run whole anyway,
-    and inventing a manifest for it would only move the failure later."""
+    missing=[kinds absent], live=None|reason). A run missing a stream
+    entirely is reported but never reconstructed: the runner skips such
+    a run whole anyway, and inventing a manifest for it would only move
+    the failure later. A LIVE run (see live_check) is returned so the
+    report can name it, and is refused by every path that writes."""
     by = {}
     for p in sorted(os.listdir(directory)):
         m = RUN_RE.match(p)
@@ -108,8 +160,18 @@ def find_orphan_runs(directory):
                            '_RECONSTRUCTED_manifest.json')):
             continue
         e['missing'] = sorted(set(AD.STREAMS) - set(e['streams']))
+        e['live'] = live_check(e, now)
         out.append(e)
     return out
+
+
+def _live_result(res, reason):
+    res.update(status='SKIPPED_LIVE_RUN', live=reason,
+               notes=['NOT an orphan: ' + reason,
+                      'left alone: the recorder writes this run\'s '
+                      'manifest when the run closes; nothing was read '
+                      'in bulk, nothing was written'])
+    return res
 
 
 def sibling_manifest(directory, run_id):
@@ -294,6 +356,10 @@ def probe_run(run):
     res = dict(base=run['base'], run_id=run['run_id'],
                session=run['session'], partial=run['partial'],
                written=[], notes=[])
+    if run.get('live'):
+        res['bytes_total'] = sum(os.path.getsize(p)
+                                 for p in run['streams'].values())
+        return _live_result(res, run['live'])
     if run['missing']:
         res.update(status='SKIPPED_INCOMPLETE_RUN', missing=run['missing'],
                    notes=['a run missing a whole stream is skipped by the '
@@ -322,13 +388,18 @@ def probe_run(run):
     return res
 
 
-def reconstruct(directory, run, repair=False, dry_run=False):
+def reconstruct(directory, run, repair=False, dry_run=False, now=None):
     """Reconstruct one orphaned run. Returns a result dict; writes
     nothing when dry_run. `repair` permits rewriting a damaged stream to
-    its last well-formed row (as a new file)."""
+    its last well-formed row (as a new file). A live run is refused
+    here as well as at discovery, re-checked at call time, so a direct
+    caller cannot bypass it."""
     res = dict(base=run['base'], run_id=run['run_id'],
                session=run['session'], partial=run['partial'],
                written=[], status=None, notes=[])
+    reason = run.get('live') or live_check(run, now)
+    if reason:
+        return _live_result(res, reason)
     if run['missing']:
         res.update(status='SKIPPED_INCOMPLETE_RUN',
                    missing=run['missing'],
@@ -480,25 +551,35 @@ def reconstruct(directory, run, repair=False, dry_run=False):
     return res
 
 
-def recover_directory(directory, repair=False, dry_run=False):
+def recover_directory(directory, repair=False, dry_run=False, now=None):
     """A dry run PROBES (header + tail only, near-instant even on a 6 GB
     depth file); a real run SCANS every row, because only every row can
-    give the sequence bounds and counts a manifest must carry."""
-    runs = find_orphan_runs(directory)
+    give the sequence bounds and counts a manifest must carry. Live
+    runs are listed, counted apart, and never scanned or written."""
+    runs = find_orphan_runs(directory, now)
     if dry_run:
         results = [probe_run(r) for r in runs]
     else:
-        results = [reconstruct(directory, r, repair, False) for r in runs]
+        results = [reconstruct(directory, r, repair, False, now)
+                   for r in runs]
+    live = sum(1 for r in runs if r['live'])
     return dict(recover=RECOVER_VERSION, directory=directory,
                 repair=repair, dry_run=dry_run,
-                orphan_runs=len(runs), results=results)
+                runs_without_manifest=len(runs),
+                orphan_runs=len(runs) - live, live_runs=live,
+                results=results)
 
 
 def text_summary(rep):
     L = ['%s  %s' % (rep['recover'], rep['directory']),
-         'orphan runs found: %d   (repair=%s, dry_run=%s)'
-         % (rep['orphan_runs'], rep['repair'], rep['dry_run'])]
-    gb = sum(r.get('bytes_total') or 0 for r in rep['results']) / 1e9
+         'runs without a manifest: %d   (repair=%s, dry_run=%s)'
+         % (rep.get('runs_without_manifest', rep['orphan_runs']),
+            rep['repair'], rep['dry_run']),
+         '  orphaned (recoverable): %d' % rep['orphan_runs'],
+         '  still being written (NOT orphans, left alone): %d'
+         % rep.get('live_runs', 0)]
+    gb = sum(r.get('bytes_total') or 0 for r in rep['results']
+             if r['status'] != 'SKIPPED_LIVE_RUN') / 1e9
     if gb:
         L.append('recoverable data in orphaned runs: %.2f GB' % gb)
     by = {}
