@@ -888,10 +888,20 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     d = argv[0] if argv else '.'
     try:
-        print(summary(audit_capture(d)))
+        res = audit_capture(d)
     except CaptureUnavailable as exc:
         print('STOPPED: %s' % exc)
         return 2
+    print(summary(res))
+    if '--out' in argv:
+        # the full result, for the God's Eye exporter; quality events
+        # carry timestamps and kinds only, never a price
+        p = argv[argv.index('--out') + 1]
+        tmp = p + '.tmp'
+        with open(tmp, 'w') as fh:
+            json.dump(res, fh, default=str, indent=1)
+        os.replace(tmp, p)
+        print('\naudit report -> %s' % p)
     return 0
 
 

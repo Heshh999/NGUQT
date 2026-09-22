@@ -1,0 +1,21 @@
+{
+  "_comment": "MROF God's Eye View configuration. Copy to godseye.config.json next to the launcher and edit. Paths may be absolute or relative to this file. The dashboard reads these; it writes only into out_dir.",
+  "capture_dir": "D:\\MLES_Capture",
+  "reports_dir": "C:\\MROF\\reports",
+  "reports": {
+    "_comment": "optional explicit files; otherwise the newest audit*.json, ledger*.json, pilot*.json, wave2*.json, recover*.json in reports_dir are used",
+    "audit": null,
+    "ledger": null,
+    "pilot": null,
+    "wave2": null,
+    "recovery": null
+  },
+  "exposure_ledger": "..\\mrofyt\\MROF_EXPOSED_PILOT_DEV_DAYS.json",
+  "windows": "C:\\MROF\\reports\\windows.json",
+  "out_dir": "C:\\MROF\\godseye_out",
+  "mrof_dir": "..\\mrof",
+  "blind_from": "20260921",
+  "synthetic": false,
+  "bind": "127.0.0.1",
+  "port": 8765
+}

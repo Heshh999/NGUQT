@@ -191,7 +191,12 @@ class PilotRunner(RUN.Runner):
                    t_start=ap.t0, wall_state=ap.wall_state,
                    window_index=ap.windows, level_px=ap.level_px,
                    run=self._cur[1] if self._cur else None,
-                   family=LV.FAMILY_OF.get(ap.level_id, '?'))
+                   family=LV.FAMILY_OF.get(ap.level_id, '?'),
+                   approach_id=ap.id, ad=ap.ad,
+                   # the level set exactly as the frozen runner held it at
+                   # this window (causal by construction): observation
+                   # for the God's Eye replay, never an input
+                   levels=dict(st.levels))
         self.windows.append(rec)
         self.approach_open.setdefault((st.instrument, ap.id),
                                       dict(t0=ap.t0, level_id=ap.level_id,
@@ -812,6 +817,26 @@ def classify(step1, ledger, rep):
              'behind the State-C gate')
 
 
+def write_windows(runner, path, blind_from=BLIND_FROM):
+    """The pilot's per-window feature vectors (with the level set the
+    runner held at each window) for sessions this pass exposes; nothing
+    from a blind session. Written aside and moved into place."""
+    keep = [w for w in runner.windows
+            if not _is_blind(w.get('session'), blind_from)]
+    doc = dict(schema='MROF-PILOT-WINDOWS-1', pilot=PILOT_VERSION,
+               blind_from=blind_from,
+               sessions=sorted({w['session'] for w in keep}),
+               note='EXPOSED sessions only; every window here belongs to '
+                    'a session labelled %s by the pass that wrote it'
+                    % EXPOSURE_LABEL,
+               windows=keep)
+    tmp = path + '.tmp'
+    with open(tmp, 'w') as fh:
+        json.dump(doc, fh, default=str)
+    os.replace(tmp, path)
+    return len(keep)
+
+
 def write_exposure_ledger(rep, path):
     """Append-only, and exposure is MONOTONE: a session may go from blind
     to exposed (an explicit unblinding at the checkpoint), never back.
@@ -967,6 +992,14 @@ def main(argv=None):
         print('STOPPED: %s' % exc)
         return 2
     print(text_summary(rep))
+    if '--windows-out' in argv:
+        # per-window feature vectors for the God's Eye replay: EXPOSED
+        # sessions only. A session this pass ran with markouts is exposed
+        # by this very pass (it is labelled so below); blind sessions'
+        # windows are event-level protected data and are never written.
+        wo = argv[argv.index('--windows-out') + 1]
+        n = write_windows(_r, wo, blind)
+        print('windows (exposed sessions only) -> %s (%d windows)' % (wo, n))
     if out:
         json.dump(rep, open(out, 'w'), indent=1, default=str)
         print('\npilot report -> %s' % out)

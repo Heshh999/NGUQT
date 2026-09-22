@@ -223,6 +223,15 @@ wave-two pass (`--both` = real levels plus the placebo arm) is a
 second full ingest, so budget about twice the pilot's wall time; it
 withholds validation-session markouts exactly as the pilot does.
 
+To watch all of this in one place, run the same tools with `--out`
+into one reports folder (the pilot also with `--windows-out`, the
+recovery tool with `--dry-run --out`) and start the read-only dashboard
+in `analysis/godseye/` (`launch_godseye.bat`; see
+`analysis/godseye/GODS_EYE_README.md`). It reads the reports and a
+bounded tail of the capture folder, writes only into its own output
+folder, and refuses to show anything event-level for a session the
+exposure ledger does not label `EXPOSED_PILOT_DEV`.
+
 A healthy audit summary looks like:
 
 ```
