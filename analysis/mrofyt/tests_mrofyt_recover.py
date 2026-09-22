@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# MROF-YT-RECOVER-1.1 suite. Manifest reconstruction for runs whose
+# MROF-YT-RECOVER-1.2 suite. Manifest reconstruction for runs whose
 # recorder died before finalizing. Exercised on synthetic recorder-format
 # runs (mles_v12_synth) damaged in the specific ways a power loss causes.
 # Synthetic events verify CODE BEHAVIOR only, never market evidence.
@@ -7,6 +7,7 @@ import glob
 import hashlib
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -399,6 +400,115 @@ t('V8d: a stale-mtime run whose session label is the CURRENT CME session '
   RC.reconstruct(d10, f10_now[0])['status'] == 'SKIPPED_LIVE_RUN' and
   RC.reconstruct(d10, f10_later[0], now=time.time() + 30 * 86400)['status']
   == 'RECONSTRUCTED')
+
+# ---------------------------------------------------------------------
+# V9: the direct check (1.2). On Windows the recorder holds each stream
+# open FileAccess.Write + FileShare.Read for the life of the run, and a
+# read-only open that refuses to share writing fails for exactly as long
+# as it does. It is the only sign that holds over a weekend: the session
+# roll is driven by market events, so the open run keeps Friday's label,
+# and the recorder writes nothing while the market is closed, so every
+# file is byte-for-byte still. 1.1's indirect signs would have rebuilt a
+# manifest for that run on Saturday -- the day --repair is meant to run.
+# The Windows call cannot run here; these pin every decision around it
+# with an injected answer, and V9f pins the recorder-side premise in the
+# recorder's own source. The call itself is verified only by a dry run
+# on the operator's machine.
+# ---------------------------------------------------------------------
+def HELD(p):
+    return 'HELD'
+
+
+def FREE(p):
+    return 'FREE'
+
+
+def ERR(p):
+    return 'ERROR: Windows error 5'
+
+
+d11 = os.path.join(WORK, 'weekend')
+mp11 = SY.synth_run(d11, n_depth=6000, cid='wkndcid', session='20260918')
+orphan(d11, mp11, rename_partial=AD.STREAMS)     # nothing written in days
+f11_ind = RC.find_orphan_runs(d11)               # no Windows check here
+f11_held = RC.find_orphan_runs(d11, probe=HELD)
+t('V9: a run NinjaTrader still holds over a weekend -- an old session '
+  'label, nothing written for days -- passes every indirect sign as '
+  'dead; the Windows check says it is held, and the check wins',
+  f11_ind[0]['live'] is None and
+  f11_held[0]['live'] and 'open for writing' in f11_held[0]['live'] and
+  f11_held[0]['liveness_by'] == 'windows file-sharing check')
+
+before11 = sorted(os.listdir(d11))
+st_held = RC.recover_directory(d11, repair=True, probe=HELD)
+st_err = RC.recover_directory(d11, repair=True, probe=ERR)
+t('V9b: held -> --repair writes nothing; and a check that FAILS is never '
+  'read as "not held" -- an error refuses exactly like a hold',
+  st_held['results'][0]['status'] == 'SKIPPED_LIVE_RUN' and
+  st_err['results'][0]['status'] == 'SKIPPED_LIVE_RUN' and
+  'never read as "not held"' in
+  RC.find_orphan_runs(d11, probe=ERR)[0]['live'] and
+  sorted(os.listdir(d11)) == before11)
+
+d12 = os.path.join(WORK, 'crashtoday')
+mp12 = SY.synth_run(d12, n_depth=6000, cid='crashcid',
+                    session=RN.session_id(time.time()))
+orphan(d12, mp12)
+t('V9c: when Windows answers FREE the session label stops vetoing -- a '
+  'run from today that NinjaTrader has released (crash, then restart) '
+  'is an orphan now, not after 18:00; with no check it waits (V8d)',
+  RC.find_orphan_runs(d12, probe=FREE)[0]['live'] is None and
+  'current CME session' in RC.find_orphan_runs(d12)[0]['live'] and
+  RC.recover_directory(d12, probe=FREE)['results'][0]['status'] ==
+  'RECONSTRUCTED')
+
+d13 = os.path.join(WORK, 'justclosed')
+n13 = 4000
+now13 = time.time()
+mp13 = SY.synth_run(d13, n_depth=n13, cid='closecid', session='20260918',
+                    t0=now13 - 30 - n13 * 0.0005)
+orphan(d13, mp13, rename_partial=AD.STREAMS)     # modified time looks old
+f13 = RC.find_orphan_runs(d13, now=now13, probe=FREE)
+f13_later = RC.find_orphan_runs(d13, now=now13 + 1200, probe=FREE)
+t('V9d: FREE, but the newest row is 30 s old by the recorder\'s own '
+  'clock -- a run the recorder may be closing right now (files released, '
+  'manifest not yet written) is left alone; twenty minutes on it is an '
+  'orphan',
+  f13[0]['live'] and 'stamped' in f13[0]['live'] and
+  f13_later[0]['live'] is None)
+
+qp13 = glob.glob(os.path.join(d13, '*_quotes.csv.partial'))[0]
+good13 = RC.newest_recv(qp13, 'quotes')
+with open(qp13, 'a') as fh:
+    fh.write('MLES-CAPTURE-1.2,closecid,closecid-R001,1,2026')   # mid-row
+t('V9e: the row clock reads the newest COMPLETE row, so a tail cut '
+  'mid-row -- a flush in progress, or a crash -- still dates the run',
+  good13 is not None and RC.newest_recv(qp13, 'quotes') == good13 and
+  abs(good13 - (now13 - 30)) < 5)
+
+CS = open(os.path.join(HERE, '..', '..', 'src',
+                       'MlesV12CaptureHost.cs')).read()
+t('V9f: the premise is the recorder\'s own source: streams are opened '
+  'FileAccess.Write + FileShare.Read (so a read open refusing write '
+  'sharing fails exactly while held), and the session roll is driven by '
+  'market events (so a weekend run keeps Friday\'s label). If either '
+  'changes, this fails before any folder is misjudged',
+  re.search(r'new FileStream\(path, FileMode\.CreateNew,\s*'
+            r'FileAccess\.Write, FileShare\.Read\)', CS) is not None and
+  'SessionOf(DateTime.UtcNow)' in CS and
+  'ev.Session != run.Session' in CS)
+
+d14 = os.path.join(WORK, 'atomic')
+mp14 = SY.synth_run(d14, n_depth=4000, cid='atomcid', session='20260916')
+orphan(d14, mp14)
+RC.recover_directory(d14, probe=FREE)
+t('V9g: the reconstructed manifest is written aside and moved into '
+  'place, so a drive that drops mid-write leaves an ignored .tmp, never '
+  'a half manifest that marks the run done',
+  any(x.endswith('_RECONSTRUCTED_manifest.json') for x in os.listdir(d14))
+  and not any(x.endswith('.tmp') for x in os.listdir(d14)) and
+  'os.replace(tmp, mp)' in open(os.path.join(HERE,
+                                             'mrofyt_recover.py')).read())
 
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)

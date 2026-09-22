@@ -28,9 +28,22 @@
 #     the manifest at close, so the run being recorded right now has
 #     none either, and its streams end mid-row because a flush is in
 #     progress. 1.0 listed today's live NQ and MNQ runs as "damaged,
-#     needs --repair" on the first real capture folder it saw. 1.1
-#     detects a live run (recent write, or session label not yet
-#     closed) and refuses to touch it under any flag.
+#     needs --repair" on the first real capture folder it saw.
+#
+#     1.1 judged liveness by indirect signs (recent write, session label
+#     not yet closed). On the operator's Windows machine the first never
+#     fires -- Windows does not keep a held file's modified time current
+#     -- and the second was the only thing protecting the live runs.
+#     Reading the recorder source then showed it would NOT have held on
+#     a weekend: the session roll is driven by market data, so the run
+#     open over a weekend keeps Friday's label, and the recorder writes
+#     nothing at all while the market is closed. 1.1 would have rebuilt
+#     a manifest for the run NinjaTrader was still holding.
+#
+#     1.2 asks Windows directly. The recorder holds every stream open
+#     FileShare.Read for the life of the run, so a read-only open that
+#     refuses to share writing fails for exactly as long as the recorder
+#     holds the file. Anything held, or that cannot be asked, is refused.
 #
 # What still carries real assurance for a recovered run: cross-run
 # instance sequence contiguity (does its seq range fit its siblings?),
@@ -38,16 +51,16 @@
 #
 # THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
 # ======================================================================
-"""mrofyt_recover.py - MROF-YT-RECOVER-1.1
+"""mrofyt_recover.py - MROF-YT-RECOVER-1.2
 
     python3 mrofyt_recover.py "<capture folder>" --dry-run   # list, instant
     python3 mrofyt_recover.py "<capture folder>"             # rebuild clean orphans
     python3 mrofyt_recover.py "<capture folder>" --repair    # also rewrite damaged tails
     ... --out recovery.json                                  # keep the report
 
-Run --repair only when the recorder is idle (weekend): it rewrites
-every stream of a damaged run as a new _RECOVERED.csv on the same
-drive the recorder is writing to.
+Safe with NinjaTrader running: a run it still holds is recognised and
+left alone. Run --repair on a weekend anyway -- it rewrites gigabytes
+onto the drive the recorder writes to.
 """
 import csv
 import datetime as _dt
@@ -62,12 +75,15 @@ import time
 import mles_v12_adapter as AD
 import mrofyt_runner as RUN                 # session_id: the CME clock
 
-RECOVER_VERSION = 'MROF-YT-RECOVER-1.1'
+RECOVER_VERSION = 'MROF-YT-RECOVER-1.2'
 CLOSE_REASON = 'RECONSTRUCTED_NO_CLEAN_CLOSE'
-# a stream written more recently than this is being written NOW; the
-# recorder flushes every flushPolicySeconds = 30 s, so a live file is
-# never minutes stale and a dead one is never seconds fresh
+# a stream modified more recently than this may be being written NOW;
+# during a session the recorder flushes every flushPolicySeconds = 30 s
 LIVE_MTIME_S = 600
+# a run whose newest row (by the recorder's own clock) is younger than
+# this may be one the recorder is closing right now -- its files already
+# released, its manifest not yet written. Never touched in that window.
+LIVE_CONTENT_S = 600
 # the recorder's own account of what it observed; unknowable from rows
 NEVER_INVENTED = ('gaps', 'duplicates', 'reversals', 'queueOverflows',
                   'droppedRows', 'writeErrors', 'reconnects', 'crossed',
@@ -85,6 +101,7 @@ RUN_RE = re.compile(r'^(?P<base>MLES12_.+?_(?P<session>\d{8})_'
                     r'(?P<stream>quotes|trades|depth|quality)\.csv'
                     r'(?P<partial>\.partial)?$')
 IDX = {k: {n: i for i, n in enumerate(v)} for k, v in AD.HEADERS.items()}
+_RECV = AD.HEADER_COMMON.index('tRecvUtc')
 
 
 def _sha_and_bytes(path):
@@ -104,33 +121,139 @@ def _iso(dt):
 # ---------------------------------------------------------------------
 # discovery
 # ---------------------------------------------------------------------
-def live_check(run, now=None):
+def held_open_for_writing(path):
+    """Ask Windows whether another process has this file open for
+    writing: 'HELD', 'FREE', 'UNSUPPORTED' (not Windows) or 'ERROR: ...'.
+
+    The recorder opens every stream FileAccess.Write, FileShare.Read and
+    holds it for the life of the run. A request for READ access that
+    does not itself share write access therefore fails with a sharing
+    violation for exactly as long as the recorder holds the file, and
+    succeeds the moment it is gone, whatever ended it. That answers "is
+    this run still being recorded?" directly. The handle asks for read
+    access only -- nothing can be written through it -- and is closed at
+    once. Any failure other than the sharing violation is reported as an
+    ERROR, never as FREE."""
+    if os.name != 'nt':
+        return 'UNSUPPORTED'
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL('kernel32', use_last_error=True)
+        create = k32.CreateFileW
+        create.restype = wintypes.HANDLE
+        create.argtypes = (wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                           wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD,
+                           wintypes.HANDLE)
+        k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        h = create(os.path.abspath(path),
+                   0x80000000,             # GENERIC_READ
+                   0x00000001,             # FILE_SHARE_READ, NOT write
+                   None,
+                   3,                      # OPEN_EXISTING
+                   0x80,                   # FILE_ATTRIBUTE_NORMAL
+                   None)
+        if h is None or h == wintypes.HANDLE(-1).value:
+            err = ctypes.get_last_error()
+            if err == 32:                  # ERROR_SHARING_VIOLATION
+                return 'HELD'
+            return 'ERROR: Windows error %d' % err
+        k32.CloseHandle(h)
+        return 'FREE'
+    except Exception as exc:               # a check that failed never
+        return 'ERROR: %s' % exc           # reads as "not held"
+
+
+def newest_recv(path, kind):
+    """Epoch seconds of the newest COMPLETE row in the file's last 64 KB,
+    by the recorder's own clock (every row carries tRecvUtc), or None
+    when there is no complete row there. Reads the tail only."""
+    n = len(AD.HEADERS[kind])
+    try:
+        size = os.path.getsize(path)
+        with open(path, 'rb') as fh:
+            start = max(0, size - 65536)
+            fh.seek(start)
+            tail = fh.read()
+    except OSError:
+        return None
+    lines = tail.split(b'\n')
+    # the last piece is empty (clean end) or a row still being written;
+    # the first is cut by the seek unless the tail began the file
+    body = lines[:-1] if start == 0 else lines[1:-1]
+    for raw in reversed(body):
+        try:
+            row = next(csv.reader([raw.rstrip(b'\r').decode()]), None)
+            if row is None or len(row) != n:
+                continue
+            t = AD.iso_to_epoch(row[_RECV].strip())
+        except Exception:
+            continue
+        if t is not None:
+            return t
+    return None
+
+
+def live_check(run, now=None, probe=None):
     """Why this run must be left alone, or None if it is a true orphan.
 
-    Two independent signs that the run is still open; either suffices:
-      * a stream written within LIVE_MTIME_S of now
-      * the run's session label is the current CME session or later --
-        a recorder that is alive but idle (weekend, feed down) goes
-        mtime-stale while its run is still open, and the recorder will
-        write the real manifest when it closes
-    Both err toward refusing, which is the only safe direction: a
-    manifest pinned on a live run would declare the session complete at
-    whatever byte the scan reached, and the runner would later ingest a
-    truncated day as if it were the whole one."""
+    Where the recorder runs (Windows), held_open_for_writing is the
+    answer. HELD on any stream: live. ERROR on any stream: refused, since
+    a check that could not be asked is never read as "not held". All
+    FREE: not being recorded -- unless its newest row is younger than
+    LIVE_CONTENT_S or a file was modified within LIVE_MTIME_S, because a
+    recorder that has just released the run may still be writing its
+    manifest, and a manifest pinned in that window would race it.
+
+    Elsewhere (a copied folder; NinjaTrader cannot run there) only
+    indirect signs exist, and each errs toward refusal: a recent row, a
+    recent modification, or a session label that is the current CME
+    session or later. These are NOT sufficient on a live Windows
+    recorder: the session roll is driven by market data, so a run held
+    over a weekend keeps Friday's label, and the recorder writes nothing
+    while the market is closed. That is why the direct check exists.
+
+    Refusing is the only safe direction: a manifest pinned on a live run
+    declares the session complete at whatever byte the scan reached, and
+    the recorder later writes its own for the same run."""
     now = time.time() if now is None else now
+    probe = held_open_for_writing if probe is None else probe
+    verdicts = {os.path.basename(p): probe(p)
+                for p in run['streams'].values()}
+    answered = any(v in ('HELD', 'FREE') for v in verdicts.values())
+    run['liveness_by'] = ('windows file-sharing check' if answered
+                          else 'indirect signs (no Windows check here)')
+    held = sorted(f for f, v in verdicts.items() if v == 'HELD')
+    if held:
+        return ('NinjaTrader still has %s open for writing'
+                % ', '.join(held))
+    errs = sorted('%s: %s' % (f, v) for f, v in verdicts.items()
+                  if v.startswith('ERROR'))
+    if errs:
+        return ('could not ask Windows whether the recorder still holds '
+                'this run (%s); a failed check is never read as "not held"'
+                % '; '.join(errs))
+    stamps = [s for s in (newest_recv(p, k)
+                          for k, p in run['streams'].items())
+              if s is not None]
+    if stamps and now - max(stamps) < LIVE_CONTENT_S:
+        return ('its newest row was stamped %d s ago by the recorder\'s '
+                'own clock; a run that recent may still be closing'
+                % max(now - max(stamps), 0))
     newest = max(os.path.getmtime(p) for p in run['streams'].values())
     age = now - newest
     if age < LIVE_MTIME_S:
         return 'still being written (last write %d s ago)' % max(age, 0)
-    cur = RUN.session_id(now)
-    if run['session'] >= cur:
-        return ('its session %s is the current CME session (%s) or later; '
-                'the recorder writes the manifest at close'
-                % (run['session'], cur))
+    if not answered:
+        cur = RUN.session_id(now)
+        if run['session'] >= cur:
+            return ('its session %s is the current CME session (%s) or '
+                    'later; the recorder writes the manifest at close'
+                    % (run['session'], cur))
     return None
 
 
-def find_orphan_runs(directory, now=None):
+def find_orphan_runs(directory, now=None, probe=None):
     """Group CSVs by run and return only the runs with NO manifest.
 
     Each entry: dict(base, session, run_id, partial, streams={kind:path},
@@ -160,7 +283,7 @@ def find_orphan_runs(directory, now=None):
                            '_RECONSTRUCTED_manifest.json')):
             continue
         e['missing'] = sorted(set(AD.STREAMS) - set(e['streams']))
-        e['live'] = live_check(e, now)
+        e['live'] = live_check(e, now, probe)
         out.append(e)
     return out
 
@@ -388,7 +511,8 @@ def probe_run(run):
     return res
 
 
-def reconstruct(directory, run, repair=False, dry_run=False, now=None):
+def reconstruct(directory, run, repair=False, dry_run=False, now=None,
+                probe=None):
     """Reconstruct one orphaned run. Returns a result dict; writes
     nothing when dry_run. `repair` permits rewriting a damaged stream to
     its last well-formed row (as a new file). A live run is refused
@@ -397,7 +521,7 @@ def reconstruct(directory, run, repair=False, dry_run=False, now=None):
     res = dict(base=run['base'], run_id=run['run_id'],
                session=run['session'], partial=run['partial'],
                written=[], status=None, notes=[])
-    reason = run.get('live') or live_check(run, now)
+    reason = run.get('live') or live_check(run, now, probe)
     if reason:
         return _live_result(res, reason)
     if run['missing']:
@@ -543,7 +667,13 @@ def reconstruct(directory, run, repair=False, dry_run=False, now=None):
                       bytes=nbytes, rows=final[k].rows, sha256=sha)
 
     mp = os.path.join(directory, run['base'] + '_RECONSTRUCTED_manifest.json')
-    json.dump(man, open(mp, 'w'), indent=1)
+    # written aside and moved into place, as the recorder does its own:
+    # a drive that drops mid-write leaves a .tmp every tool ignores, never
+    # a half manifest that marks the run done
+    tmp = mp + '.tmp'
+    with open(tmp, 'w') as fh:
+        json.dump(man, fh, indent=1)
+    os.replace(tmp, mp)
     res['written'].append(os.path.basename(mp))
     res.update(status='RECONSTRUCTED', manifest=os.path.basename(mp),
                events=man['lastEventSeq'] - man['firstEventSeq'] + 1,
@@ -551,23 +681,25 @@ def reconstruct(directory, run, repair=False, dry_run=False, now=None):
     return res
 
 
-def recover_directory(directory, repair=False, dry_run=False, now=None):
+def recover_directory(directory, repair=False, dry_run=False, now=None,
+                      probe=None):
     """A dry run PROBES (header + tail only, near-instant even on a 6 GB
     depth file); a real run SCANS every row, because only every row can
     give the sequence bounds and counts a manifest must carry. Live
     runs are listed, counted apart, and never scanned or written."""
-    runs = find_orphan_runs(directory, now)
+    runs = find_orphan_runs(directory, now, probe)
     if dry_run:
         results = [probe_run(r) for r in runs]
     else:
-        results = [reconstruct(directory, r, repair, False, now)
+        results = [reconstruct(directory, r, repair, False, now, probe)
                    for r in runs]
     live = sum(1 for r in runs if r['live'])
+    by = sorted({r.get('liveness_by') for r in runs if r.get('liveness_by')})
     return dict(recover=RECOVER_VERSION, directory=directory,
                 repair=repair, dry_run=dry_run,
                 runs_without_manifest=len(runs),
                 orphan_runs=len(runs) - live, live_runs=live,
-                results=results)
+                liveness_by=by, results=results)
 
 
 def text_summary(rep):
@@ -578,6 +710,9 @@ def text_summary(rep):
          '  orphaned (recoverable): %d' % rep['orphan_runs'],
          '  still being written (NOT orphans, left alone): %d'
          % rep.get('live_runs', 0)]
+    if rep.get('liveness_by'):
+        L.append('  "still being written" decided by: %s'
+                 % ', '.join(rep['liveness_by']))
     gb = sum(r.get('bytes_total') or 0 for r in rep['results']
              if r['status'] != 'SKIPPED_LIVE_RUN') / 1e9
     if gb:
@@ -618,8 +753,25 @@ def main(argv=None):
         print(__doc__)
         return 2
     d = argv[0]
-    rep = recover_directory(d, repair='--repair' in argv,
-                            dry_run='--dry-run' in argv)
+    try:
+        os.listdir(d)
+    except OSError as exc:
+        print('STOPPED: cannot read %s (%s). Is the drive connected, and '
+              'is it still that letter?' % (d, exc))
+        return 2
+    try:
+        rep = recover_directory(d, repair='--repair' in argv,
+                                dry_run='--dry-run' in argv)
+    except OSError as exc:
+        try:
+            os.listdir(d)
+        except OSError:
+            print('STOPPED: %s stopped answering mid-run (%s). The drive '
+                  'was disconnected or lost power. Originals are never '
+                  'modified, so nothing is damaged: reconnect and re-run.'
+                  % (d, exc))
+            return 2
+        raise
     print(text_summary(rep))
     if '--out' in argv:
         p = argv[argv.index('--out') + 1]

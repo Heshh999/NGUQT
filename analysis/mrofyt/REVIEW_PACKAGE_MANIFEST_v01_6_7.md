@@ -15,14 +15,14 @@ cb1ac7fa10b59955a467d140e7c17b9318eea525adb29b42c07cb15f64de1057  mrofyt_swings_
 b6bd0b05f48a6e26871df69c97fde97112a19d3f4b17da7edf280caa5bdc354d  mrofyt_exits_v017.py
 0df5357cce0d0c77c6f38759c757086a067ea90aef8efc1d373a766bbc8fe7f9  tests_mrofyt_v01_7.py
 cbd25e6df806db216cf480a3445f1628fc56dff95ea0d903dc197b91ac7b4791  MROF_YT_OF01_7_EXIT_FREEZE.md
-b955ea9db2e9956c0f433036e1af3f5bb66ce793ff690253f46101c58bf71d09  mrofyt_pilot.py (MROF-YT-PILOT-1.2; supersedes 3bd2b115… — validation blind (BLIND_FROM=20260921, markouts withheld, monotone exposure ledger), seeded bootstrap 95% intervals, skip reasons + book-integrity counters in the report; 1.1 supersedes a6504d0f… — event de-duplication and the 300/600/1800 s horizons, measurement only; see FINDINGS Amendment 1)
-a9bacd646e6ce57e89406745db9ca2a182820a0f9196efe409c48ebe5995a640  tests_mrofyt_pilot.py (43 tests; supersedes 417282fd… — P1b tracks the runner summary wording)
+51c2996ffcd15faeca7670864cecb51de26d9741c2903abcd2fe572af43ade80  mrofyt_pilot.py (MROF-YT-PILOT-1.2; supersedes b955ea9d… — an unreadable or empty capture STOPS the pilot before anything is written, so no report and no exposure label from a pass that did not complete; io-error skip reason reported; Amendment 11. Earlier 3bd2b115…: validation blind (BLIND_FROM=20260921, markouts withheld, monotone exposure ledger), seeded bootstrap 95% intervals, skip reasons + book-integrity counters; 1.1 a6504d0f…: event de-duplication and the 300/600/1800 s horizons)
+d174d26a87e9e8f19f833843ca75a564fb828f2a927eecf126dff1222a1b73d0  tests_mrofyt_pilot.py (44 tests; supersedes a9bacd64… — P12: a stopped pass leaves the exposure ledger byte-identical)
 6af137d68f1feb4f39206056534952712fe9468cc4818f0a409a26cb726692fa  MROF_YT_WAVE2_REGISTRATION.md (DRAFT — pending operator sign-off; supersedes 4e398285… — §11 implementation record and two implementation-precision notes in §4.1/§4.2, no hypothesis parameter changed; earlier: §8.1 interim-monitoring rule; re-hash on sign-off)
-18ba3b831df49f9b0b1531a1c2fdfbd1c2176e4ad496e717ffff9f8fd0c0091b  mrofyt_wave2.py (MROF-YT-WAVE2-1.0 — the registration as running code: W2-A1, W2-A4r, W2-A4f, W2-A4-OPEN, W2-A4r-z15, W2-A4r-HC, arm B, arm C placebo; subclass of the pilot runner via the runner's observation hooks; wave one untouched; §4.3 CAUSAL_SWING declared not-in-this-version)
-fbeb2623e7d27443658a950dff7fd461de1a57b218d478bb542500859bc283c8  tests_mrofyt_wave2.py (28 tests)
+241034220e70c661c8c5463c425c0c1b06a7b91181b93c39ce55f160b6250fd8  mrofyt_wave2.py (MROF-YT-WAVE2-1.0; supersedes 18ba3b83… — an unreadable or empty capture folder STOPS the pass with no report instead of printing zero fires on zero sessions, Amendment 11. The registration as running code: W2-A1, W2-A4r, W2-A4f, W2-A4-OPEN, W2-A4r-z15, W2-A4r-HC, arm B, arm C placebo; subclass of the pilot runner via the runner's observation hooks; wave one untouched; §4.3 CAUSAL_SWING declared not-in-this-version)
+50158d03c0cbde186b2e1fd31c16fc2b8776d29bce6e3374c29ff1bc4324804f  tests_mrofyt_wave2.py (29 tests; supersedes fbeb2623… — W8)
 6b0eb7ea4a9bc5deb48eec7e461b03c36d509defeb9a28023b104b489f929538  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md (supersedes 4624b199… — Amendment 2: the validation blind; Amendment 1 supersedes 8ab588fa…)
-0e73abfb9f1dd9114cc41ae2b75436b9d51c1b027c3c924aa508befbd31a8c26  mrofyt_recover.py (MROF-YT-RECOVER-1.1; supersedes a8b637a5… — a run still being written is recognised (recent write, or session label not yet closed), counted apart and refused by every path; see Amendment 10. 1.0: manifest reconstruction for runs killed before finalizing; --dry-run probes header+tail only, so listing what is recoverable is instant on a 6 GB file)
-ed72a3fda0a65035cab8cc500c6f032b0c806b94bea9c7fd518d4f089dd194b3  tests_mrofyt_recover.py (25 tests; supersedes 086a0ed2… — V8–V8d, and every dead-run fixture is now aged explicitly because a fixture written seconds ago is what a live run looks like)
+dcd01f4ae6706a00d22cbaa6ef94759dd7f81f280570cb004ab50f737a050124  mrofyt_recover.py (MROF-YT-RECOVER-1.2; supersedes 0e73abfb… — asks Windows directly whether the recorder still holds a run (file-sharing check), the only sign that holds over a weekend; anything held or unanswerable is refused; Amendment 11. 1.1 (0e73abfb…): indirect live-run signs; 1.0 (a8b637a5…): manifest reconstruction, instant --dry-run)
+04f7d8426bd07aeee1ab20831ed35a6c7ad6cec2775bea5a6fca186a89cf9db8  tests_mrofyt_recover.py (32 tests; supersedes ed72a3fd… — V9–V9g: the direct check with an injected answer, the closing-window veto, the recorder-source premise, the atomic manifest write)
 f61a1f23fe31a479d04d4fd98cd59c66a9b018e0ef6c5f52459e2bea4094f84c  MROF_ACTUAL_STATE_INVENTORY.md (supersedes 50d0ddc7… — row 7 records the W2-A4f wiring, row 20 the wave-two module)
 ```
 
@@ -30,8 +30,10 @@ Modified (one file, additively — a skip path, observation hooks and a
 run-id field):
 
 ```
-c48dfe9ea192b8b802ca7514b0076ac7f51d545fd5caab044d7362bf4d4d8705  mrofyt_runner.py (supersedes 50c1de80… — two no-op observation hooks `_on_trade_event` / `_on_depth_event` carrying the full adapter event, called after the frozen handling; nothing else touched, `R14`/`R14b` pin that the base ledger is unchanged; earlier 99c9b277…: truncated/corrupt streams skipped whole; earlier: retroactive disconnect-gap correction. See REVIEW_PACKAGE_MANIFEST_v12.md)
-51e08e10e78aba0bdcad86f236658105885661505748aea2eabfecea69c1598a  tests_mrofyt_runner.py (23 tests; supersedes 4656e0a8…)
+10485b6655e65a5d1b91f40e2023ba8bbed8b604dd526a37ab014433dd4e1c40  mrofyt_runner.py (supersedes c48dfe9e… — a capture folder that cannot be read, or stops answering mid-pass, STOPS the pass with no ledger; a read error on one run while the folder answers is that run's IO_ERROR skip; a run carrying both the recorder's manifest and a reconstructed one is ingested once; Amendment 11. Earlier c48dfe9e…: two no-op observation hooks for wave two; 99c9b277…: truncated/corrupt streams skipped whole; earlier: retroactive disconnect-gap correction. See REVIEW_PACKAGE_MANIFEST_v12.md)
+8ea5c6be8295ccfb41e4ca24345892067e0376722157d470269d4ad526e57ac0  tests_mrofyt_runner.py (27 tests; supersedes 51e08e10… — R15–R15d)
+003f03b8f76d48487c3f5e14f6d558136a63a3dd433c3e31eb3454522a83ba73  mles_v12_audit.py (supersedes 1f264e3b… — a run still being recorded is OPEN, not failed; damaged originals kept beside recovered copies are KEPT, not failed; unreadable capture stops the audit; per-build disconnect evidence says whether the 1.2.2 repair was exercised or merely not contradicted; Amendment 11. See REVIEW_PACKAGE_MANIFEST_v12.md)
+1c9b8973135025c5aca4d5803ac79e9df2cb29107859641f62c3088846aa03cc  tests_mles_v12.py (54 tests; supersedes 665b0a06… — T30c, T34–T34c, T35–T35b; T30's orphan fixture is now aged, because a file written a second ago is what a live run looks like)
 1c47b9c9dd4a45369d68c0446cd00720dba845e74a6ab019606735732979f9a1  NT8_RECORDING_RUNBOOK.md (supersedes 964cdc66… — §8 lists the wave-two command)
 ```
 
@@ -45,12 +47,12 @@ Delivered package (90 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-5b8e8cebf89ef0cd1354e32703d73555935e99803a818117becb0ad9edd4f4b2  MROF_V1_Engine_v01_6_7.zip (supersedes e48c8136… — recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+15852c897375daafb4bc98985b034690ccbeabd950f2e317b50bce186786e49b  MROF_V1_Engine_v01_6_7.zip (supersedes 5b8e8ceb… — recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
-# run from inside the unzipped package: 471/471, identical to the repo
+# run from inside the unzipped package: 490/490, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -74,10 +76,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | suite | result |
 | --- | --- |
 | `tests_mles_v11.py` | 29/29 |
-| `tests_mles_v12.py` | 48/48 |
+| `tests_mles_v12.py` | 54/54 |
 | `tests_mrofyt.py` | 59/59 |
-| `tests_mrofyt_pilot.py` | 43/43 |
-| `tests_mrofyt_runner.py` | 23/23 |
+| `tests_mrofyt_pilot.py` | 44/44 |
+| `tests_mrofyt_runner.py` | 27/27 |
 | `tests_mrofyt_v01_1.py` | 56/56 |
 | `tests_mrofyt_v01_2.py` | 31/31 |
 | `tests_mrofyt_v01_3.py` | 32/32 |
@@ -85,9 +87,9 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| `tests_mrofyt_recover.py` | 25/25 |
-| `tests_mrofyt_wave2.py` | 28/28 |
-| **total** | **471/471** |
+| `tests_mrofyt_recover.py` | 32/32 |
+| `tests_mrofyt_wave2.py` | 29/29 |
+| **total** | **490/490** |
 
 ## Runnable research commands
 
@@ -95,8 +97,8 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 python3 mles_v12_audit.py  "<capture folder>"                      # integrity
 python3 mrofyt_runner.py   "<capture folder>" --out ledger.json     # outcome-blind
 python3 mrofyt_pilot.py    "<capture folder>" --out pilot.json      # §8A diagnostic
-python3 mrofyt_recover.py  "<capture folder>" --dry-run             # orphaned runs (instant); live runs listed apart
-python3 mrofyt_recover.py  "<capture folder>" --repair              # rebuild manifests — recorder idle (weekend) only
+python3 mrofyt_recover.py  "<capture folder>" --dry-run             # orphaned runs (instant); runs the recorder holds listed apart
+python3 mrofyt_recover.py  "<capture folder>" --repair              # rebuild manifests — safe with NinjaTrader running; do it on a weekend anyway (I/O)
 python3 mrofyt_wave2.py    "<capture folder>" --both --out wave2.json  # wave two, real + placebo, blind
 ```
 
@@ -327,3 +329,98 @@ detector hash so registering wave two provably changed nothing.
     **run `--repair` only when the recorder is idle** — it rewrites
     every stream of a damaged run as a new file on the drive the
     recorder is writing to.
+
+11. **Recover 1.2: ask Windows, because the indirect signs do not hold
+    (2026-09-22).** The second real dry run showed 1.1's live runs were
+    caught by the session-label rule alone: the modified-time rule
+    never fired, because Windows does not keep a held file's modified
+    time current (the operator had seen this in Explorer a week earlier
+    — size growing, date not moving). Reading the recorder source then
+    showed the label rule would not have held either on the day
+    `--repair` is meant to run: the session roll is driven by market
+    events (`Process()` rotates when an event's session differs), so
+    the run open over a weekend keeps Friday's label; and the
+    recorder's idle-loop housekeeping is unreachable (`WorkerLoop`'s
+    `while (queue.Count == 0 && accepting) Monitor.Wait(...)` never
+    falls through to the `ev == null` branch), so nothing — no flush,
+    no heartbeat — is written while the market is closed. A run
+    NinjaTrader still held on a Saturday would have passed every 1.1
+    sign as dead, been given a reconstructed manifest, and been
+    finalized again by the recorder on Sunday: two manifests, one run,
+    that stretch of a **validation** session counted twice. 1.1 was not
+    used for a repair; 1.2 replaces it before one.
+
+    1.2 asks directly. The recorder opens every stream
+    `FileMode.CreateNew, FileAccess.Write, FileShare.Read` and holds it
+    for the life of the run (`V9f` pins this in the source), so a
+    read-only `CreateFileW(GENERIC_READ, FILE_SHARE_READ)` fails with
+    `ERROR_SHARING_VIOLATION` for exactly as long as the recorder holds
+    the file. HELD refuses; any other failure refuses too ("a check
+    that could not be asked is never read as not held"); FREE still
+    yields to a newest row under ten minutes old by the recorder's own
+    row clock (a run being closed has released its files but not yet
+    written its manifest). Off Windows only the indirect signs exist,
+    and they stay in force there. The Windows call itself cannot be
+    exercised in this environment; `V9`–`V9d` pin every decision around
+    it with an injected answer, and the operator's own dry run is its
+    real test: today's runs must be listed as "NinjaTrader still has
+    ... open for writing". The reconstructed manifest is now written
+    aside and moved into place (`V9g`), so a drive that drops
+    mid-repair leaves a `.tmp` every tool ignores.
+
+    The recorder idle-loop finding is a recorder defect (no flush and
+    no heartbeat during quiet periods; exposure is the last unflushed
+    buffer per stream, a few KB, when the machine dies during a break).
+    It is recorded here, not fixed: a recorder change is an F5 the
+    operator schedules deliberately, and nothing about it is urgent.
+
+    **The same day, a loose USB cable failed three passes at once.**
+    Runner, pilot and wave two all died on `OSError 22` mid-read — and
+    the wave-two pass, finding no manifests on the vanished drive,
+    printed a clean, well-formatted report of zero fires on zero
+    sessions. Read as a result that is "nothing fires". Now: a capture
+    folder that cannot be read, holds no manifest for the instruments,
+    or stops answering mid-pass raises `CaptureUnavailable` /
+    `NoCaptureData`; runner, pilot, wave two and auditor print `STOPPED`
+    with the reason, exit 2, and write **nothing** — the pilot's
+    exposure ledger stays byte-identical (`P12`), because a pass that
+    did not complete labels no session exposed. A read error on ONE run
+    while the folder still answers is that run's `IO_ERROR` skip and the
+    pass continues (`R15b`, `T34b`). Pinned by `R15`–`R15d`, `T34`–
+    `T34c`, `P12`, `W8`.
+
+    Two more closures in the same batch. The runner ingests a run
+    **once** when both the recorder's manifest and a reconstructed one
+    exist for it, preferring the recorder's and naming the other in the
+    ledger (`R15d`) — the double-count above closed a second way. And
+    the auditor reports a run still being recorded as `OPEN`, not as
+    eight `ORPHAN_PARTIAL` failures plus an instance shortfall (the
+    2026-09-21 audit carried ten such lines), using the recovery tool's
+    own liveness rule so the two can never disagree (`T30c`); damaged
+    originals kept beside their recovered copies are `KEPT`, not
+    orphans, so the post-repair audit reads honestly.
+
+    **Repair evidence, because the operator caught a confounder.** "Six
+    spurious `BOOK_READY` on builds 1.2.0/1.2.1, zero on 1.2.2" was
+    presented as proof the recorder repair works. It is not: old
+    sessions *are* the old-build sessions, so build is confounded with
+    the calendar. The repair acts only after a feed disconnect, and the
+    auditor now counts that trigger per build and prints a verdict:
+    `NOT_EXERCISED` (no repaired-build run has had a disconnect — the
+    repair is untested, however clean the runs look),
+    `EXERCISED_AND_HELD`, or `FAILED`. Runs whose rows could not be read
+    are counted, never assumed clean. `T35b` is the end-to-end case on
+    the real recorder code: the mono lifecycle harness's
+    disconnect/reconnect run, built from `src/`, reads as exercised and
+    held. Whether the operator's 1.2.2 sessions have had a disconnect
+    is what the next real audit will say.
+
+    A caveat made explicit while touching the skip paths: `CORRUPT_
+    STREAM` and `IO_ERROR` reset the run's book and report the run
+    skipped, but windows, fires and baseline observations produced
+    *before* the failing row are not rolled back — they came from valid
+    rows. `R13c` ("a partly read run leaves nothing behind") passes
+    because its fixture cannot produce a window before the bad row, not
+    because anything is undone. No real run has taken either path yet:
+    the damaged files on the capture are caught by the pre-flight size
+    check, before any row is read.

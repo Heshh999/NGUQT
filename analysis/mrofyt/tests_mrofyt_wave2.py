@@ -357,6 +357,22 @@ t('W7d: the residual model version is stamped on the report and on '
   all(x.get('model') == W2.RESID_MODEL for x in rep['fires']
       if x['family'] == 'W2-A4f'))
 
+# ---------------------------------------------------------------------
+# W8: 2026-09-22 -- with the external drive unplugged, this pass found no
+# manifests and printed a clean, well-formatted report of zero fires on
+# zero sessions. Read as a result, that is "nothing fires". It is never
+# a result: no data is STOPPED, with no report.
+# ---------------------------------------------------------------------
+d8w = os.path.join(WORK, 'empty8')
+os.makedirs(d8w)
+out8 = os.path.join(WORK, 'w2_8.json')
+rc8 = W2.main([d8w, '--both', '--out', out8])
+rc8b = W2.main([os.path.join(WORK, 'no_such_drive'), '--out', out8])
+t('W8: a capture folder with no manifest, or one that cannot be read, '
+  'stops the wave-two pass -- exit 2, no report -- instead of a clean '
+  'zero-fire report',
+  rc8 == 2 and rc8b == 2 and not os.path.exists(out8))
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -495,7 +496,7 @@ t('T29b: the allowance is tied to firstEventSeq == 1, so a continuation '
 CID30 = '20260908224314916-aa4a2af2'
 
 
-def _two_run_instance(dirname, cid, partial):
+def _two_run_instance(dirname, cid, partial, fresh=False):
     dd = os.path.join(WORK, dirname)
     SY.synth_run(dd, n_depth=1500, cid=cid, run_no=1, session='20260909')
     m1 = json.load(open(glob.glob(os.path.join(dd, '*R001_manifest.json'))[0]))
@@ -504,13 +505,24 @@ def _two_run_instance(dirname, cid, partial):
     SY.synth_run(dd, n_depth=1500, cid=cid, run_no=2, session='20260909',
                  seq_start=m1['lastEventSeq'] + 3)
     if partial:
-        open(os.path.join(dd, 'MLES12_NQ_NQ_SEP26_20260910_%s-R003_'
-                              'depth.csv.partial' % cid), 'w').write('x')
-    return [c for c, _ in AU.audit_capture(dd)['failures']]
+        pp = os.path.join(dd, 'MLES12_NQ_NQ_SEP26_20260910_%s-R003_'
+                              'depth.csv.partial' % cid)
+        open(pp, 'w').write('x')
+        if not fresh:
+            # an ORPHAN is days old; a file written a second ago is what
+            # a run being recorded right now looks like (see T30c)
+            old = time.time() - 2 * 86400
+            os.utime(pp, (old, old))
+    return AU.audit_capture(dd)
 
 
-c30 = _two_run_instance('openrun', CID30, True)
-c30b = _two_run_instance('closedrun', '20260908224314916-bbbbbbbb', False)
+def _codes(res):
+    return [c for c, _ in res['failures']]
+
+
+c30 = _codes(_two_run_instance('openrun', CID30, True))
+c30b = _codes(_two_run_instance('closedrun', '20260908224314916-bbbbbbbb',
+                                False))
 t('T30: a short union on an instance with an unfinalized run reports '
   'UNVERIFIABLE_OPEN_RUN, not a gap, and the orphan partial is still '
   'reported separately',
@@ -520,6 +532,134 @@ t('T30b: the identical shortfall with NO unfinalized run stays a genuine '
   'INSTANCE_SEQ_GAP, so the reclassification cannot hide one',
   'INSTANCE_SEQ_GAP' in c30b and
   'INSTANCE_SEQ_UNVERIFIABLE_OPEN_RUN' not in c30b)
+
+# T30c: the same open run while it is BEING RECORDED -- the state of every
+# audit taken during a session. 2026-09-21's audit carried 10 failures
+# for exactly this (the live NQ/MNQ run's 8 files and 2 instance
+# shortfalls): noise on every weekly check, which is how real failures
+# stop being read. The auditor now asks the recovery tool's liveness
+# rule -- the same one that must pass before anything is written -- so
+# the two can never disagree about which run is live.
+r30c = _two_run_instance('liverun', '20260908224314916-cccccccc', True,
+                         fresh=True)
+c30c = _codes(r30c)
+t('T30c: a run still being recorded is reported OPEN, not failed -- no '
+  'ORPHAN_PARTIAL, no UNVERIFIABLE_OPEN_RUN, no GAP -- and both its '
+  'files and its instance shortfall are named in the report',
+  'ORPHAN_PARTIAL' not in c30c and
+  'INSTANCE_SEQ_UNVERIFIABLE_OPEN_RUN' not in c30c and
+  'INSTANCE_SEQ_GAP' not in c30c and
+  '20260908224314916-cccccccc-R003' in
+  r30c['info']['open_runs_in_progress'] and
+  any('cccccccc' in x
+      for x in r30c['info']['instance_shortfall_in_progress']) and
+  'OPEN (being recorded, not a failure)' in AU.summary(r30c))
+
+# ---- T34: an unreadable capture is STOPPED, never reported ----------
+# 2026-09-22: a loose external drive failed a runner, pilot and wave-two
+# pass mid-read, and the wave-two pass printed a clean report of zero
+# fires on zero sessions. A folder that cannot be read, or holds nothing,
+# is never a result.
+empty34 = os.path.join(WORK, 'empty34')
+os.makedirs(empty34)
+r34 = AU.audit_capture(empty34)
+try:
+    AU.audit_capture(os.path.join(WORK, 'no_such_drive'))
+    gone34 = False
+except AU.CaptureUnavailable:
+    gone34 = True
+t('T34: a readable folder with no manifest is a NO_MANIFESTS failure, '
+  'and a folder that cannot be read raises instead of printing an audit',
+  'NO_MANIFESTS' in _codes(r34) and not r34['ok'] and gone34 and
+  AU.main([os.path.join(WORK, 'no_such_drive')]) == 2)
+
+FIX34 = os.path.join(WORK, 'fix34')
+shutil.copytree(os.path.join(H, 'pair'), FIX34)
+_v34 = json.load(open(AU.discover_manifests(FIX34)[0]))['depth']['file']
+_real_sha = AU.sha256
+
+
+def _flaky(p):
+    if os.path.basename(p) == _v34:
+        raise OSError(5, 'Input/output error')
+    return _real_sha(p)
+
+
+AU.sha256 = _flaky
+try:
+    r34b = AU.audit_capture(FIX34)
+finally:
+    AU.sha256 = _real_sha
+t('T34b: a read error on ONE file while the folder still answers is that '
+  'run\'s IO_ERROR; the audit carries on and reports the rest',
+  any(c == 'IO_ERROR' for r in r34b['runs'] for c, _ in r['failures']) and
+  any(r['ok'] for r in r34b['runs']))
+
+FIX34c = os.path.join(WORK, 'fix34c')
+shutil.copytree(os.path.join(H, 'pair'), FIX34c)
+_v34c = json.load(open(AU.discover_manifests(FIX34c)[0]))['depth']['file']
+
+
+def _unplug(p):
+    if os.path.basename(p) == _v34c:
+        os.rename(FIX34c, FIX34c + '_unplugged')      # the drive vanishes
+        raise OSError(22, 'Invalid argument')         # what Windows said
+    return _real_sha(p)
+
+
+AU.sha256 = _unplug
+try:
+    AU.audit_capture(FIX34c)
+    stop34 = False
+except AU.CaptureUnavailable as _e:
+    stop34 = 'stopped answering' in str(_e)
+finally:
+    AU.sha256 = _real_sha
+t('T34c: the same read error with the FOLDER gone -- the drive unplugged '
+  'mid-pass, Errno 22 as on 2026-09-22 -- stops the audit with a plain '
+  'reason instead of reporting every later run as missing',
+  stop34)
+
+# ---- T35: has the 1.2.2 repair been EXERCISED, or just not contradicted
+# Zero spurious readies on 1.2.2 and six on older builds reads like proof,
+# but the old sessions ARE the old-build sessions, so build is confounded
+# with the calendar -- the operator caught this. The repair acts only
+# after a feed disconnect, so the audit now counts that trigger.
+def _ev(build, disc, spur, read=True):
+    i = dict(recorder_build=build)
+    if read:
+        i.update(disconnects=disc, spurious_book_ready=spur)
+    return dict(info=i)
+
+
+_rv = AU.repair_evidence
+t('T35: the verdict is on the TRIGGER: repaired-build runs with no '
+  'disconnect are NOT_EXERCISED however clean they look; with '
+  'disconnects and no spurious ready, EXERCISED_AND_HELD; any spurious '
+  'ready on a repaired build, FAILED; old builds never count toward it; '
+  'an unreadable run is counted, never assumed clean',
+  _rv([_ev('1.2.2', 0, 0), _ev('1.2.1', 4, 6)])['repaired']['verdict'] ==
+  'NOT_EXERCISED' and
+  _rv([_ev('1.2.2', 2, 0)])['repaired']['verdict'] ==
+  'EXERCISED_AND_HELD' and
+  _rv([_ev('1.2.2', 2, 1)])['repaired']['verdict'] == 'FAILED' and
+  _rv([_ev('1.2.1', 4, 6)])['repaired']['verdict'] ==
+  'NO_REPAIRED_RUN_READ' and
+  _rv([_ev('1.2.2', 0, 0), _ev('1.2.2', 0, 0, read=False)])['repaired']
+  == dict(runs=2, read=1, disconnects=0, runs_with_disconnect=0,
+          spurious_book_ready=0, verdict='NOT_EXERCISED'))
+
+_dcv = _dc['info']['repair_evidence']['repaired']
+t('T35b: end to end on the REAL recorder code -- the mono harness run '
+  'with a feed disconnect/reconnect, built from src/ -- the audit counts '
+  'the disconnect, finds no spurious ready, and says the repair was '
+  'exercised and held; the synthetic fixtures with extra readies count '
+  'them as spurious',
+  _dcv['disconnects'] >= 1 and _dcv['verdict'] == 'EXERCISED_AND_HELD'
+  and 'exercised and held' in AU.summary(_dc) and
+  r2['info']['spurious_book_ready'] == 1 and
+  r0['info']['spurious_book_ready'] == 0 and
+  r0['info']['disconnects'] == 0)
 
 # adapter honesty checks
 t('adapter: v1.2 schema requires captureInstanceId column',

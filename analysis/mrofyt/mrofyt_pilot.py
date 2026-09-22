@@ -759,7 +759,8 @@ def run_pilot(capture_dir, max_sessions=None, blind_from=BLIND_FROM):
             runs_skipped_by_reason=dict(
                 missing_files=tot.get('runs_skipped_missing_files', 0),
                 truncated=tot.get('runs_skipped_truncated', 0),
-                corrupt=tot.get('runs_skipped_corrupt', 0)),
+                corrupt=tot.get('runs_skipped_corrupt', 0),
+                io_error=tot.get('runs_skipped_io_error', 0)),
             # the two counters that say how much of a pre-1.2.2
             # recording the runner had to correct retroactively
             book_integrity=dict(
@@ -892,9 +893,10 @@ def text_summary(rep):
     s2 = rep['step2_coverage_and_pipeline']
     sk = s2.get('runs_skipped_by_reason', {})
     if any(sk.values()):
-        L.append('runs skipped whole: missing-files=%d truncated=%d corrupt=%d'
+        L.append('runs skipped whole: missing-files=%d truncated=%d '
+                 'corrupt=%d io-error=%d'
                  % (sk.get('missing_files', 0), sk.get('truncated', 0),
-                    sk.get('corrupt', 0)))
+                    sk.get('corrupt', 0), sk.get('io_error', 0)))
     bi = s2.get('book_integrity', {})
     L.append('book integrity: spurious BOOK_READY ignored=%d, rows inside '
              'disconnect gaps suppressed=%d'
@@ -957,7 +959,13 @@ def main(argv=None):
               'session and every session inspected will be labelled %s '
               'permanently. This is the checkpoint read. ***\n'
               % EXPOSURE_LABEL)
-    rep, _r = run_pilot(d, max_sessions=ms, blind_from=blind)
+    try:
+        rep, _r = run_pilot(d, max_sessions=ms, blind_from=blind)
+    except (AU.CaptureUnavailable, AU.NoCaptureData) as exc:
+        # stopped BEFORE anything is written: no report, and no session
+        # is labelled exposed by a pass that did not complete
+        print('STOPPED: %s' % exc)
+        return 2
     print(text_summary(rep))
     if out:
         json.dump(rep, open(out, 'w'), indent=1, default=str)

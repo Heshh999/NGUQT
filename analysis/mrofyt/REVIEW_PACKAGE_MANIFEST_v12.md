@@ -27,24 +27,24 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|Account\.|EnterLong|EnterShort" sr
 be29c36a62624ab5e18e67d104eb4e9323abcda4bf5faf1c88c54486fc446f4a  analysis/mrofyt/nt8_stubs_v12.cs
 3d8812b9d286b754bdd01050f4714c3dea1de13c5d59e27a5274903fc180c405  analysis/mrofyt/mles_v12_harness.cs (supersedes ff2cb79e… — the disconnect gap now carries a depth row, which is what the old fixture was missing)
 12ab264bb466bbf1f48943c95b65ae524d9a142a249c94c3337ca186a3d23861  analysis/mrofyt/mles_v12_adapter.py
-1f264e3b54646c5d474107ed38c25072bed7fd95865bad2a669c00a8dfdb9a6f  analysis/mrofyt/mles_v12_audit.py (supersedes b0a2c026… — completeness asserted on churn AFTER BOOK_READY; a run that never built a book asserts nothing. Earlier b17a4732…: minimum-row guard)
-665b0a06d3079c23fd55691f9e361e64573d62ee434f1d277ac5896b94da56fa  analysis/mrofyt/tests_mles_v12.py (48 tests; supersedes b7bc3921…)
+003f03b8f76d48487c3f5e14f6d558136a63a3dd433c3e31eb3454522a83ba73  analysis/mrofyt/mles_v12_audit.py (supersedes 1f264e3b… — OPEN runs and KEPT originals reported apart from failures, unreadable capture stops the audit, per-build disconnect-repair evidence; see REVIEW_PACKAGE_MANIFEST_v01_6_7.md Amendment 11. Earlier b0a2c026…: completeness asserted on churn AFTER BOOK_READY; b17a4732…: minimum-row guard)
+1c9b8973135025c5aca4d5803ac79e9df2cb29107859641f62c3088846aa03cc  analysis/mrofyt/tests_mles_v12.py (54 tests; supersedes 665b0a06…)
 1635f0391449260d1a15c0780a54728523834f3df4505e755ad400d63a510812  analysis/mrofyt/RECORDER_DEPLOYMENT_V12.md
 65b2948c0b7877d70d71aa7a12cac2326d740ad9c0aa98d4f1b608e4f12e33a0  analysis/mrofyt/DATA_HANDOFF_V12.md
 15c3ef12b43cb0e059eb317da9c7ddd976971965009252aaa4357cc7a6195361  analysis/mrofyt/SETUP_WALKTHROUGH_V12.md
 cf42022369fe3133c2725d8a8e10c69914d889945c0b99d2da280e1a46315f2c  analysis/mrofyt/OPERATING_RUNBOOK.md (supersedes 1ef388e1… — status header updated once genuine sessions existed; points to NT8_RECORDING_RUNBOOK.md)
 1c47b9c9dd4a45369d68c0446cd00720dba845e74a6ab019606735732979f9a1  analysis/mrofyt/NT8_RECORDING_RUNBOOK.md (beginner-readable NT8 procedure; supersedes 964cdc66… — §8 lists the wave-two command)
 3231659ff5dad33c1c4c2ba7ada5d813d229dd2cbf4437d0ffde9c0a1c0ffec9  analysis/mrofyt/mles_v12_synth.py (stamps 1.2.1 deliberately: synthetic runs carry no disconnect, so they model a PRE-repair recording; supersedes c070e41e…)
-c48dfe9ea192b8b802ca7514b0076ac7f51d545fd5caab044d7362bf4d4d8705  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes 50c1de80… — two no-op observation hooks `_on_trade_event` / `_on_depth_event` for wave two, base ledger unchanged (`R14`/`R14b`); earlier supersedes 99c9b277… — truncated/corrupt streams are skipped whole instead of killing the pass, see §Amendment; earlier supersedes 3a765f3c… — honours DISCONNECTED and requires a resync before re-arming, which corrects pre-repair recordings retroactively, see §Amendment; earlier supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
-51e08e10e78aba0bdcad86f236658105885661505748aea2eabfecea69c1598a  analysis/mrofyt/tests_mrofyt_runner.py (23 tests; supersedes 4656e0a8… — R14/R14b pin the hooks; earlier c0e37963…)
+10485b6655e65a5d1b91f40e2023ba8bbed8b604dd526a37ab014433dd4e1c40  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes c48dfe9e… — unreadable/empty capture stops the pass with no ledger, IO_ERROR per-run skip, one manifest per run (`R15`–`R15d`; v01_6_7 Amendment 11); earlier c48dfe9e…: two no-op observation hooks `_on_trade_event` / `_on_depth_event` for wave two, base ledger unchanged (`R14`/`R14b`); earlier supersedes 99c9b277… — truncated/corrupt streams are skipped whole instead of killing the pass, see §Amendment; earlier supersedes 3a765f3c… — honours DISCONNECTED and requires a resync before re-arming, which corrects pre-repair recordings retroactively, see §Amendment; earlier supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
+8ea5c6be8295ccfb41e4ca24345892067e0376722157d470269d4ad526e57ac0  analysis/mrofyt/tests_mrofyt_runner.py (27 tests; supersedes 51e08e10… — R15–R15d; earlier 4656e0a8…: R14/R14b pin the hooks)
 ```
 
 Reproduce the entire proof (mcs + mono lifecycle harness + audits +
 adversarial fixtures + package byte-identity):
 
 ```
-cd analysis/mrofyt && python3 tests_mles_v12.py      # 48/48
-cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 23/23
+cd analysis/mrofyt && python3 tests_mles_v12.py      # 54/54
+cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 27/27
 ```
 
 The suite itself compiles the recorder with mcs against the stubs,
@@ -54,7 +54,7 @@ restart, disconnect/reconnect, NQ+MNQ pairing), audits the genuine
 output and then attacks the auditor with falsified fixtures.
 
 Predecessor suites (byte-identical, re-run at freeze): 59+56+31+32+
-25+36+29+42+15 = 325, all passing; grand total 434/434 across thirteen suites at that revision. Current: 471/471 across fourteen suites (see REVIEW_PACKAGE_MANIFEST_v01_6_7.md).
+25+36+29+42+15 = 325, all passing; grand total 434/434 across thirteen suites at that revision. Current: 490/490 across fourteen suites (see REVIEW_PACKAGE_MANIFEST_v01_6_7.md).
 
 ## Correction of record
 

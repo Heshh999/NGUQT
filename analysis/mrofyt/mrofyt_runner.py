@@ -46,6 +46,8 @@ import mrofyt_wall_engine as WALL      # noqa: E402
 import rvmr_spec as RV                 # noqa: E402
 
 RUNNER_VERSION = 'MROF-YT-RUNNER-1.2.1'
+CaptureUnavailable = AU.CaptureUnavailable   # stop, never report
+NoCaptureData = AU.NoCaptureData
 TICK = SIG.TICK
 BOOK_K = 10                            # frozen primary book depth
 DECISION_S = 10.0                      # frozen decision window
@@ -313,16 +315,39 @@ class Runner:
     def plan(self):
         """[(instrument, session, [manifest paths sorted by start])]"""
         by = collections.defaultdict(list)
+        mans = []
         for mp in AU.discover_manifests(self.dir):
             try:
                 man = json.load(open(mp))
+            except OSError as exc:
+                # a manifest the drive cannot deliver: gone drive -> stop
+                AU.stop_if_capture_gone(self.dir, os.path.basename(mp), exc)
+                continue
             except Exception:
                 continue
             inst = man.get('instrument')
             if inst not in self.instruments or \
                     man.get('schema') != AD.SCHEMA:
                 continue
-            by[(inst, man.get('session'))].append(
+            mans.append((mp, man))
+        # One run, one manifest. A run can carry two -- the recorder's own
+        # and a reconstructed one -- only if a recovery tool pinned a
+        # manifest on a run the recorder later finalized itself. Ingesting
+        # both counts that stretch of the session twice. The recorder's
+        # own wins, and the other is named in the ledger.
+        own = {(m.get('instrument'), m.get('runId'))
+               for _p, m in mans if not m.get('reconstructed')}
+        for mp, man in mans:
+            key = (man.get('instrument'), man.get('runId'))
+            if man.get('reconstructed') and key in own:
+                self.ledger.setdefault('duplicate_manifests_ignored',
+                                       []).append(
+                    dict(run_id=man.get('runId'),
+                         ignored=os.path.basename(mp),
+                         reason='the recorder wrote its own manifest for '
+                                'this run'))
+                continue
+            by[(key[0], man.get('session'))].append(
                 (man.get('firstRecvUtc') or '', mp, man))
         plan = []
         for (inst, ses), lst in by.items():
@@ -333,7 +358,20 @@ class Runner:
 
     # ---- main -------------------------------------------------------
     def run(self):
+        # An unreadable folder, or one with nothing in it, is stopped
+        # here rather than reported: an empty ledger reads exactly like a
+        # quiet market (2026-09-22: a loose drive, and a clean report of
+        # zero sessions from the pass that followed).
+        if not AU.capture_dir_alive(self.dir):
+            raise CaptureUnavailable(
+                'cannot read the capture folder %s. Is the drive '
+                'connected, and is it still that letter?' % self.dir)
         plan = self.plan()
+        if not plan:
+            raise NoCaptureData(
+                'no MLES-CAPTURE-1.2 manifest for %s in %s: the wrong '
+                'folder, or a drive that came back under another letter'
+                % ('/'.join(self.instruments), self.dir))
         seen_sessions = []
         for inst, ses, runs in plan:
             if ses not in seen_sessions:
@@ -393,6 +431,8 @@ class Runner:
         absent = sorted(os.path.basename(p) for p in paths.values()
                         if not os.path.exists(p))
         if absent:
+            # a vanished drive makes every file look absent
+            AU.stop_if_capture_gone(self.dir, absent[0], 'not found')
             rec.update(skipped='MISSING_STREAM_FILES', missing=absent,
                        events=0)
             self.ledger['runs'].append(rec)
@@ -409,14 +449,19 @@ class Runner:
         # feature after it is computed against a stale book. The check
         # costs one stat() per file. The auditor has always reported
         # this as BYTE_SIZE_MISMATCH; the runner ignored it.
-        truncated = sorted(
-            '%s (%d bytes on disk, manifest declares %s)'
-            % (os.path.basename(p), os.path.getsize(p),
-               (man.get(k) or {}).get('bytes'))
-            for k, p in paths.items()
-            if isinstance(man.get(k), dict)
-            and man[k].get('bytes') is not None
-            and os.path.getsize(p) != man[k]['bytes'])
+        try:
+            truncated = sorted(
+                '%s (%d bytes on disk, manifest declares %s)'
+                % (os.path.basename(p), os.path.getsize(p),
+                   (man.get(k) or {}).get('bytes'))
+                for k, p in paths.items()
+                if isinstance(man.get(k), dict)
+                and man[k].get('bytes') is not None
+                and os.path.getsize(p) != man[k]['bytes'])
+        except OSError as exc:
+            AU.stop_if_capture_gone(self.dir, man.get('runId'), exc)
+            self._skip_io_error(st, rec, man, exc)
+            return
         if truncated:
             rec.update(skipped='STREAM_SIZE_MISMATCH', truncated=truncated,
                        events=0)
@@ -434,15 +479,26 @@ class Runner:
         self._rebuild_levels(st)
         try:
             n, crossed, quotes = self._stream_run(st, paths)
+        except OSError as exc:
+            # The device failed mid-read. If the folder is gone too, the
+            # whole pass stops (every later run would fail the same way).
+            # If the folder still answers, the failure belongs to this
+            # one run: it is handled exactly like CORRUPT_STREAM below.
+            AU.stop_if_capture_gone(self.dir, man.get('runId'), exc)
+            self._skip_io_error(st, rec, man, exc)
+            return
         except (AD.MalformedHeaderError, AD.UnknownEnumError) as exc:
             # Safety net for corruption that does NOT change the file
             # size, so the stat() pre-flight above could not see it. The
             # stream is abandoned at the bad row -- there is no way to
             # know what the rest of the file would have contained, and
             # guessing is how a stale book gets treated as a live one.
-            # Everything this run fed in before the bad row is discarded
-            # by resetting the run state, and the run is reported, never
-            # silently dropped.
+            # The run's book and tape state is reset and the run is
+            # reported, never silently dropped. NOT rolled back: windows,
+            # fires and baseline observations the run produced BEFORE the
+            # bad row stay in the ledger (they came from valid rows). R13c
+            # passes because its fixture cannot produce a window before
+            # the bad row, not because anything is undone.
             st.reset_run()
             rec.update(skipped='CORRUPT_STREAM', error=str(exc), events=0)
             self.ledger['runs'].append(rec)
@@ -454,6 +510,19 @@ class Runner:
         rec.update(events=n, quotes=quotes, crossed_quotes=crossed)
         self.ledger['runs'].append(rec)
         self.ledger['totals']['events'] += n
+
+    def _skip_io_error(self, st, rec, man, exc):
+        """A read error on one run while the capture folder still
+        answers (a bad sector, a brief USB reset). Same handling and the
+        same caveat as CORRUPT_STREAM: state reset, run reported, earlier
+        windows not rolled back."""
+        st.reset_run()
+        rec.update(skipped='IO_ERROR', error=str(exc), events=0)
+        self.ledger['runs'].append(rec)
+        self.ledger['totals']['runs_skipped_io_error'] += 1
+        self.ledger['skipped_runs'].append(
+            dict(instrument=st.instrument, session=st.session,
+                 run_id=man.get('runId'), io_error=str(exc)))
 
     def _stream_run(self, st, paths):
         n = crossed = quotes = 0
@@ -984,12 +1053,13 @@ def summary(ledger):
     tot = ledger['totals']
     lines = ['%s  outcomes=%s' % (ledger['runner'], ledger['outcomes']),
              'sessions=%d runs=%d (ingested %d, skipped: missing-files %d, '
-             'truncated %d, corrupt %d) events=%d'
+             'truncated %d, corrupt %d, io-error %d) events=%d'
              % (len(ledger['sessions']), len(ledger['runs']),
                 len(ledger['runs']) - len(ledger.get('skipped_runs', [])),
                 tot.get('runs_skipped_missing_files', 0),
                 tot.get('runs_skipped_truncated', 0),
                 tot.get('runs_skipped_corrupt', 0),
+                tot.get('runs_skipped_io_error', 0),
                 tot.get('events', 0)),
              'baseline sessions: %s' % ledger.get('baseline_sessions'),
              'approaches=%d windows=%d (suppressed %d) fires=%d '
@@ -1013,6 +1083,9 @@ def summary(ledger):
     lines.append('latency ms: %s' % ledger['latency_ms'])
     lines.append('NOT WIRED (detectors disqualify by design): %s'
                  % ', '.join(sorted(ledger['not_wired'])))
+    for d in ledger.get('duplicate_manifests_ignored', []):
+        lines.append('duplicate manifest ignored: %s (%s)'
+                     % (d['ignored'], d['reason']))
     return '\n'.join(lines)
 
 
@@ -1029,7 +1102,11 @@ def main(argv=None):
     if a.outcomes:
         compute_outcomes()
     r = Runner(a.capture_dir, a.instruments.split(','), a.sessions)
-    led = r.run()
+    try:
+        led = r.run()
+    except (CaptureUnavailable, NoCaptureData) as exc:
+        print('STOPPED: %s' % exc)
+        return 2
     print(summary(led))
     if a.out:
         json.dump(led, open(a.out, 'w'), default=str, indent=1)

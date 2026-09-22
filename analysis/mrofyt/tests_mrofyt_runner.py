@@ -447,6 +447,118 @@ t('R14b: on the base runner both hooks are no-ops and change nothing in '
   json.dumps(RN.Runner(d14, ('NQ',)).run()['totals'], sort_keys=True) ==
   json.dumps(led14['totals'], sort_keys=True))
 
+
+# ---------------------------------------------------------------------
+# R15: an unreadable capture is STOPPED, never reported. 2026-09-22: a
+# loose external drive failed the runner mid-read (Errno 22); the
+# wave-two pass after it found no manifests at all and printed a clean
+# report of zero fires on zero sessions. A ledger missing everything
+# after a drive drop reads exactly like a quiet market, so no ledger is
+# the only honest output.
+# ---------------------------------------------------------------------
+d15 = os.path.join(WORK, 'empty15')
+os.makedirs(d15)
+try:
+    RN.Runner(d15, ('NQ',)).run()
+    e15 = None
+except RN.NoCaptureData as _e:
+    e15 = str(_e)
+try:
+    RN.Runner(os.path.join(WORK, 'no_such_drive'), ('NQ',)).run()
+    g15 = None
+except RN.CaptureUnavailable as _e:
+    g15 = str(_e)
+out15 = os.path.join(WORK, 'ledger15.json')
+rc15 = RN.main([d15, '--out', out15])
+t('R15: a folder with no manifest for the instruments raises '
+  'NoCaptureData, a folder that cannot be read raises CaptureUnavailable, '
+  'and main() prints STOPPED, returns 2 and writes NO ledger',
+  bool(e15) and 'no MLES-CAPTURE-1.2 manifest' in e15 and
+  bool(g15) and 'cannot read' in g15 and
+  rc15 == 2 and not os.path.exists(out15))
+
+d15b = os.path.join(WORK, 'io15')
+SY.synth_run(d15b, n_depth=20000, price_path=path, trade_every=10,
+             quote_every=5, cid='good', session='20260902')
+SY.synth_run(d15b, n_depth=20000, price_path=path, trade_every=10,
+             quote_every=5, cid='flaky', session='20260902', run_no=2)
+_real_merge = RN.AD.merge_run
+
+
+def _flaky_merge(paths, lite=True, kinds=AD.STREAMS):
+    it = _real_merge(paths, lite, kinds)
+    if not any('flaky' in p for p in paths.values()):
+        return it
+
+    def gen():
+        for i, e in enumerate(it):
+            if i == 100:
+                raise OSError(22, 'Invalid argument')
+            yield e
+    return gen()
+
+
+RN.AD.merge_run = _flaky_merge
+try:
+    led15b = RN.Runner(d15b, ('NQ',)).run()
+finally:
+    RN.AD.merge_run = _real_merge
+t('R15b: a read error on ONE run while the folder still answers is that '
+  'run\'s IO_ERROR skip -- named with the error, counted apart in the '
+  'summary -- and the clean run beside it is ingested in full',
+  led15b['totals'].get('runs_skipped_io_error') == 1 and
+  'Invalid argument' in led15b['skipped_runs'][0].get('io_error', '') and
+  sum(1 for r in led15b['runs'] if not r.get('skipped')) == 1 and
+  led15b['totals']['events'] > 0 and 'io-error 1' in RN.summary(led15b))
+
+d15c = os.path.join(WORK, 'unplug15')
+SY.synth_run(d15c, n_depth=20000, price_path=path, trade_every=10,
+             quote_every=5, cid='u1', session='20260902')
+SY.synth_run(d15c, n_depth=20000, price_path=path, trade_every=10,
+             quote_every=5, cid='u2', session='20260902', run_no=2)
+
+
+def _unplug_merge(paths, lite=True, kinds=AD.STREAMS):
+    it = _real_merge(paths, lite, kinds)
+
+    def gen():
+        for i, e in enumerate(it):
+            if i == 50:
+                os.rename(d15c, d15c + '_gone')      # the drive vanishes
+                raise OSError(22, 'Invalid argument')
+            yield e
+    return gen()
+
+
+RN.AD.merge_run = _unplug_merge
+out15c = os.path.join(WORK, 'ledger15c.json')
+try:
+    rc15c = RN.main([d15c, '--out', out15c])
+finally:
+    RN.AD.merge_run = _real_merge
+t('R15c: the same error with the folder GONE -- the drive unplugged '
+  'mid-pass -- stops the pass: STOPPED, exit 2, no ledger; never a ledger '
+  'with every later run reported as missing files',
+  rc15c == 2 and not os.path.exists(out15c))
+
+d15d = os.path.join(WORK, 'dup15')
+mp15d = SY.synth_run(d15d, n_depth=20000, price_path=path, trade_every=10,
+                     quote_every=5, cid='dup', session='20260902')
+led_single = RN.Runner(d15d, ('NQ',)).run()
+_rman = dict(json.load(open(mp15d)), reconstructed=True,
+             reconstructedBy='test')
+json.dump(_rman, open(mp15d.replace('_manifest.json',
+                                    '_RECONSTRUCTED_manifest.json'), 'w'))
+led_dup = RN.Runner(d15d, ('NQ',)).run()
+t('R15d: a run carrying both the recorder\'s manifest and a reconstructed '
+  'one is ingested ONCE, from the recorder\'s, and the other is named -- '
+  'the one way a recovery mistake could count a session twice, closed',
+  led_dup['totals']['events'] == led_single['totals']['events'] and
+  sum(1 for r in led_dup['runs'] if not r.get('skipped')) == 1 and
+  led_dup['duplicate_manifests_ignored'][0]['ignored'].endswith(
+      '_RECONSTRUCTED_manifest.json') and
+  'duplicate manifest ignored' in RN.summary(led_dup))
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

@@ -593,11 +593,19 @@ def main(argv=None):
         blind = PI.parse_blind_from(argv[argv.index('--blind-from') + 1])
     both = '--both' in argv
     mode = 'placebo' if '--placebo' in argv else 'real'
-    rep, _r = run_wave2(d, mode=mode, blind_from=blind, max_sessions=ms)
+    try:
+        rep, _r = run_wave2(d, mode=mode, blind_from=blind, max_sessions=ms)
+        rep_p = None
+        if both:
+            rep_p, _rp = run_wave2(d, mode='placebo', blind_from=blind,
+                                   max_sessions=ms)
+    except (RUN.CaptureUnavailable, RUN.NoCaptureData) as exc:
+        # 2026-09-22: this pass printed a clean report of zero fires on
+        # zero sessions from an unplugged drive. Never again: no report.
+        print('STOPPED: %s' % exc)
+        return 2
     paired = None
     if both:
-        rep_p, _rp = run_wave2(d, mode='placebo', blind_from=blind,
-                               max_sessions=ms)
         paired = paired_summary(rep, rep_p, blind)
         rep = dict(real=rep, placebo=rep_p, paired=paired,
                    wave2=rep['wave2'], mode='both', blind_from=blind,

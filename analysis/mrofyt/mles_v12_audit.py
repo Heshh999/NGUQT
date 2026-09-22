@@ -43,6 +43,7 @@ ZERO = ('gaps', 'duplicates', 'reversals', 'queueOverflows',
 MIN_OVERLAP_FRAC = 0.5
 MAX_HOLES = 100000            # more than this is not a rotation artefact
 LAT_BINS_MS = 5000            # 1 ms histogram bins for recv-exch latency
+REPAIRED_BUILD = (1, 2, 2)    # first recorder with the disconnect repair
 
 STREAM_KEYS = dict(quotes=('firstQuoteSeq', 'lastQuoteSeq'),
                    trades=('firstTradeSeq', 'lastTradeSeq'),
@@ -58,6 +59,47 @@ IDENTITY = (('capture_instance_id', 'captureInstanceId',
 
 def _fail(fails, code, detail=''):
     fails.append((code, detail))
+
+
+# ---------------------------------------------------------------------
+# an unreadable capture is stopped, never reported
+# ---------------------------------------------------------------------
+class CaptureUnavailable(RuntimeError):
+    """The capture folder cannot be read: missing, or it stopped
+    answering mid-pass (drive disconnected, USB power dropped). Raised
+    instead of reporting, because every later read fails the same way
+    and a report missing everything after that point reads exactly like
+    a quiet market. Found 2026-09-22: a loose drive took down a runner,
+    pilot and wave-two pass, and the wave-two pass printed a clean,
+    well-formatted report of zero fires on zero sessions."""
+
+
+class NoCaptureData(RuntimeError):
+    """The folder answers but holds no manifest for the instruments
+    asked for: the wrong folder, or a drive that came back under
+    another letter. Never a valid result on a real capture."""
+
+
+def capture_dir_alive(directory):
+    try:
+        os.listdir(directory)
+        return True
+    except OSError:
+        return False
+
+
+def stop_if_capture_gone(directory, what, exc):
+    """Called on an OSError while reading the capture. If the folder
+    itself no longer answers, the device is gone: raise. If it still
+    answers, the error belongs to this one file, and the caller records
+    it and carries on."""
+    if not capture_dir_alive(directory):
+        raise CaptureUnavailable(
+            'the capture folder %s stopped answering while reading %s '
+            '(%s). The drive was disconnected or lost power. Nothing was '
+            'written: a report missing everything after this point would '
+            'read like a quiet market. Reconnect the drive, check it is '
+            'still the same letter, and re-run.' % (directory, what, exc))
 
 
 class _StreamState:
@@ -131,12 +173,20 @@ def audit_run(manifest_path, lite=True):
         path = os.path.join(base, blk.get('file', ''))
         referenced.append(blk.get('file', ''))
         if not os.path.exists(path):
+            # a vanished drive makes every file look absent
+            stop_if_capture_gone(base, blk.get('file', ''), 'not found')
             _fail(fails, 'MISSING_FILE', blk.get('file', ''))
             continue
-        if os.path.getsize(path) != blk.get('bytes'):
-            _fail(fails, 'BYTE_SIZE_MISMATCH', stream)
-        if sha256(path) != blk.get('sha256'):
-            _fail(fails, 'HASH_MISMATCH', stream)
+        try:
+            if os.path.getsize(path) != blk.get('bytes'):
+                _fail(fails, 'BYTE_SIZE_MISMATCH', stream)
+            if sha256(path) != blk.get('sha256'):
+                _fail(fails, 'HASH_MISMATCH', stream)
+        except OSError as exc:
+            stop_if_capture_gone(base, blk.get('file', ''), exc)
+            _fail(fails, 'IO_ERROR', '%s: %s' % (blk.get('file', ''), exc))
+            return dict(ok=False, failures=fails, info=info, events=[],
+                        manifest=man)
         paths[stream] = path
     info['referenced_files'] = referenced
     if not paths:
@@ -270,6 +320,11 @@ def audit_run(manifest_path, lite=True):
                     manifest=man)
     except AD.UnknownEnumError as exc:
         _fail(fails, 'UNKNOWN_ENUM', str(exc))
+        return dict(ok=False, failures=fails, info=info, events=quality,
+                    manifest=man)
+    except OSError as exc:
+        stop_if_capture_gone(base, rid, exc)
+        _fail(fails, 'IO_ERROR', '%s: %s' % (rid, exc))
         return dict(ok=False, failures=fails, info=info, events=quality,
                     manifest=man)
 
@@ -452,6 +507,9 @@ def audit_run(manifest_path, lite=True):
     if info['book_ready'] > allowed:
         _fail(fails, 'BOOK_READY_WITHOUT_RESYNC',
               '%d ready > %d allowed' % (info['book_ready'], allowed))
+    # the trigger the 1.2.2 repair exists for; see repair_evidence()
+    info['disconnects'] = kinds.count('DISCONNECT')
+    info['spurious_book_ready'] = max(0, info['book_ready'] - allowed)
     info['latency_ms'] = _lat_summary(lat_hist, lat_n)
 
     return dict(ok=not fails, failures=fails, info=info,
@@ -579,9 +637,107 @@ def pair_sessions(runs, min_overlap=MIN_OVERLAP_FRAC):
     return fails, overlaps
 
 
+def _build_tuple(b):
+    try:
+        return tuple(int(x) for x in str(b).split('.'))
+    except ValueError:
+        return (0,)
+
+
+def repair_evidence(runs):
+    """Has the 1.2.2 disconnect repair actually been EXERCISED?
+
+    The repair acts only after a feed disconnect. A repaired build with
+    no spurious BOOK_READY therefore proves nothing unless its runs
+    contained a disconnect -- and comparing builds alone proves nothing
+    either, because old sessions are the old-build sessions by
+    construction: the build is confounded with the calendar. This counts
+    the trigger itself. A run whose rows could not be read is counted
+    separately, never assumed clean."""
+    by = {}
+    for r in runs:
+        i = r['info']
+        b = i.get('recorder_build') or '1.2.0'
+        e = by.setdefault(b, dict(runs=0, read=0, disconnects=0,
+                                  runs_with_disconnect=0,
+                                  spurious_book_ready=0))
+        e['runs'] += 1
+        if 'disconnects' in i:
+            e['read'] += 1
+            e['disconnects'] += i['disconnects']
+            e['runs_with_disconnect'] += 1 if i['disconnects'] else 0
+            e['spurious_book_ready'] += i['spurious_book_ready']
+    keys = ('runs', 'read', 'disconnects', 'runs_with_disconnect',
+            'spurious_book_ready')
+    rep = [e for b, e in by.items() if _build_tuple(b) >= REPAIRED_BUILD]
+    tot = {k: sum(e[k] for e in rep) for k in keys}
+    if not tot['read']:
+        tot['verdict'] = 'NO_REPAIRED_RUN_READ'
+    elif tot['spurious_book_ready']:
+        tot['verdict'] = 'FAILED'
+    elif not tot['disconnects']:
+        tot['verdict'] = 'NOT_EXERCISED'
+    else:
+        tot['verdict'] = 'EXERCISED_AND_HELD'
+    return dict(by_build=dict(sorted(by.items())), repaired=tot)
+
+
+REPAIR_VERDICT_TEXT = dict(
+    NOT_EXERCISED='no run on a repaired build has had a feed disconnect '
+                  'yet, so the repair is UNTESTED -- the absence of '
+                  'spurious readies proves nothing',
+    EXERCISED_AND_HELD='disconnects occurred on repaired builds and none '
+                       'produced a spurious BOOK_READY: the repair was '
+                       'exercised and held',
+    FAILED='a repaired build produced a spurious BOOK_READY: the repair '
+           'did NOT hold',
+    NO_REPAIRED_RUN_READ='no run from a repaired build could be read')
+
+
+def _classify_leftovers(directory):
+    """Which unreferenced CSVs are NOT failures, and why.
+
+    * a run the recorder is still writing (it has no manifest because
+      the recorder writes that at close) -- judged by the same rule the
+      recovery tool uses before it writes anything, so the two can never
+      disagree about which runs are live;
+    * a damaged original kept beside the _RECOVERED copy that a
+      reconstructed manifest references -- kept deliberately, because
+      originals are never modified.
+
+    Imported lazily: the recovery tool imports the runner, which imports
+    this module. Without it, nothing is reclassified."""
+    try:
+        import mrofyt_recover as RC
+    except ImportError:
+        return {}, {}, set()
+    live_files, live_inst = {}, {}
+    for run in RC.find_orphan_runs(directory):
+        if run.get('live'):
+            live_inst[run['run_id'].rsplit('-R', 1)[0]] = run['run_id']
+            for p in run['streams'].values():
+                live_files[os.path.basename(p)] = (run['run_id'],
+                                                   run['live'])
+    kept = set()
+    for p in os.listdir(directory):
+        m = RC.RUN_RE.match(p)
+        if m and os.path.exists(os.path.join(
+                directory, m.group('base') + '_RECONSTRUCTED_manifest.json')):
+            kept.add(p)
+    return live_files, live_inst, kept
+
+
 def audit_capture(directory, min_overlap=MIN_OVERLAP_FRAC):
+    if not capture_dir_alive(directory):
+        raise CaptureUnavailable(
+            'cannot read the capture folder %s. Is the drive connected, '
+            'and is it still that letter?' % directory)
     fails = []
     mans = discover_manifests(directory)
+    if not mans:
+        _fail(fails, 'NO_MANIFESTS',
+              '%s holds no MLES-CAPTURE-1.2 manifest: the wrong folder, or '
+              'a drive that came back under another letter' % directory)
     runs = [audit_run(m) for m in mans]
     info = dict(manifests=len(mans))
 
@@ -590,8 +746,20 @@ def audit_capture(directory, min_overlap=MIN_OVERLAP_FRAC):
     for r in runs:
         for f in r['info'].get('referenced_files', []):
             referenced.add(f)
+    live_files, live_inst, kept = _classify_leftovers(directory)
+    open_runs = {}
+    kept_originals = []
     open_instances = set()
     for p in sorted(os.listdir(directory)):
+        loose = p.endswith('.csv.partial') or \
+            (p.endswith('.csv') and p not in referenced)
+        if loose and p in live_files:
+            rid, why = live_files[p]
+            open_runs[rid] = why
+            continue
+        if loose and p in kept:
+            kept_originals.append(p)
+            continue
         if p.endswith('.csv.partial'):
             _fail(fails, 'ORPHAN_PARTIAL', p)
             m = re.search(r'_(\d{17}-[0-9a-f]{8})-R\d{3}_', p)
@@ -601,6 +769,8 @@ def audit_capture(directory, min_overlap=MIN_OVERLAP_FRAC):
             _fail(fails, 'ORPHAN_FINALIZED_CSV', p)
         elif p.endswith('_RECOVERY.json'):
             _fail(fails, 'RECOVERY_ARTIFACT_PRESENT', p)
+    info['open_runs_in_progress'] = open_runs
+    info['recovery_originals_kept'] = kept_originals
 
     # duplicate run ids / one run spanning contracts
     seen = {}
@@ -618,6 +788,7 @@ def audit_capture(directory, min_overlap=MIN_OVERLAP_FRAC):
     for r in runs:
         by_cid.setdefault(r['info'].get('capture_instance_id'),
                           []).append(r['info'])
+    in_progress = []
     for cid, rs in by_cid.items():
         ok, why = instance_seq_contiguous(rs)
         if ok:
@@ -628,12 +799,21 @@ def audit_capture(directory, min_overlap=MIN_OVERLAP_FRAC):
         # union, not a detected gap, and calling it a gap points at the
         # wrong cause. Only the count/span shortfall is reclassified: a
         # hole or an overlap is never explained by an open run.
-        if cid in open_instances and why.startswith('count '):
+        # When that run is being RECORDED right now the shortfall is the
+        # normal state of every audit taken during a session -- noted,
+        # not failed, or the weekly check would never read clean.
+        if cid in live_inst and why.startswith('count '):
+            in_progress.append('%s: %s (run %s is still being recorded; '
+                               'this resolves when it closes)'
+                               % (cid, why, live_inst[cid]))
+        elif cid in open_instances and why.startswith('count '):
             _fail(fails, 'INSTANCE_SEQ_UNVERIFIABLE_OPEN_RUN',
-                  '%s: %s (instance has an unfinalized run; re-audit once '
-                  'it closes)' % (cid, why))
+                  '%s: %s (instance has a run with no manifest; if it is '
+                  'orphaned, mrofyt_recover.py rebuilds it -- re-audit '
+                  'after)' % (cid, why))
         else:
             _fail(fails, 'INSTANCE_SEQ_GAP', '%s: %s' % (cid, why))
+    info['instance_shortfall_in_progress'] = in_progress
 
     insts_present = {r['info'].get('instrument') for r in runs}
     for need in REQUIRED_INSTRUMENTS:
@@ -650,14 +830,25 @@ def audit_capture(directory, min_overlap=MIN_OVERLAP_FRAC):
                   '%s/%s: %s' % (r['info'].get('instrument'),
                                  r['info'].get('run_id'),
                                  r['failures'][:2]))
+    info['repair_evidence'] = repair_evidence(runs)
     return dict(ok=not fails, failures=fails, runs=runs, info=info)
 
 
 def summary(result):
     """Compact text for handing back; no market content."""
+    i0 = result['info']
     lines = ['audit ok=%s failures=%d manifests=%d'
              % (result['ok'], len(result['failures']),
-                result['info'].get('manifests', 0))]
+                i0.get('manifests', 0))]
+    for rid, why in sorted(i0.get('open_runs_in_progress', {}).items()):
+        lines.append('  OPEN (being recorded, not a failure) %s: %s'
+                     % (rid, why))
+    for x in i0.get('instance_shortfall_in_progress', []):
+        lines.append('  OPEN (being recorded, not a failure) %s' % x)
+    if i0.get('recovery_originals_kept'):
+        lines.append('  KEPT %d damaged originals beside their recovered '
+                     'copies (never modified, by design; not a failure)'
+                     % len(i0['recovery_originals_kept']))
     for c, d in result['failures']:
         lines.append('  FAIL %s %s' % (c, d))
     for r in result.get('runs', []):
@@ -674,10 +865,36 @@ def summary(result):
     for ses, o in result['info'].get('overlaps', {}).items():
         lines.append('  pair %s overlap=%.3f (NQ runs %d, MNQ runs %d)'
                      % (ses, o['overlap_frac'], o['nq_runs'], o['mnq_runs']))
+    ev = i0.get('repair_evidence')
+    if ev:
+        t = ev['repaired']
+        lines.append('  disconnect repair (recorder >= %s): %d of %d runs '
+                     'read, %d with a feed disconnect (%d disconnects), %d '
+                     'spurious BOOK_READY -> %s: %s'
+                     % ('.'.join(map(str, REPAIRED_BUILD)), t['read'],
+                        t['runs'], t['runs_with_disconnect'],
+                        t['disconnects'], t['spurious_book_ready'],
+                        t['verdict'], REPAIR_VERDICT_TEXT[t['verdict']]))
+        for b, e in ev['by_build'].items():
+            lines.append('    build %-6s runs=%d read=%d disconnects=%d '
+                         'spurious_book_ready=%d'
+                         % (b, e['runs'], e['read'], e['disconnects'],
+                            e['spurious_book_ready']))
     return '\n'.join(lines)
+
+
+def main(argv=None):
+    import sys
+    argv = list(sys.argv[1:] if argv is None else argv)
+    d = argv[0] if argv else '.'
+    try:
+        print(summary(audit_capture(d)))
+    except CaptureUnavailable as exc:
+        print('STOPPED: %s' % exc)
+        return 2
+    return 0
 
 
 if __name__ == '__main__':
     import sys
-    d = sys.argv[1] if len(sys.argv) > 1 else '.'
-    print(summary(audit_capture(d)))
+    sys.exit(main())

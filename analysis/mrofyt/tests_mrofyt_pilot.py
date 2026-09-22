@@ -520,6 +520,29 @@ t('P11k: the blind date and label the code enforces are the ones the '
   PI.BLIND_FROM == '20260921' and PI.BLIND_FROM in _reg and
   PI.BLIND_LABEL in _reg and '8.1' in _reg and 'ci95_median' in _reg)
 
+# ---------------------------------------------------------------------
+# P12: an unreadable capture STOPS the pilot before anything is written
+# -- no report, and no session labelled exposed by a pass that did not
+# complete. 2026-09-22: a loose drive failed the pilot inside its audit
+# step; the exposure ledger is the one file that must never move on a
+# failure.
+# ---------------------------------------------------------------------
+_led_path = os.path.join(HERE, 'MROF_EXPOSED_PILOT_DEV_DAYS.json')
+_before12 = (open(_led_path, 'rb').read() if os.path.exists(_led_path)
+             else None)
+d12 = os.path.join(WORK, 'empty12')
+os.makedirs(d12)
+out12 = os.path.join(WORK, 'pilot12.json')
+rc12 = PI.main([d12, '--out', out12])
+rc12b = PI.main([os.path.join(WORK, 'no_such_drive'), '--out', out12])
+_after12 = (open(_led_path, 'rb').read() if os.path.exists(_led_path)
+            else None)
+t('P12: a capture folder with no manifest, or one that cannot be read, '
+  'stops the pilot -- exit 2, no report written -- and the exposure '
+  'ledger is byte-identical: a pass that did not complete labels nothing',
+  rc12 == 2 and rc12b == 2 and not os.path.exists(out12) and
+  _before12 == _after12)
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))
