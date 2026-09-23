@@ -98,6 +98,11 @@ RECOVER_VERSION = 'MROF-YT-RECOVER-1.4'
 # .partial stream in full (originals are never renamed), so on a real
 # folder it writes tens of GB.
 RESERVE_BYTES = 40 * 10 ** 9
+# No stream row is anywhere near this long. A file cut off when the
+# drive dropped can come back zero-filled with no line break at all, and
+# a line-by-line reader would then pull the whole multi-GB file into
+# memory looking for one. Every read here is bounded by this instead.
+MAX_LINE_BYTES = 1 << 20
 CLOSE_REASON = 'RECONSTRUCTED_NO_CLEAN_CLOSE'
 # a stream modified more recently than this may be being written NOW;
 # during a session the recorder flushes every flushPolicySeconds = 30 s
@@ -359,28 +364,70 @@ class _Scan(object):
         self.book_type = None
 
 
+def _lines(fh, max_len=MAX_LINE_BYTES):
+    """Lines of a binary file, memory-bounded. Yields each complete line
+    as bytes including its newline; a final piece with no newline is
+    yielded without one; a line longer than max_len is yielded as None
+    (what a zero-filled or garbage stretch looks like) and iteration
+    stops -- nothing past it is a row."""
+    pending = b''
+    while True:
+        chunk = fh.read(1 << 20)
+        if not chunk:
+            if pending:
+                yield pending
+            return
+        pending += chunk
+        while True:
+            i = pending.find(b'\n')
+            if i < 0:
+                break
+            yield pending[:i + 1]
+            pending = pending[i + 1:]
+        if len(pending) > max_len:
+            yield None
+            return
+
+
+TOO_LONG = 'line longer than %d KB: not a stream row (zero-filled or ' \
+           'garbage after a crash?)' % (MAX_LINE_BYTES // 1024)
+
+
+def _text(b):
+    return b.decode('utf-8', 'replace')
+
+
 def scan_stream(path, kind):
     """Stream one file, tolerating a malformed tail. Returns a _Scan.
 
     Deliberately does NOT use AD.iter_file: that raises on the first bad
-    row, and a bad row is exactly what this tool exists to survive."""
+    row, and a bad row is exactly what this tool exists to survive.
+    Reads are memory-bounded (see _lines)."""
     s = _Scan(kind)
     names = AD.HEADERS[kind]
     ix = IDX[kind]
     n = len(names)
-    with open(path, newline='') as fh:
-        head_line = fh.readline()
+    with open(path, 'rb') as fh:
+        it = _lines(fh)
+        head_line = next(it, b'')
+        if head_line is None:
+            s.bad_row = (0, 'no header line: ' + TOO_LONG)
+            return s
         if not head_line:
             s.bad_row = (0, 'file is empty')
             return s
-        if next(csv.reader([head_line]), None) != names:
+        if next(csv.reader([_text(head_line)]), None) != names:
             s.bad_row = (0, 'header does not match the %s schema' % kind)
             return s
-        s.good_bytes = len(head_line.encode())
-        for i, line in enumerate(fh, start=1):
-            if not line.endswith('\n'):
+        s.good_bytes = len(head_line)
+        for i, bline in enumerate(it, start=1):
+            if bline is None:
+                s.bad_row = (i, TOO_LONG)
+                break
+            if not bline.endswith(b'\n'):
                 s.bad_row = (i, 'last line has no newline (write cut off)')
                 break
+            line = _text(bline)
             raw = next(csv.reader([line]), None)
             if raw is None or len(raw) != n:
                 s.bad_row = (i, 'expected %d columns, got %d'
@@ -424,7 +471,7 @@ def scan_stream(path, kind):
                 if act in s.act:
                     s.act[act] += 1
             s.rows += 1
-            s.good_bytes += len(line.encode())
+            s.good_bytes += len(bline)
     return s
 
 
@@ -436,12 +483,13 @@ def _truncate_to(src, dst, kind, safe_ev):
     written. The source is opened read-only and never touched."""
     ix = IDX[kind]
     kept = 0
-    with open(src, newline='') as fi, open(dst, 'w', newline='') as fo:
-        fo.write(fi.readline())                       # header
-        for line in fi:
-            if not line.endswith('\n'):
+    with open(src, 'rb') as fi, open(dst, 'wb') as fo:
+        it = _lines(fi)
+        fo.write(next(it, b'') or b'')                # header
+        for bline in it:
+            if bline is None or not bline.endswith(b'\n'):
                 break
-            raw = next(csv.reader([line]), None)
+            raw = next(csv.reader([_text(bline)]), None)
             if raw is None or len(raw) != len(AD.HEADERS[kind]):
                 break
             try:
@@ -449,7 +497,7 @@ def _truncate_to(src, dst, kind, safe_ev):
                     break
             except ValueError:
                 break
-            fo.write(line)
+            fo.write(bline)
             kept += 1
     return kept
 
@@ -466,9 +514,14 @@ def probe_stream(path, kind):
     try:
         size = os.path.getsize(path)
         with open(path, 'rb') as fh:
-            head = fh.readline()
-            if not head:
+            first = fh.read(MAX_LINE_BYTES)           # bounded, never readline
+            if not first:
                 return dict(size=size, ok=False, why='file is empty')
+            nl = first.find(b'\n')
+            if nl < 0:
+                return dict(size=size, ok=False, rows_hint=0,
+                            why='no header line: ' + TOO_LONG)
+            head = first[:nl + 1]
             try:
                 cols = next(csv.reader([head.decode().rstrip('\r\n')]), None)
             except UnicodeDecodeError:
@@ -515,8 +568,11 @@ def _read_error(exc):
     Windows disk errors as errno 22 'Invalid argument'; the Windows code
     is the informative part."""
     we = getattr(exc, 'winerror', None)
-    return 'cannot be read (%s%s)' % ('Windows error %s: ' % we if we else '',
-                                      getattr(exc, 'strerror', None) or exc)
+    code = ('Windows error %s' % we) if we else ('errno %s' % exc.errno
+                                                 if getattr(exc, 'errno', None)
+                                                 else 'error')
+    return 'cannot be read (%s: %s)' % (code, getattr(exc, 'strerror', None)
+                                        or exc)
 
 
 def _unreadable_result(res, bad):

@@ -21,8 +21,8 @@ cbd25e6df806db216cf480a3445f1628fc56dff95ea0d903dc197b91ac7b4791  MROF_YT_OF01_7
 241034220e70c661c8c5463c425c0c1b06a7b91181b93c39ce55f160b6250fd8  mrofyt_wave2.py (MROF-YT-WAVE2-1.0; supersedes 18ba3b83… — an unreadable or empty capture folder STOPS the pass with no report instead of printing zero fires on zero sessions, Amendment 11. The registration as running code: W2-A1, W2-A4r, W2-A4f, W2-A4-OPEN, W2-A4r-z15, W2-A4r-HC, arm B, arm C placebo; subclass of the pilot runner via the runner's observation hooks; wave one untouched; §4.3 CAUSAL_SWING declared not-in-this-version)
 50158d03c0cbde186b2e1fd31c16fc2b8776d29bce6e3374c29ff1bc4324804f  tests_mrofyt_wave2.py (29 tests; supersedes fbeb2623… — W8)
 6b0eb7ea4a9bc5deb48eec7e461b03c36d509defeb9a28023b104b489f929538  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md (supersedes 4624b199… — Amendment 2: the validation blind; Amendment 1 supersedes 8ab588fa…)
-771f15a7450d9392fec2f701fafb2885f7d196713bdd1f0d4e2d1d2c93e065c0  mrofyt_recover.py (MROF-YT-RECOVER-1.4; supersedes bc2d60d5… — one unreadable file (the first real 1.3 dry run died on OSError 22) is named with its Windows error and set aside as SKIPPED_UNREADABLE_FILE, never repaired, and the pass carries on; 1.3 (bc2d60d5…) supersedes dcd01f4a… — a repair must not fill the drive the recorder writes to: the dry run states what --repair would write against the free space, a pass that would leave under 40 GB free is refused before writing anything, and each run is re-checked; Amendment 14. 1.2 (dcd01f4a…) supersedes 0e73abfb… — asks Windows directly whether the recorder still holds a run (file-sharing check), the only sign that holds over a weekend; anything held or unanswerable is refused; Amendment 11. 1.1 (0e73abfb…): indirect live-run signs; 1.0 (a8b637a5…): manifest reconstruction, instant --dry-run)
-2bca3a162e2393c37502c07233143f332f4b11e5e6c55bc889a0503f9be6acee  tests_mrofyt_recover.py (36 tests; supersedes 7960bb10… — V11 the unreadable file; earlier 04f7d842… → V10–V10c the free-space guard, each test stating the drive it simulates; earlier ed72a3fd… → V9–V9g: the direct check with an injected answer, the closing-window veto, the recorder-source premise, the atomic manifest write)
+3bed26e09a3f702b9d4340ce4e0e01872afea4b7a19782a5a32c4b7a30afc44e  mrofyt_recover.py (MROF-YT-RECOVER-1.4; supersedes bc2d60d5… — every read is memory-bounded (a zero-filled file with no line break, what a drive drop leaves, no longer pulls its whole size into memory: MAX_LINE_BYTES), and one unreadable file (the first real 1.3 dry run died on OSError 22) is named with its Windows error and set aside as SKIPPED_UNREADABLE_FILE, never repaired, and the pass carries on; 1.3 (bc2d60d5…) supersedes dcd01f4a… — a repair must not fill the drive the recorder writes to: the dry run states what --repair would write against the free space, a pass that would leave under 40 GB free is refused before writing anything, and each run is re-checked; Amendment 14. 1.2 (dcd01f4a…) supersedes 0e73abfb… — asks Windows directly whether the recorder still holds a run (file-sharing check), the only sign that holds over a weekend; anything held or unanswerable is refused; Amendment 11. 1.1 (0e73abfb…): indirect live-run signs; 1.0 (a8b637a5…): manifest reconstruction, instant --dry-run)
+1a91fed7e64df6542cd90eadfac5f623ef03ae3a2b2e05efb53577fbe114cc13  tests_mrofyt_recover.py (38 tests; supersedes 7960bb10… — V11 the unreadable file, V12–V12b bounded reads of zero-filled files (peak memory asserted); earlier 04f7d842… → V10–V10c the free-space guard, each test stating the drive it simulates; earlier ed72a3fd… → V9–V9g: the direct check with an injected answer, the closing-window veto, the recorder-source premise, the atomic manifest write)
 f61a1f23fe31a479d04d4fd98cd59c66a9b018e0ef6c5f52459e2bea4094f84c  MROF_ACTUAL_STATE_INVENTORY.md (supersedes 50d0ddc7… — row 7 records the W2-A4f wiring, row 20 the wave-two module)
 ```
 
@@ -79,13 +79,13 @@ Delivered package (111 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-2fa33aede22cdec1e79b6142042ec30e01056a0065ea9b6c89951dd4138c4650  MROF_V1_Engine_v01_6_7.zip (supersedes f930879f… — recover 1.4 unreadable-file guard; earlier f930879f… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+694c6367f012d256d5c2ce7dc2fecb51c938a4407fd2d69a918a0566e5f46216  MROF_V1_Engine_v01_6_7.zip (supersedes 2fa33aed… — recover 1.4 bounded reads; earlier f930879f… — recover 1.4 unreadable-file guard; earlier f930879f… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 495/495 + 42/42, identical to the repo
+# run from inside the unzipped package: 497/497 + 42/42, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -120,11 +120,11 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| `tests_mrofyt_recover.py` | 36/36 |
+| `tests_mrofyt_recover.py` | 38/38 |
 | `tests_mrofyt_wave2.py` | 29/29 |
-| **wave-one/two total** | **495/495** |
+| **wave-one/two total** | **497/497** |
 | `../godseye/tests_godseye.py` | 42/42 |
-| **package total** | **537/537** |
+| **package total** | **539/539** |
 
 ## Runnable research commands
 
@@ -631,3 +631,14 @@ detector hash so registering wave two provably changed nothing.
     run aside as `SKIPPED_UNREADABLE_FILE` (never repaired, nothing
     written for it), and carries on; a vanished drive still stops the
     pass. The dashboard's own tail reader already survived this. `V11`.
+
+    *Second look, the same day.* Reading the same failure again: a file
+    cut off when a drive drops is often zero-filled, with no line break
+    at all, and every reader here iterated lines -- `readline()` on such
+    a file pulls the whole multi-GB file into memory before it can fail
+    (on the recording laptop). Now every read is bounded: the header is
+    read from the first 1 MB, rows come from a chunked reader that stops
+    at any line over 1 MB and names the stretch, and the repair copy
+    uses the same reader. `V12` asserts peak memory under 8 MB on a
+    40 MB zero-filled file; `V12b` that a repair keeps every good row
+    before such a stretch and writes no zero byte.

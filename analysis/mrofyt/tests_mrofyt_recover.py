@@ -636,6 +636,60 @@ t('V11: a file the drive will not read (Python says errno 22) does not '
   'Windows error 1392' in RC.text_summary(dry17) and
   dry17['repair_write_plan']['bytes_to_write'] == 0)
 
+# ---------------------------------------------------------------------
+# V12: a zero-filled file (what a drive drop leaves) is read in bounded
+# memory, in the dry run, the scan and the repair copy
+# ---------------------------------------------------------------------
+import tracemalloc                                          # noqa: E402
+d18 = os.path.join(WORK, 'zeros')
+mp18 = SY.synth_run(d18, n_depth=3000, cid='zerocid', session='20260916')
+man18 = orphan(d18, mp18, rename_partial=AD.STREAMS)
+zq = os.path.join(d18, man18['quotes']['file'] + '.partial')   # header + rows, then 40 MB of zeros
+with open(zq, 'ab') as fh:
+    for _ in range(40):
+        fh.write(b'\x00' * (1 << 20))
+zt = os.path.join(d18, man18['trades']['file'] + '.partial')   # zeros only, no header at all
+with open(zt, 'wb') as fh:
+    for _ in range(40):
+        fh.write(b'\x00' * (1 << 20))
+age(d18)
+tracemalloc.start()
+sc18 = RC.scan_stream(zq, 'quotes')
+pr18 = RC.probe_stream(zt, 'trades')
+_, peak18 = tracemalloc.get_traced_memory()
+tracemalloc.stop()
+dry18 = RC.recover_directory(d18, dry_run=True, probe=FREE)['results'][0]
+rr18 = RC.recover_directory(d18, repair=True, probe=FREE)['results'][0]
+t('V12: a file that turned to zeros when the drive dropped -- no line '
+  'break for 40 MB -- is read in bounded memory (peak under 8 MB, not the '
+  'file\'s size): the scan keeps the good rows and names the stretch as '
+  'not-a-row, a header-less one has no usable rows, the dry run and the '
+  'repair both say so, and nothing is written',
+  sc18.rows > 0 and sc18.bad_row is not None and 'not a stream row' in sc18.bad_row[1]
+  and pr18['ok'] is False and pr18.get('rows_hint') == 0 and
+  peak18 < 8 * (1 << 20) and
+  dry18['status'] == 'SKIPPED_NO_USABLE_ROWS' and 'trades' in dry18['empty_streams'] and
+  rr18['status'] == 'SKIPPED_NO_USABLE_ROWS' and
+  not any('RECOVERED' in x for x in os.listdir(d18)))
+
+d19 = os.path.join(WORK, 'zerotail')
+mp19 = SY.synth_run(d19, n_depth=3000, cid='ztailcid', session='20260917')
+man19 = orphan(d19, mp19, rename_partial=AD.STREAMS)
+zd = os.path.join(d19, man19['depth']['file'] + '.partial')
+good19 = open(zd, 'rb').read()
+with open(zd, 'ab') as fh:
+    fh.write(b'\x00' * (3 << 20))                         # rows, then 3 MB of zeros
+age(d19)
+rr19 = RC.recover_directory(d19, repair=True, probe=FREE)['results'][0]
+rec19 = [x for x in os.listdir(d19) if x.endswith('_RECOVERED.csv') and 'depth' in x][0]
+t('V12b: rows followed by a zero-filled stretch: --repair keeps every '
+  'good row, cuts at the stretch, and the recovered copy holds no zero '
+  'byte; the original is untouched',
+  rr19['status'] == 'RECONSTRUCTED' and
+  b'\x00' not in open(os.path.join(d19, rec19), 'rb').read() and
+  open(zd, 'rb').read()[:len(good19)] == good19 and
+  os.path.getsize(os.path.join(d19, rec19)) <= len(good19))
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))
