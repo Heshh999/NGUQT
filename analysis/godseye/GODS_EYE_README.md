@@ -422,9 +422,9 @@ field as `—`, never as zero.
 
 | check | result |
 | --- | --- |
-| `tests_godseye.py` | **42/42** |
-| the 14 package suites in `analysis/mrofyt` | **494/494** (pilot 45 with `P13`, recovery 35 with `V10`–`V10c`) |
-| package total | **536/536** |
+| `tests_godseye.py` | **45/45** |
+| the 14 package suites in `analysis/mrofyt` | **497/497** (pilot 45 with `P13`, recovery 38 with `V10`–`V12b`) |
+| package total | **542/542** |
 | real-scale replay split | synthetic 63,000 windows / 100 MB: one-time split ~20 s, 284 MB peak; routine export 0.06 s, 5.7 MB; server ~30 MB |
 | theatre scripts vs frozen code | 15 demos: every flow demo fires in the frozen detector in the named direction, every counter-example does not and fails exactly one clause, both candle arms fire in the frozen arm functions (`G11`–`G11c`); `resolve()` agrees with `mrofyt_wave2` on 6,000 random inputs for all six derived families (`G11d`) |
 | registry vs frozen detectors | 0 mismatches on 20,000 random inputs per family (`G1b`) |
@@ -461,7 +461,12 @@ reconstructed-manifest notice is complete, labelled as such · `G13`
 replay windows split once, routine exports reuse it · `G13a` rebuild on a
 new windows file or ledger · `G13b` server holds ≤ 4 pieces and re-reads a
 changed ledger · `G13c` the launcher lets the server open the browser ·
-`G13d` the server's refresher runs one export as a separate process.
+`G13d` the server's refresher runs one export as a separate process ·
+`G8f` replay evidence matches the approach id, not only the time · `G14`
+a run with a file the drive cannot read (recover 1.4
+`SKIPPED_UNREADABLE_FILE`) is shown with the file name and the Windows
+error, alerted, and never touched · `G14b` shared-gap alerts capped at the
+five largest plus one summary line.
 
 ---
 
@@ -497,8 +502,12 @@ changed ledger · `G13c` the launcher lets the server open the browser ·
   foot of the page for the error.
 * **Alerts** are ranked: `crit` for an instrument not recording while the
   market is scheduled open or an unreadable folder; `warn` for stale rows,
-  low disk (under about three session-days), audit failures, orphaned runs
-  and shared gaps.
+  low disk (under about three session-days), audit failures, orphaned runs,
+  a file the drive refuses to read (the recovery tool's
+  `SKIPPED_UNREADABLE_FILE`: check the drive or cable; the run is left
+  alone) and shared gaps — the five largest, then one line for the rest.
+  The **Runs without a manifest** table carries the same verdict per run,
+  with the file name and the Windows error in its note column.
 * **A session row** (health or provenance) opens the inspector: click the
   session id. **A run** in the inspector opens its manifest facts,
   recorder counters, audit verdict and provenance.

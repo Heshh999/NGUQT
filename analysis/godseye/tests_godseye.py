@@ -781,6 +781,63 @@ t('G13d: while the dashboard is open the server keeps it fresh -- one '
   '--refresh 300' in _bat and
   '--refresh 300' in open(os.path.join(HERE, 'pinokio', 'start.js')).read())
 
+# ---------------------------------------------------------------------
+# G14: a file the drive refuses to read (recover 1.4) reaches the page
+# ---------------------------------------------------------------------
+# the operator's 9/22 drive drop left two depth files Windows will not
+# read (error 1392); recover 1.4 sets such a run aside as
+# SKIPPED_UNREADABLE_FILE. The dashboard must carry that verdict, name
+# the file, and never touch it
+_orph = [r for r in snap['health']['runs_without_manifest'] if not r['live']]
+_victim = next(r for r in _orph if r['instrument'] == 'NQ')
+_vpath = _victim['paths']['depth']
+_probe_orig = GE.RC.probe_stream
+
+
+def _probe_unreadable(path, kind):
+    if os.path.abspath(path) == os.path.abspath(_vpath):
+        return dict(size=os.path.getsize(path), ok=False, unreadable=True,
+                    why='cannot be read (Windows error 1392: The file or '
+                        'directory is corrupted and unreadable)')
+    return _probe_orig(path, kind)
+
+
+_cap14 = tree_hash(cfg['capture_dir'])
+GE.RC.probe_stream = _probe_unreadable
+try:
+    st14 = GE.write_snapshot(cfg)
+finally:
+    GE.RC.probe_stream = _probe_orig
+s14 = json.load(open(os.path.join(cfg['out_dir'], 'godseye_snapshot.json')))
+_r14 = {r['run_id']: r for r in s14['health']['runs_without_manifest']}
+_hit = _r14[_victim['run_id']]
+_other = [r for k, r in _r14.items() if k != _victim['run_id'] and not r['live']]
+_ses14 = next(s for s in s14['sessions'] if s['session'] == _victim['session'])
+_run14 = next(r for r in _ses14['instruments']['NQ']['runs']
+              if r['run_id'] == _victim['run_id'])
+_js14 = open(os.path.join(HERE, 'static', 'app.js')).read()
+t('G14: a run with a file the drive cannot read is shown as '
+  'SKIPPED_UNREADABLE_FILE with the file name and the Windows error, the '
+  'other orphan keeps its own verdict, the session timeline carries it, '
+  'the page raises an alert for it, and the capture folder is untouched',
+  st14['ok'] and _hit['status'] == 'SKIPPED_UNREADABLE_FILE' and
+  _hit['unreadable'] == {os.path.basename(_vpath):
+                         'cannot be read (Windows error 1392: The file or '
+                         'directory is corrupted and unreadable)'} and
+  _hit.get('streams') == {} and
+  all(r['status'] == 'WOULD_RECONSTRUCT' and not r['unreadable']
+      for r in _other) and
+  _run14['recovery_status'] == 'SKIPPED_UNREADABLE_FILE' and
+  _run14['unreadable'] == _hit['unreadable'] and
+  GP.scan_for_event_level({k: v for k, v in s14.items() if k != 'exposed'}) == [] and
+  'r.unreadable' in _js14 and 'check the drive' in _js14 and
+  tree_hash(cfg['capture_dir']) == _cap14)
+GE.write_snapshot(cfg)                             # restore a clean snapshot
+
+t('G14b: shared-gap alerts are capped at the five largest with one summary '
+  'line, so a long history cannot bury the alerts that matter',
+  'gaps.slice(0, 5)' in _js14 and 'and ${gaps.length - 5} more' in _js14)
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

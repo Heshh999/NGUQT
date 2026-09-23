@@ -219,11 +219,20 @@ function alerts(snap) {
   if (a.ok === null || a.ok === undefined) out.push(['info', 'no audit report loaded']);
   const rv = snap.recovery || {};
   if (rv.orphan_runs) out.push(['warn', `${rv.orphan_runs} orphaned run(s) without a manifest (recover on a weekend)`]);
+  // a file the drive refuses to read (recover 1.4 SKIPPED_UNREADABLE_FILE):
+  // the recorder is not at fault, the drive or cable may be; nothing here
+  // touches the file
+  const unread = (hl.runs_without_manifest || []).filter(r => r.unreadable && Object.keys(r.unreadable).length);
+  for (const r of unread) out.push(['warn', `${r.instrument || '?'} ${r.session || ''} run ${r.run_id}: ${Object.entries(r.unreadable).map(([f, w]) => `${f} ${w}`).join('; ')} — check the drive / cable; the recovery tool skips this run`]);
   const rep = (a.repair_evidence || {}).repaired || {};
   if (rep.verdict === 'NOT_EXERCISED') out.push(['info', 'disconnect repair (1.2.2) not yet exercised: no repaired-build run has had a feed disconnect']);
   if (rep.verdict === 'FAILED') out.push(['crit', 'disconnect repair FAILED on a repaired build']);
-  for (const s of (snap.sessions || [])) if (s.shared_gap_s > 300)
+  // shared gaps: the five largest, then one line for the rest, so a long
+  // history of overnight restarts cannot bury the alerts that matter
+  const gaps = (snap.sessions || []).filter(s => s.shared_gap_s > 300).sort((x, y) => y.shared_gap_s - x.shared_gap_s);
+  for (const s of gaps.slice(0, 5))
     out.push(['warn', `${s.session}: ${ago(s.shared_gap_s)} missing in BOTH instruments (pair overlap ${pct(s.pair_overlap_frac)} cannot see it)`]);
+  if (gaps.length > 5) out.push(['info', `…and ${gaps.length - 5} more session(s) with a shared gap over 5 min (see the Provenance timeline)`]);
   for (const [k, r] of Object.entries(snap.reports || {})) if (!r.ok) out.push(['info', `${k} report: ${r.error}`]);
   return out;
 }
@@ -306,8 +315,10 @@ function viewHealth(snap) {
         ['orphaned (recoverable)', n0(rv.orphan_runs)], ['still being written', n0(rv.live_runs)], ['decided by', (rv.liveness_by || []).join(', ') || '—']]),
     (hl.runs_without_manifest || []).length ? table([
       { label: 'instrument', get: r => chip(r.instrument || '?') }, { label: 'session', get: r => r.session }, { label: 'run', get: r => h('code', null, r.run_id) },
-      { label: 'state', get: r => r.live ? pill('LIVE', 'held: ' + r.live) : chip('UNKNOWN', r.status || '—') },
-      { label: 'size', num: true, get: r => bytes(r.bytes_total) }, { label: 'newest row', get: r => fmtET(r.newest_row_utc) }],
+      { label: 'state', get: r => r.live ? pill('LIVE', 'held: ' + r.live) : chip(r.status === 'SKIPPED_UNREADABLE_FILE' ? 'INVALID_OR_MISSING_DATA' : 'UNKNOWN', r.status || '—') },
+      { label: 'size', num: true, get: r => bytes(r.bytes_total) }, { label: 'newest row', get: r => fmtET(r.newest_row_utc) },
+      { label: 'note', get: r => r.unreadable && Object.keys(r.unreadable).length ? h('small', { class: 'unknown' }, Object.entries(r.unreadable).map(([f, w]) => `${f}: ${w}`).join('; '))
+                                : r.damaged_tail ? h('small', { class: 'dim' }, 'cut-off tail (recoverable)') : '' }],
       hl.runs_without_manifest) : h('div', { class: 'dim' }, 'none'),
     h('small', null, 'capture and recovery actions stay outside this dashboard (mrofyt_recover.py on a weekend)')));
   return cards;
@@ -601,18 +612,22 @@ function drawCandles(cv, b, tc) {
   // decision window and display window
   ctx.fillStyle = 'rgba(111,177,255,0.10)'; ctx.fillRect(X(b.window.display_from), 0, X(b.window.display_to) - X(b.window.display_from), H);
   ctx.fillStyle = 'rgba(111,177,255,0.25)'; ctx.fillRect(X(b.window.t_start), 0, X(b.window.t_end) - X(b.window.t_start), H);
-  // levels
-  // labels are pushed apart when two levels sit within a text height of each other; the lines stay exactly at the level
-  let lastLabelY = -100;
-  for (const [id, v] of lv.slice().sort((a, b) => Y(a[1]) - Y(b[1]))) {
-    ctx.strokeStyle = '#e0b341'; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(40, Y(v)); ctx.lineTo(W - 10, Y(v)); ctx.stroke(); ctx.setLineDash([]);
-    const ly = Math.max(Y(v) - 2, lastLabelY + 12); lastLabelY = ly;
-    ctx.fillStyle = '#e0b341'; ctx.fillText(id + ' ' + fpx(v), 44, ly);
-  }
+  // level lines (under the candles, exactly at the level)
+  const lvs = lv.slice().sort((a, b) => Y(a[1]) - Y(b[1]));
+  for (const [, v] of lvs) { ctx.strokeStyle = '#e0b341'; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(40, Y(v)); ctx.lineTo(W - 10, Y(v)); ctx.stroke(); ctx.setLineDash([]); }
   // candles
   const cw = Math.max(2, (W - 50) / cs.length * 0.7);
   for (const c of cs) { const x = X(c.t_open + 30); const up = c.c >= c.o; ctx.strokeStyle = ctx.fillStyle = up ? '#3fbf7f' : '#e06c5d';
     ctx.beginPath(); ctx.moveTo(x, Y(c.h)); ctx.lineTo(x, Y(c.l)); ctx.stroke(); ctx.fillRect(x - cw / 2, Y(Math.max(c.o, c.c)), cw, Math.max(1, Math.abs(Y(c.o) - Y(c.c)))); }
+  // level labels on top of the candles, on a dark box so a candle body cannot swallow the text;
+  // pushed apart when two levels sit within a text height of each other
+  let lastLabelY = -100;
+  for (const [id, v] of lvs) {
+    const s = id + ' ' + fpx(v); const ly = Math.max(Y(v) - 3, lastLabelY + 13); lastLabelY = ly;
+    const tw = ctx.measureText(s).width;
+    ctx.fillStyle = 'rgba(15,18,22,0.85)'; ctx.fillRect(42, ly - 10, tw + 4, 13);
+    ctx.fillStyle = '#e0b341'; ctx.fillText(s, 44, ly);
+  }
   // gaps
   ctx.fillStyle = 'rgba(224,108,93,0.25)'; for (const [a, z] of b.gaps) ctx.fillRect(X(a), 0, Math.max(X(z) - X(a), 2), H);
   // fires on this session near the window

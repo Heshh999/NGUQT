@@ -331,6 +331,10 @@ def collect_capture(capture_dir, policy, now, meter):
                                     why=v.get('why'))
                             for k, v in (pr.get('streams') or {}).items()},
                    damaged_tail=pr.get('damaged_tail'),
+                   # recover 1.4: a file the drive refuses to read, keyed
+                   # by file name with the Windows/errno text; the run is
+                   # SKIPPED_UNREADABLE_FILE and never repaired
+                   unreadable=pr.get('unreadable'),
                    paths={k: p for k, p in r['streams'].items()})
         if r.get('liveness_by'):
             live_by.add(r['liveness_by'])
@@ -643,6 +647,7 @@ def build_sessions(cap, reports, policy, now):
             newest_row_utc=o.get('newest_row_utc'),
             bytes_total=o.get('bytes_total'), partial=o.get('partial'),
             missing_streams=o.get('missing'),
+            unreadable=o.get('unreadable'),
             audit=dict(ok=None, note='no manifest: not auditable'),
             ingest=dict(skipped=True, note='no manifest: not ingestible')))
     overlaps = (audit.get('info') or {}).get('overlaps') or {}
