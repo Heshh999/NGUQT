@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# MROF-YT-RECOVER-1.3 suite. Manifest reconstruction for runs whose
+# MROF-YT-RECOVER-1.4 suite. Manifest reconstruction for runs whose
 # recorder died before finalizing. Exercised on synthetic recorder-format
 # runs (mles_v12_synth) damaged in the specific ways a power loss causes.
 # Synthetic events verify CODE BEHAVIOR only, never market evidence.
@@ -590,6 +590,51 @@ t('V10c: with exactly enough room the run is reconstructed; a direct '
   r16['status'] == 'SKIPPED_NO_SPACE' and
   sorted(os.listdir(d16)) == before16 and
   RC._free_bytes(WORK) == shutil.disk_usage(WORK).free)
+
+# ---------------------------------------------------------------------
+# V11: one file the drive will not read must not stop the pass
+# ---------------------------------------------------------------------
+d17 = os.path.join(WORK, 'unreadable')
+mp17a = SY.synth_run(d17, n_depth=3000, cid='badfile', session='20260917')
+mp17b = SY.synth_run(d17, n_depth=3000, cid='goodfile', session='20260918')
+man17a = orphan(d17, mp17a, rename_partial=AD.STREAMS)
+orphan(d17, mp17b)
+bad17 = os.path.join(d17, man17a['depth']['file'] + '.partial')
+_real_open = open
+
+
+def _open_like_a_dropped_drive(p, *a, **kw):
+    if os.path.abspath(str(p)) == os.path.abspath(bad17):
+        e = OSError(22, 'Invalid argument')
+        e.winerror = 1392                      # ERROR_FILE_CORRUPT
+        raise e
+    return _real_open(p, *a, **kw)
+
+
+RC._free_bytes = lambda d: 10 ** 13                   # a roomy drive again
+RC.open = _open_like_a_dropped_drive
+try:
+    dry17 = RC.recover_directory(d17, dry_run=True, probe=FREE)
+    before17 = sorted(os.listdir(d17))
+    real17 = RC.recover_directory(d17, repair=True, probe=FREE)
+finally:
+    del RC.open
+by17 = {r['run_id']: r for r in dry17['results']}
+byr17 = {r['run_id']: r for r in real17['results']}
+t('V11: a file the drive will not read (Python says errno 22) does not '
+  'stop the pass: the dry run names the file with its Windows error and '
+  'sets that run aside as SKIPPED_UNREADABLE_FILE, the other run is '
+  'still reconstructed, and nothing is written for the unreadable one',
+  by17['badfile-R001']['status'] == 'SKIPPED_UNREADABLE_FILE' and
+  'Windows error 1392' in list(by17['badfile-R001']['unreadable'].values())[0]
+  and os.path.basename(bad17) in by17['badfile-R001']['unreadable'] and
+  by17['goodfile-R001']['status'] == 'WOULD_RECONSTRUCT' and
+  byr17['badfile-R001']['status'] == 'SKIPPED_UNREADABLE_FILE' and
+  byr17['goodfile-R001']['status'] == 'RECONSTRUCTED' and
+  not any(x.startswith(man17a['depth']['file'][:20]) and 'RECOVERED' in x
+          for x in os.listdir(d17)) and
+  'Windows error 1392' in RC.text_summary(dry17) and
+  dry17['repair_write_plan']['bytes_to_write'] == 0)
 
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)

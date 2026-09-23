@@ -50,6 +50,12 @@
 #     writes to. 1.3 states the size against the free space in the dry
 #     run, refuses a pass that would leave less than RESERVE_BYTES free
 #     before writing anything, and re-checks per run.
+#   * ONE UNREADABLE FILE MUST NOT STOP THE PASS. The first real dry run
+#     of 1.3 died with OSError 22 on a single leftover file -- one cut
+#     off when the drive dropped, most likely; Python reports many
+#     Windows disk errors that way. 1.4 names the file with its Windows
+#     error, sets that run aside as SKIPPED_UNREADABLE_FILE (never
+#     repaired), and carries on; a drive that vanished still stops.
 #
 # What still carries real assurance for a recovered run: cross-run
 # instance sequence contiguity (does its seq range fit its siblings?),
@@ -57,7 +63,7 @@
 #
 # THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
 # ======================================================================
-"""mrofyt_recover.py - MROF-YT-RECOVER-1.3
+"""mrofyt_recover.py - MROF-YT-RECOVER-1.4
 
     python3 mrofyt_recover.py "<capture folder>" --dry-run   # list, instant
     python3 mrofyt_recover.py "<capture folder>"             # rebuild clean orphans
@@ -84,7 +90,7 @@ import time
 import mles_v12_adapter as AD
 import mrofyt_runner as RUN                 # session_id: the CME clock
 
-RECOVER_VERSION = 'MROF-YT-RECOVER-1.3'
+RECOVER_VERSION = 'MROF-YT-RECOVER-1.4'
 # Free space a write must leave on the capture drive -- it is the drive
 # the recorder writes to, and on the Sunday after a weekend repair it
 # starts again: about three session-days at the ~13 GB per session-day
@@ -456,24 +462,31 @@ def probe_stream(path, kind):
     This is all a dry run needs. Reconstruction itself still does the
     full scan_stream pass, because sequence bounds and row counts can
     only come from every row."""
-    size = os.path.getsize(path)
     names = AD.HEADERS[kind]
-    with open(path, 'rb') as fh:
-        head = fh.readline()
-        if not head:
-            return dict(size=size, ok=False, why='file is empty')
-        try:
-            cols = next(csv.reader([head.decode().rstrip('\r\n')]), None)
-        except UnicodeDecodeError:
-            return dict(size=size, ok=False, why='header is not text')
-        if cols != names:
-            return dict(size=size, ok=False,
-                        why='header does not match the %s schema' % kind)
-        if size <= len(head):
-            return dict(size=size, ok=False, rows_hint=0,
-                        why='header only, no rows')
-        fh.seek(max(len(head), size - 65536))
-        tail = fh.read()
+    try:
+        size = os.path.getsize(path)
+        with open(path, 'rb') as fh:
+            head = fh.readline()
+            if not head:
+                return dict(size=size, ok=False, why='file is empty')
+            try:
+                cols = next(csv.reader([head.decode().rstrip('\r\n')]), None)
+            except UnicodeDecodeError:
+                return dict(size=size, ok=False, why='header is not text')
+            if cols != names:
+                return dict(size=size, ok=False,
+                            why='header does not match the %s schema' % kind)
+            if size <= len(head):
+                return dict(size=size, ok=False, rows_hint=0,
+                            why='header only, no rows')
+            fh.seek(max(len(head), size - 65536))
+            tail = fh.read()
+    except OSError as exc:
+        # the drive answers but THIS file cannot be read -- typically one
+        # cut off when the drive dropped. Named, never repaired, never a
+        # crash of the whole pass (a vanished drive is caught in main)
+        return dict(size=_size_or_none(path), ok=False, unreadable=True,
+                    why=_read_error(exc))
     if not tail.endswith(b'\n'):
         return dict(size=size, ok=False,
                     why='last line has no newline (write cut off)')
@@ -488,6 +501,31 @@ def probe_stream(path, kind):
                         % (0 if raw is None else len(raw), len(names)))
     return dict(size=size, ok=True,
                 last_event_seq=int(raw[IDX[kind]['eventSeq']]))
+
+
+def _size_or_none(path):
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return None
+
+
+def _read_error(exc):
+    """'cannot be read (Windows error 1392: ...)'. Python reports many
+    Windows disk errors as errno 22 'Invalid argument'; the Windows code
+    is the informative part."""
+    we = getattr(exc, 'winerror', None)
+    return 'cannot be read (%s%s)' % ('Windows error %s: ' % we if we else '',
+                                      getattr(exc, 'strerror', None) or exc)
+
+
+def _unreadable_result(res, bad):
+    res.update(status='SKIPPED_UNREADABLE_FILE', unreadable=bad,
+               notes=['a file of this run cannot be read from the drive '
+                      '(often one cut off when the drive disconnected); '
+                      'the run is left exactly as it is and nothing is '
+                      'written for it'])
+    return res
 
 
 def probe_run(run):
@@ -506,8 +544,12 @@ def probe_run(run):
                           'would only move the failure downstream'])
         return res
     probes = {k: probe_stream(p, k) for k, p in run['streams'].items()}
+    res['bytes_total'] = sum(v['size'] or 0 for v in probes.values())
+    unread = {os.path.basename(run['streams'][k]): v['why']
+              for k, v in probes.items() if v.get('unreadable')}
+    if unread:
+        return _unreadable_result(res, unread)
     bad = {k: v['why'] for k, v in probes.items() if not v['ok']}
-    res['bytes_total'] = sum(v['size'] for v in probes.values())
     res['streams'] = {k: dict(bytes=v['size'], ends_cleanly=v['ok'],
                               why=v.get('why'))
                       for k, v in sorted(probes.items())}
@@ -595,7 +637,14 @@ def reconstruct(directory, run, repair=False, dry_run=False, now=None,
                           'would only move the failure downstream'])
         return res
 
-    scans = {k: scan_stream(p, k) for k, p in run['streams'].items()}
+    scans = {}
+    for k, p in run['streams'].items():
+        try:
+            scans[k] = scan_stream(p, k)
+        except OSError as exc:
+            os.listdir(directory)       # the drive itself gone: raise to main
+            return _unreadable_result(res, {os.path.basename(p):
+                                            _read_error(exc)})
     empty = [k for k, s in scans.items() if not s.rows]
     if empty:
         res.update(status='SKIPPED_NO_USABLE_ROWS', empty_streams=empty)
@@ -838,6 +887,8 @@ def text_summary(rep):
             for d, why in sorted((r.get('damaged') or {}).items()):
                 L.append('      %s damaged at row %s: %s'
                          % (d, why[0], why[1]))
+            for f, why in sorted((r.get('unreadable') or {}).items()):
+                L.append('      %s %s' % (f, why))
     if any(r['status'] == 'RECONSTRUCTED' for r in rep['results']):
         L.append('')
         L.append('Reconstructed manifests are flagged "reconstructed": '
