@@ -16,13 +16,13 @@ b6bd0b05f48a6e26871df69c97fde97112a19d3f4b17da7edf280caa5bdc354d  mrofyt_exits_v
 0df5357cce0d0c77c6f38759c757086a067ea90aef8efc1d373a766bbc8fe7f9  tests_mrofyt_v01_7.py
 cbd25e6df806db216cf480a3445f1628fc56dff95ea0d903dc197b91ac7b4791  MROF_YT_OF01_7_EXIT_FREEZE.md
 51c2996ffcd15faeca7670864cecb51de26d9741c2903abcd2fe572af43ade80  mrofyt_pilot.py (MROF-YT-PILOT-1.2; supersedes b955ea9d… — an unreadable or empty capture STOPS the pilot before anything is written, so no report and no exposure label from a pass that did not complete; io-error skip reason reported; Amendment 11. Earlier 3bd2b115…: validation blind (BLIND_FROM=20260921, markouts withheld, monotone exposure ledger), seeded bootstrap 95% intervals, skip reasons + book-integrity counters; 1.1 a6504d0f…: event de-duplication and the 300/600/1800 s horizons)
-d174d26a87e9e8f19f833843ca75a564fb828f2a927eecf126dff1222a1b73d0  tests_mrofyt_pilot.py (44 tests; supersedes a9bacd64… — P12: a stopped pass leaves the exposure ledger byte-identical)
+3f118e151d4634a177a148df9f26dc45dc5e94037bbe9f39b0796d205a1d4d9e  tests_mrofyt_pilot.py (45 tests; supersedes d174d26a… — P13 the level snapshot is kept only for non-blind windows; earlier a9bacd64… → P12: a stopped pass leaves the exposure ledger byte-identical)
 6af137d68f1feb4f39206056534952712fe9468cc4818f0a409a26cb726692fa  MROF_YT_WAVE2_REGISTRATION.md (DRAFT — pending operator sign-off; supersedes 4e398285… — §11 implementation record and two implementation-precision notes in §4.1/§4.2, no hypothesis parameter changed; earlier: §8.1 interim-monitoring rule; re-hash on sign-off)
 241034220e70c661c8c5463c425c0c1b06a7b91181b93c39ce55f160b6250fd8  mrofyt_wave2.py (MROF-YT-WAVE2-1.0; supersedes 18ba3b83… — an unreadable or empty capture folder STOPS the pass with no report instead of printing zero fires on zero sessions, Amendment 11. The registration as running code: W2-A1, W2-A4r, W2-A4f, W2-A4-OPEN, W2-A4r-z15, W2-A4r-HC, arm B, arm C placebo; subclass of the pilot runner via the runner's observation hooks; wave one untouched; §4.3 CAUSAL_SWING declared not-in-this-version)
 50158d03c0cbde186b2e1fd31c16fc2b8776d29bce6e3374c29ff1bc4324804f  tests_mrofyt_wave2.py (29 tests; supersedes fbeb2623… — W8)
 6b0eb7ea4a9bc5deb48eec7e461b03c36d509defeb9a28023b104b489f929538  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md (supersedes 4624b199… — Amendment 2: the validation blind; Amendment 1 supersedes 8ab588fa…)
-dcd01f4ae6706a00d22cbaa6ef94759dd7f81f280570cb004ab50f737a050124  mrofyt_recover.py (MROF-YT-RECOVER-1.2; supersedes 0e73abfb… — asks Windows directly whether the recorder still holds a run (file-sharing check), the only sign that holds over a weekend; anything held or unanswerable is refused; Amendment 11. 1.1 (0e73abfb…): indirect live-run signs; 1.0 (a8b637a5…): manifest reconstruction, instant --dry-run)
-04f7d8426bd07aeee1ab20831ed35a6c7ad6cec2775bea5a6fca186a89cf9db8  tests_mrofyt_recover.py (32 tests; supersedes ed72a3fd… — V9–V9g: the direct check with an injected answer, the closing-window veto, the recorder-source premise, the atomic manifest write)
+bc2d60d5c0196fe407c4ac44f3293bfcec29155c359cc1cd921a854cb1845798  mrofyt_recover.py (MROF-YT-RECOVER-1.3; supersedes dcd01f4a… — a repair must not fill the drive the recorder writes to: the dry run states what --repair would write against the free space, a pass that would leave under 40 GB free is refused before writing anything, and each run is re-checked; Amendment 14. 1.2 (dcd01f4a…) supersedes 0e73abfb… — asks Windows directly whether the recorder still holds a run (file-sharing check), the only sign that holds over a weekend; anything held or unanswerable is refused; Amendment 11. 1.1 (0e73abfb…): indirect live-run signs; 1.0 (a8b637a5…): manifest reconstruction, instant --dry-run)
+7960bb10253b71b5e9577e5a29bdcf2582a358a37c32a6440e044dcafc16ac5f  tests_mrofyt_recover.py (35 tests; supersedes 04f7d842… — V10–V10c the free-space guard, each test stating the drive it simulates; earlier ed72a3fd… → V9–V9g: the direct check with an injected answer, the closing-window veto, the recorder-source premise, the atomic manifest write)
 f61a1f23fe31a479d04d4fd98cd59c66a9b018e0ef6c5f52459e2bea4094f84c  MROF_ACTUAL_STATE_INVENTORY.md (supersedes 50d0ddc7… — row 7 records the W2-A4f wiring, row 20 the wave-two module)
 ```
 
@@ -32,21 +32,21 @@ God's Eye View — the read-only dashboard (`analysis/godseye/`, Amendment 12):
 e79dd336adfea628846db28c3d4019ea0b4f2fad72aa00d6fac5cc1e3da78bf0  ../godseye/godseye_registry.py (MROF-GODSEYE-REGISTRY-1.0; supersedes f7c4d222… — resolve() judges each wave-two family exactly as mrofyt_wave2 does (G11d), and DEMOS: one scripted mechanism scenario per hypothesis with a counter-example, every one run through the frozen detector by G11–G11c; Amendment 13. Earlier: hypotheses, levels, context and the discrepancy record as the frozen code has them; G1b reproduces every frozen detector from its written conditions)
 71126ff55621e752576179e7e6f937b0410dc76eedb5bde56a4487507ca82aaf  ../godseye/godseye_policy.py (MROF-GODSEYE-POLICY-1.0: EXPOSED / BLIND / PROTECTED_UNLISTED / UNKNOWN, fail closed; event-level field list; strip-and-scan boundary; outcome lock read only)
 bb5ce978700145faebd3d211ebbe4232c55e5081661363eaf9255b9827a3a328  ../godseye/godseye_replay.py (bounded raw reads: byte-offset search, 250,000-row cap that says truncated, book rebuilt with the runner's frozen KLevelBook, depth never invented)
-60e463e35a03968fe70483a8d3c9e54772587bc0891c80c87d81731712cea280  ../godseye/godseye_export.py (MROF-GODSEYE-EXPORT-1.0; supersedes 16aa4c57… — progress section (complete-session rule, runbook milestones, checkpoint clock, accrual counts), disk runway, next scheduled market change, resolved conditions for wave-two families; Amendment 13. Earlier: reports + bounded capture tail -> one sanitized snapshot, atomic, refuses to write on any event-level key outside the exposed section, refuses an out_dir inside the capture folder)
-775e412f48ed9a4edd5d10f02202cc1202f46ab54dbbf3b0fb3a25a272c20a02  ../godseye/godseye_server.py (MROF-GODSEYE-SERVER-1.0: stdlib HTTP on 127.0.0.1; policy re-checked on every replay request; stale after 15 min; last good snapshot kept)
+7fb480f5d7aef91d8a9b247f8b8c3e852a053cae15a14dc7ea493dbd129b890f  ../godseye/godseye_export.py (MROF-GODSEYE-EXPORT-1.0; supersedes 60e463e3… — the replay windows file is split once per pilot run into one piece per (session, instrument) of inspectable sessions, so a routine export reads a small index instead of ~100 MB; a session whose only audit flag is RECONSTRUCTED_RUN_NOT_SELF_VERIFYING counts as complete, labelled; Amendment 14. Earlier 16aa4c57… → progress section (complete-session rule, runbook milestones, checkpoint clock, accrual counts), disk runway, next scheduled market change, resolved conditions for wave-two families; Amendment 13. Earlier: reports + bounded capture tail -> one sanitized snapshot, atomic, refuses to write on any event-level key outside the exposed section, refuses an out_dir inside the capture folder)
+ad1f8523f147d07e26273298b25069170a8f8b6fa0360429e6fd2055b538f180  ../godseye/godseye_server.py (MROF-GODSEYE-SERVER-1.0; supersedes 775e412f… — serves replay windows one (session, instrument) piece at a time, at most four held; re-reads the exposure ledger when it changes; --open opens the browser once listening; --refresh N re-runs the export every N s as a separate below-normal-priority process (the launchers use 300); Amendment 14. Earlier: stdlib HTTP on 127.0.0.1; policy re-checked on every replay request; stale after 15 min; last good snapshot kept)
 b0aaf0743b2f87c3661bfeaa9fc02caeb24b6c81da6dafd650e97147f9588de1  ../godseye/godseye_demo.py (MROF-GODSEYE-DEMO-1.0: labelled synthetic capture + reports through library entry points only; its own ledger, inside the demo folder)
-edc2d6bf37d9881d3644fb9cb26a30075247513de4951bdec7c54f8653de3e24  ../godseye/tests_godseye.py (36 tests, G1–G12d; supersedes 3d2d5111… — G11–G11d theatre scripts vs the frozen code, G12–G12d study progress, clock, runway)
-44bfe9ea67f74f72bddb457be652c5903768a003098f586d2aa7bf780679a4cd  ../godseye/static/app.js (supersedes 0fd3a368… — progress rail, schedule-aware alerts, runway, watchdog notifications, funnel bars)
+a7b2608795ab8e6939abe71ec8e1c3740eb45c502d04d6e852150f7af7975b2d  ../godseye/tests_godseye.py (42 tests, G1–G13d; supersedes edc2d6bf… — G12e reconstructed-only sessions complete and labelled, G13–G13d the replay split, the server's bounded pieces and ledger re-read, the launcher, the refresher; earlier 3d2d5111… → G11–G11d theatre scripts vs the frozen code, G12–G12d study progress, clock, runway)
+fe366ff30f3008c268aecfafa5f10ebe74c782760eda24060cdf53decab73994  ../godseye/static/app.js (supersedes 44bfe9ea… — the progress rail names sessions relying on reconstructed manifests; earlier 0fd3a368… → progress rail, schedule-aware alerts, runway, watchdog notifications, funnel bars)
 c0d29207c0b283751bd38e5b4c614b3f4e86025c4b0c09ae3e9f40ac8a0a27e3  ../godseye/static/theatre.js (the Mechanism theatre view and keyboard shortcuts; Amendment 13)
 b65447cb56b2ef6e8067095adf094413f4ffc5094c450771b530577021fd7c69  ../godseye/static/index.html
 c3dd56058931c0f773d15648e5de1ce659c722d390d81a99ff6c87063c3e44a3  ../godseye/static/style.css
-6c7dc013ac90be8e644d138abc5a25f3b3ed41ee6444ae59f708cdafa09c9d5c  ../godseye/GODS_EYE_README.md (architecture, permission model, setup, the four views, blind enforcement, discrepancy record, adapters, verification, blockers, user guide)
-a3cf21051b0dc0779b7aa457e0ca34c06be814f5aac13578cba6cd4ac8e5f5cc  ../godseye/launch_godseye.bat (reviewed, not executed: no Windows here)
+ba9cf7ca6510b14c85f1cbe63660ca8a42665194df83793a8f31be8a00258d39  ../godseye/GODS_EYE_README.md (architecture, permission model, setup, the four views, blind enforcement, discrepancy record, adapters, verification, blockers, user guide)
+8169159cbf3444a82bc59538d6053fc4c693606c7d4c6f7f73e811f42fb635f6  ../godseye/launch_godseye.bat (supersedes a3cf2105… — the server opens the browser once listening instead of racing it; reviewed, not executed: no Windows here)
 6d52566b3cd6dcc310517733fc94b4cdc355beecd10fe3ff7260082040420b36  ../godseye/export_godseye.bat
 8799ff3dc698a7f2a186be1dc18c3c35e1697bce554f350b9f77f74ca17fd21e  ../godseye/godseye.config.example.json
 ec8366a0e493efe33963a227bda8084e9f5a1e7123de66687b6881387d511c00  ../godseye/pinokio/pinokio.js (optional Pinokio launcher, dashboard only; NOT exercised here — no Pinokio)
 31526b3cee7dfe325758e4eb321134897a1f52232cd4094d73581e58df480b3f  ../godseye/pinokio/install.js
-89fe091672a47e5c4bb4e1ce351fc06a00c1a8278c4bdacbf29850f08602ced7  ../godseye/pinokio/start.js
+e89a18767df0469c2c15262f90937e19a9577f453b9070cfc63064829fa118c1  ../godseye/pinokio/start.js
 451a3544e1a854195bdb62b247186cfc15eaf70aedc49a9d0b270f63f537eb83  ../godseye/pinokio/stop.js
 8d1b123206885250b9a9b21951b58e37ed318fd0d2f93656c91926135b097e16  ../godseye/pinokio/export.js
 ```
@@ -65,7 +65,7 @@ cdf6d14cfd324225340795932eac96c830e4eb936a3d7dee686141fd9e6fd534  NT8_RECORDING_
 The pilot line above (51c2996f…) is superseded in Amendment 12 by:
 
 ```
-f81c6b146c646bdaedacf82cdaa9ff04daf2ad7d62cf86a19dcce2f94361715a  mrofyt_pilot.py (MROF-YT-PILOT-1.2; supersedes 51c2996f… — `--windows-out FILE` writes the decision windows of EXPOSED sessions only (MROF-PILOT-WINDOWS-1) for the dashboard's replay, and each window record carries the approach id, side and the runner's levels; no detector, threshold, level, window, baseline or feature definition touched — P10d re-pins the frozen signal hash; Amendment 12)
+2b6efce22c51d84b12fb264a837aad0fb46e6f6a23f1df46d1bc53d7807aa6a6  mrofyt_pilot.py (MROF-YT-PILOT-1.2; supersedes f81c6b14… — a window keeps the level snapshot only when its session is not blind (the validation sessions grow weekly and are never written); Amendment 14. f81c6b14… supersedes 51c2996f… — `--windows-out FILE` writes the decision windows of EXPOSED sessions only (MROF-PILOT-WINDOWS-1) for the dashboard's replay, and each window record carries the approach id, side and the runner's levels; no detector, threshold, level, window, baseline or feature definition touched — P10d re-pins the frozen signal hash; Amendment 12)
 ```
 
 Archived source directives:
@@ -79,13 +79,13 @@ Delivered package (111 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-4e67cd09261a3ba9f1e943cc34c015173e3fc109cb252a3b6a072909ab7b9764  MROF_V1_Engine_v01_6_7.zip (supersedes 108325dd… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+f930879f2070d657423d020b2100f33ed25a6951ab0113aac6558e60196531e9  MROF_V1_Engine_v01_6_7.zip (supersedes 4e67cd09… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 490/490 + 36/36, identical to the repo
+# run from inside the unzipped package: 494/494 + 42/42, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -111,7 +111,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mles_v11.py` | 29/29 |
 | `tests_mles_v12.py` | 54/54 |
 | `tests_mrofyt.py` | 59/59 |
-| `tests_mrofyt_pilot.py` | 44/44 |
+| `tests_mrofyt_pilot.py` | 45/45 |
 | `tests_mrofyt_runner.py` | 27/27 |
 | `tests_mrofyt_v01_1.py` | 56/56 |
 | `tests_mrofyt_v01_2.py` | 31/31 |
@@ -120,11 +120,11 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_5.py` | 36/36 |
 | `tests_mrofyt_v01_6.py` | 21/21 |
 | `tests_mrofyt_v01_7.py` | 15/15 |
-| `tests_mrofyt_recover.py` | 32/32 |
+| `tests_mrofyt_recover.py` | 35/35 |
 | `tests_mrofyt_wave2.py` | 29/29 |
-| **wave-one/two total** | **490/490** |
-| `../godseye/tests_godseye.py` | 36/36 |
-| **package total** | **526/526** |
+| **wave-one/two total** | **494/494** |
+| `../godseye/tests_godseye.py` | 42/42 |
+| **package total** | **536/536** |
 
 ## Runnable research commands
 
@@ -567,3 +567,56 @@ detector hash so registering wave two provably changed nothing.
     recording stops during market hours. Keyboard shortcuts throughout.
     No frozen file changed; the package suites stay 490/490; the dashboard
     suite is 36/36.
+
+14. **Before the first real deployment: four things the real data would
+    have hit (2026-09-23).** Found while writing the operator's steps
+    against the capture's real numbers, not the demo's.
+
+    *The replay file.* The first real pilot produced 44,628 windows from
+    ~10 sessions; the pilot's `--windows-out` file is ~1.5 KB per window,
+    so the September DEV sessions make ~100 MB. God's Eye 1.0 parsed the
+    whole file on every export (284 MB peak each time, every 5 minutes if
+    scheduled) and the server held all of it (183 MB) -- on the laptop
+    that is recording. It is now split once per pilot run (or ledger
+    change) into one piece per (session, instrument) of inspectable
+    sessions, in `out_dir`; a routine export reads the ~1.5 MB index
+    (0.06 s, 5.7 MB); the server holds at most four pieces (~30 MB).
+    Measured on a synthetic 63,000-window, 100 MB file. `G13`-`G13b`.
+    The server also re-reads the exposure ledger when it changes, so a
+    weekly pilot run needs no restart (still fail-closed).
+
+    *The repair's size.* `reconstruct()` copies every `.partial` stream
+    in full as `_RECOVERED.csv` (the original is never renamed), not only
+    damaged ones, and every orphan on the real folder is `.partial`: a
+    `--repair` writes up to the orphans' full size (~67 GB at the last
+    dry run) onto the drive the recorder resumes writing to on Sunday
+    18:00 ET. Nothing checked the space. Recover 1.3 prints what
+    `--repair` would write against the free space in every dry run,
+    refuses a pass that would leave under 40 GB free (about three
+    session-days) before writing anything, and re-checks per run.
+    `V10`-`V10c`; the suite now states the drive each test simulates,
+    because this sandbox itself has only ~30 GB free.
+
+    *Complete sessions after the repair.* The auditor flags every
+    reconstructed run `RECONSTRUCTED_RUN_NOT_SELF_VERIFYING` (correctly:
+    such a manifest cannot verify its own file). The progress rail read
+    any flag as "not complete", so after the repair the repaired DEV
+    sessions would never have counted toward the 20/60 milestones even
+    though the runner ingests them. A session whose only flag is that
+    one now counts and is labelled "relying on N reconstructed
+    manifest(s)"; any other flag still excludes it. `G12e`.
+
+    *Memory the pilot does not need.* The pilot kept each window's level
+    snapshot for blind sessions too, though `write_windows` never writes
+    them; validation sessions grow every week to December. Now kept only
+    for non-blind windows (`P13`); no detector, threshold, level, window
+    or feature definition touched.
+
+    Also: the Windows launcher could open the browser before the server
+    listened ("site can't be reached"); the server now opens it once
+    bound (`--open`, `G13c`). And the snapshot went stale 15 minutes
+    after launch unless the operator set up Task Scheduler, which would
+    have made the new watchdog report "stale while the market is open"
+    all day; the server now re-runs the export every 5 minutes while it
+    is open, as a separate below-normal-priority process, one at a time
+    (`--refresh 300` in both launchers, `G13d`).

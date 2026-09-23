@@ -44,6 +44,12 @@
 #     FileShare.Read for the life of the run, so a read-only open that
 #     refuses to share writing fails for exactly as long as the recorder
 #     holds the file. Anything held, or that cannot be asked, is refused.
+#   * A REPAIR MUST NOT FILL THE RECORDER'S DRIVE. Every .partial stream
+#     is copied in full (the original is never renamed), so a real
+#     folder's repair writes tens of GB onto the drive the recorder
+#     writes to. 1.3 states the size against the free space in the dry
+#     run, refuses a pass that would leave less than RESERVE_BYTES free
+#     before writing anything, and re-checks per run.
 #
 # What still carries real assurance for a recovered run: cross-run
 # instance sequence contiguity (does its seq range fit its siblings?),
@@ -51,7 +57,7 @@
 #
 # THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
 # ======================================================================
-"""mrofyt_recover.py - MROF-YT-RECOVER-1.2
+"""mrofyt_recover.py - MROF-YT-RECOVER-1.3
 
     python3 mrofyt_recover.py "<capture folder>" --dry-run   # list, instant
     python3 mrofyt_recover.py "<capture folder>"             # rebuild clean orphans
@@ -60,7 +66,9 @@
 
 Safe with NinjaTrader running: a run it still holds is recognised and
 left alone. Run --repair on a weekend anyway -- it rewrites gigabytes
-onto the drive the recorder writes to.
+onto the drive the recorder writes to. The dry run says how many, and a
+pass that would leave that drive with less than 40 GB free stops before
+writing anything.
 """
 import csv
 import datetime as _dt
@@ -69,13 +77,21 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sys
 import time
 
 import mles_v12_adapter as AD
 import mrofyt_runner as RUN                 # session_id: the CME clock
 
-RECOVER_VERSION = 'MROF-YT-RECOVER-1.2'
+RECOVER_VERSION = 'MROF-YT-RECOVER-1.3'
+# Free space a write must leave on the capture drive -- it is the drive
+# the recorder writes to, and on the Sunday after a weekend repair it
+# starts again: about three session-days at the ~13 GB per session-day
+# (both instruments) the September capture shows. A repair copies every
+# .partial stream in full (originals are never renamed), so on a real
+# folder it writes tens of GB.
+RESERVE_BYTES = 40 * 10 ** 9
 CLOSE_REASON = 'RECONSTRUCTED_NO_CLEAN_CLOSE'
 # a stream modified more recently than this may be being written NOW;
 # during a session the recorder flushes every flushPolicySeconds = 30 s
@@ -511,6 +527,53 @@ def probe_run(run):
     return res
 
 
+class InsufficientSpace(RuntimeError):
+    """A write that would leave the capture drive with less than
+    RESERVE_BYTES free. Raised before anything is written."""
+
+
+def _free_bytes(directory):
+    return shutil.disk_usage(directory).free
+
+
+def _copies(run, damaged_names=(), needs_cut=()):
+    """The streams a non-dry run rewrites as _RECOVERED.csv: every
+    .partial one (a finalized name cannot be had without a copy, and the
+    original is never renamed), every damaged one, every one cut."""
+    out = []
+    for k, p in run['streams'].items():
+        if p.endswith('.partial') or k in damaged_names or k in needs_cut:
+            out.append(k)
+    return out
+
+
+def write_plan(runs, results, directory, repair):
+    """Upper bound of what a real run would write, from the dry-run
+    probes: for a damaged run every stream (the cut may reach any of
+    them), otherwise the .partial ones. Damaged runs count only when
+    `repair` (without it they are left as NEEDS_REPAIR)."""
+    by_base = {r['base']: r for r in runs}
+    need = 0
+    for res in results:
+        run = by_base.get(res.get('base'))
+        if run is None or run.get('live'):
+            continue
+        st = res.get('status')
+        if st == 'WOULD_RECONSTRUCT_WITH_REPAIR':
+            if repair:
+                need += sum(os.path.getsize(p) for p in run['streams'].values())
+        elif st == 'WOULD_RECONSTRUCT':
+            need += sum(os.path.getsize(run['streams'][k])
+                        for k in _copies(run))
+    try:
+        free = _free_bytes(directory)
+    except OSError:
+        free = None
+    return dict(bytes_to_write=need, free_bytes=free,
+                reserve_bytes=RESERVE_BYTES,
+                fits=None if free is None else free - need >= RESERVE_BYTES)
+
+
 def reconstruct(directory, run, repair=False, dry_run=False, now=None,
                 probe=None):
     """Reconstruct one orphaned run. Returns a result dict; writes
@@ -583,6 +646,21 @@ def reconstruct(directory, run, repair=False, dry_run=False, now=None,
                    damaged={k: list(v) for k, v in damaged.items()},
                    safe_event_seq=safe_ev,
                    streams_to_truncate=sorted(needs_cut))
+        return res
+
+    # ---- room on the drive the recorder writes to, checked per run ----
+    # (the directory-level plan refuses a pass that cannot fit; this
+    # catches the space shrinking during one, and direct callers)
+    copy = [k for k in run['streams']
+            if k in damaged or k in needs_cut or
+            run['streams'][k].endswith('.partial')]
+    need = sum(os.path.getsize(run['streams'][k]) for k in copy)
+    if need and _free_bytes(directory) - need < RESERVE_BYTES:
+        res.update(status='SKIPPED_NO_SPACE',
+                   notes=['would write %.1f GB with %.1f GB free; at least '
+                          '%.0f GB must stay free for the recorder'
+                          % (need / 1e9, _free_bytes(directory) / 1e9,
+                             RESERVE_BYTES / 1e9)])
         return res
 
     # ---- write repaired copies where needed -------------------------
@@ -688,8 +766,20 @@ def recover_directory(directory, repair=False, dry_run=False, now=None,
     give the sequence bounds and counts a manifest must carry. Live
     runs are listed, counted apart, and never scanned or written."""
     runs = find_orphan_runs(directory, now, probe)
+    probes = [probe_run(r) for r in runs]
+    # what --repair would write, and whether the drive can take it; a
+    # real pass that cannot fit is refused before anything is written
+    plan = write_plan(runs, probes, directory, repair=True)
+    plan_now = write_plan(runs, probes, directory, repair) \
+        if not dry_run else None
+    if not dry_run and plan_now['fits'] is False:
+        raise InsufficientSpace(
+            'this pass would write up to %.1f GB and %s has %.1f GB free; '
+            'at least %.0f GB must stay free for the recorder. Nothing was '
+            'written.' % (plan_now['bytes_to_write'] / 1e9, directory,
+                          plan_now['free_bytes'] / 1e9, RESERVE_BYTES / 1e9))
     if dry_run:
-        results = [probe_run(r) for r in runs]
+        results = probes
     else:
         results = [reconstruct(directory, r, repair, False, now, probe)
                    for r in runs]
@@ -699,7 +789,7 @@ def recover_directory(directory, repair=False, dry_run=False, now=None,
                 repair=repair, dry_run=dry_run,
                 runs_without_manifest=len(runs),
                 orphan_runs=len(runs) - live, live_runs=live,
-                liveness_by=by, results=results)
+                liveness_by=by, repair_write_plan=plan, results=results)
 
 
 def text_summary(rep):
@@ -717,6 +807,18 @@ def text_summary(rep):
              if r['status'] != 'SKIPPED_LIVE_RUN') / 1e9
     if gb:
         L.append('recoverable data in orphaned runs: %.2f GB' % gb)
+    wp = rep.get('repair_write_plan')
+    if wp and wp.get('bytes_to_write'):
+        L.append('--repair would write up to %.1f GB of copies (originals '
+                 'are never touched); drive free now: %s; must stay free for '
+                 'the recorder: %.0f GB -> %s'
+                 % (wp['bytes_to_write'] / 1e9,
+                    'unknown' if wp['free_bytes'] is None
+                    else '%.1f GB' % (wp['free_bytes'] / 1e9),
+                    wp['reserve_bytes'] / 1e9,
+                    'fits' if wp['fits'] else
+                    'DOES NOT FIT: free space first, or ask'
+                    if wp['fits'] is False else 'cannot tell'))
     by = {}
     for r in rep['results']:
         by.setdefault(r['status'], []).append(r)
@@ -762,6 +864,9 @@ def main(argv=None):
     try:
         rep = recover_directory(d, repair='--repair' in argv,
                                 dry_run='--dry-run' in argv)
+    except InsufficientSpace as exc:
+        print('STOPPED: %s' % exc)
+        return 2
     except OSError as exc:
         try:
             os.listdir(d)

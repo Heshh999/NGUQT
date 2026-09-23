@@ -15,7 +15,7 @@ module.exports = {
       method: "shell.run",
       params: {
         path: "app",
-        message: "python godseye_server.py --config godseye.config.json",
+        message: "python godseye_server.py --config godseye.config.json --refresh 300",
         on: [{ event: "/(http:\\/\\/127\\.0\\.0\\.1:[0-9]+\\/)/", done: true }],
       },
     },

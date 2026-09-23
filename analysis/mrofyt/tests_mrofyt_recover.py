@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# MROF-YT-RECOVER-1.2 suite. Manifest reconstruction for runs whose
+# MROF-YT-RECOVER-1.3 suite. Manifest reconstruction for runs whose
 # recorder died before finalizing. Exercised on synthetic recorder-format
 # runs (mles_v12_synth) damaged in the specific ways a power loss causes.
 # Synthetic events verify CODE BEHAVIOR only, never market evidence.
@@ -23,6 +23,12 @@ import mles_v12_audit as AU       # noqa: E402
 import mles_v12_synth as SY       # noqa: E402
 import mrofyt_recover as RC       # noqa: E402
 import mrofyt_runner as RN        # noqa: E402
+
+# The drive each test simulates is stated, not inherited from whatever
+# machine runs the suite (this sandbox has ~30 GB free, below the 40 GB
+# reserve). V1-V9 simulate a roomy drive; V10 sets its own numbers.
+_REAL_FREE_BYTES = RC._free_bytes
+RC._free_bytes = lambda d: 10 ** 13                   # a 10 TB-free drive
 
 OK = []
 
@@ -509,6 +515,81 @@ t('V9g: the reconstructed manifest is written aside and moved into '
   and not any(x.endswith('.tmp') for x in os.listdir(d14)) and
   'os.replace(tmp, mp)' in open(os.path.join(HERE,
                                              'mrofyt_recover.py')).read())
+
+# ---------------------------------------------------------------------
+# V10: a repair must not fill the drive the recorder writes to
+# ---------------------------------------------------------------------
+d15 = os.path.join(WORK, 'space')
+mp15a = SY.synth_run(d15, n_depth=4000, cid='spacea', session='20260914')
+mp15b = SY.synth_run(d15, n_depth=4000, cid='spaceb', session='20260915')
+orphan(d15, mp15a, rename_partial=AD.STREAMS)            # clean, all .partial
+man15b = orphan(d15, mp15b, rename_partial=AD.STREAMS)
+dmg15 = os.path.join(d15, man15b['depth']['file'] + '.partial')
+with open(dmg15, 'a') as fh:
+    fh.write('MLES-CAPTURE-1.2,spaceb,spaceb-R001,1,2026')  # cut mid-row
+age(d15)
+runs15 = RC.find_orphan_runs(d15, probe=FREE)
+size = lambda cid: sum(os.path.getsize(p) for r in runs15          # noqa: E731
+                       if cid in r['base'] for p in r['streams'].values())
+need15 = size('spacea') + size('spaceb')
+dry15 = RC.recover_directory(d15, dry_run=True, probe=FREE)
+wp15 = dry15['repair_write_plan']
+t('V10: the dry run states what --repair would write -- every .partial '
+  'stream of a clean run and every stream of a damaged one, in full -- '
+  'against the free space and the 40 GB kept for the recorder',
+  wp15['bytes_to_write'] == need15 and wp15['reserve_bytes'] == 40 * 10 ** 9
+  and wp15['fits'] is True and
+  '--repair would write up to' in RC.text_summary(dry15) and
+  RC.write_plan(runs15, dry15['results'], d15, repair=False)[
+      'bytes_to_write'] == size('spacea'))
+
+tree15 = {x: sha(os.path.join(d15, x)) for x in sorted(os.listdir(d15))}
+RC._free_bytes = lambda d: need15 + RC.RESERVE_BYTES - 1   # one byte short
+raised15 = None
+try:
+    RC.recover_directory(d15, repair=True, probe=FREE)
+except RC.InsufficientSpace as exc:
+    raised15 = str(exc)
+import io                                                   # noqa: E402
+import contextlib                                           # noqa: E402
+_buf = io.StringIO()
+_rf = RC.find_orphan_runs
+
+
+def _free_probe_find(d, now=None, probe=None):
+    return _rf(d, now, FREE)
+
+
+RC.find_orphan_runs = _free_probe_find
+with contextlib.redirect_stdout(_buf):
+    rc15 = RC.main([d15, '--repair'])
+RC.find_orphan_runs = _rf
+t('V10b: one byte short of leaving 40 GB free, --repair stops before '
+  'writing anything -- the folder is byte-identical, the CLI prints '
+  'STOPPED with the numbers and exits 2',
+  raised15 is not None and 'Nothing was written' in raised15 and
+  rc15 == 2 and 'STOPPED' in _buf.getvalue() and
+  {x: sha(os.path.join(d15, x)) for x in sorted(os.listdir(d15))} == tree15)
+
+RC._free_bytes = lambda d: need15 + RC.RESERVE_BYTES       # exactly enough
+direct15 = RC.reconstruct(
+    d15, [r for r in runs15 if 'spacea' in r['base']][0], probe=FREE)
+RC._free_bytes = lambda d: RC.RESERVE_BYTES               # none to spare
+d16 = os.path.join(WORK, 'space2')
+mp16 = SY.synth_run(d16, n_depth=3000, cid='spacec', session='20260916')
+orphan(d16, mp16, rename_partial=AD.STREAMS)
+before16 = sorted(os.listdir(d16))
+r16 = RC.reconstruct(d16, RC.find_orphan_runs(d16, probe=FREE)[0],
+                     probe=FREE)
+RC._free_bytes = _REAL_FREE_BYTES
+t('V10c: with exactly enough room the run is reconstructed; a direct '
+  'reconstruct() with no room to spare is refused per run as '
+  'SKIPPED_NO_SPACE and writes nothing; the real free-space call is the '
+  'drive\'s own',
+  direct15['status'] == 'RECONSTRUCTED' and
+  r16['status'] == 'SKIPPED_NO_SPACE' and
+  sorted(os.listdir(d16)) == before16 and
+  RC._free_bytes(WORK) == shutil.disk_usage(WORK).free)
 
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)

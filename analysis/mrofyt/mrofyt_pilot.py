@@ -162,6 +162,11 @@ class PilotRunner(RUN.Runner):
     def __init__(self, *a, **kw):
         RUN.Runner.__init__(self, *a, **kw)
         self.windows = []                       # feature vector per window
+        # the level snapshot is kept only where it can be written out
+        # (write_windows never writes a blind session); run_pilot sets
+        # the pass's own blind date. Memory, not logic: the validation
+        # sessions grow every week and their levels are never read
+        self.levels_blind_from = BLIND_FROM
         # Mid series are kept PER RUN, never concatenated per instrument.
         # Two reasons, both correctness: concurrent duplicate recorder
         # instances overlap in time, so a per-instrument series is not
@@ -195,8 +200,11 @@ class PilotRunner(RUN.Runner):
                    approach_id=ap.id, ad=ap.ad,
                    # the level set exactly as the frozen runner held it at
                    # this window (causal by construction): observation
-                   # for the God's Eye replay, never an input
-                   levels=dict(st.levels))
+                   # for the God's Eye replay, never an input; None on a
+                   # blind session, whose windows are never written
+                   levels=None if _is_blind(st.session,
+                                            self.levels_blind_from)
+                   else dict(st.levels))
         self.windows.append(rec)
         self.approach_open.setdefault((st.instrument, ap.id),
                                       dict(t0=ap.t0, level_id=ap.level_id,
@@ -732,6 +740,7 @@ def verdicts(step1, cov, funnel, sigs, health, ledger):
 def run_pilot(capture_dir, max_sessions=None, blind_from=BLIND_FROM):
     step1 = step1_data_audit(capture_dir)
     r = PilotRunner(capture_dir, max_sessions=max_sessions)
+    r.levels_blind_from = blind_from
     ledger = r.run()
     cov = coverage_windows(step1['verified_runs'])
     health = step3_feature_health(r.windows)

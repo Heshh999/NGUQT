@@ -929,17 +929,25 @@ MILESTONES = [
 ]
 COMPLETE_COVER_FRAC = 0.95
 COMPLETE_SHARED_GAP_S = 300.0
+# An audit flag that is a statement about PROVENANCE, not a defect: a
+# manifest rebuilt by mrofyt_recover cannot verify its own file, and the
+# auditor says so on every such run. The runner ingests those runs, so
+# a session whose only flag is this one is complete -- and is reported
+# as relying on reconstructed manifests, never as a clean pass.
+PROVENANCE_ONLY_CODES = frozenset(('RECONSTRUCTED_RUN_NOT_SELF_VERIFYING',))
 
 
 def session_completeness(rec):
     """(complete: bool, why: str) for one session record of
     build_sessions. Complete means: the expected window has fully passed,
     both instruments cover >= 95% of it, no shared gap over 5 minutes,
-    and every run with a manifest passed the audit (a run still open or
-    without a manifest cannot count)."""
+    and every run with a manifest passed the audit -- or was flagged only
+    as reconstructed (a run still open or without a manifest cannot
+    count)."""
     if rec.get('expected_clipped_to_now'):
         return False, 'session still in progress'
     why = []
+    recon = 0
     for inst in INSTRUMENTS:
         d = rec['instruments'].get(inst) or {}
         cf = d.get('covered_frac')
@@ -948,13 +956,23 @@ def session_completeness(rec):
                                          else '%.1f%%' % (100 * cf)))
         for r in d.get('runs', []):
             a = r.get('audit') or {}
-            if a.get('ok') is not True:
-                why.append('%s run %s: %s' % (inst, r.get('run_id'),
-                                              a.get('note') or 'audit failed'))
-                break
+            codes = set(a.get('failure_codes') or [])
+            if a.get('ok') is True:
+                continue
+            if a.get('ok') is False and codes and codes <= PROVENANCE_ONLY_CODES:
+                recon += 1
+                continue
+            why.append('%s run %s: %s' % (
+                inst, r.get('run_id'),
+                a.get('note') or ('audit failed: ' + ', '.join(sorted(codes))
+                                  if codes else 'audit failed')))
+            break
     if (rec.get('shared_gap_s') or 0) > COMPLETE_SHARED_GAP_S:
         why.append('%.0f min missing in both' % (rec['shared_gap_s'] / 60))
-    return (not why), ('; '.join(why) if why else 'complete')
+    if why:
+        return False, '; '.join(why)
+    return True, ('complete' if not recon else
+                  'complete, relying on %d reconstructed manifest(s)' % recon)
 
 
 def build_progress(sessions, counts, now):
@@ -998,6 +1016,8 @@ def build_progress(sessions, counts, now):
              'accrual at the rate so far and is a count, not a result'
              % FAMILY_MIN_EVENTS,
         today_et=today, sessions_seen=len(sessions), sessions_complete=n,
+        sessions_complete_reconstructed=sum(
+            1 for c in complete if c['why'] != 'complete'),
         complete=complete, incomplete=incomplete,
         milestones=[dict(sessions=m, label=lab, reached=n >= m,
                          remaining=max(m - n, 0)) for m, lab in MILESTONES],
@@ -1070,7 +1090,7 @@ def build_counts(reports, policy):
 # ---------------------------------------------------------------------
 # exposed sessions: event-level material the replay may show
 # ---------------------------------------------------------------------
-def build_exposed(reports, policy, windows_path, meter):
+def build_exposed(reports, policy, windows_path, meter, out_dir=None):
     ledger = reports['ledger'].get('doc') or {}
     wave2 = reports['wave2'].get('doc') or {}
     w2real = wave2.get('real') or wave2
@@ -1093,39 +1113,123 @@ def build_exposed(reports, policy, windows_path, meter):
                 state=f.get('state')))
     idx = {}
     winfo = dict(path=windows_path, ok=False)
-    if windows_path and os.path.exists(windows_path):
+    if windows_path and os.path.exists(windows_path) and out_dir:
         try:
-            doc = meter.read_json(windows_path)
-            winfo.update(ok=True, pilot=doc.get('pilot'),
-                         sessions=doc.get('sessions'),
-                         windows=len(doc.get('windows', [])))
-            for w in doc.get('windows', []):
-                ses = str(w.get('session'))
-                if not policy.may_inspect(ses):
-                    continue
-                inst = w.get('instrument')
-                # approach-level index only; the windows themselves are
-                # served on demand by the server from the windows file
-                ap = idx.setdefault(ses, {}).setdefault(inst, {}).setdefault(
-                    str(w.get('approach_id')),
-                    dict(approach_id=w.get('approach_id'),
-                         level_id=w.get('level_id'), level_px=w.get('level_px'),
-                         ad=w.get('ad'), t0=w.get('t_start'), run=w.get('run'),
-                         family=w.get('family'), n_windows=0, t_last=None))
-                ap['n_windows'] += 1
-                ap['t_last'] = max(ap['t_last'] or 0, w.get('t_end') or 0)
+            wi, how = shard_windows(windows_path, out_dir, policy, meter)
+            winfo.update(ok=True, pilot=wi.get('pilot'),
+                         sessions=wi.get('sessions'), windows=wi.get('windows'),
+                         shards=len(wi.get('shards', [])), index=how)
+            idx = wi.get('approaches') or {}
         except (OSError, ValueError) as exc:
             winfo['error'] = str(exc)
-    elif windows_path:
+    elif windows_path and not os.path.exists(windows_path):
         winfo['error'] = 'not found'
     for ses in sorted(set(fires) | set(idx)):
+        if not policy.may_inspect(ses):
+            continue
         out['sessions'][ses] = dict(
             session=ses, fires=sorted(fires.get(ses, []),
                                       key=lambda x: x.get('t') or 0),
-            approaches={inst: sorted(aps.values(), key=lambda a: a['t0'] or 0)
-                        for inst, aps in idx.get(ses, {}).items()})
+            approaches=idx.get(ses, {}))
     out['windows_file'] = winfo
     return out
+
+
+# ---------------------------------------------------------------------
+# replay windows, split once per pilot run
+#
+# On a real capture the pilot's windows file is ~1.5 KB per window and
+# ~4,500 windows per session (the first real pilot: 44,628 windows over
+# ~10 sessions), so ~100 MB once the September DEV sessions are all in.
+# Parsing that on every export, and holding all of it in the server,
+# is not light on a laptop that is recording. So it is split ONCE per
+# change of the windows file / the exposure ledger / the blind date into
+# one small file per (session, instrument) of INSPECTABLE sessions, plus
+# an approach-level index; a routine export reads only the index, and
+# the server loads one (session, instrument) piece at a time.
+# ---------------------------------------------------------------------
+WINDOWS_INDEX_NAME = 'godseye_windows_index.json'
+SHARD_SCHEMA = 'MROF-GODSEYE-WINDOW-SHARDS-1'
+SHARD_DIR_PREFIX = 'godseye_windows_'
+
+
+def _file_key(path):
+    """[absolute path, size, mtime ns]: what makes a split stale. None
+    when there is no such file."""
+    if not path:
+        return None
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return [os.path.abspath(path), st.st_size, st.st_mtime_ns]
+
+
+def shard_windows(windows_path, out_dir, policy, meter):
+    """(index, 'cached' | 'rebuilt'). The index names the directory that
+    holds this build's pieces, so a reader never sees a half-written set;
+    older builds are removed afterwards (best effort)."""
+    key = dict(schema=SHARD_SCHEMA, windows=_file_key(windows_path),
+               ledger=_file_key(policy.ledger_path),
+               blind_from=policy.blind_from)
+    ip = os.path.join(out_dir, WINDOWS_INDEX_NAME)
+    try:
+        with open(ip) as fh:
+            cur = json.load(fh)
+        if cur.get('key') == key and all(
+                os.path.isfile(os.path.join(out_dir, cur['dir'], s['file']))
+                for s in cur.get('shards', [])):
+            meter.bytes += os.path.getsize(ip)
+            meter.files += 1
+            return cur, 'cached'
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    doc = meter.read_json(windows_path)
+    groups = collections.defaultdict(list)
+    idx = {}
+    for w in doc.get('windows', []):
+        ses = str(w.get('session'))
+        if not policy.may_inspect(ses):
+            continue
+        inst = w.get('instrument')
+        groups[(ses, inst)].append(w)
+        ap = idx.setdefault(ses, {}).setdefault(inst, {}).setdefault(
+            str(w.get('approach_id')),
+            dict(approach_id=w.get('approach_id'),
+                 level_id=w.get('level_id'), level_px=w.get('level_px'),
+                 ad=w.get('ad'), t0=w.get('t_start'), run=w.get('run'),
+                 family=w.get('family'), n_windows=0, t_last=None))
+        ap['n_windows'] += 1
+        ap['t_last'] = max(ap['t_last'] or 0, w.get('t_end') or 0)
+    dname = '%s%d' % (SHARD_DIR_PREFIX, time.time_ns())
+    ddir = os.path.join(out_dir, dname)
+    tmpd = ddir + '.tmp'
+    os.makedirs(tmpd)
+    shards = []
+    for (ses, inst), ws in sorted(groups.items()):
+        fn = '%s_%s.json' % (ses, inst)
+        with open(os.path.join(tmpd, fn), 'w') as fh:
+            json.dump(dict(schema=SHARD_SCHEMA, session=ses, instrument=inst,
+                           windows=ws), fh, default=str)
+        shards.append(dict(session=ses, instrument=inst, file=fn,
+                           windows=len(ws)))
+    os.replace(tmpd, ddir)
+    cur = dict(key=key, dir=dname, pilot=doc.get('pilot'),
+               sessions=doc.get('sessions'),
+               windows=len(doc.get('windows', [])), shards=shards,
+               approaches={ses: {inst: sorted(aps.values(),
+                                              key=lambda a: a['t0'] or 0)
+                                 for inst, aps in d.items()}
+                           for ses, d in idx.items()})
+    tmp = ip + '.tmp'
+    with open(tmp, 'w') as fh:
+        json.dump(cur, fh, default=str)
+    os.replace(tmp, ip)
+    del doc, groups
+    for old in glob.glob(os.path.join(out_dir, SHARD_DIR_PREFIX + '*')):
+        if os.path.basename(old) != dname and os.path.isdir(old):
+            shutil.rmtree(old, ignore_errors=True)
+    return cur, 'rebuilt'
 
 
 # ---------------------------------------------------------------------
@@ -1184,7 +1288,8 @@ def build_snapshot(cfg, now=None):
         sessions=build_sessions(cap, reports, policy, now),
         hypotheses=build_hypotheses(reports, policy),
         counts=build_counts(reports, policy),
-        exposed=build_exposed(reports, policy, cfg.get('windows'), meter),
+        exposed=build_exposed(reports, policy, cfg.get('windows'), meter,
+                              out_dir),
     )
     snap['progress'] = build_progress(snap['sessions'], snap['counts'], now)
     # second line of defence: strip event-level keys from every record

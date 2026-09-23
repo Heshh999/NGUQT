@@ -543,6 +543,40 @@ t('P12: a capture folder with no manifest, or one that cannot be read, '
   rc12 == 2 and rc12b == 2 and not os.path.exists(out12) and
   _before12 == _after12)
 
+# ---------------------------------------------------------------------
+# P13: the replay's level snapshot is kept only where it can be written
+# ---------------------------------------------------------------------
+import types as _types                                    # noqa: E402
+
+_pr = PI.PilotRunner.__new__(PI.PilotRunner)
+_pr.windows, _pr.approach_open, _pr._cur = [], {}, ('NQ', 'R1')
+_pr.levels_blind_from = PI.BLIND_FROM
+_ap13 = _types.SimpleNamespace(t0=1.0, wall_state='NO_QUALIFYING_WALL',
+                               windows=1, level_px=15000.0, level_id='PP',
+                               id=7, ad=1)
+for _ses in (DEV, VAL):
+    _pr._on_window(_types.SimpleNamespace(instrument='NQ', session=_ses,
+                                          levels={'PP': 15000.0}),
+                   _ap13, 11.0, dict(aggr_z=None))
+_wo13 = os.path.join(WORK, 'windows13.json')
+_n13 = PI.write_windows(_pr, _wo13)
+_doc13 = json.load(open(_wo13))
+_pr.levels_blind_from = None                              # checkpoint read
+_pr._on_window(_types.SimpleNamespace(instrument='NQ', session=VAL,
+                                      levels={'PP': 15000.0}),
+               _ap13, 21.0, dict(aggr_z=None))
+t('P13: a window keeps the level snapshot only when its session is not '
+  'blind -- the validation sessions grow every week and their windows are '
+  'never written -- the file carries exposed windows with levels, an '
+  'unblinded pass keeps them all, and run_pilot hands the pass\'s own '
+  'blind date to the runner',
+  _pr.windows[0]['levels'] == {'PP': 15000.0} and
+  _pr.windows[1]['levels'] is None and
+  _pr.windows[2]['levels'] == {'PP': 15000.0} and
+  _n13 == 1 and _doc13['sessions'] == [DEV] and
+  _doc13['windows'][0]['levels'] == {'PP': 15000.0} and
+  'r.levels_blind_from = blind_from' in open(PI.__file__).read())
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

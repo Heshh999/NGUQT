@@ -323,7 +323,7 @@ function progressRail(snap) {
     ...p.milestones.map(m => h('span', { class: 'mark' + (m.reached ? ' hit' : ''), style: `left:${100 * m.sessions / maxM}%`, title: m.label }, m.sessions)));
   const fams = Object.keys(p.nq_events_by_family || {});
   return h('section', { class: 'card c8' }, h('h2', null, 'Where the study stands'),
-    h('div', { class: 'row' }, h('b', { class: 'mono', style: 'font-size:22px' }, `${p.sessions_complete}`), h('span', null, `complete session${p.sessions_complete === 1 ? '' : 's'} of ${p.sessions_seen} seen`),
+    h('div', { class: 'row' }, h('b', { class: 'mono', style: 'font-size:22px' }, `${p.sessions_complete}`), h('span', null, `complete session${p.sessions_complete === 1 ? '' : 's'} of ${p.sessions_seen} seen` + (p.sessions_complete_reconstructed ? ` (${p.sessions_complete_reconstructed} relying on reconstructed manifests)` : '')),
       ...p.milestones.map(m => chip(m.reached ? 'READY' : 'INSUFFICIENT_PRIOR_HISTORY', m.reached ? `${m.sessions}: reached` : `${m.sessions}: ${m.remaining} to go`))),
     rail,
     h('ul', null, ...p.milestones.map(m => h('li', { class: 'dim' }, `${m.sessions} — ${m.label}`))),

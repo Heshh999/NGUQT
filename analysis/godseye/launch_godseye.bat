@@ -1,6 +1,9 @@
 @echo off
 rem MROF God's Eye View - ordinary Windows launcher (no Pinokio needed).
-rem Runs ONE bounded export, then serves the dashboard on 127.0.0.1.
+rem Runs ONE bounded export, then serves the dashboard on 127.0.0.1 and
+rem opens it in the browser once the server is listening; while the window
+rem stays open the snapshot is refreshed every 5 minutes (a separate,
+rem below-normal-priority process).
 rem It never starts, stops or touches NinjaTrader or the recorder.
 setlocal
 cd /d "%~dp0"
@@ -17,6 +20,5 @@ if errorlevel 1 (
   echo Export reported a problem. The previous snapshot, if any, is served as STALE.
 )
 echo [2/2] serving on http://127.0.0.1:8765/  (Ctrl+C stops the dashboard only)
-start "" http://127.0.0.1:8765/
-python godseye_server.py --config godseye.config.json
+python godseye_server.py --config godseye.config.json --open --refresh 300
 endlocal

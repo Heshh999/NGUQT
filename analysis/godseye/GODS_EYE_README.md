@@ -80,6 +80,20 @@ capture file open between requests.
   after it (15 min of 1-minute candles either side from the trade stream),
   capped at 250,000 rows per stream. A capped read says `truncated` in the
   bundle and on the page. The demo's window read 978.5 KB.
+* The pilot's windows file (`--windows-out`) is ~1.5 KB per decision
+  window, ~4,500 windows per session: about **100 MB** once the September
+  DEV sessions are all in. It is split **once per pilot run** (or ledger
+  change) into one piece per (session, instrument) of inspectable
+  sessions, in `out_dir`; a routine export then reads only the ~1.5 MB
+  index, and the server loads at most four pieces. Measured on a
+  synthetic 63,000-window, 100 MB file: the one-time split ~20 s at 284 MB
+  peak Python heap; a routine export's windows part 0.06 s and 5.7 MB;
+  the server ~30 MB after opening six sessions. (1.0 parsed the whole
+  file on every export and held all of it in the server: 284 MB peak per
+  export, 183 MB resident.)
+* The server re-reads the exposure ledger whenever it changes, so a
+  weekly pilot run that labels new sessions needs no server restart; a
+  missing or unreadable ledger still closes every event-level view.
 * The snapshot records `resource_use.bytes_read` and `files_read`; the
   status file records duration and peak Python heap.
 
@@ -140,6 +154,9 @@ python mrofyt_runner.py   "D:\MLES_Capture" --out C:\MROF\reports\ledger.json
 python mrofyt_pilot.py    "D:\MLES_Capture" --out C:\MROF\reports\pilot.json --windows-out C:\MROF\reports\windows.json
 python mrofyt_wave2.py    "D:\MLES_Capture" --both --out C:\MROF\reports\wave2.json
 python mrofyt_recover.py  "D:\MLES_Capture" --dry-run --out C:\MROF\reports\recovery.json
+                          (the dry run also says what a --repair would write
+                           against the free space; 1.3 refuses a repair that
+                           would leave the drive under 40 GB free)
 ```
 
 Then:
@@ -175,13 +192,15 @@ a date before the hold-out is not automatically exposed.
 
 ### 3.3 Ordinary Windows launch
 
-* `launch_godseye.bat` — one bounded export, then the server; opens
-  `http://127.0.0.1:8765/`. `Ctrl+C` stops the dashboard only. It never
-  starts, stops or touches NinjaTrader or the recorder.
-* `export_godseye.bat` — refresh the snapshot only. For a live view while
-  the recorder runs, schedule it (Task Scheduler → *Create Basic Task* →
-  repeat every 5 minutes → *Start a program* → this file, *Start in* =
-  this folder). Each run is seconds and reads kilobytes of the open runs.
+* `launch_godseye.bat` — one bounded export, then the server, which opens
+  `http://127.0.0.1:8765/` in the browser once it is listening (`--open`)
+  and, while its window stays open, re-runs the export every 5 minutes
+  (`--refresh 300`) as a separate process at below-normal priority, so the
+  health view and the 🔔 watchdog stay current without any scheduling.
+  `Ctrl+C` stops the dashboard only. It never starts, stops or touches
+  NinjaTrader or the recorder.
+* `export_godseye.bat` — refresh the snapshot only, by hand. Not needed
+  while the dashboard is open.
 * Manual: `python godseye_export.py --config godseye.config.json` then
   `python godseye_server.py --config godseye.config.json [--port N]`.
 
@@ -279,7 +298,9 @@ counter-example, `1`–`5` views.
 
 **Where the study stands (on Recording health).** Complete sessions —
 window fully passed, both instruments ≥ 95% covered, no shared gap over
-5 minutes, every manifest run audit-clean — against the runbook's 20- and
+5 minutes, every manifest run audit-clean (a run whose only flag is
+`RECONSTRUCTED_RUN_NOT_SELF_VERIFYING` counts, and the session is shown
+as relying on reconstructed manifests) — against the runbook's 20- and
 60-session milestones on a rail; the registration's checkpoint
 (2026-12-01) with trading days left; NQ signal-source events per family
 against the 30-event minimum with a linear accrual projection (a count,
@@ -401,9 +422,10 @@ field as `—`, never as zero.
 
 | check | result |
 | --- | --- |
-| `tests_godseye.py` | **36/36** |
-| the 14 package suites in `analysis/mrofyt` | **490/490** (unchanged; re-run after the two additive flags) |
-| package total | **526/526** |
+| `tests_godseye.py` | **42/42** |
+| the 14 package suites in `analysis/mrofyt` | **494/494** (pilot 45 with `P13`, recovery 35 with `V10`–`V10c`) |
+| package total | **536/536** |
+| real-scale replay split | synthetic 63,000 windows / 100 MB: one-time split ~20 s, 284 MB peak; routine export 0.06 s, 5.7 MB; server ~30 MB |
 | theatre scripts vs frozen code | 15 demos: every flow demo fires in the frozen detector in the named direction, every counter-example does not and fails exactly one clause, both candle arms fire in the frozen arm functions (`G11`–`G11c`); `resolve()` agrees with `mrofyt_wave2` on 6,000 random inputs for all six derived families (`G11d`) |
 | registry vs frozen detectors | 0 mismatches on 20,000 random inputs per family (`G1b`) |
 | browser render | Chromium 141 headless (Playwright): all four views rendered, replay cursor moved into a window, no page errors, no console errors |
@@ -434,7 +456,12 @@ script and the frozen detector fires on it · `G11b` counter-examples do
 not fire, one clause fails · `G11c` candle arms through the frozen arm
 functions · `G11d` resolve() equals mrofyt_wave2 · `G12` complete-session
 rule · `G12b` progress section · `G12c` market clock and trading days ·
-`G12d` disk runway.
+`G12d` disk runway · `G12e` a session whose only audit flag is the
+reconstructed-manifest notice is complete, labelled as such · `G13`
+replay windows split once, routine exports reuse it · `G13a` rebuild on a
+new windows file or ledger · `G13b` server holds ≤ 4 pieces and re-reads a
+changed ledger · `G13c` the launcher lets the server open the browser ·
+`G13d` the server's refresher runs one export as a separate process.
 
 ---
 

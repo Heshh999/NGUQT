@@ -39,6 +39,7 @@ SERVER_VERSION = 'MROF-GODSEYE-SERVER-1.0'
 STATIC_DIR = os.path.join(HERE, 'static')
 STALE_AFTER_S = 15 * 60               # a snapshot older than this is stale
 BUNDLE_CACHE = 24
+SHARD_CACHE = 4                       # (session, instrument) window pieces held
 _MIME = {'.html': 'text/html; charset=utf-8', '.js': 'application/javascript',
          '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml',
          '.png': 'image/png', '.ico': 'image/x-icon'}
@@ -50,15 +51,33 @@ class State(object):
     def __init__(self, cfg):
         self.cfg = cfg
         self.out_dir = cfg['out_dir']
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self._snap = (None, None)          # (mtime, doc)
-        self._windows = None               # (mtime, index)
+        self._windex = (None, None)        # (mtime, windows index)
+        self._shards = collections.OrderedDict()   # path -> windows list
         self._bundles = collections.OrderedDict()
-        self.policy = GP.Policy.from_files(cfg.get('exposure_ledger') or '',
-                                           cfg.get('blind_from',
-                                                   GP.DEFAULT_BLIND_FROM),
-                                           synthetic=cfg.get('synthetic',
-                                                             False))
+        self._policy = None
+        self._policy_key = object()
+
+    # ---- the policy, re-read whenever the exposure ledger changes -------
+    # (a weekly pilot run labels new sessions; a server left running
+    # would otherwise keep refusing them until restarted -- fail closed,
+    # but confusing). The ledger is small; a stat per request is cheap.
+    @property
+    def policy(self):
+        lp = self.cfg.get('exposure_ledger') or ''
+        try:
+            st = os.stat(lp)
+            key = (st.st_size, st.st_mtime_ns)
+        except OSError:
+            key = None
+        with self.lock:
+            if key != self._policy_key or self._policy is None:
+                self._policy = GP.Policy.from_files(
+                    lp, self.cfg.get('blind_from', GP.DEFAULT_BLIND_FROM),
+                    synthetic=self.cfg.get('synthetic', False))
+                self._policy_key = key
+            return self._policy
 
     # ---- snapshot ----------------------------------------------------
     def snapshot(self):
@@ -106,24 +125,52 @@ class State(object):
                     replay_available=bool(self.cfg.get('capture_dir')) and
                     self.policy.ledger_days is not None)
 
-    # ---- windows (exposed feature vectors) -----------------------------
-    def windows(self):
-        p = self.cfg.get('windows')
-        if not p:
-            return None, 'no windows file configured (pilot --windows-out)'
+    # ---- windows (exposed feature vectors), one piece at a time ---------
+    def _windows_index(self, force=False):
+        p = os.path.join(self.out_dir, 'godseye_windows_index.json')
         try:
             m = os.path.getmtime(p)
-        except OSError as exc:
-            return None, 'windows file unreadable: %s' % exc
+        except OSError:
+            return None, ('no replay windows yet: run the pilot with '
+                          '--windows-out, name that file in the config, '
+                          'and export again')
         with self.lock:
-            if self._windows is None or self._windows[0] != m:
-                with open(p) as fh:
-                    doc = json.load(fh)
-                idx = collections.defaultdict(list)
-                for w in doc.get('windows', []):
-                    idx[(str(w.get('session')), w.get('instrument'))].append(w)
-                self._windows = (m, idx)
-            return self._windows[1], None
+            if force or self._windex[0] != m:
+                try:
+                    with open(p) as fh:
+                        self._windex = (m, json.load(fh))
+                except (OSError, ValueError) as exc:
+                    return None, 'windows index unreadable: %s' % exc
+            return self._windex[1], None
+
+    def windows_for(self, session, instrument):
+        """The decision windows of one (session, instrument), read from
+        the exporter's split. At most SHARD_CACHE pieces are held."""
+        for attempt in (0, 1):
+            wi, err = self._windows_index(force=bool(attempt))
+            if wi is None:
+                return None, err
+            sh = next((s for s in wi.get('shards', [])
+                       if s['session'] == str(session) and
+                       s['instrument'] == instrument), None)
+            if sh is None:
+                return [], None
+            path = os.path.join(self.out_dir, wi['dir'], sh['file'])
+            with self.lock:
+                if path in self._shards:
+                    self._shards.move_to_end(path)
+                    return self._shards[path], None
+            try:
+                with open(path) as fh:
+                    ws = json.load(fh).get('windows', [])
+            except OSError:
+                continue            # a newer export replaced the split
+            with self.lock:
+                self._shards[path] = ws
+                while len(self._shards) > SHARD_CACHE:
+                    self._shards.popitem(last=False)
+            return ws, None
+        return None, 'the replay windows changed while reading; try again'
 
     # ---- bundles -------------------------------------------------------
     def bundle(self, session, instrument, run, t_start, t_end):
@@ -261,10 +308,9 @@ class Handler(BaseHTTPRequestHandler):
             if p == '/api/replay/windows':
                 ses, inst = q.get('session'), q.get('instrument')
                 st.policy.require_inspectable([ses], 'features')
-                idx, err = st.windows()
-                if idx is None:
+                ws, err = st.windows_for(ses, inst)
+                if ws is None:
                     return self._json(503, dict(error=err))
-                ws = idx.get((str(ses), inst), [])
                 return self._json(200, dict(session=ses, instrument=inst,
                                             windows=ws,
                                             explain={h['id']: GR.explain(
@@ -274,11 +320,11 @@ class Handler(BaseHTTPRequestHandler):
             if p == '/api/replay/explain':
                 ses, inst = q.get('session'), q.get('instrument')
                 st.policy.require_inspectable([ses], 'features')
-                idx, err = st.windows()
-                if idx is None:
+                ws, err = st.windows_for(ses, inst)
+                if ws is None:
                     return self._json(503, dict(error=err))
                 te = float(q.get('t_end', 'nan'))
-                w = next((w for w in idx.get((str(ses), inst), [])
+                w = next((w for w in ws
                           if abs(float(w.get('t_end', 0)) - te) < 1e-6), None)
                 if w is None:
                     return self._json(404, dict(error='no such window'))
@@ -317,19 +363,68 @@ def make_server(cfg, bind='127.0.0.1', port=8765):
     return ThreadingHTTPServer((bind, port), Handler)
 
 
+EXPORT_SCRIPT = os.path.join(HERE, 'godseye_export.py')
+
+
+def refresh_once(config_path, timeout_s=900):
+    """Run ONE export as a separate process (never in this one), below
+    normal priority on Windows so the recorder's machine is not
+    competed with. Returns the exporter's exit code, or None when it
+    could not be run or did not finish in time."""
+    import subprocess
+    kw = {}
+    if os.name == 'nt':
+        kw['creationflags'] = getattr(subprocess, 'BELOW_NORMAL_PRIORITY_CLASS', 0)
+    try:
+        return subprocess.run([sys.executable, EXPORT_SCRIPT, '--config',
+                               config_path], stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL, timeout=timeout_s,
+                              **kw).returncode
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def start_refresher(config_path, every_s):
+    """Keep the snapshot fresh while the dashboard is open: one export
+    every `every_s` seconds, one at a time (a slow one -- the one-time
+    replay split after a pilot run -- delays the next, never overlaps)."""
+    def loop():
+        while True:
+            time.sleep(every_s)
+            refresh_once(config_path)
+    th = threading.Thread(target=loop, name='godseye-refresh', daemon=True)
+    th.start()
+    return th
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=SERVER_VERSION)
     p.add_argument('--config', required=True)
     p.add_argument('--port', type=int, default=None)
     p.add_argument('--bind', default=None)
+    p.add_argument('--open', action='store_true',
+                   help='open the dashboard in the browser once listening')
+    p.add_argument('--refresh', type=int, default=0, metavar='SECONDS',
+                   help='re-run the export every SECONDS while serving '
+                        '(separate process, below normal priority); 0 = never')
     a = p.parse_args(argv)
     cfg = load_config(a.config)
     bind = a.bind or cfg.get('bind') or '127.0.0.1'
     port = a.port or int(cfg.get('port') or 8765)
     srv = make_server(cfg, bind, port)
-    print('%s on http://%s:%d/  (snapshot dir: %s)'
-          % (SERVER_VERSION, bind, port, cfg['out_dir']))
+    url = 'http://%s:%d/' % ('127.0.0.1' if bind in ('0.0.0.0', '') else bind,
+                             port)
+    print('%s on %s  (snapshot dir: %s)' % (SERVER_VERSION, url, cfg['out_dir']))
     print('read-only; Ctrl+C stops it; the recorder is not touched')
+    if a.refresh:
+        every = max(60, a.refresh)
+        start_refresher(os.path.abspath(a.config), every)
+        print('snapshot refreshed every %d s while this window is open' % every)
+    if a.open:
+        # the socket is already bound and listening here, so the page the
+        # browser asks for can be answered -- no "site can't be reached"
+        import webbrowser
+        threading.Timer(0.3, webbrowser.open, [url]).start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

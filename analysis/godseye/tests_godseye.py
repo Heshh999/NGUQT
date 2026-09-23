@@ -660,6 +660,105 @@ t('G12d: disk runway is the free space over the median finalized bytes per '
   abs(disk['runway_session_days'] - disk['free_bytes'] / disk['bytes_per_session_day']) < 0.1 and
   'median' in disk['runway_note'])
 
+_recon = json.loads(json.dumps(_good))
+_recon['instruments']['NQ']['runs'] = [dict(
+    run_id='rr', audit=dict(ok=False, failure_codes=[
+        'RECONSTRUCTED_RUN_NOT_SELF_VERIFYING']))]
+_recon_bad = json.loads(json.dumps(_recon))
+_recon_bad['instruments']['NQ']['runs'][0]['audit']['failure_codes'].append(
+    'INSTANCE_SEQ_GAP')
+t('G12e: after a weekend repair a session whose ONLY audit flag is '
+  'RECONSTRUCTED_RUN_NOT_SELF_VERIFYING is complete and says it relies on '
+  'a reconstructed manifest; any other flag beside it still makes the '
+  'session incomplete, and the flag is named',
+  GE.session_completeness(_recon) ==
+  (True, 'complete, relying on 1 reconstructed manifest(s)') and
+  not GE.session_completeness(_recon_bad)[0] and
+  'INSTANCE_SEQ_GAP' in GE.session_completeness(_recon_bad)[1])
+
+# ---------------------------------------------------------------------
+# G13: replay windows are split once per pilot run; neither a routine
+# export nor the server holds the whole file
+# ---------------------------------------------------------------------
+wf_size = os.path.getsize(cfg['windows'])
+ix_path = os.path.join(cfg['out_dir'], GE.WINDOWS_INDEX_NAME)
+st13 = GE.write_snapshot(cfg)                       # a routine export
+s13 = json.load(open(os.path.join(cfg['out_dir'], 'godseye_snapshot.json')))
+ix13 = json.load(open(ix_path))
+wdoc13 = json.load(open(cfg['windows']))
+inspectable13 = [w for w in wdoc13['windows']
+                 if demo_pol.may_inspect(str(w['session']))]
+pieces_ok = True
+n_in_pieces = 0
+for sh in ix13['shards']:
+    p = json.load(open(os.path.join(cfg['out_dir'], ix13['dir'], sh['file'])))
+    n_in_pieces += len(p['windows'])
+    pieces_ok &= demo_pol.may_inspect(sh['session']) and all(
+        str(w['session']) == sh['session'] and w['instrument'] == sh['instrument']
+        for w in p['windows'])
+t('G13: the first export split the windows file into one piece per '
+  '(session, instrument) of inspectable sessions, each holding only its '
+  'own windows and together all of them; a routine export reuses the '
+  'split and does not read the windows file again',
+  s13['exposed']['windows_file']['index'] == 'cached' and pieces_ok and
+  n_in_pieces == len(inspectable13) and len(ix13['shards']) >= 2 and
+  st['bytes_read'] - st13['bytes_read'] > 0.9 * wf_size)
+
+old_dir13 = ix13['dir']
+_t13 = os.path.getmtime(cfg['windows']) + 5
+os.utime(cfg['windows'], (_t13, _t13))              # a new pilot run
+GE.write_snapshot(cfg)
+ix13b = json.load(open(ix_path))
+_l13 = os.path.getmtime(cfg['exposure_ledger']) + 5
+os.utime(cfg['exposure_ledger'], (_l13, _l13))      # the ledger moved on
+GE.write_snapshot(cfg)
+ix13c = json.load(open(ix_path))
+t('G13a: a changed windows file, or a changed exposure ledger, rebuilds '
+  'the split into a fresh directory and removes the old one',
+  ix13b['dir'] != old_dir13 and ix13c['dir'] != ix13b['dir'] and
+  not os.path.exists(os.path.join(cfg['out_dir'], old_dir13)) and
+  not os.path.exists(os.path.join(cfg['out_dir'], ix13b['dir'])) and
+  os.path.isdir(os.path.join(cfg['out_dir'], ix13c['dir'])))
+
+stt = GS.State(dict(cfg))
+pol_a = stt.policy
+pairs = [(sh['session'], sh['instrument']) for sh in ix13c['shards']]
+got = [stt.windows_for(s, i) for s, i in pairs]
+_l13b = os.path.getmtime(cfg['exposure_ledger']) + 5
+os.utime(cfg['exposure_ledger'], (_l13b, _l13b))
+pol_b = stt.policy
+t('G13b: the server reads one piece per (session, instrument), holds at '
+  'most %d, returns nothing for a session with no piece, and re-reads the '
+  'exposure ledger when it changes (no restart needed after a pilot run; '
+  'still fail-closed)' % GS.SHARD_CACHE,
+  all(err is None and ws and all(w['instrument'] == i for w in ws)
+      for (ws, err), (_, i) in zip(got, pairs)) and
+  len(stt._shards) <= GS.SHARD_CACHE < len(pairs) and
+  stt.windows_for('20260921', 'NQ') == ([], None) and
+  pol_b is not pol_a and not pol_b.may_inspect(prot[0]) and
+  pol_b.may_inspect(exposed[0]))
+
+_bat = open(os.path.join(HERE, 'launch_godseye.bat')).read()
+t('G13c: the Windows launcher lets the server open the browser once it is '
+  'listening, instead of racing it',
+  '--open' in _bat and 'start ""' not in _bat and
+  'webbrowser.open' in open(os.path.join(HERE, 'godseye_server.py')).read())
+
+# the refresher: one export, run as a SEPARATE process by the server
+_cfgp = os.path.join(DEMO, 'godseye.config.json')
+_snap_p = os.path.join(cfg['out_dir'], 'godseye_snapshot.json')
+_before_gen = json.load(open(_snap_p))['generated_epoch']
+time.sleep(1.1)
+_rc = GS.refresh_once(_cfgp)
+_after = json.load(open(_snap_p))
+_stat = json.load(open(os.path.join(cfg['out_dir'], 'godseye_status.json')))
+t('G13d: while the dashboard is open the server keeps it fresh -- one '
+  'export per tick, in a separate process (the launcher asks for every '
+  '300 s), so the snapshot never silently goes stale during market hours',
+  _rc == 0 and _stat['ok'] and _after['generated_epoch'] > _before_gen and
+  '--refresh 300' in _bat and
+  '--refresh 300' in open(os.path.join(HERE, 'pinokio', 'start.js')).read())
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))
