@@ -500,18 +500,464 @@ def _clause(cl, f):
                 passed=passed)
 
 
+# how each derived (wave-two) family differs from the family it is
+# derived from, exactly as mrofyt_wave2 implements it: an input swapped
+# (W2-A1, W2-A4r-HC), an input forced None (W2-A4r and everything built
+# on it: the response-failure test is progress_ticks <= 1 alone), an
+# input required (W2-A4f: evaluated only where the residual model can
+# speak), a threshold changed (W2-A4r-z15), a gate added (W2-A4-OPEN)
+_SUBSTITUTE = {'W2-A1': {'replenish_z': 'repl10_z'},
+               'W2-A4r-HC': {'aggr_z': 'aggr_z_hc'}}
+_FORCE_NONE = {'W2-A4r': ('resid_tail_5pct',)}
+_REQUIRE = {'W2-A4f': ('resid_tail_5pct',)}
+_EXTRA_GATE = {'W2-A4-OPEN': [_c('in_0930_1030', 'is_true')]}
+
+
+def _rename(cl, subs):
+    if cl.get('op') == 'any':
+        return _any(*[_rename(c, subs) for c in cl['clauses']])
+    return dict(cl, feature=subs.get(cl['feature'], cl['feature']))
+
+
+def _drop_forced(cl, forced):
+    """A clause on a forced-None feature can never hold; inside an
+    'any' it is removed, and an 'any' left with one clause is that
+    clause (this is what forcing resid None does to A4's fail test)."""
+    if cl.get('op') == 'any':
+        kept = [_drop_forced(c, forced) for c in cl['clauses']
+                if c.get('op') == 'any' or c['feature'] not in forced]
+        if len(kept) == 1:
+            return kept[0]
+        return _any(*kept)
+    return cl
+
+
+def resolve(hid):
+    """The gate, conditions and required inputs a family is actually
+    judged by, following derived_from. Wave-one entries resolve to
+    themselves; wave-two entries resolve to their base with the one
+    change the registration made, so the same evaluator explains both."""
+    h = by_id(hid)
+    if h.get('derived_from'):
+        base = resolve(h['derived_from'])
+        gate = list(base['gate'])
+        conds = [dict(c) for c in base['conditions']]
+        req = list(base['required_inputs'])
+        forced = set(base['forced_none'])
+        chain = base['chain'] + [hid]
+    else:
+        gate = list(h.get('gate', []))
+        conds = list(h.get('conditions', []))
+        req = list(h.get('required_inputs') or [
+            i['name'] for i in h.get('inputs', [])
+            if i.get('role') != 'direction'])
+        forced = set()
+        chain = [hid]
+    subs = _SUBSTITUTE.get(hid, {})
+    if subs:
+        conds = [_rename(c, subs) for c in conds]
+        req = [subs.get(r, r) for r in req]
+    forced |= set(_FORCE_NONE.get(hid, ()))
+    if forced:
+        conds = [_drop_forced(c, forced) for c in conds]
+        req = [r for r in req if r not in forced]
+    for r in _REQUIRE.get(hid, ()):
+        if r not in req:
+            req.append(r)
+    thr = h.get('threshold_change')
+    if thr:
+        conds = [dict(c, value=thr['variant'])
+                 if c.get('feature') == thr['feature'] and
+                 c.get('value') == thr['frozen'] else c for c in conds]
+    gate = gate + _EXTRA_GATE.get(hid, [])
+    return dict(id=hid, chain=chain, gate=gate, conditions=conds,
+                required_inputs=req, forced_none=sorted(forced),
+                substitutions=subs,
+                direction_sign=h.get('direction_sign'))
+
+
 def explain(hid, f):
     """{gate: [...], inputs_missing: [...], conditions: [...],
-    all_passed: bool} for one recorded feature dict."""
-    h = by_id(hid)
-    gate = [_clause(c, f) for c in h.get('gate', [])]
-    req = h.get('required_inputs') or tuple(
-        i['name'] for i in h.get('inputs', []) if i.get('role') != 'direction')
-    missing = [k for k in req if f.get(k) is None]
-    conds = [_clause(c, f) for c in h.get('conditions', [])]
+    all_passed: bool} for one recorded feature dict, judged by the
+    family's resolved conditions."""
+    r = resolve(hid)
+    if r['forced_none']:
+        f = dict(f, **{k: None for k in r['forced_none']})
+    gate = [_clause(c, f) for c in r['gate']]
+    missing = [k for k in r['required_inputs'] if f.get(k) is None]
+    conds = [_clause(c, f) for c in r['conditions']]
     return dict(gate=gate, inputs_missing=missing, conditions=conds,
                 all_passed=(all(g['passed'] for g in gate) and not missing
                             and all(c['passed'] is True for c in conds)))
+
+
+# ---------------------------------------------------------------------
+# MECHANISM THEATRE: one scripted, synthetic scenario per hypothesis.
+#
+# These are ILLUSTRATIONS of what each frozen rule is looking for, not
+# data: the values were chosen so that the final beat satisfies every
+# resolved condition, and tests_godseye.py::G11 proves that by running
+# the frozen detector itself on them. Each demo also carries one
+# counter-example that changes ONE thing and does not fire, so the
+# rule's edge is visible. `inputs` accumulate beat by beat; `px` is the
+# price in ticks relative to the level; `bid`/`ask` are displayed sizes
+# resting at the level; `prints` are executions in that beat.
+# ---------------------------------------------------------------------
+def _beat(caption, px, bid, ask, prints=(), inputs=()):
+    return dict(caption=caption, px=px, bid=bid, ask=ask,
+                prints=[list(p) for p in prints],
+                inputs=[list(i) for i in inputs])
+
+
+_A4_BEATS = [
+    _beat('approach from below: price climbs into the level; sellers rest '
+          'on the offer there', -2, 9, 30, [['BUY', 4]]),
+    _beat('an aggressive push: buyers hit the level hard (aggr_z 2.3), '
+          'price pokes one tick through (progress 1) and no further -- '
+          'the push under-responds', 1, 7, 26,
+          [['BUY', 14], ['BUY', 11], ['BUY', 9]],
+          [['aggr_z', 2.3], ['progress_ticks', 1], ['aggr_dir', 1]]),
+    _beat('price comes back through the level (returned_through_level)',
+          -1, 12, 34, [['SELL', 8], ['SELL', 6]],
+          [['returned_through_level', True], ['sweep_reclaimed_5s', False]]),
+    _beat('the opposite side flips: sellers turn aggressive '
+          '(opp_flip_z 1.2)', -2, 15, 38, [['SELL', 12], ['SELL', 9]],
+          [['opp_flip_z', 1.2]]),
+    _beat('decision: aggression, failed response, return, flip -- fire '
+          'SHORT (-aggr_dir), away from the failed push', -3, 17, 40,
+          [['SELL', 5]]),
+]
+
+DEMOS = [
+    dict(id='A1', title='Absorption reversal', level='YDAY_HIGH', ad=1,
+         setting='price rises into yesterday\'s high from below; sellers '
+                 'rest at the level',
+         beats=[
+             _beat('a second approach inside 60 s (approaches_60s 2): price '
+                   'climbs back to the level', -2, 8, 40, [['BUY', 5]],
+                   [['approaches_60s', 2]]),
+             _beat('aggressive buying hits the offer (aggr_z 2.6) but price '
+                   'does not advance (progress 0 ticks)', 0, 6, 32,
+                   [['BUY', 12], ['BUY', 9], ['BUY', 14]],
+                   [['aggr_z', 2.6], ['progress_ticks', 0], ['aggr_dir', 1]]),
+             _beat('the offer refills faster than it is eaten '
+                   '(replenish_z 2.1): the buying is being absorbed', 0, 6, 44,
+                   [['BUY', 7]], [['replenish_z', 2.1]]),
+             _beat('the other side flips: sellers turn aggressive '
+                   '(opp_flip_z 1.4) and price retreats a tick '
+                   '(retreat_ticks 1)', -1, 10, 46, [['SELL', 11], ['SELL', 8]],
+                   [['opp_flip_z', 1.4], ['retreat_ticks', 1]]),
+             _beat('decision: every condition held -- fire SHORT (-aggr_dir), '
+                   'away from the absorbed buyers', -2, 12, 48, [['SELL', 6]]),
+         ],
+         counter=dict(caption='same tape, but the offer is NOT refilled '
+                              '(replenish_z 0.3): nothing absorbed the '
+                              'buying, so A1 stays silent -- a wall being '
+                              'eaten through is A2\'s territory, not A1\'s',
+                      inputs=[['replenish_z', 0.3]])),
+    dict(id='A2', title='Depletion continuation', level='YDAY_HIGH', ad=1,
+         setting='a qualifying wall (wall_z 2.4) rests on the offer at '
+                 'yesterday\'s high; price approaches from below',
+         beats=[
+             _beat('the wall is visible: displayed size on the offer is 2.4 '
+                   'baseline deviations above normal', -2, 8, 120, [],
+                   [['wall_z', 2.4]]),
+             _beat('it is executed THROUGH: 1.8x its displayed size trades '
+                   'into it (exec_vs_displayed 1.8)', 0, 8, 40,
+                   [['BUY', 60], ['BUY', 70], ['BUY', 85]],
+                   [['exec_vs_displayed', 1.8]]),
+             _beat('and it is not refilled (replenish_ratio 0.1): the level '
+                   'clears', 1, 10, 12, [['BUY', 20]],
+                   [['replenish_ratio', 0.1]]),
+             _beat('the clear holds 5 s (cleared_held_5s) and flow keeps '
+                   'agreeing, tick after tick (persist_agree 4)', 2, 14, 10,
+                   [['BUY', 9], ['BUY', 11], ['BUY', 8], ['BUY', 10]],
+                   [['cleared_held_5s', True], ['persist_agree', 4],
+                    ['break_dir', 1]]),
+             _beat('flow after the clear is still elevated (post_clear_z '
+                   '1.3) -- fire LONG (break_dir): continuation THROUGH the '
+                   'wall, not a fade of it', 3, 16, 9, [['BUY', 13]],
+                   [['post_clear_z', 1.3]]),
+         ],
+         counter=dict(caption='the wall is hit just as hard, but it refills '
+                              '(replenish_ratio 0.6): not a depletion -- '
+                              'that tape is closer to A1',
+                      inputs=[['replenish_ratio', 0.6]])),
+    dict(id='A3', title='Vacuum continuation', level='SESSION_VWAP', ad=1,
+         setting='the book above price thins out without being traded '
+                 'through; this family runs on its own 2 s grid and needs a '
+                 'feed on which ADD/REMOVE/UPDATE are distinguishable',
+         beats=[
+             _beat('the feed distinguishes depth actions '
+                   '(actions_distinguishable): pulls can be told from '
+                   'executions', -1, 20, 60, [],
+                   [['actions_distinguishable', True]]),
+             _beat('the target side (the offer) drops 70% within 2 s with no '
+                   'matching executions (tgt_drop_frac 0.70): the liquidity '
+                   'was pulled, not eaten', -1, 20, 18, [],
+                   [['tgt_drop_frac', 0.70]]),
+             _beat('the opposite side barely moves (opp_drop_frac 0.10): '
+                   'this is not a book reset', -1, 18, 16, [],
+                   [['opp_drop_frac', 0.10]]),
+             _beat('flow leans into the gap (delta_z 1.4) and price advances '
+                   'two ticks (advance_ticks 2)', 1, 18, 14,
+                   [['BUY', 9], ['BUY', 12]],
+                   [['delta_z', 1.4], ['advance_ticks', 2], ['vacuum_dir', 1]]),
+             _beat('decision: fire LONG (vacuum_dir): continuation INTO the '
+                   'vacuum', 2, 18, 12, [['BUY', 7]]),
+         ],
+         counter=dict(caption='both sides drop together (opp_drop_frac '
+                              '0.50): that is a book reset or a blackout, '
+                              'not a vacuum -- no fire',
+                      inputs=[['opp_drop_frac', 0.50]])),
+    dict(id='A4', title='Response-failure reversal', level='YDAY_HIGH', ad=1,
+         setting='price pushes through yesterday\'s high from below and '
+                 'the push does not get paid',
+         beats=_A4_BEATS,
+         counter=dict(caption='the push under-responds and sellers flip, '
+                              'but price never comes back through the level '
+                              '(no return, no reclaim): no reversal to '
+                              'trade -- no fire',
+                      inputs=[['returned_through_level', False],
+                              ['sweep_reclaimed_5s', False]])),
+    dict(id='A5', title='Pullback resumption', level='SESSION_VWAP', ad=-1,
+         setting='an up-trend (trend_dir +1) pulls back DOWN into VWAP from '
+                 'above. NOTE: four of these five inputs are passed as '
+                 'None by the runner today, so this is what the rule '
+                 'WOULD look for, not something the pilot can see',
+         beats=[
+             _beat('the higher-timeframe trend is up (trend_dir +1); price '
+                   'pulls back into VWAP from above', 1, 40, 12,
+                   [['SELL', 5]], [['trend_dir', 1]]),
+             _beat('counter-trend selling hits the bid at the level '
+                   '(adverse_z 2.2) and price does not give way '
+                   '(adverse_progress_ticks 0)', 0, 34, 10,
+                   [['SELL', 13], ['SELL', 10], ['SELL', 12]],
+                   [['adverse_z', 2.2], ['adverse_progress_ticks', 0]]),
+             _beat('the bid refills (replenish_z 1.9): the pullback is being '
+                   'absorbed', 0, 46, 10, [['SELL', 6]],
+                   [['replenish_z', 1.9]]),
+             _beat('the trend side flips back to aggression '
+                   '(trend_flip_z 1.3)', 1, 48, 8, [['BUY', 11], ['BUY', 9]],
+                   [['trend_flip_z', 1.3]]),
+             _beat('decision: fire LONG (trend_dir): RESUMPTION with the '
+                   'trend -- the pullback is faded, the trend followed',
+                   2, 50, 7, [['BUY', 8]]),
+         ],
+         counter=dict(caption='the pullback is absorbed but the trend side '
+                              'never flips back (trend_flip_z 0.2): no '
+                              'resumption yet -- no fire',
+                      inputs=[['trend_flip_z', 0.2]])),
+    dict(id='A6', title='Open continuation', level='OVERNIGHT_LOW', ad=-1,
+         setting='09:31 ET: price breaks the overnight low from above '
+                 '(ad -1) inside the first 15 minutes of cash trading',
+         beats=[
+             _beat('the gate: 09:30:00-09:45:00 ET and an open-type level '
+                   '(in_0930_0945)', 1, 30, 14, [['SELL', 6]],
+                   [['in_0930_0945', True]]),
+             _beat('a clean cross: price goes through the level without '
+                   'trading back across it (clean_cross)', -1, 12, 16,
+                   [['SELL', 14], ['SELL', 11]],
+                   [['clean_cross', True], ['break_dir', -1]]),
+             _beat('control flow is strong (control_z 2.5) and the break '
+                   'holds 5 s (held_5s)', -2, 10, 18,
+                   [['SELL', 12], ['SELL', 9], ['SELL', 10]],
+                   [['control_z', 2.5], ['held_5s', True]]),
+             _beat('flow keeps agreeing tick after tick (persist_agree 3) '
+                   'and the far side does NOT refill (opp_replenish_z 0.4)',
+                   -3, 9, 20, [['SELL', 8], ['SELL', 7], ['SELL', 9]],
+                   [['persist_agree', 3], ['opp_replenish_z', 0.4]]),
+             _beat('decision: fire SHORT (break_dir): CONTINUATION of the '
+                   'break -- not A4\'s reversal', -4, 8, 22, [['SELL', 6]]),
+         ],
+         counter=dict(caption='same break, but the far side refills '
+                              '(opp_replenish_z 2.0): the break is being '
+                              'absorbed -- no continuation, no fire',
+                      inputs=[['opp_replenish_z', 2.0]])),
+    dict(id='W2-A1', title='A1 with replenishment on every grid tick',
+         level='YDAY_HIGH', ad=1,
+         setting='the same tape as A1; the one change is HOW '
+                 'replenishment is measured: adds at the top-3 levels over '
+                 '10 s divided by executions there, observed on EVERY grid '
+                 'tick (repl10_z) instead of only when an execution '
+                 'happens at the level',
+         beats=[
+             _beat('second approach inside 60 s', -2, 8, 40, [['BUY', 5]],
+                   [['approaches_60s', 2]]),
+             _beat('aggressive buying (aggr_z 2.6), no progress', 0, 6, 32,
+                   [['BUY', 12], ['BUY', 9], ['BUY', 14]],
+                   [['aggr_z', 2.6], ['progress_ticks', 0], ['aggr_dir', 1]]),
+             _beat('adds at the top three offer levels outrun executions '
+                   'over the 10 s window (repl10_z 2.0) -- measurable on '
+                   'this tick even though nothing traded AT the level',
+                   0, 6, 44, [], [['repl10_z', 2.0]]),
+             _beat('sellers flip (opp_flip_z 1.4), price retreats a tick',
+                   -1, 10, 46, [['SELL', 11], ['SELL', 8]],
+                   [['opp_flip_z', 1.4], ['retreat_ticks', 1]]),
+             _beat('decision: fire SHORT (-aggr_dir), as A1', -2, 12, 48,
+                   [['SELL', 6]]),
+         ],
+         counter=dict(caption='adds do not outrun executions '
+                              '(repl10_z 0.2): no absorption -- no fire',
+                      inputs=[['repl10_z', 0.2]])),
+    dict(id='W2-A4r', title='A4 as it ran', level='YDAY_HIGH', ad=1,
+         setting='A4 with resid_tail_5pct forced None: the response-failure '
+                 'test is progress_ticks <= 1 alone. This is the version '
+                 'that produced every wave-one A4 event',
+         beats=_A4_BEATS,
+         counter=dict(caption='sellers never flip (opp_flip_z 0.3): the '
+                              'failed push is not answered -- no fire',
+                      inputs=[['opp_flip_z', 0.3]])),
+    dict(id='W2-A4f', title='A4 as written (residual wired)',
+         level='YDAY_HIGH', ad=1,
+         setting='the push DOES move price three ticks -- but the '
+                 'expected-response model says that is in the bottom 5% '
+                 'of what such aggression normally buys (resid_tail_5pct). '
+                 'Only the residual can call this a failure; progress '
+                 'alone would not',
+         beats=[
+             _beat('approach from below', -2, 9, 30, [['BUY', 4]]),
+             _beat('a hard push (aggr_z 2.8) moves price three ticks '
+                   '(progress 3) -- on its face, a response', 3, 7, 22,
+                   [['BUY', 16], ['BUY', 13], ['BUY', 12]],
+                   [['aggr_z', 2.8], ['progress_ticks', 3], ['aggr_dir', 1]]),
+             _beat('the residual model, fitted on >= 20 prior observations '
+                   'in this 5-minute bucket, expected far more: the response '
+                   'is in the bottom 5% tail (resid_tail_5pct True)', 3, 7, 24,
+                   [], [['resid_tail_5pct', True]]),
+             _beat('price comes back through (returned_through_level) and '
+                   'sellers flip (opp_flip_z 1.3)', -1, 13, 36,
+                   [['SELL', 12], ['SELL', 10], ['SELL', 9]],
+                   [['returned_through_level', True],
+                    ['sweep_reclaimed_5s', False], ['opp_flip_z', 1.3]]),
+             _beat('decision: fire SHORT (-aggr_dir), and this event is '
+                   'resid-only: A4r would NOT have fired here', -2, 15, 40,
+                   [['SELL', 6]]),
+         ],
+         counter=dict(caption='the model says the three-tick response was '
+                              'normal (resid_tail_5pct False): with progress '
+                              '3 there is no failure -- no fire',
+                      inputs=[['resid_tail_5pct', False]])),
+    dict(id='W2-A4-OPEN', title='A4r where the mechanism is forced',
+         level='CASH_OPEN_0930', ad=1,
+         setting='09:52 ET, at the cash open price: the first hour, where '
+                 'a failed push is most likely to be a genuine failure. A '
+                 'REVERSAL family -- the opposite of A6',
+         beats=[_beat('the gate: 09:30-10:30 ET on CASH_OPEN_0930 or an '
+                      'overnight extreme (in_0930_1030)', -2, 9, 30,
+                      [['BUY', 4]], [['in_0930_1030', True]])] + _A4_BEATS[1:],
+         counter=dict(caption='the identical tape at 10:45 ET '
+                              '(in_0930_1030 False): outside the window '
+                              'the mechanism is not forced -- W2-A4r may '
+                              'fire, W2-A4-OPEN does not',
+                      inputs=[['in_0930_1030', False]])),
+    dict(id='W2-A4r-z15', title='A4r at aggr_z >= 1.5', level='YDAY_HIGH',
+         ad=1,
+         setting='the same failed push with milder aggression (aggr_z 1.7): '
+                 'below the frozen 2.0, above the variant\'s 1.5. Reported '
+                 'BESIDE W2-A4r, never in place of it',
+         beats=[
+             _beat('approach from below', -2, 9, 30, [['BUY', 4]]),
+             _beat('a moderate push (aggr_z 1.7) pokes one tick through and '
+                   'stalls (progress 1)', 1, 7, 26, [['BUY', 9], ['BUY', 8]],
+                   [['aggr_z', 1.7], ['progress_ticks', 1], ['aggr_dir', 1]]),
+             _beat('price comes back through', -1, 12, 34,
+                   [['SELL', 8], ['SELL', 6]],
+                   [['returned_through_level', True],
+                    ['sweep_reclaimed_5s', False]]),
+             _beat('sellers flip (opp_flip_z 1.2)', -2, 15, 38,
+                   [['SELL', 12], ['SELL', 9]], [['opp_flip_z', 1.2]]),
+             _beat('decision: the z15 variant fires SHORT; W2-A4r itself '
+                   'would not (1.7 < 2.0)', -3, 17, 40, [['SELL', 5]]),
+         ],
+         counter=dict(caption='aggression at 1.2: below even the variant\'s '
+                              'threshold -- no fire',
+                      inputs=[['aggr_z', 1.2]])),
+    dict(id='W2-A4r-HC', title='A4r on high-confidence aggressor',
+         level='YDAY_HIGH', ad=1,
+         setting='aggr_z is recomputed from prints whose inferred aggressor '
+                 'side is HIGH confidence only (aggr_z_hc). Here the '
+                 'all-prints z is 1.4 -- much of it low-confidence -- while '
+                 'the high-confidence prints alone read 2.2',
+         beats=[
+             _beat('approach from below', -2, 9, 30, [['BUY', 4]]),
+             _beat('a push whose HIGH-confidence prints are decisive '
+                   '(aggr_z_hc 2.2; all-prints aggr_z only 1.4); one tick '
+                   'through, stall', 1, 7, 26, [['BUY', 14], ['BUY', 10]],
+                   [['aggr_z_hc', 2.2], ['aggr_z', 1.4], ['progress_ticks', 1],
+                    ['aggr_dir', 1]]),
+             _beat('price comes back through', -1, 12, 34,
+                   [['SELL', 8], ['SELL', 6]],
+                   [['returned_through_level', True],
+                    ['sweep_reclaimed_5s', False]]),
+             _beat('sellers flip (opp_flip_z 1.2)', -2, 15, 38,
+                   [['SELL', 12], ['SELL', 9]], [['opp_flip_z', 1.2]]),
+             _beat('decision: fire SHORT on the high-confidence measure; '
+                   'this arm measures what the aggressor inference costs',
+                   -3, 17, 40, [['SELL', 5]]),
+         ],
+         counter=dict(caption='the high-confidence prints alone are not '
+                              'decisive (aggr_z_hc 1.1): no fire, whatever '
+                              'the all-prints z says',
+                      inputs=[['aggr_z_hc', 1.1]])),
+    dict(id='ARM-B1', title='Candle-only rejection wick', level='YDAY_HIGH',
+         ad=1, kind='candles',
+         setting='no flow input at all: the 1-minute bar containing the '
+                 'approach. The control every flow family must beat',
+         bars=[[0, 14998.0, 15004.0, 14997.5, 14998.5, 100]],
+         level_px=15000.0,
+         beats=[
+             _beat('the bar containing the approach opens below the level '
+                   'and pokes above it', 0, 0, 0),
+             _beat('the wick beyond the level is 4.0 of a 6.5 range (62%, '
+                   '>= 50%)', 0, 0, 0),
+             _beat('and the bar closes back below the level (14998.5 < '
+                   '15000): fire SHORT (-ad), away from the wick, at the '
+                   'first print after the minute ends', 0, 0, 0),
+         ],
+         counter=dict(caption='the same wick, but the bar closes ABOVE the '
+                              'level (15001): not a rejection -- no fire',
+                      bars=[[0, 14998.0, 15004.0, 14997.5, 15001.0, 100]])),
+    dict(id='ARM-B2', title='Candle-only engulfing reclaim', level='YDAY_HIGH',
+         ad=1, kind='candles',
+         setting='two 1-minute bars: the first closes THROUGH the level, '
+                 'the next closes back on the original side',
+         bars=[[0, 14998.5, 15002.0, 14998.0, 15001.5, 100],
+               [60, 15001.5, 15002.0, 14997.0, 14998.0, 120]],
+         level_px=15000.0,
+         beats=[
+             _beat('bar 1 closes through the level (15001.5 > 15000)', 0, 0, 0),
+             _beat('bar 2 opens there and trades back down', 0, 0, 0),
+             _beat('bar 2 closes back on the original side (14998 < 15000): '
+                   'fire SHORT (-ad) at the second bar\'s close', 0, 0, 0),
+         ],
+         counter=dict(caption='bar 2 closes at 15000.5: still through -- '
+                              'no reclaim, no fire',
+                      bars=[[0, 14998.5, 15002.0, 14998.0, 15001.5, 100],
+                            [60, 15001.5, 15002.0, 14997.0, 15000.5, 120]])),
+    dict(id='ARM-C', title='Placebo levels', level='placebo(YDAY_HIGH)', ad=1,
+         setting='the W2-A4r tape replayed at a level that is NOT a level: '
+                 'yesterday\'s high shifted by 6-20 proximity radii, seeded '
+                 'per session and level, kept >= 3 radii from every real '
+                 'level. If the families fire as often here, the level is '
+                 'not doing the work',
+         beats=_A4_BEATS,
+         counter=dict(caption='(the control has no counter-example: it is '
+                              'compared to, not judged)', inputs=[])),
+]
+
+
+def demo_inputs(demo, counter=False):
+    """The accumulated input dict at the final beat (with the
+    counter-example's overrides applied when asked)."""
+    f = {}
+    for b in demo['beats']:
+        for k, v in b['inputs']:
+            f[k] = v
+    if counter:
+        for k, v in demo['counter'].get('inputs', []):
+            f[k] = v
+    return f
 
 
 DISCREPANCIES = [

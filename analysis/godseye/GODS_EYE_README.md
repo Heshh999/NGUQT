@@ -23,7 +23,8 @@ order API, and `tests_godseye.py::G10b` scans every dashboard file for one.
 | `godseye_server.py` | MROF-GODSEYE-SERVER-1.0 | stdlib HTTP server on `127.0.0.1` serving the snapshot, the static page and the replay endpoints; re-checks the policy on every replay request |
 | `godseye_demo.py` | MROF-GODSEYE-DEMO-1.0 | builds a labelled **synthetic** capture and its reports through the tools' library entry points (never their CLIs, so no real ledger is touched) |
 | `static/index.html`, `static/style.css`, `static/app.js` | — | the dark, dependency-free frontend (vanilla JS, canvas) |
-| `tests_godseye.py` | 28 tests | boundary behaviour, HTTP behaviour, bounded reads, the demo |
+| `static/theatre.js` | — | the Mechanism theatre: one scripted scenario per hypothesis, played beat by beat while the frozen conditions light up; the thought-experiment sliders (§4a) |
+| `tests_godseye.py` | 36 tests | boundary behaviour, HTTP behaviour, bounded reads, the demo, the theatre scripts against the frozen detectors, study progress |
 | `launch_godseye.bat`, `export_godseye.bat` | — | ordinary Windows launchers (§3) |
 | `pinokio/` | — | optional Pinokio launcher that starts and stops **only** the dashboard (§3.4, unverified here) |
 | `godseye.config.example.json` | — | configuration template for real report locations (§3.2) |
@@ -258,6 +259,41 @@ identical to `ACTIVE_LEVEL_IDS`) and the context inventory (RVMR, ADR,
 running extremes, psychological, causal swings, 1-hour zones, EMA, Asia)
 sit below, each with its implementation status.
 
+**Mechanism theatre (§4a).** Every hypothesis — A1–A6, the six wave-two
+families, both candle arms and the placebo control — has one scripted
+scenario: five beats of a synthetic tape (price in ticks from the level,
+resting size at the level, executions) with the inputs the frozen rule
+reads appearing beat by beat, the condition checklist lighting up as they
+arrive, and the verdict at the end (fire long / fire short, with the
+direction rule quoted). Each has a **counter-example** that changes one
+thing — the offer is not refilled, the far side refills, price never
+comes back through, the same tape at 10:45 instead of 09:52 — and does
+not fire, so the rule's edge is visible. A **thought experiment** panel
+puts every input on a slider and re-evaluates the written conditions
+live. The scripts live in `godseye_registry.DEMOS`; `G11` runs the
+frozen detector itself (`mrofyt_signals`, `mrofyt_wave2`) on every
+script's final beat and on every counter-example, and `G11c` runs the
+frozen arm functions on the candle bars. Nothing in the theatre is data;
+it says so on every page. Keys: `space` play/pause, `←`/`→` beat, `c`
+counter-example, `1`–`5` views.
+
+**Where the study stands (on Recording health).** Complete sessions —
+window fully passed, both instruments ≥ 95% covered, no shared gap over
+5 minutes, every manifest run audit-clean — against the runbook's 20- and
+60-session milestones on a rail; the registration's checkpoint
+(2026-12-01) with trading days left; NQ signal-source events per family
+against the 30-event minimum with a linear accrual projection (a count,
+never a result; families in registry order, never ranked); why each
+incomplete session is incomplete. Also on that view: **disk runway** in
+session-days (free space over the median finalized bytes per session-day)
+and the **next scheduled market change** (opens/closes, ET, countdown).
+Alerts are schedule-aware: not recording is `crit` while the market is
+scheduled open and `info` on a weekend, with the time by which recording
+must resume. The 🔔 **notify me** button (opt-in, this browser only)
+raises a local notification when recording stops or the snapshot goes
+stale during market hours; the tab title carries ⚠ while anything is
+critical.
+
 **Data quality & provenance.** One timeline per session, 18:00 ET the day
 before to 17:00 ET (DST-aware), NQ and MNQ rows, recorder runs / reconstructed
 manifests / orphans / open runs / audit failures distinguished by form and
@@ -365,9 +401,10 @@ field as `—`, never as zero.
 
 | check | result |
 | --- | --- |
-| `tests_godseye.py` | **28/28** |
+| `tests_godseye.py` | **36/36** |
 | the 14 package suites in `analysis/mrofyt` | **490/490** (unchanged; re-run after the two additive flags) |
-| package total | **518/518** |
+| package total | **526/526** |
+| theatre scripts vs frozen code | 15 demos: every flow demo fires in the frozen detector in the named direction, every counter-example does not and fails exactly one clause, both candle arms fire in the frozen arm functions (`G11`–`G11c`); `resolve()` agrees with `mrofyt_wave2` on 6,000 random inputs for all six derived families (`G11d`) |
 | registry vs frozen detectors | 0 mismatches on 20,000 random inputs per family (`G1b`) |
 | browser render | Chromium 141 headless (Playwright): all four views rendered, replay cursor moved into a window, no page errors, no console errors |
 | demo export | 0.428 s wall, 8,809,915 bytes read from 32 files, 22.75 MB peak Python heap, 155,476-byte snapshot |
@@ -392,7 +429,12 @@ with ≥ 5 sessions is not called prior-history · `G7` session window ET/UTC
 served, blind/unlisted 403 · `G8b` bundle contents · `G8c` evidence
 endpoint · `G8d` static traversal 404 · `G8e` served document clean ·
 `G9` row cap says truncated · `G9b` byte-offset search · `G10` windows
-file exposed-only · `G10b` no order API.
+file exposed-only · `G10b` no order API · `G11` every hypothesis has a
+script and the frozen detector fires on it · `G11b` counter-examples do
+not fire, one clause fails · `G11c` candle arms through the frozen arm
+functions · `G11d` resolve() equals mrofyt_wave2 · `G12` complete-session
+rule · `G12b` progress section · `G12c` market clock and trading days ·
+`G12d` disk runway.
 
 ---
 
@@ -440,5 +482,14 @@ file exposed-only · `G10b` no order API.
   slider covers 60 s before the window to 60 s after it. Red bands are
   gaps or invalid-book stretches. The evidence panel shows why each family
   did or did not fire at that window.
+* **Mechanism theatre**: pick a hypothesis, press play (or `space`), step
+  with `←`/`→`, press `c` for the counter-example, move a slider to ask
+  "what if this input were different". The verdict box quotes the
+  direction rule. From a family's inspector, "▶ watch the mechanism" jumps
+  here.
+* **Where the study stands**: the rail fills with complete sessions; the
+  chips say how many to go to each milestone; the family table says which
+  families would be read at the checkpoint at the current pace. "NOT
+  TESTED at this pace" means keep recording — it is not a failure.
 * **Nothing here is a fill, a stop, a target or an outcome.** Markouts are
   never shown for any session.

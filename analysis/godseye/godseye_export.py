@@ -125,6 +125,34 @@ def market_open(epoch):
     return not (17 * 3600 <= sod < 18 * 3600)
 
 
+def market_next_change(epoch, horizon_s=8 * 86400):
+    """The next scheduled open or close after `epoch`, to the minute:
+    (epoch_of_change, 'opens' | 'closes'). None past the horizon."""
+    state = market_open(epoch)
+    t = epoch - (epoch % 60) + 60
+    end = epoch + horizon_s
+    while t <= end:
+        if market_open(t) != state:
+            return t, ('closes' if state else 'opens')
+        t += 60
+    return None, None
+
+
+def trading_days_between(et_day_from, et_day_to):
+    """Weekdays strictly after `et_day_from` and before `et_day_to`
+    (YYYYMMDD both): the sessions still to come before a date. Exchange
+    holidays are not modelled, so this is an upper bound and says so."""
+    a = _dt.datetime.strptime(et_day_from, '%Y%m%d').date()
+    b = _dt.datetime.strptime(et_day_to, '%Y%m%d').date()
+    n = 0
+    d = a + _dt.timedelta(days=1)
+    while d < b:
+        if d.weekday() < 5:
+            n += 1
+        d += _dt.timedelta(days=1)
+    return n
+
+
 # ---------------------------------------------------------------------
 # bounded capture reads
 # ---------------------------------------------------------------------
@@ -258,6 +286,33 @@ def collect_capture(capture_dir, policy, now, meter):
             else 'recorder'
         runs.append(rec)
     cap['manifest_runs'] = runs
+    # disk runway: median bytes per session-day over sessions where both
+    # instruments closed at least one run, divided into the free space.
+    # Sessions still being written are not measured
+    per_ses = collections.defaultdict(lambda: dict(bytes=0, insts=set()))
+    for r in runs:
+        if 'error' in r or not r.get('session'):
+            continue
+        b = sum((s.get('bytes') or 0) for s in (r.get('streams') or {}).values())
+        per_ses[r['session']]['bytes'] += b
+        per_ses[r['session']]['insts'].add(r.get('instrument'))
+    sizes = sorted(v['bytes'] for v in per_ses.values()
+                   if v['insts'] >= set(INSTRUMENTS) and v['bytes'] > 0)
+    disk = cap.get('disk') or {}
+    if sizes and disk.get('free_bytes') is not None:
+        med = sizes[len(sizes) // 2]
+        disk.update(bytes_per_session_day=med,
+                    sessions_measured=len(sizes),
+                    runway_session_days=round(disk['free_bytes'] / med, 1),
+                    runway_note='median finalized bytes per session-day '
+                                '(both instruments) over %d session(s); '
+                                'exchange holidays and growth are not '
+                                'modelled' % len(sizes))
+    elif disk:
+        disk.update(bytes_per_session_day=None, sessions_measured=len(sizes),
+                    runway_session_days=None,
+                    runway_note='no session with both instruments finalized '
+                                'yet; runway unknown')
     # runs without a manifest: the recovery tool's own classification,
     # which is the rule that must pass before it writes anything
     orphans = []
@@ -294,6 +349,10 @@ def collect_capture(capture_dir, policy, now, meter):
     cap['runs_without_manifest'] = orphans
     cap['liveness_by'] = sorted(live_by)
     cap['market_scheduled_open'] = market_open(now)
+    nxt, what = market_next_change(now)
+    cap['market_next_change'] = dict(utc=_iso(nxt), epoch=nxt, what=what,
+                                     in_s=None if nxt is None
+                                     else round(nxt - now))
     cap['instruments'] = {i: _instrument_status(i, runs, orphans, now, cap)
                           for i in INSTRUMENTS}
     worst = [cap['instruments'][i]['status'] for i in INSTRUMENTS]
@@ -746,7 +805,10 @@ def build_hypotheses(reports, policy):
                    grid=h['grid'], window_et=h.get('window_et'),
                    level_set=h.get('level_set'),
                    inputs=h.get('inputs', []),
-                   conditions=h.get('conditions', []), gate=h.get('gate', []),
+                   conditions=GR.resolve(h['id'])['conditions'],
+                   gate=GR.resolve(h['id'])['gate'],
+                   required_inputs=GR.resolve(h['id'])['required_inputs'],
+                   forced_none=GR.resolve(h['id'])['forced_none'],
                    baseline=(GR.BASELINE_Z if h.get('baseline') == 'BASELINE_Z'
                              else GR.BASELINE_RESID if h.get('baseline')
                              else None),
@@ -850,6 +912,102 @@ def build_hypotheses(reports, policy):
                 baselines=dict(z=GR.BASELINE_Z, resid=GR.BASELINE_RESID),
                 families=out, levels=GR.LEVELS, context=GR.CONTEXT,
                 discrepancies=GR.DISCREPANCIES)
+
+
+# ---------------------------------------------------------------------
+# where the study stands: complete sessions against the runbook's
+# milestones, and event accrual against the registration's minimum.
+# Accrual only -- counts of events, never their direction or outcome
+# ---------------------------------------------------------------------
+CHECKPOINT_DATE = '20261201'          # MROF_YT_WAVE2_REGISTRATION.md §7
+FAMILY_MIN_EVENTS = 30                # NQ events; below it: NOT TESTED
+HARD_KILL_EVENTS = 200                # the registration's hard-kill count
+MILESTONES = [
+    (20, 'verification checkpoint: audit + outcome-blind runner on ~20 '
+         'complete sessions (NT8_RECORDING_RUNBOOK PHASE 2)'),
+    (60, 'descriptive read on ~60 complete sessions (PHASE 3)'),
+]
+COMPLETE_COVER_FRAC = 0.95
+COMPLETE_SHARED_GAP_S = 300.0
+
+
+def session_completeness(rec):
+    """(complete: bool, why: str) for one session record of
+    build_sessions. Complete means: the expected window has fully passed,
+    both instruments cover >= 95% of it, no shared gap over 5 minutes,
+    and every run with a manifest passed the audit (a run still open or
+    without a manifest cannot count)."""
+    if rec.get('expected_clipped_to_now'):
+        return False, 'session still in progress'
+    why = []
+    for inst in INSTRUMENTS:
+        d = rec['instruments'].get(inst) or {}
+        cf = d.get('covered_frac')
+        if cf is None or cf < COMPLETE_COVER_FRAC:
+            why.append('%s covers %s' % (inst, 'nothing' if cf is None
+                                         else '%.1f%%' % (100 * cf)))
+        for r in d.get('runs', []):
+            a = r.get('audit') or {}
+            if a.get('ok') is not True:
+                why.append('%s run %s: %s' % (inst, r.get('run_id'),
+                                              a.get('note') or 'audit failed'))
+                break
+    if (rec.get('shared_gap_s') or 0) > COMPLETE_SHARED_GAP_S:
+        why.append('%.0f min missing in both' % (rec['shared_gap_s'] / 60))
+    return (not why), ('; '.join(why) if why else 'complete')
+
+
+def build_progress(sessions, counts, now):
+    today = RUN.et_parts(now)[0]
+    complete, incomplete = [], []
+    for rec in sessions:
+        ok, why = session_completeness(rec)
+        (complete if ok else incomplete).append(
+            dict(session=rec['session'], why=why))
+    n = len(complete)
+    nq = {}
+    src = []
+    pil = (counts or {}).get('pilot') or {}
+    if pil:
+        # every wave-one family is listed once a pilot report exists; a
+        # family absent from the report's map has zero NQ events so far
+        for h in GR.WAVE_ONE:
+            nq[h['id']] = 0
+        src.append('pilot %s' % ((pil.get('source') or {}).get('version') or ''))
+    for fam, v in (pil.get('signal_source_events_by_family') or {}).items():
+        nq[fam] = v
+    w2 = (counts or {}).get('wave2') or {}
+    for fam, v in (w2.get('families') or {}).items():
+        if v.get('signal_source_events') is not None:
+            nq[fam] = v['signal_source_events']
+    if w2:
+        src.append('wave2 %s' % ((w2.get('source') or {}).get('version') or ''))
+    inspected = len(pil.get('sessions_inspected') or []) or None
+    tdays = trading_days_between(today, CHECKPOINT_DATE)
+    rate, proj = {}, {}
+    for fam, v in nq.items():
+        if inspected and isinstance(v, (int, float)):
+            rate[fam] = round(v / inspected, 3)
+            proj[fam] = int(round(v + rate[fam] * tdays))
+    return dict(
+        rule='a session is COMPLETE when its window has fully passed, both '
+             'instruments cover >= 95%% of it, no gap over 5 minutes is '
+             'shared, and every manifest run passed the audit; milestones '
+             'are the runbook\'s; the family minimum is the registration\'s '
+             '(%d NQ events by the checkpoint); the projection is linear '
+             'accrual at the rate so far and is a count, not a result'
+             % FAMILY_MIN_EVENTS,
+        today_et=today, sessions_seen=len(sessions), sessions_complete=n,
+        complete=complete, incomplete=incomplete,
+        milestones=[dict(sessions=m, label=lab, reached=n >= m,
+                         remaining=max(m - n, 0)) for m, lab in MILESTONES],
+        checkpoint=dict(date=CHECKPOINT_DATE, trading_days_to=tdays,
+                        note='weekdays before the checkpoint; exchange '
+                             'holidays not modelled'),
+        family_min_events=FAMILY_MIN_EVENTS, hard_kill_events=HARD_KILL_EVENTS,
+        nq_events_by_family=nq, sessions_inspected=inspected,
+        accrual_rate_per_session=rate, projected_by_checkpoint=proj,
+        sources=src)
 
 
 # ---------------------------------------------------------------------
@@ -1028,10 +1186,11 @@ def build_snapshot(cfg, now=None):
         counts=build_counts(reports, policy),
         exposed=build_exposed(reports, policy, cfg.get('windows'), meter),
     )
+    snap['progress'] = build_progress(snap['sessions'], snap['counts'], now)
     # second line of defence: strip event-level keys from every record
     # section that is not the exposed one, then prove it over the WHOLE
     # document minus that section
-    for k in ('health', 'audit', 'recovery', 'sessions', 'counts'):
+    for k in ('health', 'audit', 'recovery', 'sessions', 'counts', 'progress'):
         snap[k] = GP.strip_event_level(snap[k])
     hits = []
     for k in snap:

@@ -504,6 +504,162 @@ t('G10b: no dashboard module names an order API or the outcome stage '
   not any(any(tok in open(f).read() for tok in _ORDER_TOKENS)
           for f in glob.glob(os.path.join(HERE, 'godseye_*.py'))))
 
+# ---------------------------------------------------------------------
+# G11: the mechanism theatre's scripts are the frozen rules, not a story
+# ---------------------------------------------------------------------
+import random                                             # noqa: E402
+import mrofyt_signals as _SIG                             # noqa: E402
+import mrofyt_wave2 as _W2                                # noqa: E402
+
+
+def _frozen(hid, f, sod=9.87 * 3600):
+    """The frozen code's own verdict on a feature dict."""
+    if hid in _SIG.DETECTORS:
+        return _SIG.DETECTORS[hid](f)
+    return {'W2-A1': _W2.w2_a1, 'W2-A4r': _W2.w2_a4r, 'ARM-C': _W2.w2_a4r,
+            'W2-A4f': lambda g: _W2.w2_a4f(g)[0],
+            'W2-A4-OPEN': lambda g: _W2.w2_a4_open(
+                dict(g, level_id='CASH_OPEN_0930'),
+                sod if g.get('in_0930_1030') else 10.75 * 3600),
+            'W2-A4r-z15': _W2.w2_a4r_z15, 'W2-A4r-HC': _W2.w2_a4r_hc}[hid](f)
+
+
+flow_demos = [d for d in GR.DEMOS if d.get('kind') != 'candles']
+candle_demos = [d for d in GR.DEMOS if d.get('kind') == 'candles']
+t('G11: every hypothesis has one scripted demo, and on each flow demo\'s '
+  'final beat the FROZEN detector fires, in the direction the registry\'s '
+  'rule names, while the registry\'s written conditions agree',
+  {d['id'] for d in GR.DEMOS} == {h['id'] for h in GR.HYPOTHESES} and
+  all(_frozen(d['id'], GR.demo_inputs(d)) != 0 and
+      GR.explain(d['id'], GR.demo_inputs(d))['all_passed'] and
+      _frozen(d['id'], GR.demo_inputs(d)) == (
+          -GR.demo_inputs(d)[sign[1:]] if sign.startswith('-')
+          else GR.demo_inputs(d)[sign])
+      for d in flow_demos
+      # the control keeps each family's own direction: W2-A4r's here
+      for sign in [GR.resolve(d['id'])['direction_sign'] or '-aggr_dir']))
+
+
+def _n_failing(hid, f):
+    ex = GR.explain(hid, f)
+    return (sum(1 for c in ex['gate'] + ex['conditions'] if c['passed'] is not True)
+            + len(ex['inputs_missing']))
+
+
+t('G11b: each counter-example changes one thing and does NOT fire in the '
+  'frozen code; exactly one resolved clause fails (the control arm has no '
+  'counter-example and is excluded)',
+  all(_frozen(d['id'], GR.demo_inputs(d, counter=True)) == 0 and
+      _n_failing(d['id'], GR.demo_inputs(d, counter=True)) == 1
+      for d in flow_demos if d['id'] != 'ARM-C') and
+  GR.demo_inputs(next(d for d in GR.DEMOS if d['id'] == 'ARM-C'),
+                 counter=True) == GR.demo_inputs(
+      next(d for d in GR.DEMOS if d['id'] == 'ARM-C')))
+
+
+def _arm(d, bars):
+    if d['id'] == 'ARM-B1':
+        return _W2.arm_b1(bars[0], d['level_px'], d['ad'])
+    return _W2.arm_b2(bars[0], bars[1], d['level_px'], d['ad'])
+
+
+t('G11c: the candle arms\' bars fire -ad in the FROZEN arm functions and '
+  'the counter-example bars do not',
+  len(candle_demos) == 2 and
+  all(_arm(d, d['bars']) == -d['ad'] and _arm(d, d['counter']['bars']) == 0
+      for d in candle_demos))
+
+# resolve(): a derived family's resolved conditions are its wave-two
+# function, on random inputs including None
+rng = random.Random(11)
+
+
+def _rand_vec():
+    pick = lambda *xs: rng.choice(xs)                    # noqa: E731
+    return dict(aggr_z=pick(None, rng.uniform(0, 4)),
+                aggr_z_hc=pick(None, rng.uniform(0, 4)),
+                progress_ticks=pick(None, 0, 1, 2, 3),
+                resid_tail_5pct=pick(None, True, False),
+                returned_through_level=pick(None, True, False),
+                sweep_reclaimed_5s=pick(None, True, False),
+                opp_flip_z=pick(None, rng.uniform(0, 3)),
+                repl10_z=pick(None, rng.uniform(0, 3)),
+                replenish_z=pick(None, rng.uniform(0, 3)),
+                approaches_60s=pick(None, 1, 2, 3),
+                retreat_ticks=pick(None, 0, 1, 2),
+                aggr_dir=pick(1, -1), in_0930_1030=pick(True, False))
+
+
+vecs = [_rand_vec() for _ in range(6000)]
+t('G11d: resolve() makes the registry judge each wave-two family exactly '
+  'as mrofyt_wave2 does -- on 6,000 random inputs the resolved conditions '
+  'and the frozen function agree for W2-A1, W2-A4r, W2-A4f, W2-A4-OPEN, '
+  'W2-A4r-z15 and W2-A4r-HC (input swapped, forced None, required, gated, '
+  'threshold changed)',
+  all(GR.explain(hid, f)['all_passed'] == (_frozen(hid, f) != 0)
+      for hid in ('W2-A1', 'W2-A4r', 'W2-A4f', 'W2-A4-OPEN', 'W2-A4r-z15',
+                  'W2-A4r-HC')
+      for f in vecs) and
+  GR.resolve('W2-A4r-z15')['conditions'][0]['value'] == 1.5 and
+  GR.resolve('W2-A4r')['forced_none'] == ['resid_tail_5pct'] and
+  'resid_tail_5pct' in GR.resolve('W2-A4f')['required_inputs'] and
+  GR.resolve('W2-A4r-HC')['required_inputs'][0] == 'aggr_z_hc')
+
+# ---------------------------------------------------------------------
+# G12: where the study stands -- complete sessions, runway, the clock
+# ---------------------------------------------------------------------
+_good = dict(session='20260910', expected_clipped_to_now=False, shared_gap_s=0.0,
+             instruments={i: dict(covered_frac=0.99, runs=[dict(run_id='r', audit=dict(ok=True))])
+                          for i in ('NQ', 'MNQ')})
+_short = json.loads(json.dumps(_good)); _short['instruments']['MNQ']['covered_frac'] = 0.90
+_gap = json.loads(json.dumps(_good)); _gap['shared_gap_s'] = 900.0
+_open = json.loads(json.dumps(_good)); _open['instruments']['NQ']['runs'].append(
+    dict(run_id='o', audit=dict(ok=None, note='no manifest: not auditable')))
+_live = json.loads(json.dumps(_good)); _live['expected_clipped_to_now'] = True
+t('G12: a session is complete only when its window has passed, both '
+  'instruments cover >= 95%, no shared gap over 5 min, and every run passed '
+  'the audit; each failing reason is named',
+  GE.session_completeness(_good) == (True, 'complete') and
+  not GE.session_completeness(_short)[0] and 'MNQ covers 90.0%' in GE.session_completeness(_short)[1] and
+  not GE.session_completeness(_gap)[0] and '15 min missing in both' in GE.session_completeness(_gap)[1] and
+  not GE.session_completeness(_open)[0] and 'not auditable' in GE.session_completeness(_open)[1] and
+  GE.session_completeness(_live) == (False, 'session still in progress'))
+
+prog = snap['progress']
+t('G12b: the progress section of the demo snapshot counts sessions by that '
+  'rule, carries the runbook milestones (20, 60) and the registration\'s '
+  'checkpoint (2026-12-01, 30 NQ events, hard kill 200), lists every wave-one '
+  'and wave-two family with an integer count, and projects a count only',
+  prog['sessions_seen'] == len(snap['sessions']) and
+  prog['sessions_complete'] == sum(1 for s in snap['sessions'] if GE.session_completeness(s)[0]) and
+  [m['sessions'] for m in prog['milestones']] == [20, 60] and
+  prog['checkpoint']['date'] == '20261201' and prog['family_min_events'] == 30 and
+  prog['hard_kill_events'] == 200 and
+  set(prog['nq_events_by_family']) >= {'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'W2-A1', 'W2-A4r'} and
+  all(isinstance(v, int) for v in prog['nq_events_by_family'].values()) and
+  all(isinstance(v, int) for v in prog['projected_by_checkpoint'].values()) and
+  GP.scan_for_event_level(prog) == [])
+
+sat_noon = GE.et_local_to_utc('20260926', 12)             # a Saturday
+nxt, what = GE.market_next_change(sat_noon)
+wed = GE.et_local_to_utc('20260923', 10)
+nxt2, what2 = GE.market_next_change(wed)
+t('G12c: the clock -- from Saturday noon ET the next change is the Sunday '
+  '18:00 ET open; from Wednesday 10:00 ET it is the 17:00 ET halt; trading '
+  'days to the checkpoint count weekdays only',
+  what == 'opens' and nxt == GE.et_local_to_utc('20260927', 18) and
+  what2 == 'closes' and nxt2 == GE.et_local_to_utc('20260923', 17) and
+  GE.trading_days_between('20260925', '20260929') == 1 and     # Fri -> Mon
+  GE.trading_days_between('20261127', '20261201') == 1)
+
+disk = snap['health']['disk']
+t('G12d: disk runway is the free space over the median finalized bytes per '
+  'session-day, measured on sessions where both instruments closed a run, '
+  'and says so',
+  disk['sessions_measured'] > 0 and disk['bytes_per_session_day'] > 0 and
+  abs(disk['runway_session_days'] - disk['free_bytes'] / disk['bytes_per_session_day']) < 0.1 and
+  'median' in disk['runway_note'])
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

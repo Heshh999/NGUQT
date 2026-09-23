@@ -238,6 +238,14 @@ class Handler(BaseHTTPRequestHandler):
             if p == '/api/registry':
                 return self._json(200, dict(
                     registry=GR.REGISTRY_VERSION, hypotheses=GR.HYPOTHESES,
+                    resolved={h['id']: GR.resolve(h['id'])
+                              for h in GR.HYPOTHESES},
+                    demos=GR.DEMOS, demo_note=(
+                        'SCRIPTED ILLUSTRATIONS: synthetic values chosen '
+                        'so the final beat satisfies every frozen '
+                        'condition (tests_godseye G11 runs the frozen '
+                        'detector on them). Not market data; nothing here '
+                        'is a result or an outcome'),
                     levels=GR.LEVELS, context=GR.CONTEXT,
                     not_in_this_version=GR.NOT_IN_THIS_VERSION,
                     discrepancies=GR.DISCREPANCIES))

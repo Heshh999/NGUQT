@@ -168,6 +168,27 @@ canvas { width: 100%; display: block; background: var(--bg); border: 1px solid v
   border-radius: 4px; }
 footer { padding: 8px 16px 20px; color: var(--fg3); font-size: 12px;
   border-top: 1px solid var(--line); font-family: var(--mono); }
+
+/* study progress rail */
+.rail { position: relative; height: 16px; margin: 10px 0 22px; background: var(--bg3);
+  border: 1px solid var(--line); border-radius: 8px; }
+.rail .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--acc);
+  border-radius: 8px; opacity: .8; }
+.rail .mark { position: absolute; top: 18px; transform: translateX(-50%);
+  font-family: var(--mono); font-size: 11px; color: var(--fg2); }
+.rail .mark::before { content: ""; position: absolute; left: 50%; top: -18px; width: 2px;
+  height: 16px; background: var(--fg3); }
+.rail .mark.hit { color: #9fe0bd; } .rail .mark.hit::before { background: var(--live); }
+
+/* mechanism theatre */
+.caption { margin: 8px 0; min-height: 40px; font-size: 14px; line-height: 1.4; }
+.verdict { margin: 8px 0; padding: 8px 10px; border-radius: 4px; border: 1px solid var(--line);
+  font-family: var(--mono); font-size: 12.5px; color: var(--fg2); }
+.verdict.fire { border-color: var(--live); color: #9fe0bd; background: #12241b; }
+.verdict.nofire { border-color: var(--stale); color: #f1d98a; background: #2a2410; }
+.lab { display: grid; grid-template-columns: 150px 1fr 48px; gap: 8px; align-items: center;
+  margin: 4px 0; font-size: 12px; }
+.lab input[type=range] { width: 100%; accent-color: var(--acc); }
 @media (prefers-reduced-motion: no-preference) {
   .pill .dot.s-LIVE { animation: none; }
 }

@@ -102,7 +102,36 @@ async function load() {
   } catch (e) {
     S.err = 'server unreachable: ' + e;
   }
+  watchdog();
   render();
+}
+
+// ---------------------------------------------------------------- watchdog
+// a local browser notification when recording stops while the market is
+// scheduled open, or when the snapshot itself goes stale then. Opt-in,
+// per browser; nothing leaves this computer
+function watchPref() { try { return localStorage.getItem('godseye_watch') === '1'; } catch (e) { return false; } }
+function watchButton() {
+  const on = watchPref() && typeof Notification !== 'undefined' && Notification.permission === 'granted';
+  return h('button', { class: on ? 'on' : '', title: 'browser notification if recording stops during market hours (this browser only)', onclick: async () => {
+    if (typeof Notification === 'undefined') { alert('this browser has no Notification API'); return; }
+    if (on) { try { localStorage.setItem('godseye_watch', '0'); } catch (e) {} render(); return; }
+    const p = await Notification.requestPermission();
+    if (p === 'granted') { try { localStorage.setItem('godseye_watch', '1'); } catch (e) {} new Notification('MROF God\'s Eye', { body: 'watching: you will be told if recording stops while the market is open' }); }
+    render();
+  } }, on ? '🔔 watching' : '🔕 notify me');
+}
+function watchdog() {
+  const d = S.data; const snap = d && d.snapshot; const hl = (snap && snap.health) || {};
+  const open = hl.market_scheduled_open === true;
+  const bad = ['NQ', 'MNQ'].filter(i => ['DISCONNECTED', 'UNAVAILABLE', 'STALE'].includes(((hl.instruments || {})[i] || {}).status));
+  const critical = !!S.err || (snap && !hl.readable) || (open && bad.length > 0) || (open && d && d.stale);
+  const why = S.err ? S.err : snap && !hl.readable ? 'capture folder unreadable' : d && d.stale && open ? 'snapshot is STALE while the market is open' : bad.length ? bad.map(i => `${i} ${hl.instruments[i].status}`).join(', ') + ' while the market is open' : '';
+  document.title = (critical ? '⚠ ' : '') + 'MROF God\'s Eye View';
+  if (critical && !S.wasCritical && watchPref() && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    try { new Notification('MROF recorder needs attention', { body: why }); } catch (e) {}
+  }
+  S.wasCritical = critical;
 }
 
 // ---------------------------------------------------------------- header
@@ -118,8 +147,11 @@ function renderStrip() {
     strip.append(pill(x.status || 'UNKNOWN', i + ' ' + (x.status || 'UNKNOWN') +
       (o.newest_row_age_s !== undefined && o.newest_row_age_s !== null ? ' · row ' + ago(o.newest_row_age_s) + ' ago' : '')));
   }
+  const nx = hl.market_next_change || {};
+  if (hl.market_scheduled_open !== undefined) strip.append(h('span', { class: 'dim' }, (hl.market_scheduled_open ? 'market open' : 'market closed') + (nx.what ? ` · ${nx.what} in ${ago(nx.in_s)}` : '')));
   strip.append(h('span', { class: 'dim' }, 'snapshot ' + ago(d.age_s) + ' old' +
     (d.stale ? ' · STALE' : '')));
+  strip.append(watchButton());
   const p = snap.policy || {};
   strip.append(h('span', { class: 'dim' }, 'blind from ' + p.blind_from +
     ' · exposed ' + (p.exposed_sessions || []).length + ' · ledger ' +
@@ -160,9 +192,15 @@ function alerts(snap) {
   const out = [];
   const hl = snap.health || {};
   if (!hl.readable) out.push(['crit', 'capture folder cannot be read']);
+  const open = hl.market_scheduled_open; const nx = hl.market_next_change || {};
+  const nextOpen = nx.what === 'opens' ? ` — must be recording again by ${fmtET(nx.utc)} (${ago(nx.in_s)})` : '';
   for (const i of ['NQ', 'MNQ']) {
     const x = (hl.instruments || {})[i] || {};
-    if (['DISCONNECTED', 'UNAVAILABLE'].includes(x.status)) out.push(['crit', `${i}: ${x.status} — ${(x.evidence||[])[0]||''}`]);
+    if (['DISCONNECTED', 'UNAVAILABLE'].includes(x.status)) {
+      // not recording is critical only while the market is scheduled open; on a weekend it is expected
+      if (open === false) out.push(['info', `${i}: ${x.status} while the market is scheduled closed${nextOpen}`]);
+      else out.push(['crit', `${i}: ${x.status} — ${(x.evidence||[])[0]||''}`]);
+    }
     else if (x.status === 'STALE') out.push(['warn', `${i}: STALE — ${(x.evidence||[]).slice(-1)[0]||''}`]);
     else if (x.status === 'UNKNOWN') out.push(['warn', `${i}: UNKNOWN — ${(x.evidence||[])[0]||''}`]);
     const hb = (x.open_run || {}).heartbeat || {};
@@ -170,10 +208,12 @@ function alerts(snap) {
     if (+hb.dropped > 0) out.push(['warn', `${i}: recorder reports ${hb.dropped} dropped row(s)`]);
   }
   const disk = hl.disk || {};
-  if (disk.free_frac !== undefined && disk.free_frac !== null && disk.free_frac < 0.1)
-    out.push(['crit', `disk free ${pct(disk.free_frac)} (${bytes(disk.free_bytes)})`]);
-  else if (disk.free_bytes !== undefined && disk.free_bytes < 60e9)
-    out.push(['warn', `disk free ${bytes(disk.free_bytes)} — under ~3 session-days`]);
+  const rw = disk.runway_session_days;
+  if (rw !== undefined && rw !== null) {
+    if (rw < 3) out.push(['crit', `disk runway ${rw} session-days (${bytes(disk.free_bytes)} free at ${bytes(disk.bytes_per_session_day)} per session-day)`]);
+    else if (rw < 10) out.push(['warn', `disk runway ${rw} session-days (${bytes(disk.free_bytes)} free) — plan the next drive`]);
+  } else if (disk.free_frac !== undefined && disk.free_frac !== null && disk.free_frac < 0.1)
+    out.push(['crit', `disk free ${pct(disk.free_frac)} (${bytes(disk.free_bytes)}); runway unknown (no finalized session-day to measure)`]);
   const a = snap.audit || {};
   if (a.ok === false) out.push(['warn', `audit: ${Object.entries(a.failures_by_code||{}).map(([k,v])=>k+'×'+v).join(', ')}`]);
   if (a.ok === null || a.ok === undefined) out.push(['info', 'no audit report loaded']);
@@ -217,11 +257,13 @@ function viewHealth(snap) {
       c ? [h('h3', null, 'last closed run'), kv([['run', h('code', null, c.run_id)], ['session', c.session],
         ['contract', c.contract], ['build', c.build], ['closed', c.close_reason], ['last row', fmtET(c.last_recv_utc)], ['manifest', c.source]])] : null));
   }
-  const disk = hl.disk || {}; const files = hl.files || {};
+  cards.push(progressRail(snap));
+  const disk = hl.disk || {}; const files = hl.files || {}; const nx = hl.market_next_change || {};
   cards.push(h('section', { class: 'card c4' }, h('h2', null, 'Capture folder'),
     kv([['path', h('code', null, hl.path)], ['readable', hl.readable ? 'yes' : 'NO'],
-        ['scanned', fmtET(hl.scanned_utc)], ['market', hl.market_scheduled_open ? 'scheduled open' : 'scheduled closed'],
-        ['disk free', disk.free_bytes !== undefined ? `${bytes(disk.free_bytes)} of ${bytes(disk.total_bytes)} (${pct(disk.free_frac)})` : (disk.error || '—')]]),
+        ['scanned', fmtET(hl.scanned_utc)], ['market', (hl.market_scheduled_open ? 'scheduled open' : 'scheduled closed') + (nx.what ? ` · ${nx.what} ${fmtET(nx.utc)} (in ${ago(nx.in_s)})` : '')],
+        ['disk free', disk.free_bytes !== undefined ? `${bytes(disk.free_bytes)} of ${bytes(disk.total_bytes)} (${pct(disk.free_frac)})` : (disk.error || '—')],
+        ['runway', disk.runway_session_days !== undefined && disk.runway_session_days !== null ? `${disk.runway_session_days} session-days at ${bytes(disk.bytes_per_session_day)} per session-day (median of ${disk.sessions_measured})` : (disk.runway_note || '—')]]),
     disk.free_frac !== undefined ? h('div', { class: 'bar', title: 'used' }, h('i', { style: 'width:' + (100 * (1 - disk.free_frac)).toFixed(1) + '%' })) : null,
     h('h3', null, 'files'),
     kv([['manifests', n0(files.manifest)], ['reconstructed manifests', n0(files.reconstructed_manifest)],
@@ -269,6 +311,33 @@ function viewHealth(snap) {
       hl.runs_without_manifest) : h('div', { class: 'dim' }, 'none'),
     h('small', null, 'capture and recovery actions stay outside this dashboard (mrofyt_recover.py on a weekend)')));
   return cards;
+}
+// where the study stands: complete sessions against the runbook's
+// milestones, event accrual against the registration's minimum. Counts
+// only -- nothing here is a result, and families are listed in registry
+// order, never ranked
+function progressRail(snap) {
+  const p = snap.progress; if (!p) return h('section', { class: 'card c8' }, h('h2', null, 'Where the study stands'), h('div', { class: 'dim' }, 'no progress section in this snapshot (older exporter)'));
+  const maxM = Math.max(...p.milestones.map(m => m.sessions), 1);
+  const rail = h('div', { class: 'rail' }, h('i', { class: 'fill', style: `width:${Math.min(100, 100 * p.sessions_complete / maxM).toFixed(1)}%` }),
+    ...p.milestones.map(m => h('span', { class: 'mark' + (m.reached ? ' hit' : ''), style: `left:${100 * m.sessions / maxM}%`, title: m.label }, m.sessions)));
+  const fams = Object.keys(p.nq_events_by_family || {});
+  return h('section', { class: 'card c8' }, h('h2', null, 'Where the study stands'),
+    h('div', { class: 'row' }, h('b', { class: 'mono', style: 'font-size:22px' }, `${p.sessions_complete}`), h('span', null, `complete session${p.sessions_complete === 1 ? '' : 's'} of ${p.sessions_seen} seen`),
+      ...p.milestones.map(m => chip(m.reached ? 'READY' : 'INSUFFICIENT_PRIOR_HISTORY', m.reached ? `${m.sessions}: reached` : `${m.sessions}: ${m.remaining} to go`))),
+    rail,
+    h('ul', null, ...p.milestones.map(m => h('li', { class: 'dim' }, `${m.sessions} — ${m.label}`))),
+    h('div', { class: 'row', style: 'margin-top:8px' }, h('b', null, 'checkpoint '), h('span', { class: 'mono' }, p.checkpoint.date), h('span', { class: 'dim' }, `· ${p.checkpoint.trading_days_to} trading days left (${p.checkpoint.note})`), h('span', { class: 'dim' }, `· hold-out from ${(snap.policy || {}).blind_from}`)),
+    fams.length ? [h('h3', null, `NQ signal-source events so far (accrual only; minimum ${p.family_min_events} by the checkpoint; hard kill at ${p.hard_kill_events})`),
+      table([{ label: 'family', get: f => h('code', null, f) }, { label: 'events', num: true, get: f => n0(p.nq_events_by_family[f]) },
+             { label: 'per session', num: true, get: f => n0((p.accrual_rate_per_session || {})[f]) },
+             { label: `projected by ${p.checkpoint.date}`, num: true, get: f => n0((p.projected_by_checkpoint || {})[f]) },
+             { label: 'read at checkpoint?', get: f => { const n = p.nq_events_by_family[f] || 0, pr = (p.projected_by_checkpoint || {})[f]; return n >= p.family_min_events ? chip('READY', 'minimum reached') : pr !== undefined && pr >= p.family_min_events ? chip('CONDITION_FALSE', 'on pace (projection)') : chip('INSUFFICIENT_PRIOR_HISTORY', 'NOT TESTED at this pace'); } }],
+        fams),
+      h('small', null, 'a linear projection of a count at the rate so far; sessions inspected: ' + n0(p.sessions_inspected) + ' · sources: ' + (p.sources || []).join(', '))] : h('div', { class: 'dim' }, 'no event counts loaded'),
+    p.incomplete.length ? h('details', null, h('summary', null, `${p.incomplete.length} session(s) not complete — why`),
+      table([{ label: 'session', get: r => r.session }, { label: 'why', get: r => r.why }], p.incomplete)) : null,
+    h('small', null, p.rule));
 }
 function track(r, inst) {
   const [e0, e1] = r.expected_epoch; const span = Math.max(e1 - e0, 1);
@@ -340,7 +409,10 @@ function inspectorHyp(f, snap) {
       { label: 'baseline', get: r => r.baseline || '' }, { label: 'note', get: r => r.note || (r.role ? r.role : '') }], f.inputs)] : null,
     (f.conditions || []).length ? [h('h3', null, 'frozen conditions'), h('ul', { class: 'cond' }, ...f.conditions.map(cl => h('li', null, condText(cl))))] : null,
     br.first_failing_stage ? [h('h3', null, `funnel (${br.windows} windows, ${br.passed} passed, ${br.fires_recorded} fires)`),
-      table([{ label: 'first failing stage', get: r => h('code', null, r[0]) }, { label: 'windows', num: true, get: r => r[1] }], Object.entries(br.first_failing_stage).sort((a, b) => b[1] - a[1])),
+      table([{ label: 'first failing stage', get: r => h('code', null, r[0]) }, { label: 'windows', num: true, get: r => r[1] },
+             { label: 'share', get: r => h('div', { class: 'bar', style: 'width:120px', title: pct(r[1] / Math.max(br.windows, 1)) }, h('i', { style: 'width:' + (100 * r[1] / Math.max(br.windows, 1)).toFixed(1) + '%' })) }],
+        Object.entries(br.first_failing_stage).sort((a, b) => b[1] - a[1])),
+      h('small', null, h('a', { href: '#', onclick: (e) => { e.preventDefault(); S.th.id = f.id; S.th.beat = 0; S.th.t = 0; S.th.counter = false; S.th.lab = null; setView('theatre'); } }, '▶ watch the mechanism this family looks for (scripted illustration)')),
       (br.missing_inputs || []).length ? [h('h3', null, 'missing inputs'), table([{ label: 'input', get: r => h('code', null, r.input) }, { label: 'windows', num: true, get: r => r.windows }], br.missing_inputs)] : null] : null,
     br.checks !== undefined ? kv([['vacuum checks (2 s grid)', br.checks], ['vacuum events', br.vacuum_events], ['fires', br.fires_recorded]]) : null,
     br.windows !== undefined && br.raw_fires !== undefined ? kv([['windows', br.windows], ['input None', n0(br.input_none)], ['raw fires', br.raw_fires], ['distinct events', br.distinct_events]]) : null,
@@ -622,7 +694,7 @@ function render() {
   const m = document.getElementById('main'); m.innerHTML = '';
   const d = S.data; const snap = d && d.snapshot;
   if (!snap) { m.append(h('section', { class: 'card' }, h('h2', null, 'UNAVAILABLE'), h('p', null, (d && d.snapshot_error) || S.err || 'no data'), h('p', { class: 'dim' }, 'Run the exporter (godseye_export.py) and refresh. A missing snapshot is never shown as zero of anything.'))); return; }
-  const cards = S.view === 'health' ? viewHealth(snap) : S.view === 'hyp' ? viewHyp(snap) : S.view === 'prov' ? viewProv(snap) : viewReplay(snap);
+  const cards = S.view === 'health' ? viewHealth(snap) : S.view === 'hyp' ? viewHyp(snap) : S.view === 'theatre' ? viewTheatre(snap) : S.view === 'prov' ? viewProv(snap) : viewReplay(snap);
   for (const c of cards) m.append(c);
 }
 document.querySelectorAll('#nav button').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
