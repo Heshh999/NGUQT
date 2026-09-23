@@ -567,7 +567,7 @@ async function selectWindow(w) {
   render();
   try {
     const q = `session=${encodeURIComponent(rp.session)}&instrument=${rp.instrument}&run=${encodeURIComponent(rp.approach.run)}&t_start=${w.t_start}&t_end=${w.t_end}`;
-    const [rb, re] = await Promise.all([fetch('/api/replay/bundle?' + q), fetch(`/api/replay/explain?session=${encodeURIComponent(rp.session)}&instrument=${rp.instrument}&t_end=${w.t_end}`)]);
+    const [rb, re] = await Promise.all([fetch('/api/replay/bundle?' + q), fetch(`/api/replay/explain?session=${encodeURIComponent(rp.session)}&instrument=${rp.instrument}&t_end=${w.t_end}&approach_id=${encodeURIComponent(rp.approach.approach_id)}`)]);
     const b = await rb.json(); const e = await re.json();
     if (!rb.ok) rp.bErr = (b.refused ? 'REFUSED by policy: ' : 'error: ') + b.error; else rp.bundle = b;
     if (re.ok) rp.explain = e;

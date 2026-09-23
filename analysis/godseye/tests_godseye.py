@@ -442,6 +442,28 @@ t('G8c: the evidence endpoint explains a window with the registry\'s '
   and all(ex['explain'][k]['all_passed'] == (SIG.DETECTORS[k](ex['window'])
                                               != 0) for k in ex['explain']))
 
+# two approaches that share a t_end (levels crossed at the same instant):
+# the evidence must be for the approach the page asked about
+_by_te = {}
+for _w in w1['windows']:
+    _by_te.setdefault(_w['t_end'], []).append(_w)
+_twins = next((v for v in _by_te.values()
+               if len({x['approach_id'] for x in v}) > 1), None)
+_ok_twins = _twins is not None
+if _twins:
+    for _w in _twins:
+        _c, _e = get('/api/replay/explain?session=%s&instrument=NQ&t_end=%s'
+                     '&approach_id=%s' % (exposed[0], _w['t_end'],
+                                          _w['approach_id']))
+        _ok_twins &= (_c == 200 and _e['window']['approach_id'] ==
+                      _w['approach_id'] and
+                      _e['window']['level_id'] == _w['level_id'])
+t('G8f: when two levels are approached at the same instant (same t_end), '
+  'the evidence is for the approach asked about -- its level, not the '
+  'first one found (the demo has such twins; the page sends the id)',
+  _ok_twins and 'approach_id=${encodeURIComponent(rp.approach.approach_id)}'
+  in open(os.path.join(HERE, 'static', 'app.js')).read())
+
 cs, _ = get('/static/../godseye_policy.py')
 ci, idx = get('/')
 t('G8d: static files are served from static/ only (traversal is 404) and '

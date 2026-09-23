@@ -33,10 +33,10 @@ e79dd336adfea628846db28c3d4019ea0b4f2fad72aa00d6fac5cc1e3da78bf0  ../godseye/god
 71126ff55621e752576179e7e6f937b0410dc76eedb5bde56a4487507ca82aaf  ../godseye/godseye_policy.py (MROF-GODSEYE-POLICY-1.0: EXPOSED / BLIND / PROTECTED_UNLISTED / UNKNOWN, fail closed; event-level field list; strip-and-scan boundary; outcome lock read only)
 bb5ce978700145faebd3d211ebbe4232c55e5081661363eaf9255b9827a3a328  ../godseye/godseye_replay.py (bounded raw reads: byte-offset search, 250,000-row cap that says truncated, book rebuilt with the runner's frozen KLevelBook, depth never invented)
 7fb480f5d7aef91d8a9b247f8b8c3e852a053cae15a14dc7ea493dbd129b890f  ../godseye/godseye_export.py (MROF-GODSEYE-EXPORT-1.0; supersedes 60e463e3… — the replay windows file is split once per pilot run into one piece per (session, instrument) of inspectable sessions, so a routine export reads a small index instead of ~100 MB; a session whose only audit flag is RECONSTRUCTED_RUN_NOT_SELF_VERIFYING counts as complete, labelled; Amendment 14. Earlier 16aa4c57… → progress section (complete-session rule, runbook milestones, checkpoint clock, accrual counts), disk runway, next scheduled market change, resolved conditions for wave-two families; Amendment 13. Earlier: reports + bounded capture tail -> one sanitized snapshot, atomic, refuses to write on any event-level key outside the exposed section, refuses an out_dir inside the capture folder)
-ad1f8523f147d07e26273298b25069170a8f8b6fa0360429e6fd2055b538f180  ../godseye/godseye_server.py (MROF-GODSEYE-SERVER-1.0; supersedes 775e412f… — serves replay windows one (session, instrument) piece at a time, at most four held; re-reads the exposure ledger when it changes; --open opens the browser once listening; --refresh N re-runs the export every N s as a separate below-normal-priority process (the launchers use 300); Amendment 14. Earlier: stdlib HTTP on 127.0.0.1; policy re-checked on every replay request; stale after 15 min; last good snapshot kept)
+8b61f9abbf5b7db3aae302f086038f02d8b57713822d4341a86993a4824ffa9c  ../godseye/godseye_server.py (the evidence endpoint matches the approach id as well as the time (two levels approached at one instant no longer swap evidence); MROF-GODSEYE-SERVER-1.0; supersedes 775e412f… — serves replay windows one (session, instrument) piece at a time, at most four held; re-reads the exposure ledger when it changes; --open opens the browser once listening; --refresh N re-runs the export every N s as a separate below-normal-priority process (the launchers use 300); Amendment 14. Earlier: stdlib HTTP on 127.0.0.1; policy re-checked on every replay request; stale after 15 min; last good snapshot kept)
 b0aaf0743b2f87c3661bfeaa9fc02caeb24b6c81da6dafd650e97147f9588de1  ../godseye/godseye_demo.py (MROF-GODSEYE-DEMO-1.0: labelled synthetic capture + reports through library entry points only; its own ledger, inside the demo folder)
-a7b2608795ab8e6939abe71ec8e1c3740eb45c502d04d6e852150f7af7975b2d  ../godseye/tests_godseye.py (42 tests, G1–G13d; supersedes edc2d6bf… — G12e reconstructed-only sessions complete and labelled, G13–G13d the replay split, the server's bounded pieces and ledger re-read, the launcher, the refresher; earlier 3d2d5111… → G11–G11d theatre scripts vs the frozen code, G12–G12d study progress, clock, runway)
-fe366ff30f3008c268aecfafa5f10ebe74c782760eda24060cdf53decab73994  ../godseye/static/app.js (supersedes 44bfe9ea… — the progress rail names sessions relying on reconstructed manifests; earlier 0fd3a368… → progress rail, schedule-aware alerts, runway, watchdog notifications, funnel bars)
+a264c7def223e8f25cd0ef6bdbdb3363e16742a7301efbbd8beaf35cc4403254  ../godseye/tests_godseye.py (43 tests, G1–G13d + G8f; supersedes edc2d6bf… — G12e reconstructed-only sessions complete and labelled, G13–G13d the replay split, the server's bounded pieces and ledger re-read, the launcher, the refresher; earlier 3d2d5111… → G11–G11d theatre scripts vs the frozen code, G12–G12d study progress, clock, runway)
+a19771cc4fefd104d9339218a9bd2efa358d21c85387a4a34f3ebdd97dbe70bd  ../godseye/static/app.js (the page sends the approach id with every evidence request; supersedes 44bfe9ea… — the progress rail names sessions relying on reconstructed manifests; earlier 0fd3a368… → progress rail, schedule-aware alerts, runway, watchdog notifications, funnel bars)
 c0d29207c0b283751bd38e5b4c614b3f4e86025c4b0c09ae3e9f40ac8a0a27e3  ../godseye/static/theatre.js (the Mechanism theatre view and keyboard shortcuts; Amendment 13)
 b65447cb56b2ef6e8067095adf094413f4ffc5094c450771b530577021fd7c69  ../godseye/static/index.html
 c3dd56058931c0f773d15648e5de1ce659c722d390d81a99ff6c87063c3e44a3  ../godseye/static/style.css
@@ -79,13 +79,13 @@ Delivered package (111 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-694c6367f012d256d5c2ce7dc2fecb51c938a4407fd2d69a918a0566e5f46216  MROF_V1_Engine_v01_6_7.zip (supersedes 2fa33aed… — recover 1.4 bounded reads; earlier f930879f… — recover 1.4 unreadable-file guard; earlier f930879f… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+416beef6ad70345375e2221409dd41ea406a628a2bdbc8ba2a7d547c729b92de  MROF_V1_Engine_v01_6_7.zip (supersedes 694c6367… — replay evidence matches the approach id; earlier 2fa33aed… — recover 1.4 bounded reads; earlier f930879f… — recover 1.4 unreadable-file guard; earlier f930879f… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 497/497 + 42/42, identical to the repo
+# run from inside the unzipped package: 497/497 + 43/43, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -123,8 +123,8 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_recover.py` | 38/38 |
 | `tests_mrofyt_wave2.py` | 29/29 |
 | **wave-one/two total** | **497/497** |
-| `../godseye/tests_godseye.py` | 42/42 |
-| **package total** | **539/539** |
+| `../godseye/tests_godseye.py` | 43/43 |
+| **package total** | **540/540** |
 
 ## Runnable research commands
 
@@ -642,3 +642,10 @@ detector hash so registering wave two provably changed nothing.
     uses the same reader. `V12` asserts peak memory under 8 MB on a
     40 MB zero-filled file; `V12b` that a repair keeps every good row
     before such a stretch and writes no zero byte.
+
+    *Replay evidence, found in a screenshot.* Two levels approached at
+    the same instant share a window end time; the evidence endpoint
+    matched on time only and returned the first, so the panel could
+    explain a different level than the header named. It now matches the
+    approach id too, and the page sends it. `G8f` (the demo has such
+    twins).

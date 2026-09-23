@@ -324,8 +324,14 @@ class Handler(BaseHTTPRequestHandler):
                 if ws is None:
                     return self._json(503, dict(error=err))
                 te = float(q.get('t_end', 'nan'))
+                # two levels approached at the same instant share a t_end;
+                # the approach id says WHICH window is meant, so it must
+                # match too when given (the page always sends it)
+                aid = q.get('approach_id')
                 w = next((w for w in ws
-                          if abs(float(w.get('t_end', 0)) - te) < 1e-6), None)
+                          if abs(float(w.get('t_end', 0)) - te) < 1e-6 and
+                          (aid is None or str(w.get('approach_id')) == aid)),
+                         None)
                 if w is None:
                     return self._json(404, dict(error='no such window'))
                 return self._json(200, dict(
