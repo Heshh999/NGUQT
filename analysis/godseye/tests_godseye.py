@@ -832,7 +832,54 @@ t('G14: a run with a file the drive cannot read is shown as '
   GP.scan_for_event_level({k: v for k, v in s14.items() if k != 'exposed'}) == [] and
   'r.unreadable' in _js14 and 'check the drive' in _js14 and
   tree_hash(cfg['capture_dir']) == _cap14)
-GE.write_snapshot(cfg)                             # restore a clean snapshot
+
+# G14c: on the recorder laptop every read of such a file makes Windows
+# pop a "Corrupt File -- run Chkdsk" warning, and the refresher exports
+# every 5 minutes. Once found, the file must not be opened again until
+# its size or modification time changes (chkdsk, or a copy put back)
+_opened = []
+
+
+def _counting_open(mod):
+    real = open
+
+    def _open(path, *a, **k):
+        _opened.append(os.path.abspath(str(path)))
+        return real(path, *a, **k)
+    return _open
+
+
+_mem = GE.load_unreadable(cfg['out_dir'])
+GE.RC.open = _counting_open(GE.RC)
+GE.open = _counting_open(GE)
+try:
+    st14c = GE.write_snapshot(cfg)          # the REAL readers; file is fine
+    reads_while_known = _opened.count(os.path.abspath(_vpath))
+    s14c = json.load(open(os.path.join(cfg['out_dir'], 'godseye_snapshot.json')))
+    _hit_c = {r['run_id']: r for r in s14c['health']['runs_without_manifest']}[
+        _victim['run_id']]
+    _t = os.path.getmtime(_vpath) - 100          # what chkdsk would change
+    os.utime(_vpath, (_t, _t))
+    del _opened[:]
+    GE.write_snapshot(cfg)
+    reads_after_change = _opened.count(os.path.abspath(_vpath))
+finally:
+    del GE.RC.open
+    del GE.open
+s14d = json.load(open(os.path.join(cfg['out_dir'], 'godseye_snapshot.json')))
+_hit_d = {r['run_id']: r for r in s14d['health']['runs_without_manifest']}[
+    _victim['run_id']]
+t('G14c: a file found unreadable is remembered in the dashboard\'s own '
+  'folder and never opened again (no repeated Windows "Corrupt File" '
+  'warning every 5 minutes); once its size or time changes -- chkdsk -- '
+  'it is read again, and a readable file loses the mark',
+  os.path.abspath(_vpath) in _mem and st14c['ok'] and
+  reads_while_known == 0 and
+  _hit_c['status'] == 'SKIPPED_UNREADABLE_FILE' and
+  'remembered' in list(_hit_c['unreadable'].values())[0] and
+  reads_after_change > 0 and _hit_d['status'] == 'WOULD_RECONSTRUCT' and
+  GE.load_unreadable(cfg['out_dir']) == {} and
+  not os.path.exists(os.path.join(cfg['capture_dir'], GE.UNREADABLE_NAME)))
 
 t('G14b: shared-gap alerts are capped at the five largest with one summary '
   'line, so a long history cannot bury the alerts that matter',

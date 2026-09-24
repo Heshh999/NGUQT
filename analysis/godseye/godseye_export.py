@@ -168,6 +168,103 @@ class _Meter(object):
             return json.load(fh)
 
 
+# ---------------------------------------------------------------------
+# files the drive refuses to read: found once, then never read again
+# ---------------------------------------------------------------------
+# On the recorder laptop every read of a file NTFS holds as corrupt makes
+# Windows raise a "Corrupt File ... run Chkdsk" warning. The refresher
+# exports every 5 minutes, and the recovery module's readers touch such a
+# file several times per export, so the warning kept coming back. Once a
+# file has failed to read, it is remembered in out_dir (keyed by size and
+# modification time, which stat() gives without reading the file) and is
+# not opened for reading again until it changes -- e.g. after chkdsk.
+UNREADABLE_NAME = 'godseye_unreadable.json'
+UNREADABLE_SCHEMA = 'MROF-GODSEYE-UNREADABLE-1'
+UNREADABLE_NOTE = ('remembered: the dashboard does not read this file '
+                   'again until it changes (each read makes Windows show '
+                   'a "Corrupt File" warning)')
+
+
+def _stat_key(path):
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return [st.st_size, st.st_mtime_ns]
+
+
+def load_unreadable(out_dir):
+    try:
+        with open(os.path.join(out_dir, UNREADABLE_NAME)) as fh:
+            files = json.load(fh).get('files') or {}
+        return {k: v for k, v in files.items()
+                if isinstance(v, dict) and v.get('key')}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
+def save_unreadable(out_dir, files):
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, UNREADABLE_NAME)
+    tmp = path + '.tmp'
+    with open(tmp, 'w') as fh:
+        json.dump(dict(schema=UNREADABLE_SCHEMA, files=files,
+                       note='files the drive refused to read; not read '
+                            'again while their size and modification time '
+                            'are unchanged. Deleting this file only makes '
+                            'the next export try them once more.'),
+                  fh, indent=1)
+    os.replace(tmp, path)
+
+
+class _UnreadableGuard(object):
+    """While active, the recovery module's two small readers
+    (probe_stream: head + tail; newest_recv: tail) return at once for a
+    file already known unreadable instead of opening it. Everything else
+    -- the classification, the liveness check, the verdicts -- is the
+    recovery tool's own code, unchanged."""
+
+    def __init__(self, known, now):
+        self.known = dict(known or {})
+        self.found = {}
+        self.now = now
+
+    def is_bad(self, path):
+        ap = os.path.abspath(path)
+        if ap in self.found:
+            return self.found[ap]
+        k = self.known.get(ap)
+        if k and k.get('key') == _stat_key(path):
+            self.found[ap] = k
+            return k
+        return None
+
+    def __enter__(self):
+        self._probe, self._newest = RC.probe_stream, RC.newest_recv
+
+        def probe(path, kind):
+            k = self.is_bad(path)
+            if k:
+                return dict(size=k['key'][0], ok=False, unreadable=True,
+                            why='%s; %s' % (k.get('why'), UNREADABLE_NOTE))
+            res = self._probe(path, kind)
+            key = _stat_key(path) if res.get('unreadable') else None
+            if key:
+                self.found[os.path.abspath(path)] = dict(
+                    key=key, why=res.get('why'), first_seen_utc=_iso(self.now))
+            return res
+
+        def newest(path, kind):
+            return None if self.is_bad(path) else self._newest(path, kind)
+
+        RC.probe_stream, RC.newest_recv = probe, newest
+        return self
+
+    def __exit__(self, *exc):
+        RC.probe_stream, RC.newest_recv = self._probe, self._newest
+        return False
+
+
 def _tail_rows(path, kind, n=200, meter=None):
     """The last n complete rows of a stream as dicts, from the file's
     last 64 KB. Used on the quality stream only (kinds, counters,
@@ -212,7 +309,7 @@ def _instrument_of_base(base):
     return m.group(1) if m else None
 
 
-def collect_capture(capture_dir, policy, now, meter):
+def collect_capture(capture_dir, policy, now, meter, known_unreadable=None):
     cap = dict(path=capture_dir, readable=AU.capture_dir_alive(capture_dir),
                scanned_utc=_iso(now))
     if not cap['readable']:
@@ -317,8 +414,13 @@ def collect_capture(capture_dir, policy, now, meter):
     # which is the rule that must pass before it writes anything
     orphans = []
     live_by = set()
-    for r in RC.find_orphan_runs(capture_dir, now):
-        pr = RC.probe_run(r)
+    with _UnreadableGuard(known_unreadable, now) as guard:
+        orphan_runs = RC.find_orphan_runs(capture_dir, now)
+        probed = [(r, RC.probe_run(r)) for r in orphan_runs]
+        newest = {p: RC.newest_recv(p, k) for r in orphan_runs
+                  for k, p in r['streams'].items()}
+    cap['_unreadable_files'] = guard.found
+    for r, pr in probed:
         meter.bytes += 4 * 65536
         meter.files += len(r['streams'])
         rec = dict(base=r['base'], run_id=r['run_id'], session=r['session'],
@@ -339,14 +441,13 @@ def collect_capture(capture_dir, policy, now, meter):
         if r.get('liveness_by'):
             live_by.add(r['liveness_by'])
         # the newest row by the recorder's own clock, from the tails
-        stamps = [s for s in (RC.newest_recv(p, k)
-                              for k, p in r['streams'].items())
+        stamps = [s for s in (newest[p] for p in r['streams'].values())
                   if s is not None]
         rec['newest_row_epoch'] = max(stamps) if stamps else None
         rec['newest_row_utc'] = _iso(rec['newest_row_epoch'])
         # the quality tail: identity, heartbeat counters, connection
         qp = r['streams'].get('quality')
-        if qp:
+        if qp and os.path.abspath(qp) not in guard.found:
             rows = _tail_rows(qp, 'quality', 200, meter)
             rec['quality_tail'] = _summarise_quality(rows)
         orphans.append(rec)
@@ -1250,7 +1351,11 @@ def build_snapshot(cfg, now=None):
         raise ExportError('out_dir must not be inside the capture folder')
     policy = GP.Policy.from_files(cfg['exposure_ledger'], cfg['blind_from'],
                                   synthetic=cfg.get('synthetic', False))
-    cap = collect_capture(cap_dir, policy, now, meter)
+    cap = collect_capture(cap_dir, policy, now, meter,
+                          load_unreadable(out_dir))
+    bad = cap.pop('_unreadable_files', None)
+    if bad is not None:          # a vanished drive keeps the old memory
+        save_unreadable(out_dir, bad)
     reports = load_reports(cfg.get('reports_dir'), cfg.get('reports'), meter)
     audit = reports['audit'].get('doc') or {}
     recov = reports['recovery'].get('doc') or {}

@@ -422,9 +422,9 @@ field as `—`, never as zero.
 
 | check | result |
 | --- | --- |
-| `tests_godseye.py` | **45/45** |
+| `tests_godseye.py` | **46/46** |
 | the 14 package suites in `analysis/mrofyt` | **497/497** (pilot 45 with `P13`, recovery 38 with `V10`–`V12b`) |
-| package total | **542/542** |
+| package total | **543/543** |
 | real-scale replay split | synthetic 63,000 windows / 100 MB: one-time split ~20 s, 284 MB peak; routine export 0.06 s, 5.7 MB; server ~30 MB |
 | theatre scripts vs frozen code | 15 demos: every flow demo fires in the frozen detector in the named direction, every counter-example does not and fails exactly one clause, both candle arms fire in the frozen arm functions (`G11`–`G11c`); `resolve()` agrees with `mrofyt_wave2` on 6,000 random inputs for all six derived families (`G11d`) |
 | registry vs frozen detectors | 0 mismatches on 20,000 random inputs per family (`G1b`) |
@@ -466,7 +466,9 @@ changed ledger · `G13c` the launcher lets the server open the browser ·
 a run with a file the drive cannot read (recover 1.4
 `SKIPPED_UNREADABLE_FILE`) is shown with the file name and the Windows
 error, alerted, and never touched · `G14b` shared-gap alerts capped at the
-five largest plus one summary line.
+five largest plus one summary line · `G14c` a file found unreadable is
+remembered in the output folder and not opened again until its size or
+time changes (no repeated Windows "Corrupt File" warning).
 
 ---
 
@@ -507,7 +509,11 @@ five largest plus one summary line.
   `SKIPPED_UNREADABLE_FILE`: check the drive or cable; the run is left
   alone) and shared gaps — the five largest, then one line for the rest.
   The **Runs without a manifest** table carries the same verdict per run,
-  with the file name and the Windows error in its note column.
+  with the file name and the Windows error in its note column. Such a
+  file is read once, remembered in `godseye_unreadable.json` in the
+  output folder, and not opened again until its size or modification
+  time changes (chkdsk): every read of it makes Windows show a "Corrupt
+  File" warning.
 * **A session row** (health or provenance) opens the inspector: click the
   session id. **A run** in the inspector opens its manifest facts,
   recorder counters, audit verdict and provenance.
