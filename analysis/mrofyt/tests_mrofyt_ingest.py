@@ -17,6 +17,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -835,8 +836,14 @@ t('G5: an unknown enum in a row that kept the file\'s byte count is '
 
 _d6, _, _ = capture()
 open(os.path.join(_d6, 'stray.csv'), 'w').write('x\n')
-open(os.path.join(_d6, 'MLES12_NQ_x_20260901_c1-R002_depth.csv.partial'),
-     'w').write('x\n')
+_p6 = os.path.join(_d6, 'MLES12_NQ_x_20260901_c1-R002_depth.csv.partial')
+open(_p6, 'w').write('x\n')
+# an abandoned partial, not one written seconds ago: since recover 1.1
+# the auditor shares the recovery tool's liveness rule, and a .partial
+# modified in the last 10 minutes may still be recording (OPEN, not a
+# failure)
+_old6 = time.time() - 3600
+os.utime(_p6, (_old6, _old6))
 t('G6: a CSV no manifest references and an unfinalized .partial are '
   'both reported, so a folder cannot hide rows from the audit',
   {'ORPHAN_FINALIZED_CSV', 'ORPHAN_PARTIAL'} <= set(codes(
