@@ -32,13 +32,13 @@ Recalculated from Git-tracked files at the current commit:
 
 | Dimension | Measured |
 |---|---|
-| Tracked files | **783** |
-| Python / C# / Markdown files | 203 / 49 / 179 |
-| Python / C# lines | 55,344 / 27,877 (**83,221** combined) |
-| Analysis module directories | **38** |
-| Dedicated test files | **27** (19 Python suites, 8 C# suites) |
-| Findings reports | **51** |
-| Protocol, preregistration and freeze documents | **50** |
+| Tracked files | **827** |
+| Python / C# / Markdown files | 222 / 49 / 190 |
+| Python / C# lines | 68,644 / 27,917 (**96,561** combined) |
+| Analysis module directories | **39** |
+| Dedicated test files | **34** (26 Python suites, 8 C# suites) |
+| Findings reports | **52** |
+| Protocol, preregistration and freeze documents | **53** |
 | Data and provenance audits | 17 |
 | Registered hypotheses / distinct mechanism classes | **99 / 30** |
 | Canonical 1-minute records | **2,503,622** |
@@ -73,7 +73,64 @@ flowchart TD
     K -->|"No"| G["Findings and rejection registry"]
     K -->|"Yes"| J["Prospective NinjaTrader integration"]
     J --> G
+    I --> M["God's Eye View: read-only monitoring dashboard"]
 ```
+
+### Level II order-flow pipeline and the God's Eye View
+
+The live order-flow program runs as a separate, outcome-blind pipeline. Every arrow into
+the dashboard is a read; nothing in it can write to the capture, change a frozen
+hypothesis, or place an order.
+
+```mermaid
+flowchart TB
+    subgraph REC["Recorder laptop - Windows, NinjaTrader 8"]
+        R["MlesV12CaptureHost 1.2.2<br/>NQ + MNQ depth, trades, quotes, quality"]
+    end
+    R -->|"per-run CSVs + hashed manifest"| CF[("Capture folder<br/>external drive")]
+    CF --> AU["Auditor<br/>mles_v12_audit"]
+    CF --> RC["Recovery tool<br/>mrofyt_recover"]
+    RC -->|"reconstructed manifests;<br/>originals never modified"| CF
+    CF --> RN["Outcome-blind runner<br/>mrofyt_runner"]
+    RN --> PI["Pilot diagnostic<br/>mrofyt_pilot"]
+    RN --> W2["Wave-two families<br/>mrofyt_wave2"]
+    PI -->|"labels every inspected day"| LG[("Exposure ledger<br/>EXPOSED_PILOT_DEV")]
+    AU --> RP[("Reports<br/>audit, recovery, ledger,<br/>pilot, wave two, windows")]
+    RC --> RP
+    RN --> RP
+    PI --> RP
+    W2 --> RP
+    LOCK["Outcome lock<br/>STATE-C file absent"] -.->|"outcomes stay locked"| RN
+    subgraph GE["God's Eye View - read-only, 127.0.0.1"]
+        EX["Exporter<br/>bounded reads + blind policy"] --> SN[("Snapshot JSON")]
+        SN --> SV["Local server"]
+        SV --> UI["Browser: recording health, hypothesis readiness,<br/>mechanism theatre, provenance, exposed-data replay"]
+    end
+    CF -.->|"manifests, file tails,<br/>Windows liveness check"| EX
+    RP -.-> EX
+    LG -.-> EX
+```
+
+**How the God's Eye View is built** ([`analysis/godseye/`](analysis/godseye/GODS_EYE_README.md)):
+
+- **Exporter** (`godseye_export.py`, a separate process every 5 minutes at below-normal
+  priority): reads manifests, the last 64 KB of open streams, one `stat()` per file and
+  the report files; asks Windows directly whether NinjaTrader still holds a run; writes
+  only into its own output folder, never inside the capture folder. A file the drive
+  refuses to read is remembered and not re-read.
+- **Blind policy** (`godseye_policy.py`): every session is `EXPOSED`, `BLIND` (the
+  hold-out from 2026-09-21), `PROTECTED_UNLISTED` or `UNKNOWN`, and it fails closed.
+  Event-level fields are stripped from every non-exposed section, and the finished
+  snapshot is scanned before it is written; a hit refuses the write.
+- **Server** (`godseye_server.py`, stdlib HTTP on 127.0.0.1): serves the snapshot,
+  refuses replay or evidence requests for any session the ledger does not label exposed
+  (HTTP 403), and re-reads the ledger when it changes.
+- **Page** (vanilla JavaScript, no framework): five views. One of them is a mechanism
+  theatre, where each frozen hypothesis has a scripted demonstration and a
+  counter-example; the tests run each script through the frozen detector code itself.
+- **Verified by** `tests_godseye.py` (46 checks): no writes to the capture folder, no
+  event-level key outside the exposed section, 403 for blind and unlisted sessions, no
+  order API in any dashboard file, demos consistent with the frozen detectors.
 
 ---
 
@@ -107,9 +164,28 @@ similarity screen blocking re-tests of a dead idea under a new name.
 
 **Live capture.** A NinjaTrader 8 recorder writes Level II depth, time-and-sales and BBO
 into hashed, per-run manifested files. It implements session and contract rotation,
-disconnect/reconnect handling and restart-safe auditing. These paths are covered by
-deterministic harnesses; live session rotation has been observed, while the current 1.2.1
-build still awaits final NinjaTrader verification.
+disconnect/reconnect handling and restart-safe auditing. Build 1.2.2 records on the
+operator's NinjaTrader; its disconnect repair has been exercised on real data (the
+auditor reports 32 feed disconnects across 14 repaired-build runs with zero spurious
+`BOOK_READY`, against 2 and 14 on the two earlier builds).
+
+**Audit and recovery.** The streaming auditor verifies every manifest's hashes, row
+counts, sequence continuity and NQ/MNQ pairing, and tells a run still being recorded apart
+from an orphan by asking Windows directly. The recovery tool rebuilds manifests for runs
+killed before finalizing (power loss, a dropped drive). It never modifies an original
+file, refuses any run the recorder still holds, and refuses a repair that would leave the
+recording drive under 40 GB free. A file the drive cannot read is set aside rather than
+stopping the pass.
+
+**Outcome-blind ingest.** The ingest runner computes the frozen features and detector
+firings without computing any outcome. The outcome stage is locked behind an
+authorization file that does not exist. A run with any decode failure or read error is
+skipped whole and wound back, so a skipped run leaves no counts behind. A capture that
+cannot be read stops the pass with no ledger, rather than reporting a quiet market.
+
+**Monitoring — the God's Eye View.** A local, read-only research dashboard covering
+recording health, hypothesis readiness, data provenance and exposed-data replay, with the
+validation blind enforced in its backend (see the architecture above).
 
 ---
 
@@ -120,6 +196,9 @@ build still awaits final NinjaTrader verification.
 - **Causality enforcement.** Features must be computable at decision time; snapshot
   helpers raise on lookahead rather than warning.
 - **Fail closed.** Ambiguous data quarantines a batch instead of being repaired in place.
+- **Blinding in code.** Days inspected by the pilot are permanently labelled
+  `EXPOSED_PILOT_DEV`; the validation hold-out is withheld by the tools and the dashboard's
+  backend, not by convention.
 - **Explicit epistemic status.** Documents state what was verified, what was inferred, and
   what was not run.
 - **Corrections of record.** A disproven claim is amended into its freeze document rather
@@ -139,6 +218,9 @@ build still awaits final NinjaTrader verification.
 | [`analysis/rnvp/RNVP_V1_FINDINGS.md`](analysis/rnvp/RNVP_V1_FINDINGS.md) | A rejection: positive point estimates that failed significance |
 | [`analysis/mofad/MOFAD_V1_PROTOCOL_FREEZE.md`](analysis/mofad/MOFAD_V1_PROTOCOL_FREEZE.md) | Full preregistration structure |
 | [`analysis/mrofyt/OPERATING_RUNBOOK.md`](analysis/mrofyt/OPERATING_RUNBOOK.md) | Operational capture procedure |
+| [`analysis/godseye/GODS_EYE_README.md`](analysis/godseye/GODS_EYE_README.md) | The read-only dashboard: permission model, blind enforcement, verification |
+| [`analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`](analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md) | Hash-pinned review package and every amendment, including defects found on real data |
+| [`analysis/mrofyt/RUNNER_GUIDE.md`](analysis/mrofyt/RUNNER_GUIDE.md) | Running the outcome-blind ingest runner, and what each skip means |
 | [`docs/COMPLIANCE_AUDIT_V6.md`](docs/COMPLIANCE_AUDIT_V6.md) | Rule-by-rule audit listing open issues |
 
 ---
@@ -146,8 +228,10 @@ build still awaits final NinjaTrader verification.
 ## Repository structure
 
 ```
-analysis/   38 research modules — features, protocols, findings, registries, tests
-docs/       99 protocol, preregistration, findings, audit and runbook documents
+analysis/   39 research modules — features, protocols, findings, registries, tests
+  mrofyt/   Level II order flow: capture audit, recovery, outcome-blind runner, pilot, wave two
+  godseye/  God's Eye View: read-only research dashboard (stdlib Python + vanilla JavaScript)
+docs/       101 protocol, preregistration, findings, audit and runbook documents
 src/        34 C# files — NT8 strategies, research hosts, capture recorders
 tests/      C# deterministic suites, NT8 API stubs, parity drivers
 ```
@@ -183,12 +267,27 @@ standard library alone.
 cd analysis/mrofyt && python3 tests_mrofyt.py          # 59 assertions
 cd analysis/mrof   && python3 tests_mrof.py            # 42 assertions
 cd analysis/mofad  && python3 tests_closure.py         # registry closure
-cd analysis/mgsd   && python3 tests_mgsd.py            # 19 assertions (requires NumPy)
+cd analysis/mgsd   && python3 tests_mgsd.py            # 19 assertions (requires NumPy and the dataset)
 ```
 
-A full Python-suite run currently reports 549 passing checks and one registry-snapshot
-mismatch. The mismatch compares an immutable 78-row historical ontology snapshot with the
-current 99-row registry; the check correctly reports the difference and exits nonzero.
+The Level II order-flow package and the dashboard run on the standard library alone,
+from a fresh clone:
+
+```bash
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 15 suites, 572 checks
+cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
+```
+
+At the current commit those 618 checks all pass, both from the repository and from inside
+the unzipped review package
+([`REVIEW_PACKAGE_MANIFEST_v01_6_7.md`](analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md)
+pins every file by SHA-256). Four historical suites (MGSD, MOFAD, MTF, VTBS) need the
+canonical 1-minute dataset, which is never committed, so they stop at their first
+real-data check in a fresh clone. Every other Python suite runs, and all pass except one
+known, deliberate check in `tests_nmae_precondition.py` (18/19). That check compares an
+immutable 78-row historical ontology snapshot with the current 99-row registry; it
+correctly reports the difference and exits nonzero. The last full run with the dataset
+present reported 549 passing checks plus that same mismatch.
 
 C# engine suites run under Mono or .NET, no NinjaTrader required:
 
@@ -226,9 +325,17 @@ capture installation and operation.
   sessions; the outcome stage is gated behind an authorization file that does not exist,
   and the ingest runner raises rather than computing outcomes.
 - Three candidates are frozen awaiting prospective validation; none is promoted.
-- Recorder build 1.2 completed a genuine NinjaTrader F5 compile and live capture. The
-  current 1.2.1 repair remains pending a user-side F5 compile, reinstall and first 1.2.1
-  session audit. Mono stub compiles prove syntax only.
+- Recorder build 1.2.2 is compiled in NinjaTrader and recording NQ and MNQ; the auditor
+  confirms its disconnect repair on real feed disconnects. Mono stub compiles elsewhere in
+  the repository prove syntax only.
+- The order-flow pilot has inspected five sessions (2026-09-01 to 09-05), each labelled
+  `EXPOSED_PILOT_DEV` for good. Sessions from 2026-09-21 onward are a validation hold-out
+  that the tools and the dashboard withhold. Two wave-one families are
+  `IMPLEMENTED_NOT_WIRED`. A5 has four of its five frozen inputs uncomputed, so it cannot
+  fire on real data. A4 runs with one of its two alternative residual inputs uncomputed.
+- The capture drive recorded file-system damage in two depth files after a disconnect on
+  2026-09-22. The audit and recovery tools set those runs aside rather than reading
+  guessed data.
 - A genuine MNQ run recorded a 259 ms median receive-minus-exchange timestamp difference.
   Clock-synchronization confounding remains unresolved, so this is recorded but not
   interpreted as pure feed or network latency — see
@@ -258,7 +365,8 @@ deterministic Python or C#.
 This repository is research infrastructure published for engineering and methodological
 review. It is **not** investment advice and **not** an offer of any financial product.
 
-The Level II capture components are read-only and contain no order-submission APIs.
+The Level II capture components and the God's Eye View are read-only and contain no
+order-submission APIs (the dashboard's suite scans every one of its files for one).
 Separate NinjaTrader strategy code contains order-entry methods, but it is not presented as
 validated or approved for live use.
 
