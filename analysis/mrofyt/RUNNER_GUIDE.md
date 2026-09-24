@@ -35,6 +35,12 @@ A manifest is ignored without comment if its `schema` is not
 are grouped by `(instrument, session)` and replayed in `firstRecvUtc`
 order, so restarts inside a session are fine.
 
+A run rebuilt by `mrofyt_recover.py` carries a
+`_RECONSTRUCTED_manifest.json` and is ingested like any other. If a run
+has both the recorder's manifest and a reconstructed one, it is
+ingested once, from the recorder's, and the summary names the ignored
+duplicate.
+
 Python 3.11 was used for the runs quoted below; the runner is stdlib
 only, but it imports its siblings from `analysis/mrof` and
 `analysis/rvmr` by relative path, so keep the tree intact. You can
@@ -75,8 +81,8 @@ file is safe.
 A clean two-run synthetic folder:
 
 ```
-MROF-YT-RUNNER-1.2.1  outcomes=LOCKED
-sessions=1 runs=2 (ingested 2, skipped: missing-files 0, truncated 0, corrupt 0) events=12788
+MROF-YT-RUNNER-1.2.2  outcomes=LOCKED
+sessions=1 runs=2 (ingested 2, skipped: missing-files 0, truncated 0, corrupt 0, io-error 0) events=12788
 baseline sessions: {'NQ': 1, 'MNQ': 1}
 approaches=10 windows=0 (suppressed 0) fires=0 vacuum_events=0
 fires by family: none
@@ -85,13 +91,13 @@ wall states: {}
 feature None counts: {}
 book integrity: spurious BOOK_READY ignored=0, rows inside disconnect gaps suppressed=0
 regime at windows: {}
-latency ms: {'NQ': {'p50': 250, 'p95': 250, 'n': 6390}, 'MNQ': {...}}
+latency ms: {'NQ': {'p50': 250, 'p95': 250, 'n': 6390}, 'MNQ': {'p50': 250, 'p95': 250, 'n': 6390}}
 NOT WIRED (detectors disqualify by design): resid_tail_5pct, trend_dir
 ```
 
 Line by line:
 
-- **line 2** is the ingest tally. Read the three skip counters every
+- **line 2** is the ingest tally. Read the four skip counters every
   time — see §5.
 - **baseline sessions** is how many sessions have closed into each
   instrument's causal baseline store. Detectors that need a baseline
@@ -124,26 +130,31 @@ ledger are what move to research; raw CSVs never move.
 
 The runner never ingests part of a run. A run with any problem is
 skipped whole, because features computed against half a book or half a
-tape are wrong in a way nothing downstream can detect. One bad run does
-not stop the pass: the clean runs beside it are still ingested, and the
-process exits 0 either way.
+tape are wrong in a way nothing downstream can detect. "Whole" includes
+what the run fed in before the problem was found: its windows,
+approaches, fires, wall states, latency samples and baseline
+observations are wound back to a mark taken before its first event, so
+a run the ledger reports as `events=0` leaves nothing behind. One bad
+run does not stop the pass: the clean runs beside it are still
+ingested, and the process exits 0.
 
 **So a zero exit status is not success.** Check the skip counters on
 line 2 of the summary, or `skipped_runs` in the ledger.
 
-There are exactly three skip reasons:
+There are four skip reasons:
 
 | Reason | What happened | What to do |
 |---|---|---|
 | `MISSING_STREAM_FILES` | The manifest declares a CSV that is not on disk. The handoff sends manifests first and bulk CSVs later, so this is an ordinary state, not damage. | Fetch the named files and re-run. Nothing to repair. |
 | `STREAM_SIZE_MISMATCH` | A file's size on disk differs from the byte count its own manifest declares — truncated or partially copied. Caught before ingest by one `stat()` per file. | Re-transfer the run from the source machine. Never edit, re-save or truncate a file to make it match. |
-| `CORRUPT_STREAM` | A malformed header or unknown enum was hit mid-stream, i.e. corruption that did not change the file size. The stream is abandoned at the bad row and everything the run had fed in is discarded. | Re-transfer the run. If a fresh copy fails the same way, the recorder's own output is suspect — send the manifest and the error text. |
+| `CORRUPT_STREAM` | A row failed to decode mid-stream — a wrong column count, an unknown enum, or a garbled price, sequence number or timestamp — i.e. corruption that did not change the file size. The stream is abandoned at the bad row and everything the run had fed in is wound back. The error names the file and how many rows decoded before the bad one. | Re-transfer the run. If a fresh copy fails the same way, the recorder's own output is suspect — send the manifest and the error text. |
+| `IO_ERROR` | The drive failed to read one run's file (a bad sector, a brief USB reset) while the capture folder itself still answers. Handled like `CORRUPT_STREAM`: that run is wound back and skipped, the rest are ingested. | Check the drive and cable; run the recovery tool's dry run and `chkdsk` (read-only) before trusting the drive again. |
 
 The ledger names the specific file or value in each case, for example:
 
 ```json
 {"instrument": "NQ", "session": "20260902", "run_id": "c1-R001",
- "corrupt": "unknown bookType 'XBP'"}
+ "corrupt": "..._depth.csv: unknown bookType 'XBP' (after 1203 decoded rows)"}
 ```
 
 The auditor, run on the same folder, independently reports the
@@ -152,9 +163,20 @@ underlying codes — `MISSING_FILE`, `BYTE_SIZE_MISMATCH`,
 you report a bad batch. A failed audit quarantines the batch
 (`DATA_SUPPRESSED`); files are never repaired in place.
 
-Two things that look like failures and are not: a folder with no
-matching manifests prints `sessions=0 runs=0` and exits 0, and
-`--outcomes` raising `STATE-C LOCKED` is the lock working as designed.
+**When the pass STOPS instead (exit 2, no ledger written).** A capture
+that cannot be read at all is never reported as a quiet market:
+
+- a folder with no MLES-CAPTURE-1.2 manifest for the instruments prints
+  `STOPPED: no MLES-CAPTURE-1.2 manifest for NQ/MNQ in <folder>: the
+  wrong folder, or a drive that came back under another letter`;
+- a folder that cannot be read, or stops answering mid-pass (the drive
+  unplugged), prints `STOPPED` with the reason.
+
+In both cases nothing is written to `--out`, so an old ledger is never
+mistaken for a new one. Fix the folder or the drive and re-run.
+
+One thing that looks like a failure and is not: `--outcomes` raising
+`STATE-C LOCKED` is the lock working as designed.
 
 ---
 
@@ -178,7 +200,8 @@ S.synth_run('/tmp/cap', n_depth=6000, instrument='MNQ', session='20260902', cid=
 The runner's own suite covers the skip paths and the funnel:
 
 ```
-python3 analysis/mrofyt/tests_mrofyt_runner.py     # 21/21 tests passed
+python3 analysis/mrofyt/tests_mrofyt_runner.py     # 33/33 tests passed
+python3 analysis/mrofyt/tests_mrofyt_ingest.py     # 69/69 tests passed
 ```
 
 For the funnel diagnostic and markout registration built on top of this

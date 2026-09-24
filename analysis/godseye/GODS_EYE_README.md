@@ -423,8 +423,8 @@ field as `—`, never as zero.
 | check | result |
 | --- | --- |
 | `tests_godseye.py` | **46/46** |
-| the 14 package suites in `analysis/mrofyt` | **497/497** (pilot 45 with `P13`, recovery 38 with `V10`–`V12b`) |
-| package total | **543/543** |
+| the 15 package suites in `analysis/mrofyt` | **572/572** (pilot 45 with `P13`, recovery 38 with `V10`–`V12b`, runner 33 with `R13f`–`R13j` and `R15e`, ingest 69) |
+| package total | **618/618** |
 | real-scale replay split | synthetic 63,000 windows / 100 MB: one-time split ~20 s, 284 MB peak; routine export 0.06 s, 5.7 MB; server ~30 MB |
 | theatre scripts vs frozen code | 15 demos: every flow demo fires in the frozen detector in the named direction, every counter-example does not and fails exactly one clause, both candle arms fire in the frozen arm functions (`G11`–`G11c`); `resolve()` agrees with `mrofyt_wave2` on 6,000 random inputs for all six derived families (`G11d`) |
 | registry vs frozen detectors | 0 mismatches on 20,000 random inputs per family (`G1b`) |

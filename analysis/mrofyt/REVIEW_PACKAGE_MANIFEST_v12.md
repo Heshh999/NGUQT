@@ -35,8 +35,8 @@ be29c36a62624ab5e18e67d104eb4e9323abcda4bf5faf1c88c54486fc446f4a  analysis/mrofy
 cf42022369fe3133c2725d8a8e10c69914d889945c0b99d2da280e1a46315f2c  analysis/mrofyt/OPERATING_RUNBOOK.md (supersedes 1ef388e1… — status header updated once genuine sessions existed; points to NT8_RECORDING_RUNBOOK.md)
 1c47b9c9dd4a45369d68c0446cd00720dba845e74a6ab019606735732979f9a1  analysis/mrofyt/NT8_RECORDING_RUNBOOK.md (beginner-readable NT8 procedure; supersedes 964cdc66… — §8 lists the wave-two command)
 3231659ff5dad33c1c4c2ba7ada5d813d229dd2cbf4437d0ffde9c0a1c0ffec9  analysis/mrofyt/mles_v12_synth.py (stamps 1.2.1 deliberately: synthetic runs carry no disconnect, so they model a PRE-repair recording; supersedes c070e41e…)
-10485b6655e65a5d1b91f40e2023ba8bbed8b604dd526a37ab014433dd4e1c40  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner, build 1.2.1; supersedes c48dfe9e… — unreadable/empty capture stops the pass with no ledger, IO_ERROR per-run skip, one manifest per run (`R15`–`R15d`; v01_6_7 Amendment 11); earlier c48dfe9e…: two no-op observation hooks `_on_trade_event` / `_on_depth_event` for wave two, base ledger unchanged (`R14`/`R14b`); earlier supersedes 99c9b277… — truncated/corrupt streams are skipped whole instead of killing the pass, see §Amendment; earlier supersedes 3a765f3c… — honours DISCONNECTED and requires a resync before re-arming, which corrects pre-repair recordings retroactively, see §Amendment; earlier supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
-8ea5c6be8295ccfb41e4ca24345892067e0376722157d470269d4ad526e57ac0  analysis/mrofyt/tests_mrofyt_runner.py (27 tests; supersedes 51e08e10… — R15–R15d; earlier 4656e0a8…: R14/R14b pin the hooks)
+a4a518b7f34d854866fe005752a4c20d0d7f32facd60d7e09bb7cc3e4eda683a  analysis/mrofyt/mrofyt_runner.py (outcome-blind runner MROF-YT-RUNNER-1.2.2; supersedes 10485b66… — every decode failure caught, abandoned runs wound back whole (the amendment below); earlier supersedes c48dfe9e… — unreadable/empty capture stops the pass with no ledger, IO_ERROR per-run skip, one manifest per run (`R15`–`R15d`; v01_6_7 Amendment 11); earlier c48dfe9e…: two no-op observation hooks `_on_trade_event` / `_on_depth_event` for wave two, base ledger unchanged (`R14`/`R14b`); earlier supersedes 99c9b277… — truncated/corrupt streams are skipped whole instead of killing the pass, see §Amendment; earlier supersedes 3a765f3c… — honours DISCONNECTED and requires a resync before re-arming, which corrects pre-repair recordings retroactively, see §Amendment; earlier supersedes b1086f7e… — the first genuine recordings exposed a crash on manifest-only runs and the runner gained a skip-whole path, an observation hook and a run-id field. See MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md)
+a8737602137ef6ea60e306e16c7151d9993e5dde5258756cb152c7c36c727519  analysis/mrofyt/tests_mrofyt_runner.py (33 tests; supersedes 8ea5c6be… — R13f–R13j, R15e; earlier supersedes 51e08e10… — R15–R15d; earlier 4656e0a8…: R14/R14b pin the hooks)
 ```
 
 Reproduce the entire proof (mcs + mono lifecycle harness + audits +
@@ -44,7 +44,7 @@ adversarial fixtures + package byte-identity):
 
 ```
 cd analysis/mrofyt && python3 tests_mles_v12.py      # 54/54
-cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 27/27
+cd analysis/mrofyt && python3 tests_mrofyt_runner.py # 33/33
 ```
 
 The suite itself compiles the recorder with mcs against the stubs,
@@ -54,7 +54,7 @@ restart, disconnect/reconnect, NQ+MNQ pairing), audits the genuine
 output and then attacks the auditor with falsified fixtures.
 
 Predecessor suites (byte-identical, re-run at freeze): 59+56+31+32+
-25+36+29+42+15 = 325, all passing; grand total 434/434 across thirteen suites at that revision. Current: 490/490 across fourteen suites (see REVIEW_PACKAGE_MANIFEST_v01_6_7.md).
+25+36+29+42+15 = 325, all passing; grand total 434/434 across thirteen suites at that revision. Current: 572/572 across fifteen suites (see REVIEW_PACKAGE_MANIFEST_v01_6_7.md).
 
 ## Correction of record
 
@@ -320,3 +320,59 @@ What still carries real assurance for a recovered run: cross-run
 instance sequence contiguity, NQ/MNQ pairing, row-shape and enum
 validity, and merge order. Those are checks the reconstruction did not
 get to choose the answers to.
+
+## Amendment: every decode failure is caught, and an abandoned run is wound back whole
+
+Two holes in the 2026-09-19 guard above, found by re-reading it against
+the adapter it defends.
+
+**1. The handler caught two exceptions; the adapter raises three kinds.**
+`MalformedHeaderError` (wrong column count) and `UnknownEnumError` are
+the adapter's own classes, but `_num`, `_int` and `parse_iso` raise a
+bare `ValueError`. So a row corrupted in place that keeps all twenty
+columns and garbles a price, a sequence number or a timestamp — the
+exact shape of corruption the byte-count pre-flight cannot see, which is
+the only reason the in-merge net exists — went straight past the handler
+and killed the pass, with no ledger written. Row decoding is now wrapped
+at the boundary and raises `CorruptStream` for any decode failure. The
+wrap covers the pull from the adapter and nothing else, so a
+`ValueError` from a detector still propagates as the bug it is rather
+than being reported as a corrupt recording (`R13j`).
+
+The skip now names the file and how far the stream decoded before the
+bad row, which is what an operator needs to find it in a 25M-row file.
+
+**2. "Skipped whole" was not whole.** A run abandoned mid-stream reset
+the book and the tape, but its prefix's windows, wall states, regime
+tags, feature-availability counts, latency samples, open approaches and
+baseline observations stayed in the ledger — so the totals described
+data the same ledger reported as never read. `R13c` missed this only
+because its bad row sits halfway through the file, before the first
+window completes; with the row at 90% the abandoned run left 5 windows
+and 46,799 latency samples behind. The runner now marks the instrument
+state and the ledger's accumulators before the first event of a run and
+winds back to that mark when the run is abandoned. `PilotRunner` winds
+back its own observation buffers with it.
+
+Pinned by `R13f`-`R13j`: the three same-byte-count flavours that used to
+escape, the file-and-position message, a truncation on an exact row
+boundary (every remaining row parses, so only the pre-flight can see
+it), the late abandon against a clean reference run, and the runner's
+own errors still escaping.
+
+*Merged 2026-09-24.* The amendment above was written in a parallel
+session on 2026-09-19 and never reached this branch; it is merged
+here together with that session's ingest suite
+(`tests_mrofyt_ingest.py`) and run guide (`RUNNER_GUIDE.md`). Where
+the two lines of work met: this branch's `IO_ERROR` skip (a read
+error on one run while the folder answers) now winds the run back
+to the same mark as `CORRUPT_STREAM`, instead of only resetting the
+book (`R15e`: a late device error leaves no approach or latency
+sample of that run behind); `R15b`/`R15c` inject their device error
+at the runner's new row-reading boundary (`AD.iter_file`), since
+rows no longer pass through `AD.merge_run`; the ingest suite's `G6`
+ages its partial by an hour, because the auditor shares the
+recovery tool's liveness rule and a partial written seconds ago may
+still be recording. Runner version `MROF-YT-RUNNER-1.2.2`: ledgers
+written before this revision may still carry a skipped run's
+prefix.
