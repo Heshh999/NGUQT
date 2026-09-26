@@ -34,7 +34,7 @@ Recalculated from Git-tracked files at the current commit:
 |---|---|
 | Tracked files | **827** |
 | Python / C# / Markdown files | 222 / 49 / 190 |
-| Python / C# lines | 68,644 / 27,917 (**96,561** combined) |
+| Python / C# lines | 69,450 / 27,917 (**97,367** combined) |
 | Analysis module directories | **39** |
 | Dedicated test files | **34** (26 Python suites, 8 C# suites) |
 | Findings reports | **52** |
@@ -175,7 +175,10 @@ from an orphan by asking Windows directly. The recovery tool rebuilds manifests 
 killed before finalizing (power loss, a dropped drive). It never modifies an original
 file, refuses any run the recorder still holds, and refuses a repair that would leave the
 recording drive under 40 GB free. A file the drive cannot read is set aside rather than
-stopping the pass.
+stopping the pass. A real pass reports each run as it goes, oldest session first. If a
+write fails, it asks the drive and the folder separately and says which one stopped
+answering, takes back that run's unfinished copies, and stops. A manifest left by an
+interrupted pass is checked against its files before it is trusted.
 
 **Outcome-blind ingest.** The ingest runner computes the frozen features and detector
 firings without computing any outcome. The outcome stage is locked behind an
@@ -274,11 +277,11 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 15 suites, 572 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 15 suites, 584 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
-At the current commit those 618 checks all pass, both from the repository and from inside
+At the current commit those 630 checks all pass, both from the repository and from inside
 the unzipped review package
 ([`REVIEW_PACKAGE_MANIFEST_v01_6_7.md`](analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md)
 pins every file by SHA-256). Four historical suites (MGSD, MOFAD, MTF, VTBS) need the
@@ -335,7 +338,9 @@ capture installation and operation.
   fire on real data. A4 runs with one of its two alternative residual inputs uncomputed.
 - The capture drive recorded file-system damage in two depth files after a disconnect on
   2026-09-22. The audit and recovery tools set those runs aside rather than reading
-  guessed data.
+  guessed data. The first full repair pass, on 2026-09-26, stopped partway when Windows
+  refused to create a file on that drive and the folder stopped listing; recovery 1.5
+  reports which part failed and checks the folder takes a new file before it starts.
 - A genuine MNQ run recorded a 259 ms median receive-minus-exchange timestamp difference.
   Clock-synchronization confounding remains unresolved, so this is recorded but not
   interpreted as pure feed or network latency — see

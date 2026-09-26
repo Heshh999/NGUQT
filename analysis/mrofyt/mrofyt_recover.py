@@ -56,6 +56,32 @@
 #     Windows disk errors that way. 1.4 names the file with its Windows
 #     error, sets that run aside as SKIPPED_UNREADABLE_FILE (never
 #     repaired), and carries on; a drive that vanished still stops.
+#   * A PASS THAT STOPS MUST SAY WHERE, AND WHY. The first real --repair
+#     on the operator's drive (1.4, 26 Sep) printed nothing for its whole
+#     run -- the summary comes at the end -- then stopped when Windows
+#     refused to create one _RECOVERED.csv (errno 22) and the folder
+#     stopped listing. The only record of what got done was the manifests
+#     on the drive, and "the drive was disconnected" was a guess: the
+#     same errno comes back from a damaged folder index on a drive that
+#     is still there. 1.5:
+#       - prints each run as it starts and as it ends, and what it is
+#         doing in between, so a stop shows exactly how far it got;
+#       - asks the drive root and the folder separately after a failed
+#         read or write, and names which one stopped answering -- drive
+#         gone, folder unreadable, or a step refused while both answer;
+#       - never writes after a refused write: this run's own new files
+#         are removed and the pass stops, since pressing on means more
+#         writes into a folder that has just refused one;
+#       - checks, before reading anything in bulk, that the folder takes
+#         a new file at all (the recorder needs the same on Sunday);
+#       - takes runs oldest session first, so the DEV days the study
+#         needs next come before the sealed hold-out days;
+#       - does not trust its own manifest blindly: one from an earlier
+#         pass that does not parse, or whose copies are missing or not
+#         the size it records, marks the run for redoing, never done;
+#       - borrows declared fields only from a manifest the recorder
+#         wrote, never from a reconstructed one (a redo would otherwise
+#         borrow from its own stale manifest).
 #
 # What still carries real assurance for a recovered run: cross-run
 # instance sequence contiguity (does its seq range fit its siblings?),
@@ -63,7 +89,7 @@
 #
 # THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
 # ======================================================================
-"""mrofyt_recover.py - MROF-YT-RECOVER-1.4
+"""mrofyt_recover.py - MROF-YT-RECOVER-1.5
 
     python3 mrofyt_recover.py "<capture folder>" --dry-run   # list, instant
     python3 mrofyt_recover.py "<capture folder>"             # rebuild clean orphans
@@ -75,6 +101,10 @@ left alone. Run --repair on a weekend anyway -- it rewrites gigabytes
 onto the drive the recorder writes to. The dry run says how many, and a
 pass that would leave that drive with less than 40 GB free stops before
 writing anything.
+
+A real pass prints each run as it goes, oldest session first. If it is
+interrupted, run it again: runs already rebuilt are skipped, and a run
+whose rebuild was cut short is done again.
 """
 import csv
 import datetime as _dt
@@ -90,7 +120,7 @@ import time
 import mles_v12_adapter as AD
 import mrofyt_runner as RUN                 # session_id: the CME clock
 
-RECOVER_VERSION = 'MROF-YT-RECOVER-1.4'
+RECOVER_VERSION = 'MROF-YT-RECOVER-1.5'
 # Free space a write must leave on the capture drive -- it is the drive
 # the recorder writes to, and on the Sunday after a weekend repair it
 # starts again: about three session-days at the ~13 GB per session-day
@@ -280,15 +310,11 @@ def live_check(run, now=None, probe=None):
     return None
 
 
-def find_orphan_runs(directory, now=None, probe=None):
-    """Group CSVs by run and return only the runs with NO manifest.
-
-    Each entry: dict(base, session, run_id, partial, streams={kind:path},
-    missing=[kinds absent], live=None|reason). A run missing a stream
-    entirely is reported but never reconstructed: the runner skips such
-    a run whole anyway, and inventing a manifest for it would only move
-    the failure later. A LIVE run (see live_check) is returned so the
-    report can name it, and is refused by every path that writes."""
+def _group_runs(directory):
+    """[dict(base, session, run_id, partial, streams={kind: path})], one
+    per run with a stream file in the folder, in the order runs are handled:
+    oldest session first (then by name), so the development days a study
+    needs next come before the sealed hold-out days."""
     by = {}
     for p in sorted(os.listdir(directory)):
         m = RUN_RE.match(p)
@@ -301,14 +327,83 @@ def find_orphan_runs(directory, now=None, probe=None):
         e['streams'][g['stream']] = os.path.join(directory, p)
         if g['partial']:
             e['partial'] = True
+    return [by[b] for b in sorted(by, key=lambda b: (by[b]['session'], b))]
+
+
+def reconstructed_problem(directory, base):
+    """None when the _RECONSTRUCTED_manifest.json an earlier pass wrote
+    for this run holds up; otherwise why it cannot be trusted.
+
+    The manifest is written last, after its copies, so a pass cut off
+    mid-run leaves none. But a drive that drops can lose writes it had
+    already acknowledged, so the manifest is read back and every file it
+    names must exist at the byte count it records. Sizes only -- cheap
+    enough for every listing; the auditor re-hashes every file."""
+    mp = os.path.join(directory, base + '_RECONSTRUCTED_manifest.json')
+    try:
+        with open(mp) as fh:
+            man = json.load(fh)
+    except (OSError, ValueError) as exc:
+        return 'its manifest from an earlier pass cannot be read (%s)' % exc
+    if not isinstance(man, dict) or man.get('reconstructed') is not True:
+        return 'its manifest from an earlier pass is not a reconstructed one'
+    for k in AD.STREAMS:
+        ent = man.get(k)
+        if not isinstance(ent, dict) or not ent.get('file'):
+            return 'its manifest from an earlier pass names no %s file' % k
+        try:
+            size = os.path.getsize(os.path.join(directory, ent['file']))
+        except OSError:
+            return ('%s, named by its manifest from an earlier pass, is '
+                    'missing' % ent['file'])
+        if size != ent.get('bytes'):
+            return ('%s is %d bytes but its manifest from an earlier pass '
+                    'records %s: that pass was cut short'
+                    % (ent['file'], size, ent.get('bytes')))
+    return None
+
+
+def _manifest_state(directory, base):
+    """'RECORDER' (the recorder's own manifest: never touched), 'REBUILT'
+    (an earlier pass's reconstructed manifest that holds up), None (no
+    manifest), or the reason an earlier pass's manifest cannot be
+    trusted (the run is done again)."""
+    if os.path.exists(os.path.join(directory, base + '_manifest.json')):
+        return 'RECORDER'
+    if not os.path.exists(os.path.join(
+            directory, base + '_RECONSTRUCTED_manifest.json')):
+        return None
+    return reconstructed_problem(directory, base) or 'REBUILT'
+
+
+def rebuilt_runs(directory):
+    """Run ids an earlier pass already rebuilt, whose manifests hold up."""
+    return [e['run_id'] for e in _group_runs(directory)
+            if _manifest_state(directory, e['base']) == 'REBUILT']
+
+
+def find_orphan_runs(directory, now=None, probe=None):
+    """Group CSVs by run and return only the runs with NO manifest,
+    oldest session first.
+
+    Each entry: dict(base, session, run_id, partial, streams={kind:path},
+    missing=[kinds absent], live=None|reason, and redo=reason when an
+    earlier pass left a manifest that does not hold up). A run missing a
+    stream entirely is reported but never reconstructed: the runner
+    skips such a run whole anyway, and inventing a manifest for it would
+    only move the failure later. A LIVE run (see live_check) is returned
+    so the report can name it, and is refused by every path that
+    writes."""
     out = []
-    for base, e in sorted(by.items()):
+    for e in _group_runs(directory):
         # a run already reconstructed is no longer an orphan, so running
         # this tool twice over the same folder is a no-op the second time
-        if any(os.path.exists(os.path.join(directory, base + suf))
-               for suf in ('_manifest.json',
-                           '_RECONSTRUCTED_manifest.json')):
+        # -- unless the first pass was cut short (reconstructed_problem)
+        state = _manifest_state(directory, e['base'])
+        if state in ('RECORDER', 'REBUILT'):
             continue
+        if state is not None:
+            e['redo'] = state
         e['missing'] = sorted(set(AD.STREAMS) - set(e['streams']))
         e['live'] = live_check(e, now, probe)
         out.append(e)
@@ -326,13 +421,22 @@ def _live_result(res, reason):
 
 def sibling_manifest(directory, run_id):
     """A manifest from the SAME capture instance, for the declared (not
-    observed) fields. Identity is checked before anything is borrowed."""
+    observed) fields. Identity is checked before anything is borrowed.
+
+    Only a manifest the RECORDER wrote counts (1.5). A reconstructed one
+    holds declarations only second-hand -- borrowed from a recorder
+    manifest that is then found directly, or inferred from the rows,
+    which are not declarations at all -- and a run rebuilt again (a
+    redo) would otherwise borrow from its own stale manifest."""
     inst = run_id.rsplit('-R', 1)[0]
     best = None
     for p in sorted(glob.glob(os.path.join(directory, '*_manifest.json'))):
         try:
-            man = json.load(open(p))
+            with open(p) as fh:
+                man = json.load(fh)
         except Exception:
+            continue
+        if not isinstance(man, dict) or man.get('reconstructed'):
             continue
         if man.get('captureInstanceId') == inst:
             best = man
@@ -483,22 +587,31 @@ def _truncate_to(src, dst, kind, safe_ev):
     written. The source is opened read-only and never touched."""
     ix = IDX[kind]
     kept = 0
-    with open(src, 'rb') as fi, open(dst, 'wb') as fo:
-        it = _lines(fi)
-        fo.write(next(it, b'') or b'')                # header
-        for bline in it:
-            if bline is None or not bline.endswith(b'\n'):
-                break
-            raw = next(csv.reader([_text(bline)]), None)
-            if raw is None or len(raw) != len(AD.HEADERS[kind]):
-                break
-            try:
-                if int(raw[ix['eventSeq']]) > safe_ev:
-                    break
-            except ValueError:
-                break
-            fo.write(bline)
-            kept += 1
+    try:
+        with open(src, 'rb') as fi:
+            fo = _open_w(dst, 'wb')    # a failure writing is marked as one,
+            try:                       # so a stop can say which side failed
+                it = _lines(fi)
+                _w(fo, next(it, b'') or b'')          # header
+                for bline in it:
+                    if bline is None or not bline.endswith(b'\n'):
+                        break
+                    raw = next(csv.reader([_text(bline)]), None)
+                    if raw is None or len(raw) != len(AD.HEADERS[kind]):
+                        break
+                    try:
+                        if int(raw[ix['eventSeq']]) > safe_ev:
+                            break
+                    except ValueError:
+                        break
+                    _w(fo, bline)
+                    kept += 1
+            finally:
+                _close_w(fo)
+    except OSError as exc:
+        if not getattr(exc, 'writing', False):
+            _named(exc, src)               # the read side failed
+        raise
     return kept
 
 
@@ -563,16 +676,174 @@ def _size_or_none(path):
         return None
 
 
-def _read_error(exc):
-    """'cannot be read (Windows error 1392: ...)'. Python reports many
-    Windows disk errors as errno 22 'Invalid argument'; the Windows code
-    is the informative part."""
+def _os_error_text(exc):
+    """'Windows error 1392: ...' or 'errno 22: Invalid argument'. Python
+    reports many Windows disk errors as errno 22 'Invalid argument'; the
+    Windows code, where Python keeps it, is the informative part."""
     we = getattr(exc, 'winerror', None)
-    code = ('Windows error %s' % we) if we else ('errno %s' % exc.errno
-                                                 if getattr(exc, 'errno', None)
-                                                 else 'error')
-    return 'cannot be read (%s: %s)' % (code, getattr(exc, 'strerror', None)
-                                        or exc)
+    no = getattr(exc, 'errno', None)
+    code = ('Windows error %s' % we) if we else \
+        ('errno %s' % no) if no else 'error'
+    return '%s: %s' % (code, getattr(exc, 'strerror', None) or exc)
+
+
+def _read_error(exc):
+    """'cannot be read (Windows error 1392: ...)'."""
+    return 'cannot be read (%s)' % _os_error_text(exc)
+
+
+# ---------------------------------------------------------------------
+# when the drive fails mid-pass: which part stopped answering
+# ---------------------------------------------------------------------
+DRIVE_GONE = 'DRIVE_GONE'
+FOLDER_UNREADABLE = 'FOLDER_UNREADABLE'
+WRITE_REFUSED = 'WRITE_REFUSED'
+READ_REFUSED = 'READ_REFUSED'
+NEXT_STEP = {
+    DRIVE_GONE: 'Reconnect the drive (straight into the laptop, not '
+                'through a hub), check the folder lists again, and run the '
+                'same command: runs already rebuilt are skipped and it '
+                'carries on where it stopped.',
+    FOLDER_UNREADABLE: 'Do not run --repair again yet: it would write '
+                       'into a folder that is failing. Check the drive '
+                       'before anything else writes to it.',
+    WRITE_REFUSED: 'Do not run --repair again yet: it would write into a '
+                   'folder that has just refused a write. Check the drive '
+                   'before anything else writes to it.',
+    READ_REFUSED: 'The drive and the folder still answer, so this is one '
+                  'file or one step, not the drive. Send a screenshot of '
+                  'this before running anything else.',
+}
+
+
+class PassStopped(RuntimeError):
+    """A read or write failed in a way that ends the pass. .verdict is
+    DRIVE_GONE, FOLDER_UNREADABLE, WRITE_REFUSED or READ_REFUSED;
+    .results holds what the pass finished before the stop."""
+
+    def __init__(self, verdict, message, results=None):
+        RuntimeError.__init__(self, message)
+        self.verdict = verdict
+        self.results = list(results or [])
+
+
+def _answers(path):
+    """None when the path can be listed, else the OSError."""
+    try:
+        os.listdir(path)
+        return None
+    except OSError as exc:
+        return exc
+
+
+def _drive_root(directory):
+    """D:\\ for D:\\MLES_Capture; the parent folder where there are no
+    drive letters."""
+    ap = os.path.abspath(directory)
+    drive = os.path.splitdrive(ap)[0]
+    return drive + os.sep if drive else os.path.dirname(ap)
+
+
+def diagnose(directory, exc, writing=True):
+    """After a failed step: (verdict, sentence). The drive root and the
+    folder are asked separately, at once, because the error itself does
+    not say which failed: errno 22 comes back from a drive that has gone
+    and from a damaged folder index on a drive that is still there.
+
+      DRIVE_GONE         the drive root does not answer
+      FOLDER_UNREADABLE  the root answers, the folder cannot be listed
+      WRITE_REFUSED      both answer; the write itself was refused
+      READ_REFUSED       both answer; a read was refused (writing=False)
+    """
+    root = _drive_root(directory)
+    f = getattr(exc, 'filename', None)
+    step = '%s %s' % ('writing' if writing else 'reading',
+                      os.path.basename(f) if f else 'a file')
+    what = '%s failed with %s' % (step, _os_error_text(exc))
+    root_err = _answers(root)
+    if root_err is not None:
+        return DRIVE_GONE, (
+            '%s. The drive itself (%s) stopped answering (%s): it was '
+            'disconnected or lost power.'
+            % (what, root, _os_error_text(root_err)))
+    folder_err = _answers(directory)
+    if folder_err is not None:
+        return FOLDER_UNREADABLE, (
+            '%s. The drive (%s) still answers, but the folder %s can no '
+            'longer be listed (%s). The drive is connected; the folder\'s '
+            'index on it is damaged.'
+            % (what, root, directory, _os_error_text(folder_err)))
+    if writing:
+        return WRITE_REFUSED, (
+            '%s. The drive (%s) and the folder both still answer, so the '
+            'drive did not disconnect: Windows refused the write itself. '
+            'That points to damage in the file system on the drive (the '
+            'folder\'s index, or its record of free space), not to the '
+            'cable.' % (what, root))
+    return READ_REFUSED, (
+        '%s. The drive (%s) and the folder both still answer.' % (what, root))
+
+
+def _remove_own(paths):
+    """Remove files THIS pass created for a run it could not finish:
+    (removed, [(name, error)]). Only ever _RECOVERED.csv copies and a
+    manifest .tmp -- never an original."""
+    removed, left = [], []
+    for p in paths:
+        try:
+            if os.path.exists(p):
+                os.remove(p)
+                removed.append(os.path.basename(p))
+        except OSError as exc:
+            left.append((os.path.basename(p), _os_error_text(exc)))
+    return removed, left
+
+
+def _stopped(directory, exc, written, writing=True, diag=None):
+    """The PassStopped for a failed step. Where the drive still answers,
+    this run's own new files are removed first, so the folder holds no
+    copy that no manifest references."""
+    verdict, sentence = diag or diagnose(directory, exc, writing)
+    msg = [sentence]
+    if verdict != DRIVE_GONE and written:
+        removed, left = _remove_own(written)
+        if removed:
+            msg.append('Removed the unfinished copies this run had '
+                       'started: %s.' % ', '.join(removed))
+        if left:
+            msg.append('Could not remove %s; the next pass replaces it.'
+                       % '; '.join('%s (%s)' % x for x in left))
+    msg.append('Nothing more was written. Originals are never modified.')
+    msg.append(NEXT_STEP[verdict])
+    return PassStopped(verdict, ' '.join(msg))
+
+
+WRITE_CHECK_NAME = '_mrofyt_recover_write_check.tmp'
+
+
+def write_check(directory):
+    """Before a real pass reads anything in bulk: does the folder take a
+    new file? One small file is created, synced, read back and removed.
+    None when it does, else the OSError. The recorder needs the same
+    thing every time it opens a run."""
+    p = os.path.join(directory, WRITE_CHECK_NAME)
+    payload = b'MROF-YT-RECOVER write check\n' * 64
+    try:
+        with open(p, 'wb') as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        with open(p, 'rb') as fh:
+            back = fh.read()
+        os.remove(p)
+    except OSError as exc:
+        if exc.filename is None:
+            exc.filename = p
+        return exc
+    if back != payload:
+        return OSError(5, 'the check file read back different from what '
+                          'was written', p)
+    return None
 
 
 def _unreadable_result(res, bad):
@@ -589,6 +860,8 @@ def probe_run(run):
     res = dict(base=run['base'], run_id=run['run_id'],
                session=run['session'], partial=run['partial'],
                written=[], notes=[])
+    if run.get('redo'):
+        res['redo'] = run['redo']
     if run.get('live'):
         res['bytes_total'] = sum(os.path.getsize(p)
                                  for p in run['streams'].values())
@@ -622,6 +895,9 @@ def probe_run(run):
         res.update(status='WOULD_RECONSTRUCT',
                    notes=['every stream ends on a complete row; no repair '
                           'needed, just the missing manifest'])
+    if run.get('redo'):
+        res['notes'].append('an earlier pass left this run unfinished (%s); '
+                            'a real pass rebuilds it' % run['redo'])
     return res
 
 
@@ -673,12 +949,16 @@ def write_plan(runs, results, directory, repair):
 
 
 def reconstruct(directory, run, repair=False, dry_run=False, now=None,
-                probe=None):
+                probe=None, say=None):
     """Reconstruct one orphaned run. Returns a result dict; writes
     nothing when dry_run. `repair` permits rewriting a damaged stream to
     its last well-formed row (as a new file). A live run is refused
     here as well as at discovery, re-checked at call time, so a direct
-    caller cannot bypass it."""
+    caller cannot bypass it. `say` receives a line per phase.
+
+    Raises PassStopped when the drive or the folder stops answering, or
+    when a write is refused: this run's own new files are removed where
+    the drive still answers, and nothing more is written."""
     res = dict(base=run['base'], run_id=run['run_id'],
                session=run['session'], partial=run['partial'],
                written=[], status=None, notes=[])
@@ -693,12 +973,19 @@ def reconstruct(directory, run, repair=False, dry_run=False, now=None,
                           'would only move the failure downstream'])
         return res
 
+    say = say or (lambda s: None)
     scans = {}
-    for k, p in run['streams'].items():
+    say('reading every row (%.2f GB); this is the slow part'
+        % (sum(_size_or_none(p) or 0 for p in run['streams'].values()) / 1e9))
+    for k, p in sorted(run['streams'].items()):
         try:
             scans[k] = scan_stream(p, k)
         except OSError as exc:
-            os.listdir(directory)       # the drive itself gone: raise to main
+            # one file the drive will not read sets the run aside (1.4);
+            # a drive or folder that stopped answering ends the pass
+            diag = diagnose(directory, _named(exc, p), writing=False)
+            if diag[0] in (DRIVE_GONE, FOLDER_UNREADABLE):
+                raise _stopped(directory, exc, [], writing=False, diag=diag)
             return _unreadable_result(res, {os.path.basename(p):
                                             _read_error(exc)})
     empty = [k for k, s in scans.items() if not s.rows]
@@ -753,6 +1040,63 @@ def reconstruct(directory, run, repair=False, dry_run=False, now=None,
                    streams_to_truncate=sorted(needs_cut))
         return res
 
+    # every file this pass creates for the run, so a stop can take them
+    # back out: the folder must never hold a copy no manifest references
+    written_now = []
+    try:
+        return _write_run(directory, run, res, scans, ident, damaged,
+                          needs_cut, safe_ev, written_now, say)
+    except OSError as exc:
+        raise _stopped(directory, exc, written_now,
+                       writing=getattr(exc, 'writing', False))
+
+
+def _open_w(path, mode='wb'):
+    """open() for writing, with any failure marked as a write."""
+    try:
+        return open(path, mode)
+    except OSError as exc:
+        exc.writing = True
+        raise
+
+
+def _named(exc, path):
+    """An error from read()/write() on an open file carries no file
+    name; give it the one it happened on."""
+    if getattr(exc, 'filename', None) is None:
+        exc.filename = path
+    return exc
+
+
+def _w(fh, data):
+    try:
+        fh.write(data)
+    except OSError as exc:
+        exc.writing = True
+        raise _named(exc, fh.name)
+
+
+def _close_w(fh):
+    """close() flushes: a failure there is a failed write too."""
+    try:
+        fh.close()
+    except OSError as exc:
+        exc.writing = True
+        raise _named(exc, fh.name)
+
+
+def _read(path, fn, *args):
+    """fn(*args), with a read failure named after `path`."""
+    try:
+        return fn(*args)
+    except OSError as exc:
+        raise _named(exc, path)
+
+
+def _write_run(directory, run, res, scans, ident, damaged, needs_cut,
+               safe_ev, written_now, say):
+    """The writing half of reconstruct(). Every file it creates is added
+    to written_now BEFORE it is opened."""
     # ---- room on the drive the recorder writes to, checked per run ----
     # (the directory-level plan refuses a pass that cannot fit; this
     # catches the space shrinking during one, and direct callers)
@@ -770,12 +1114,16 @@ def reconstruct(directory, run, repair=False, dry_run=False, now=None,
 
     # ---- write repaired copies where needed -------------------------
     out_paths = dict(run['streams'])
+    if copy:
+        say('writing %d cop%s (%.2f GB)' % (len(copy), 'y' if len(copy) == 1
+                                            else 'ies', need / 1e9))
     for k, p in sorted(run['streams'].items()):
         base = os.path.basename(p)
         clean = base[:-len('.partial')] if base.endswith('.partial') else base
         if k in damaged or k in needs_cut or base != clean:
             dst = os.path.join(directory, clean.replace(
                 '.csv', '_RECOVERED.csv'))
+            written_now.append(dst)
             kept = _truncate_to(p, dst, k, safe_ev)
             out_paths[k] = dst
             res['written'].append(os.path.basename(dst))
@@ -783,12 +1131,20 @@ def reconstruct(directory, run, repair=False, dry_run=False, now=None,
                                 % (k, kept, safe_ev))
 
     # ---- rescan whatever will actually be referenced ----------------
-    final = {k: scan_stream(p, k) for k, p in out_paths.items()}
+    say('checking what was written')
+    final = {k: _read(p, scan_stream, p, k)
+             for k, p in sorted(out_paths.items())}
     if any(s.bad_row for s in final.values()) or \
             not all(s.rows for s in final.values()):
-        res.update(status='FAILED_REPAIR',
+        # nothing is pinned, so the copies would be referenced by no
+        # manifest: take them back out rather than leave them loose
+        removed, left = _remove_own(written_now)
+        res.update(status='FAILED_REPAIR', written=[],
                    notes=res['notes'] + ['a rewritten stream is still not '
-                                         'well formed; nothing was pinned'])
+                                         'well formed; nothing was pinned'] +
+                   (['removed the copies: %s' % ', '.join(removed)]
+                    if removed else []) +
+                   ['could not remove %s (%s)' % x for x in left])
         return res
 
     dep = final['depth']
@@ -844,8 +1200,9 @@ def reconstruct(directory, run, repair=False, dry_run=False, now=None,
         res['notes'].append('no sibling manifest for this capture '
                             'instance; declaredDepth inferred from the '
                             'deepest level observed')
+    say('fingerprinting the files (SHA-256) and writing the manifest')
     for k, p in sorted(out_paths.items()):
-        sha, nbytes = _sha_and_bytes(p)
+        sha, nbytes = _read(p, _sha_and_bytes, p)
         man[k] = dict(present=True, file=os.path.basename(p),
                       bytes=nbytes, rows=final[k].rows, sha256=sha)
 
@@ -854,9 +1211,18 @@ def reconstruct(directory, run, repair=False, dry_run=False, now=None,
     # a drive that drops mid-write leaves a .tmp every tool ignores, never
     # a half manifest that marks the run done
     tmp = mp + '.tmp'
-    with open(tmp, 'w') as fh:
-        json.dump(man, fh, indent=1)
-    os.replace(tmp, mp)
+    written_now.append(tmp)
+    fh = _open_w(tmp, 'w')
+    try:
+        _w(fh, json.dumps(man, indent=1))
+    finally:
+        _close_w(fh)
+    try:
+        os.replace(tmp, mp)
+    except OSError as exc:
+        exc.writing = True
+        raise
+    written_now.remove(tmp)
     res['written'].append(os.path.basename(mp))
     res.update(status='RECONSTRUCTED', manifest=os.path.basename(mp),
                events=man['lastEventSeq'] - man['firstEventSeq'] + 1,
@@ -864,12 +1230,45 @@ def reconstruct(directory, run, repair=False, dry_run=False, now=None,
     return res
 
 
+def _label(run):
+    """'NQ_NQ_DEC26' from MLES12_NQ_NQ_DEC26_<session>_<run id>."""
+    head = run['base'].split('_%s_' % run['session'], 1)[0]
+    return head[len('MLES12_'):] if head.startswith('MLES12_') else head
+
+
+def _one_line(res):
+    """A run's outcome in one line, for the progress output."""
+    st = res.get('status')
+    why = ''
+    if res.get('unreadable'):
+        why = '; '.join('%s %s' % kv for kv in sorted(res['unreadable'].items()))
+    elif res.get('empty_streams'):
+        why = 'no usable rows in: %s' % ', '.join(res['empty_streams'])
+    elif res.get('live'):
+        why = res['live']
+    elif res.get('missing'):
+        why = 'missing: %s' % ', '.join(res['missing'])
+    elif st in ('NEEDS_REPAIR', 'SKIPPED_NO_SPACE', 'FAILED_REPAIR',
+                'SKIPPED_MIXED_IDENTITY', 'SKIPPED_FOREIGN_SCHEMA') and \
+            res.get('notes'):
+        why = res['notes'][-1]
+    return st + (' (%s)' % why if why else '')
+
+
 def recover_directory(directory, repair=False, dry_run=False, now=None,
-                      probe=None):
+                      probe=None, progress=None):
     """A dry run PROBES (header + tail only, near-instant even on a 6 GB
     depth file); a real run SCANS every row, because only every row can
     give the sequence bounds and counts a manifest must carry. Live
-    runs are listed, counted apart, and never scanned or written."""
+    runs are listed, counted apart, and never scanned or written.
+
+    A real pass first checks the folder takes a new file, then goes
+    through the runs oldest session first; `progress`, when given,
+    receives a line as each run starts, moves through its phases and
+    ends. It raises PassStopped (with .results: what it finished) when
+    the drive or the folder stops answering, or a write is refused."""
+    say = progress or (lambda s: None)
+    rebuilt = rebuilt_runs(directory)
     runs = find_orphan_runs(directory, now, probe)
     probes = [probe_run(r) for r in runs]
     # what --repair would write, and whether the drive can take it; a
@@ -886,12 +1285,43 @@ def recover_directory(directory, repair=False, dry_run=False, now=None,
     if dry_run:
         results = probes
     else:
-        results = [reconstruct(directory, r, repair, False, now, probe)
-                   for r in runs]
+        results = []
+        will_write = [p for p in probes
+                      if p['status'] == 'WOULD_RECONSTRUCT' or
+                      (repair and p['status'] ==
+                       'WOULD_RECONSTRUCT_WITH_REPAIR')]
+        say('rebuilt by an earlier pass: %d run(s). To go through now: %d, '
+            'oldest session first.' % (len(rebuilt), len(runs)))
+        if will_write:
+            say('checking that %s takes a new file ...' % directory)
+            err = write_check(directory)
+            if err is not None:
+                raise _stopped(directory, err,
+                               [os.path.join(directory, WRITE_CHECK_NAME)],
+                               writing=True)
+            say('  yes')
+        for i, (r, pr) in enumerate(zip(runs, probes), 1):
+            say('[%d/%d] %s  %s  %s  %.2f GB'
+                % (i, len(runs), r['session'], _label(r), r['run_id'],
+                   (pr.get('bytes_total') or 0) / 1e9))
+            t0 = time.time()
+            if pr['status'] == 'SKIPPED_UNREADABLE_FILE':
+                res = pr        # known unreadable: never read a second time
+            else:
+                try:
+                    res = reconstruct(directory, r, repair, False, now, probe,
+                                      say=lambda s: say('      ' + s))
+                except PassStopped as exc:
+                    exc.results = results
+                    raise
+            results.append(res)
+            say('      done: %s, %.1f min' % (_one_line(res),
+                                              (time.time() - t0) / 60))
     live = sum(1 for r in runs if r['live'])
     by = sorted({r.get('liveness_by') for r in runs if r.get('liveness_by')})
     return dict(recover=RECOVER_VERSION, directory=directory,
                 repair=repair, dry_run=dry_run,
+                rebuilt_earlier=rebuilt,
                 runs_without_manifest=len(runs),
                 orphan_runs=len(runs) - live, live_runs=live,
                 liveness_by=by, repair_write_plan=plan, results=results)
@@ -908,6 +1338,13 @@ def text_summary(rep):
     if rep.get('liveness_by'):
         L.append('  "still being written" decided by: %s'
                  % ', '.join(rep['liveness_by']))
+    if 'rebuilt_earlier' in rep:
+        L.append('rebuilt by an earlier pass (their manifests check out): %d'
+                 % len(rep['rebuilt_earlier']))
+    redo = [r for r in rep['results'] if r.get('redo')]
+    if redo:
+        L.append('  left unfinished by an earlier pass, rebuilt again by a '
+                 'real pass: %d' % len(redo))
     gb = sum(r.get('bytes_total') or 0 for r in rep['results']
              if r['status'] != 'SKIPPED_LIVE_RUN') / 1e9
     if gb:
@@ -956,6 +1393,44 @@ def text_summary(rep):
     return '\n'.join(L)
 
 
+def _say(line):
+    print(line, flush=True)
+
+
+def _where(exc):
+    """'reconstruct(), line 1040' -- the last step of this tool the
+    error passed through, so a screenshot says where it stopped without
+    a traceback."""
+    import traceback
+    tb = traceback.extract_tb(exc.__traceback__)
+    mine = [f for f in tb if os.path.basename(f.filename) ==
+            os.path.basename(__file__)]
+    f = (mine or tb or [None])[-1]
+    return None if f is None else '%s(), line %d' % (f.name, f.lineno)
+
+
+def _report_stop(d, stop, out, where=None):
+    done = [r['run_id'] for r in stop.results
+            if r.get('status') == 'RECONSTRUCTED']
+    print('')
+    print('STOPPED (%s): %s' % (stop.verdict, stop))
+    print('Rebuilt in this pass before the stop: %d run(s)%s'
+          % (len(done), (': ' + ', '.join(done)) if done else '.'))
+    if where:
+        print('(stopped in %s)' % where)
+    if out:
+        try:
+            with open(out, 'w') as fh:
+                json.dump(dict(recover=RECOVER_VERSION, directory=d,
+                               stopped=stop.verdict, message=str(stop),
+                               where=where, results=stop.results),
+                          fh, indent=1, default=str)
+            print('stop report -> %s' % out)
+        except OSError as exc:
+            print('could not write the stop report %s (%s)'
+                  % (out, _os_error_text(exc)))
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv:
@@ -968,27 +1443,36 @@ def main(argv=None):
         print('STOPPED: cannot read %s (%s). Is the drive connected, and '
               'is it still that letter?' % (d, exc))
         return 2
+    repair = '--repair' in argv
+    dry = '--dry-run' in argv
+    out = argv[argv.index('--out') + 1] if '--out' in argv else None
+    if not dry:
+        _say('%s  %s  (%s)' % (RECOVER_VERSION, d, 'repair' if repair
+                               else 'rebuild clean orphans'))
     try:
-        rep = recover_directory(d, repair='--repair' in argv,
-                                dry_run='--dry-run' in argv)
+        rep = recover_directory(d, repair=repair, dry_run=dry,
+                                progress=None if dry else _say)
     except InsufficientSpace as exc:
         print('STOPPED: %s' % exc)
         return 2
+    except PassStopped as exc:
+        _report_stop(d, exc, out)
+        return 2
     except OSError as exc:
-        try:
-            os.listdir(d)
-        except OSError:
-            print('STOPPED: %s stopped answering mid-run (%s). The drive '
-                  'was disconnected or lost power. Originals are never '
-                  'modified, so nothing is damaged: reconnect and re-run.'
-                  % (d, exc))
-            return 2
-        raise
+        # anywhere else (discovery, a probe): the same question -- is it
+        # the drive, the folder, or one file -- answered, not guessed
+        diag = diagnose(d, exc, writing=getattr(exc, 'writing', False))
+        stop = PassStopped(diag[0], '%s Nothing more was written. Originals '
+                                    'are never modified. %s'
+                           % (diag[1], NEXT_STEP[diag[0]]))
+        _report_stop(d, stop, out, where=_where(exc))
+        return 2
+    if not dry:
+        _say('')
     print(text_summary(rep))
-    if '--out' in argv:
-        p = argv[argv.index('--out') + 1]
-        json.dump(rep, open(p, 'w'), indent=1, default=str)
-        print('\nrecovery report -> %s' % p)
+    if out:
+        json.dump(rep, open(out, 'w'), indent=1, default=str)
+        print('\nrecovery report -> %s' % out)
     return 0
 
 

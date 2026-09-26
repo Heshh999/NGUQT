@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# MROF-YT-RECOVER-1.4 suite. Manifest reconstruction for runs whose
+# MROF-YT-RECOVER-1.5 suite. Manifest reconstruction for runs whose
 # recorder died before finalizing. Exercised on synthetic recorder-format
 # runs (mles_v12_synth) damaged in the specific ways a power loss causes.
 # Synthetic events verify CODE BEHAVIOR only, never market evidence.
@@ -689,6 +689,328 @@ t('V12b: rows followed by a zero-filled stretch: --repair keeps every '
   b'\x00' not in open(os.path.join(d19, rec19), 'rb').read() and
   open(zd, 'rb').read()[:len(good19)] == good19 and
   os.path.getsize(os.path.join(d19, rec19)) <= len(good19))
+
+# ---------------------------------------------------------------------
+# V13-V16 (1.5): the first real --repair on the operator's drive printed
+# nothing for its whole run, then stopped when Windows refused to create
+# one _RECOVERED.csv (errno 22) and the folder stopped listing. 1.4 said
+# "the drive was disconnected" -- a guess, because errno 22 also comes
+# back from a damaged folder index on a drive that is still there.
+# ---------------------------------------------------------------------
+def _tree(d):
+    return {x: sha(os.path.join(d, x)) for x in sorted(os.listdir(d))}
+
+
+def _cli(d, *args):
+    """main() as the operator runs it (Windows answers FREE here)."""
+    buf = io.StringIO()
+    RC.find_orphan_runs = _free_probe_find
+    try:
+        with contextlib.redirect_stdout(buf):
+            rc = RC.main([d] + list(args))
+    finally:
+        RC.find_orphan_runs = _rf
+    return rc, buf.getvalue()
+
+
+d20 = os.path.join(WORK, 'order')
+orphan(d20, SY.synth_run(d20, n_depth=3000, contract='NQ DEC26',
+                         session='20260922',
+                         cid='20260922204838191-d5223c43'),
+       rename_partial=AD.STREAMS)
+orphan(d20, SY.synth_run(d20, n_depth=3000, contract='NQ SEP26',
+                         session='20260908',
+                         cid='20260907175959000-b96e5fe5'),
+       rename_partial=AD.STREAMS)
+bases20 = sorted(r['base'] for r in RC.find_orphan_runs(d20, probe=FREE))
+said20_dry = []
+RC.recover_directory(d20, dry_run=True, probe=FREE, progress=said20_dry.append)
+said20 = []
+rep20 = RC.recover_directory(d20, repair=True, probe=FREE,
+                             progress=said20.append)
+heads20 = [x for x in said20 if x.startswith('[')]
+t('V13: a real pass says what it is doing as it goes -- a line as each '
+  'run starts, one per phase, one per outcome -- and takes runs oldest '
+  'session first (9/08 before 9/22) even where the file names sort the '
+  'other way; a dry run prints nothing extra',
+  '20260922' in bases20[0] and                      # by name, 9/22 first
+  [r['session'] for r in rep20['results']] == ['20260908', '20260922'] and
+  len(heads20) == 2 and heads20[0].startswith('[1/2] 20260908') and
+  'NQ_NQ_SEP26' in heads20[0] and 'b96e5fe5-R001' in heads20[0] and
+  heads20[1].startswith('[2/2] 20260922') and
+  sum('done: RECONSTRUCTED' in x for x in said20) == 2 and
+  any('reading every row' in x for x in said20) and
+  any('writing 4 copies' in x for x in said20) and
+  any('checking what was written' in x for x in said20) and
+  said20_dry == [])
+
+rc20, out20 = _cli(d20, '--dry-run')
+t('V13b: once rebuilt, the dry run counts the runs an earlier pass '
+  'finished and whose manifests check out -- how the operator sees how '
+  'far an interrupted pass got',
+  rc20 == 0 and RC.rebuilt_runs(d20) == [r['run_id'] for r in
+                                         rep20['results']] and
+  'rebuilt by an earlier pass (their manifests check out): 2' in out20 and
+  'runs without a manifest: 0' in out20)
+
+# V14: a write refused while the drive and the folder still answer
+d21 = os.path.join(WORK, 'refused')
+orphan(d21, SY.synth_run(d21, n_depth=3000, cid='refa', session='20260914'),
+       rename_partial=AD.STREAMS)
+orphan(d21, SY.synth_run(d21, n_depth=3000, cid='refb', session='20260915'),
+       rename_partial=AD.STREAMS)
+tree21 = _tree(d21)
+
+
+def _refuse_refb_quality(p, *a, **kw):
+    # run refb's second copy: its depth copy is already on disk by then
+    if 'refb' in str(p) and str(p).endswith('_quality_RECOVERED.csv'):
+        raise OSError(22, 'Invalid argument', str(p))
+    return _real_open(p, *a, **kw)
+
+
+RC.open = _refuse_refb_quality
+try:
+    rc21, out21 = _cli(d21, '--repair')
+finally:
+    del RC.open
+left21 = sorted(os.listdir(d21))
+t('V14: Windows refuses a new file while the drive and the folder both '
+  'answer: the pass stops (WRITE_REFUSED, not "disconnected"), names the '
+  'file and says not to run --repair again yet; the run before it stays '
+  'rebuilt',
+  rc21 == 2 and 'STOPPED (WRITE_REFUSED)' in out21 and
+  '_quality_RECOVERED.csv failed with errno 22' in out21 and
+  'did not disconnect' in out21 and
+  'Do not run --repair again yet' in out21 and
+  'Rebuilt in this pass before the stop: 1 run(s): refa-R001' in out21 and
+  any(x.endswith('refa-R001_RECONSTRUCTED_manifest.json') for x in left21))
+t('V14b: nothing more is written, and the stopped run leaves nothing '
+  'behind: the depth copy it had finished is taken back out (no copy '
+  'without a manifest), no manifest or .tmp; every original is '
+  'byte-identical',
+  not any('refb' in x and ('RECOVERED' in x or 'manifest' in x)
+          for x in left21) and
+  'Removed the unfinished copies this run had started' in out21 and
+  '_depth_RECOVERED.csv' in out21 and
+  not any(x.endswith('.tmp') for x in left21) and
+  all(_tree(d21)[x] == h for x, h in tree21.items()))
+
+
+def _refuse_every_copy(p, *a, **kw):
+    if str(p).endswith('_RECOVERED.csv'):
+        raise OSError(22, 'Invalid argument', str(p))
+    return _real_open(p, *a, **kw)
+
+
+_real_answers = RC._answers
+d22 = os.path.join(WORK, 'folderbad')
+orphan(d22, SY.synth_run(d22, n_depth=3000, cid='folda', session='20260916'),
+       rename_partial=AD.STREAMS)
+
+
+def _folder_unlistable(path):
+    if os.path.abspath(path) == os.path.abspath(d22):
+        e = OSError(22, 'The file or directory is corrupted and unreadable')
+        e.winerror = 1392
+        return e
+    return _real_answers(path)
+
+
+RC.open, RC._answers = _refuse_every_copy, _folder_unlistable
+try:
+    stop22 = None
+    try:
+        RC.recover_directory(d22, repair=True, probe=FREE)
+    except RC.PassStopped as exc:
+        stop22 = exc
+finally:
+    del RC.open
+    RC._answers = _real_answers
+t('V14c: the drive root answers but the folder no longer lists: '
+  'FOLDER_UNREADABLE, with the folder\'s own Windows error -- the folder '
+  'index is damaged, the drive is connected',
+  stop22 is not None and stop22.verdict == 'FOLDER_UNREADABLE' and
+  'Windows error 1392' in str(stop22) and
+  'index on it is damaged' in str(stop22) and stop22.results == [])
+
+# a drive that has gone: nothing can be removed, and a re-run finishes
+d23 = os.path.join(WORK, 'drivegone')
+orphan(d23, SY.synth_run(d23, n_depth=3000, cid='gonea', session='20260917'),
+       rename_partial=AD.STREAMS)
+tree23 = _tree(d23)
+_gone = {'on': False}
+
+
+def _drop_after_depth(p, *a, **kw):
+    if str(p).endswith('_quality_RECOVERED.csv'):
+        _gone['on'] = True                     # the drive drops here
+        raise OSError(22, 'Invalid argument', str(p))
+    return _real_open(p, *a, **kw)
+
+
+def _nothing_answers(path):
+    if _gone['on']:
+        e = OSError(2, 'The system cannot find the path specified')
+        e.winerror = 3
+        return e
+    return _real_answers(path)
+
+
+RC.open, RC._answers = _drop_after_depth, _nothing_answers
+try:
+    rc23, out23 = _cli(d23, '--repair')
+finally:
+    del RC.open
+    RC._answers = _real_answers
+kept23 = [x for x in os.listdir(d23) if x.endswith('_depth_RECOVERED.csv')]
+rc23b, out23b = _cli(d23, '--repair')        # reconnected: run it again
+man23 = json.load(open(glob.glob(os.path.join(
+    d23, '*_RECONSTRUCTED_manifest.json'))[0]))
+t('V14d: the drive root itself stops answering: DRIVE_GONE, which says '
+  'reconnect and run the same command; nothing is removed from a drive '
+  'that is not there, and the re-run replaces the leftover copy and '
+  'finishes -- originals byte-identical throughout',
+  rc23 == 2 and 'STOPPED (DRIVE_GONE)' in out23 and
+  'disconnected or lost power' in out23 and
+  'Windows error 3' in out23 and 'run the same command' in out23 and
+  len(kept23) == 1 and
+  rc23b == 0 and 'done: RECONSTRUCTED' in out23b and
+  man23['depth']['sha256'] == sha(os.path.join(d23, man23['depth']['file']))
+  and all(_tree(d23)[x] == h for x, h in tree23.items()))
+
+# V15: before anything is read in bulk, the folder must take a new file
+d24 = os.path.join(WORK, 'nocreate')
+orphan(d24, SY.synth_run(d24, n_depth=3000, cid='nocra', session='20260914'),
+       rename_partial=AD.STREAMS)
+tree24 = _tree(d24)
+_scans24 = []
+_real_scan = RC.scan_stream
+
+
+def _counting_scan(p, k):
+    _scans24.append(p)
+    return _real_scan(p, k)
+
+
+def _refuse_check(p, *a, **kw):
+    if str(p).endswith(RC.WRITE_CHECK_NAME):
+        raise OSError(22, 'Invalid argument', str(p))
+    return _real_open(p, *a, **kw)
+
+
+RC.open, RC.scan_stream = _refuse_check, _counting_scan
+try:
+    rc24, out24 = _cli(d24, '--repair')
+finally:
+    del RC.open
+    RC.scan_stream = _real_scan
+t('V15: a folder that refuses a new file is found by a small check '
+  'before a single stream is read in bulk: the pass stops there '
+  '(WRITE_REFUSED), and the folder is exactly as it was',
+  rc24 == 2 and 'STOPPED (WRITE_REFUSED)' in out24 and
+  RC.WRITE_CHECK_NAME in out24 and _scans24 == [] and
+  'checking that' in out24 and _tree(d24) == tree24)
+rc24b, out24b = _cli(d24, '--repair')
+t('V15b: when the folder takes the check file, it is written, read back '
+  'and removed -- never left behind -- and the pass goes on',
+  rc24b == 0 and '  yes' in out24b and
+  RC.WRITE_CHECK_NAME not in os.listdir(d24) and
+  'done: RECONSTRUCTED' in out24b)
+
+# V16: an earlier pass's manifest is checked, never trusted blindly
+d25 = os.path.join(WORK, 'resume')
+orphan(d25, SY.synth_run(d25, n_depth=3000, cid='resa', session='20260915'),
+       rename_partial=AD.STREAMS)
+RC.recover_directory(d25, probe=FREE)
+mp25 = glob.glob(os.path.join(d25, '*_RECONSTRUCTED_manifest.json'))[0]
+man25 = json.load(open(mp25))
+cp25 = os.path.join(d25, man25['depth']['file'])
+full25 = open(cp25, 'rb').read()
+ok25 = RC.find_orphan_runs(d25, probe=FREE) == [] and \
+    RC.rebuilt_runs(d25) == ['resa-R001']
+with open(cp25, 'wb') as fh:                   # the last writes never landed
+    fh.write(full25[:len(full25) // 2])
+f25 = RC.find_orphan_runs(d25, probe=FREE)
+rb25 = RC.rebuilt_runs(d25)
+dry25 = RC.recover_directory(d25, dry_run=True, probe=FREE)
+real25 = RC.recover_directory(d25, probe=FREE)
+t('V16: a manifest from an earlier pass whose copy is not the size it '
+  'records (writes a dropping drive never landed) does not mark the run '
+  'done: it is listed for redoing with the reason, and a real pass '
+  'rebuilds it whole',
+  ok25 and len(f25) == 1 and 'cut short' in f25[0]['redo'] and
+  rb25 == [] and
+  any('an earlier pass left this run unfinished' in n
+      for n in dry25['results'][0]['notes']) and
+  'left unfinished by an earlier pass' in RC.text_summary(dry25) and
+  real25['results'][0]['status'] == 'RECONSTRUCTED' and
+  open(cp25, 'rb').read() == full25 and
+  RC.reconstructed_problem(d25, f25[0]['base']) is None)
+good_man25 = open(mp25).read()
+with open(mp25, 'w') as fh:
+    fh.write('')                               # an empty manifest
+e25 = RC.find_orphan_runs(d25, probe=FREE)
+with open(mp25, 'w') as fh:
+    fh.write(good_man25)
+os.remove(cp25)                                # a copy that is gone
+m25 = RC.reconstructed_problem(d25, f25[0]['base'])
+t('V16b: an empty manifest, or one naming a copy that is gone, is not '
+  'trusted either; a recorder-written manifest is never second-guessed',
+  len(e25) == 1 and 'cannot be read' in e25[0]['redo'] and
+  m25 is not None and 'missing' in m25 and
+  RC._manifest_state(d7, os.path.basename(mp7)[:-len('_manifest.json')])
+  == 'RECORDER')
+
+# a redo must not borrow its "declared" fields from its own stale
+# manifest, nor from any reconstructed one: only the recorder declares
+d27 = os.path.join(WORK, 'redosib')
+orphan(d27, SY.synth_run(d27, n_depth=3000, cid='rsib', session='20260916',
+                         run_no=1), rename_partial=AD.STREAMS)
+orphan(d27, SY.synth_run(d27, n_depth=3000, cid='rsib', session='20260916',
+                         run_no=2, seq_start=10 ** 6),
+       rename_partial=AD.STREAMS)
+RC.recover_directory(d27, probe=FREE)
+m27 = {os.path.basename(p): json.load(open(p)) for p in
+       glob.glob(os.path.join(d27, '*_RECONSTRUCTED_manifest.json'))}
+t('V16d: with no recorder manifest for the capture instance, every '
+  'rebuilt run says its declared depth is inferred -- none borrows from '
+  'another rebuilt run (or, when redone, from its own stale manifest)',
+  len(m27) == 2 and
+  all(m.get('declaredDepthInferred') is True and
+      'reconstructedFieldsFrom' not in m for m in m27.values()))
+
+# the unreadable run of V11: known from the probe, never read a second
+# time in the real pass, and its line names the file and the error
+_scans17 = []
+
+
+def _counting_scan17(p, k):
+    _scans17.append(p)
+    return _real_scan(p, k)
+
+
+d26 = os.path.join(WORK, 'unreadable2')
+man26 = orphan(d26, SY.synth_run(d26, n_depth=3000, cid='badtwo',
+                                 session='20260917'),
+               rename_partial=AD.STREAMS)
+bad17 = os.path.join(d26, man26['depth']['file'] + '.partial')
+said26 = []
+RC.open, RC.scan_stream = _open_like_a_dropped_drive, _counting_scan17
+try:
+    rep26 = RC.recover_directory(d26, repair=True, probe=FREE,
+                                 progress=said26.append)
+finally:
+    del RC.open
+    RC.scan_stream = _real_scan
+t('V16c: a run the probe already found unreadable is not read again by '
+  'the real pass (each read of a damaged file can raise a Windows '
+  '"Corrupt File" warning), and its progress line names the file and '
+  'the Windows error',
+  rep26['results'][0]['status'] == 'SKIPPED_UNREADABLE_FILE' and
+  _scans17 == [] and
+  any('done: SKIPPED_UNREADABLE_FILE' in x and 'Windows error 1392' in x
+      and os.path.basename(bad17) in x for x in said26))
 
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
