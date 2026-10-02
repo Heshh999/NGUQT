@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# MROF-YT-RECOVER-1.5 suite. Manifest reconstruction for runs whose
+# MROF-YT-RECOVER-1.6 suite. Manifest reconstruction for runs whose
 # recorder died before finalizing. Exercised on synthetic recorder-format
 # runs (mles_v12_synth) damaged in the specific ways a power loss causes.
 # Synthetic events verify CODE BEHAVIOR only, never market evidence.
@@ -1011,6 +1011,55 @@ t('V16c: a run the probe already found unreadable is not read again by '
   _scans17 == [] and
   any('done: SKIPPED_UNREADABLE_FILE' in x and 'Windows error 1392' in x
       and os.path.basename(bad17) in x for x in said26))
+
+# ---------------------------------------------------------------------
+# V17 (1.6): the 2 Oct dry run on the operator's drive stopped in
+# live_check, where os.path.getmtime of a .partial file raised Windows
+# error 1392 before any run was listed
+# ---------------------------------------------------------------------
+d27 = os.path.join(WORK, 'nodate')
+mp27a = SY.synth_run(d27, n_depth=3000, cid='nodate', session='20261001')
+mp27b = SY.synth_run(d27, n_depth=3000, cid='dated', session='20261002')
+man27a = orphan(d27, mp27a, rename_partial=AD.STREAMS)
+orphan(d27, mp27b)
+bad27 = os.path.join(d27, man27a['depth']['file'] + '.partial')
+_real_getmtime = os.path.getmtime
+
+
+def _no_date(p):
+    if os.path.abspath(str(p)) == os.path.abspath(bad27):
+        e = OSError(22, 'The file or directory is corrupted and unreadable')
+        e.winerror = 1392
+        raise e
+    return _real_getmtime(p)
+
+
+_scans17[:] = []
+RC.os.path.getmtime = _no_date
+RC.scan_stream = _counting_scan17
+try:
+    dry27 = RC.recover_directory(d27, dry_run=True, probe=FREE)
+    before27 = sorted(os.listdir(d27))
+    real27 = RC.recover_directory(d27, repair=True, probe=FREE)
+finally:
+    RC.os.path.getmtime = _real_getmtime
+    RC.scan_stream = _real_scan
+by27 = {r['run_id']: r for r in dry27['results']}
+byr27 = {r['run_id']: r for r in real27['results']}
+t('V17: a .partial file whose date Windows refuses (error 1392) does not '
+  'stop the dry run: its run is set aside as SKIPPED_UNREADABLE_FILE '
+  'naming the file and the error, every other run is still listed and '
+  'rebuilt, and the damaged run is never read in bulk or written for',
+  by27['nodate-R001']['status'] == 'SKIPPED_UNREADABLE_FILE' and
+  'Windows error 1392' in
+  by27['nodate-R001']['unreadable'][os.path.basename(bad27)] and
+  by27['dated-R001']['status'] == 'WOULD_RECONSTRUCT' and
+  byr27['nodate-R001']['status'] == 'SKIPPED_UNREADABLE_FILE' and
+  byr27['dated-R001']['status'] == 'RECONSTRUCTED' and
+  not any(p.endswith(os.path.basename(bad27)) for p in _scans17) and
+  not any('nodate' in x and ('RECOVERED' in x or 'RECONSTRUCTED' in x)
+          for x in os.listdir(d27)) and
+  'Windows error 1392' in RC.text_summary(dry27))
 
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)

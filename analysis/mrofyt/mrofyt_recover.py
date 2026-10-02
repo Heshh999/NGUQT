@@ -82,6 +82,12 @@
 #       - borrows declared fields only from a manifest the recorder
 #         wrote, never from a reconstructed one (a redo would otherwise
 #         borrow from its own stale manifest).
+#   1.6 (2 Oct): the 1.5 dry run on the operator's drive stopped on a
+#     .partial file whose date Windows would not even return (error 1392,
+#     a damaged directory entry), inside the "is it still being written?"
+#     check, before any run was listed. Such a file is now set aside as
+#     SKIPPED_UNREADABLE_FILE like one whose bytes cannot be read, and
+#     the pass goes on to every other run.
 #
 # What still carries real assurance for a recovered run: cross-run
 # instance sequence contiguity (does its seq range fit its siblings?),
@@ -89,7 +95,7 @@
 #
 # THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
 # ======================================================================
-"""mrofyt_recover.py - MROF-YT-RECOVER-1.5
+"""mrofyt_recover.py - MROF-YT-RECOVER-1.6
 
     python3 mrofyt_recover.py "<capture folder>" --dry-run   # list, instant
     python3 mrofyt_recover.py "<capture folder>"             # rebuild clean orphans
@@ -120,7 +126,7 @@ import time
 import mles_v12_adapter as AD
 import mrofyt_runner as RUN                 # session_id: the CME clock
 
-RECOVER_VERSION = 'MROF-YT-RECOVER-1.5'
+RECOVER_VERSION = 'MROF-YT-RECOVER-1.6'
 # Free space a write must leave on the capture drive -- it is the drive
 # the recorder writes to, and on the Sunday after a weekend repair it
 # starts again: about three session-days at the ~13 GB per session-day
@@ -297,7 +303,20 @@ def live_check(run, now=None, probe=None):
         return ('its newest row was stamped %d s ago by the recorder\'s '
                 'own clock; a run that recent may still be closing'
                 % max(now - max(stamps), 0))
-    newest = max(os.path.getmtime(p) for p in run['streams'].values())
+    mtimes, unread = [], {}
+    for p in run['streams'].values():
+        try:
+            mtimes.append(os.path.getmtime(p))
+        except OSError as exc:
+            # 1.6: Windows answered "not held" but will not even give this
+            # file's date (error 1392 on a damaged directory entry). Not
+            # live, and not readable: probe_run sets the run aside as
+            # SKIPPED_UNREADABLE_FILE and nothing is ever written for it
+            unread[os.path.basename(p)] = _read_error(exc)
+    if unread:
+        run['unreadable'] = unread
+        return None
+    newest = max(mtimes)
     age = now - newest
     if age < LIVE_MTIME_S:
         return 'still being written (last write %d s ago)' % max(age, 0)
@@ -862,8 +881,10 @@ def probe_run(run):
                written=[], notes=[])
     if run.get('redo'):
         res['redo'] = run['redo']
+    if run.get('unreadable'):
+        return _unreadable_result(res, dict(run['unreadable']))
     if run.get('live'):
-        res['bytes_total'] = sum(os.path.getsize(p)
+        res['bytes_total'] = sum(_size_or_none(p) or 0
                                  for p in run['streams'].values())
         return _live_result(res, run['live'])
     if run['missing']:

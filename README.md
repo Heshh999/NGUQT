@@ -277,11 +277,11 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 15 suites, 584 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 15 suites, 585 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
-At the current commit those 630 checks all pass, both from the repository and from inside
+At the current commit those 631 checks all pass, both from the repository and from inside
 the unzipped review package
 ([`REVIEW_PACKAGE_MANIFEST_v01_6_7.md`](analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md)
 pins every file by SHA-256). Four historical suites (MGSD, MOFAD, MTF, VTBS) need the
@@ -341,6 +341,10 @@ capture installation and operation.
   guessed data. The first full repair pass, on 2026-09-26, stopped partway when Windows
   refused to create a file on that drive and the folder stopped listing; recovery 1.5
   reports which part failed and checks the folder takes a new file before it starts.
+  On 2026-10-02 a third file, the depth stream of an MNQ run from the week of
+  2026-09-28, came back with the same error, this time before Windows would return the
+  file's date. Recovery 1.6 sets such a file aside instead of stopping, so the dry run
+  lists every other run.
 - A genuine MNQ run recorded a 259 ms median receive-minus-exchange timestamp difference.
   Clock-synchronization confounding remains unresolved, so this is recorded but not
   interpreted as pure feed or network latency — see
