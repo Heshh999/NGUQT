@@ -194,9 +194,34 @@ from it is a wave-four registration on sessions not yet recorded.
 - additional instruments
 - live, paper or simulated order placement
 
-## 10. Implementation record
+## 10. Implementation record — 2026-10-03
 
-Filled in by the commit that adds `mrofyt_bigmove.py` and
-`tests_mrofyt_bigmove.py`. The module is written against this file;
-where the code is more precise than the text, the precision is recorded
-there and does not change a threshold.
+`mrofyt_bigmove.py` (MROF-YT-W3-BIGMOVE-1.0), `tests_mrofyt_bigmove.py`.
+Written against §1–§9 **before** any recorded session was read by it;
+the engineering verification ran on synthetic tape and is asserted by
+the suite, never by market evidence. The module subclasses the pilot
+runner and overrides hooks only; the wave-one ledger it emits is
+byte-identical to the pilot's (suite `B9`), and the frozen signal
+module keeps the hash `tests_mles_v12` pins (`B10`).
+
+| registered | implemented as | precision / departure |
+| --- | --- | --- |
+| §1 grid features | one record per frozen 10 s grid tick while the book is ready: `D`, `z(delta10, s·D)`, `r` (10 s mid response, ticks), persistence agreement in direction `s`, the frozen control score in direction `s`; `n10` (trade count) observed under its own baseline key | the baseline store gains the key `n10`; no frozen key is read or written differently |
+| §1 G3 | the previous grid record of the same instrument; a session roll clears it | none |
+| §1 L1–L4 | evaluated in the runner's window hook with the window's own `f`, at most once per approach | `clean_cross`, `held_5s` etc. are the frozen fields verbatim |
+| §1 L4 memory | `{level_id: break direction}` per instrument, set when a window of a range level has `clean_cross` and `held_5s`, cleared at the session roll; the retest must be a different approach (the first-fire-per-approach rule makes the breaking approach itself ineligible only if it never satisfies L4 — it cannot, since it needs `ad == -b`) | none |
+| §1 D1 | per-grid `D` summed into six 10-minute bins over 09:30–10:30 ET; decided on the first grid tick at or after 10:30:00 and before 18:00 | none |
+| §2 path | the run's mid series compressed to price changes; first touches by a right-to-left sweep over two prefix-minimum Fenwick trees keyed by half-tick price bins; the suite checks it against a plain forward scan (`B1`) | none |
+| §2 tie | a stop index `<=` the target index is a STOP | none |
+| §2 excursions | computed for events only (the baseline needs no excursion) | none |
+| §3 baseline | every grid tick with a path answer, both directions, cells `(instrument, ET hour)`; a pattern's expected rate is the mean of its events' cells; events whose cell has no resolved tick are dropped from the lift and counted in `n_resolved` | none |
+| §3 interval | seeded percentile bootstrap, 2 000 draws, the pilot's seed; two-sided p = 2 × min(share of draws ≤ 0, share ≥ 0), floored at 1/2 000; no interval below five events | none |
+| §4 placebo | `mode='placebo'`: the wave-two ARM-C offset rule copied verbatim (same seed expression, same magnitudes, same minimum separation); `--both` prints real against placebo for L1–L4 | none |
+| §5 Holm | over the 24 `(pattern, stop)` p-values on NQ; a test with no p-value counts toward `m` and is never rejected; "survives" also requires `>= 30` resolved NQ events | none |
+| §7 census | maximum up and down excursion over `(i, i + 1800 s]` by a monotonic-deque sweep, checked against a plain scan (`B1b`); deciles of five grid features | none |
+| §8 gate | `plan()` drops every session `> 20260918` unless `--unblind`, lists them as refused, and stops with nothing read if nothing remains; `--unblind` prints a banner and writes every session read to the exposure ledger as exposed by this wave, monotone | none |
+
+Blind: waves one and two are untouched; this tool never computes a
+fixed-horizon markout. Read-only: no order API, no fill, slippage or
+commission; the expectancy printed is mid-to-mid and labelled so on
+every line (`B8`).

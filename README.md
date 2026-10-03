@@ -94,8 +94,9 @@ flowchart TB
     CF --> RN["Outcome-blind runner<br/>mrofyt_runner"]
     RN --> PI["Pilot diagnostic<br/>mrofyt_pilot"]
     RN --> W2["Wave-two families<br/>mrofyt_wave2"]
+    RN --> W3["Wave-three big-move search<br/>mrofyt_bigmove"]
     PI -->|"labels every inspected day"| LG[("Exposure ledger<br/>EXPOSED_PILOT_DEV")]
-    AU --> RP[("Reports<br/>audit, recovery, ledger,<br/>pilot, wave two, windows")]
+    AU --> RP[("Reports<br/>audit, recovery, ledger,<br/>pilot, wave two, wave three, windows")]
     RC --> RP
     RN --> RP
     PI --> RP
@@ -232,7 +233,7 @@ validation blind enforced in its backend (see the architecture above).
 
 ```
 analysis/   39 research modules — features, protocols, findings, registries, tests
-  mrofyt/   Level II order flow: capture audit, recovery, outcome-blind runner, pilot, wave two
+  mrofyt/   Level II order flow: capture audit, recovery, outcome-blind runner, pilot, wave two, wave three
   godseye/  God's Eye View: read-only research dashboard (stdlib Python + vanilla JavaScript)
 docs/       101 protocol, preregistration, findings, audit and runbook documents
 src/        34 C# files — NT8 strategies, research hosts, capture recorders
@@ -277,11 +278,11 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 15 suites, 585 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 16 suites, 612 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
-At the current commit those 631 checks all pass, both from the repository and from inside
+At the current commit those 658 checks all pass, both from the repository and from inside
 the unzipped review package
 ([`REVIEW_PACKAGE_MANIFEST_v01_6_7.md`](analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md)
 pins every file by SHA-256). Four historical suites (MGSD, MOFAD, MTF, VTBS) need the

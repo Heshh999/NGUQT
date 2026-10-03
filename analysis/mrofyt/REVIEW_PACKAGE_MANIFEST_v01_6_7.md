@@ -20,6 +20,9 @@ cbd25e6df806db216cf480a3445f1628fc56dff95ea0d903dc197b91ac7b4791  MROF_YT_OF01_7
 6af137d68f1feb4f39206056534952712fe9468cc4818f0a409a26cb726692fa  MROF_YT_WAVE2_REGISTRATION.md (DRAFT — pending operator sign-off; supersedes 4e398285… — §11 implementation record and two implementation-precision notes in §4.1/§4.2, no hypothesis parameter changed; earlier: §8.1 interim-monitoring rule; re-hash on sign-off)
 241034220e70c661c8c5463c425c0c1b06a7b91181b93c39ce55f160b6250fd8  mrofyt_wave2.py (MROF-YT-WAVE2-1.0; supersedes 18ba3b83… — an unreadable or empty capture folder STOPS the pass with no report instead of printing zero fires on zero sessions, Amendment 11. The registration as running code: W2-A1, W2-A4r, W2-A4f, W2-A4-OPEN, W2-A4r-z15, W2-A4r-HC, arm B, arm C placebo; subclass of the pilot runner via the runner's observation hooks; wave one untouched; §4.3 CAUSAL_SWING declared not-in-this-version)
 50158d03c0cbde186b2e1fd31c16fc2b8776d29bce6e3374c29ff1bc4324804f  tests_mrofyt_wave2.py (29 tests; supersedes fbeb2623… — W8)
+ea3ec3031ce13be354df00614054512a6bfc8549b78d32848a55eed4b2982949  MROF_YT_WAVE3_BIGMOVE_REGISTRATION.md (FROZEN 2026-10-03 before any run, committed at 85084ff5… and then completed with its §10 implementation record: eight big-move patterns on the frozen grid and approach windows, a 100-tick target with 40/60/80-tick stops and an 1800 s limit, hour-matched baseline, the wave-two placebo arm, 24 tests under Holm, DEV sessions <= 20260918 only; Amendment 18)
+1059327c003162e986967b47eef7a55c41eb3ea503a6cc52c508d8c2f783b168  mrofyt_bigmove.py (MROF-YT-W3-BIGMOVE-1.0: the registration as code on the pilot runner's hooks only; refuses every session after 20260918 unless --unblind, which announces itself and exposes permanently; the path score by a Fenwick first-touch sweep checked against a plain scan; no fill, slippage, commission or order; Amendment 18)
+cf2cef7f3691a4e93d76e5b8d9c27130ddb8c8374b53c2b8021641279a2f70e1  tests_mrofyt_bigmove.py (27 tests, B1–B11: the score against a forward scan on 8 904 random-walk checks, hand paths, every pattern condition load-bearing, Holm, the refusal gate, the hour-matched lift recomputed from the report, placebo offsets identical to wave two, the unblind ledger, wave-one ledger identity, frozen-hash pins, the census)
 6b0eb7ea4a9bc5deb48eec7e461b03c36d509defeb9a28023b104b489f929538  MROF_YT_PILOT_DIAGNOSTIC_FINDINGS.md (supersedes 4624b199… — Amendment 2: the validation blind; Amendment 1 supersedes 8ab588fa…)
 aaf1f1f91e33ecd14b81b3b5d58f750acd0800fc57059b1a861b2c950e73edda  mrofyt_recover.py (MROF-YT-RECOVER-1.6; supersedes 962f7319… — a file whose date Windows will not return (error 1392 on a damaged directory entry) is set aside as SKIPPED_UNREADABLE_FILE inside the live-run check instead of stopping the whole dry run before any run is listed, Amendment 17. 1.5 (962f7319…) supersedes 3bed26e0… — a real pass prints each run as it starts, its phases and its outcome, oldest session first; after a failed read or write it asks the drive root and the folder separately and names which stopped answering (DRIVE_GONE, FOLDER_UNREADABLE, WRITE_REFUSED, READ_REFUSED) instead of guessing "disconnected"; a refused write stops the pass after taking back that run's unfinished copies; the folder must take a small check file before anything is read in bulk; an earlier pass's manifest whose files are missing or not the size it records marks the run for redoing; a run the probe found unreadable is not read again; declared fields are borrowed from recorder-written manifests only; Amendment 16. 1.4 (3bed26e0…) supersedes bc2d60d5… — every read is memory-bounded (a zero-filled file with no line break, what a drive drop leaves, no longer pulls its whole size into memory: MAX_LINE_BYTES), and one unreadable file (the first real 1.3 dry run died on OSError 22) is named with its Windows error and set aside as SKIPPED_UNREADABLE_FILE, never repaired, and the pass carries on; 1.3 (bc2d60d5…) supersedes dcd01f4a… — a repair must not fill the drive the recorder writes to: the dry run states what --repair would write against the free space, a pass that would leave under 40 GB free is refused before writing anything, and each run is re-checked; Amendment 14. 1.2 (dcd01f4a…) supersedes 0e73abfb… — asks Windows directly whether the recorder still holds a run (file-sharing check), the only sign that holds over a weekend; anything held or unanswerable is refused; Amendment 11. 1.1 (0e73abfb…): indirect live-run signs; 1.0 (a8b637a5…): manifest reconstruction, instant --dry-run)
 1143117b906ace167869d2cf336add6ffb1f21048a9132ec672f6298f422cf2e  tests_mrofyt_recover.py (51 tests; supersedes d65c1740… — V17 a .partial file whose date Windows refuses; earlier d65c1740… supersedes 1a91fed7… — V13–V13b progress lines, oldest-first order, the earlier-pass count; V14–V14d a refused write, an unlistable folder, a vanished drive (each named, the stopped run's copies taken back where the drive answers, the re-run finishing); V15–V15b the check file before any bulk read; V16–V16d the earlier-pass manifest check, recorder-only declarations, no second read of an unreadable file; earlier 1a91fed7… → V11–V12b; earlier 7960bb10… → V11 the unreadable file, V12–V12b bounded reads of zero-filled files (peak memory asserted); earlier 04f7d842… → V10–V10c the free-space guard, each test stating the drive it simulates; earlier ed72a3fd… → V9–V9g: the direct check with an injected answer, the closing-window veto, the recorder-source premise, the atomic manifest write)
@@ -77,17 +80,17 @@ Archived source directives:
 b2a0122b40e6ef140a1cb6fe7011068bfa3cc52039a75b19da54c9fc1e7ae389  ../../docs/prompts/MROF_GODS_EYE_VIEW_CLAUDE_PROMPT_PINOKIO.md (the dashboard directive, Amendment 12; archived from the upload as it was read — 166 lines — so the hash is of this archived copy)
 ```
 
-Delivered package (111 files, repo layout preserved so every suite runs
+Delivered package (116 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-5285925c64305b10107e5f616545cbf01dcc0e197ef50a1df50d02cafce07c2c  MROF_V1_Engine_v01_6_7.zip (supersedes 092a62e0… — recover 1.6: a file Windows will not date is set aside instead of stopping the dry run, 113 files, Amendment 17; earlier 092a62e0… supersedes 14adcbf4… — recover 1.5: progress per run, oldest session first, a stop that names the drive, the folder or the refused step, the check file before any bulk read, earlier-pass manifests checked, recorder-only declarations, 113 files, Amendment 16; earlier 14adcbf4… supersedes 9a8bce6c… — the 9/19 parallel-session work merged: runner 1.2.2 decode-failure catch and wind-back, the ingest suite, the run guide, 113 files, Amendment 15; earlier c5f652c5… — a known-unreadable file is not re-read; earlier 416beef6… — unreadable-file verdict on the page, capped shared-gap alerts, legible replay level labels; earlier 694c6367… — replay evidence matches the approach id; earlier 2fa33aed… — recover 1.4 bounded reads; earlier f930879f… — recover 1.4 unreadable-file guard; earlier f930879f… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+64002e08e7eb492151effafb358a77db98c83fe3b62df810723c744916d895c8  MROF_V1_Engine_v01_6_7.zip (supersedes 5285925c… — wave three: the big-move registration, mrofyt_bigmove.py and its 27-test suite, 116 files, Amendment 18; earlier 5285925c… supersedes 092a62e0… — recover 1.6: a file Windows will not date is set aside instead of stopping the dry run, 113 files, Amendment 17; earlier 092a62e0… supersedes 14adcbf4… — recover 1.5: progress per run, oldest session first, a stop that names the drive, the folder or the refused step, the check file before any bulk read, earlier-pass manifests checked, recorder-only declarations, 113 files, Amendment 16; earlier 14adcbf4… supersedes 9a8bce6c… — the 9/19 parallel-session work merged: runner 1.2.2 decode-failure catch and wind-back, the ingest suite, the run guide, 113 files, Amendment 15; earlier c5f652c5… — a known-unreadable file is not re-read; earlier 416beef6… — unreadable-file verdict on the page, capped shared-gap alerts, legible replay level labels; earlier 694c6367… — replay evidence matches the approach id; earlier 2fa33aed… — recover 1.4 bounded reads; earlier f930879f… — recover 1.4 unreadable-file guard; earlier f930879f… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 585/585 + 46/46, identical to the repo
+# run from inside the unzipped package: 612/612 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -125,9 +128,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_v01_7.py` | 15/15 |
 | `tests_mrofyt_recover.py` | 51/51 |
 | `tests_mrofyt_wave2.py` | 29/29 |
-| **wave-one/two total** | **585/585** |
+| `tests_mrofyt_bigmove.py` | 27/27 |
+| **wave-one/two/three total** | **612/612** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **631/631** |
+| **package total** | **658/658** |
 
 ## Runnable research commands
 
@@ -138,6 +142,7 @@ python3 mrofyt_pilot.py    "<capture folder>" --out pilot.json      # §8A diagn
 python3 mrofyt_recover.py  "<capture folder>" --dry-run             # orphaned runs (instant); runs the recorder holds listed apart
 python3 mrofyt_recover.py  "<capture folder>" --repair              # rebuild manifests — safe with NinjaTrader running; do it on a weekend anyway (I/O)
 python3 mrofyt_wave2.py    "<capture folder>" --both --out wave2.json  # wave two, real + placebo, blind
+python3 mrofyt_bigmove.py  "<capture folder>" --both --out w3.json     # wave three big-move search, DEV sessions only, real + placebo
 ```
 
 All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -804,3 +809,46 @@ detector hash so registering wave two provably changed nothing.
     on this drive (the first two files on 2026-09-22), now on a run from
     the week of 2026-09-28, which is the case for copying the capture
     off the drive before any further long pass. Battery: 585/585 + 46/46.
+
+18. **Wave three: a registered search for order-flow events that precede
+    25-point moves (2026-10-03).** The operator, reading the pilot's
+    A4 markouts (a +2-point typical move with a −3-point average, no
+    interval excluding zero), asked for recurring order-flow events
+    that produce 25+ point moves, "built the right way". The right way
+    is the one this package already uses: write down what will be
+    looked for, how it is scored and how many things are tried, before
+    looking. `MROF_YT_WAVE3_BIGMOVE_REGISTRATION.md` was committed
+    (85084ff5…) before `mrofyt_bigmove.py` existed, and the tool has not
+    been run on a recorded session here (none exists in this
+    environment).
+
+    * eight patterns on the frozen runner's own grid ticks and approach
+      windows, with the frozen fields unchanged: flow shock with and
+      against the response, a two-tick control run, a held open break,
+      a sweep-and-reclaim of a range level, a VWAP band snapback, a
+      failed retest of a held break, and a 10:30 ET trend read;
+    * one path score, fixed: target 100 ticks, stops 40/60/80 ticks,
+      1800 s limit, a tie is a stop, mid-to-mid inside one recording
+      run, no fill, spread, slippage or commission. This is the first
+      wave in the package that reads a path outcome; it does so on DEV
+      sessions (`<= 20260918`) only, in its own module, and feeds
+      nothing back into a wave-one or wave-two threshold. The wave-one
+      ledger it emits is byte-identical to the pilot's (`B9`) and the
+      frozen signal module keeps its pinned hash (`B10`);
+    * an hour-matched baseline (every grid tick, both directions, cells
+      by instrument and ET hour), because the patterns cluster in cash
+      hours where 25-point moves are routine; the lift is observed minus
+      the events' own cells, with a seeded bootstrap interval and p;
+    * the wave-two placebo arm for the level patterns, same seed rule
+      (`B6`);
+    * 24 tests under Holm, fixed in the registration; fewer than 30
+      resolved NQ events is NOT TESTED;
+    * the gate: every session after 20260918 is refused and listed;
+      `--unblind` is the checkpoint read, announces itself, and writes
+      every session read to the exposure ledger as exposed by this
+      wave, monotone (`B5`, `B7`, `B7b`);
+    * a census of grid-feature deciles against the share of ticks that
+      reach ±100 ticks inside 1800 s, labelled diagnostic, producing no
+      verdict; a rule read off it is a wave-four registration.
+
+    Battery: 612/612 + 46/46.
