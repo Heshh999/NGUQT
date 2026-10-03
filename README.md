@@ -278,11 +278,11 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 16 suites, 612 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 16 suites, 615 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
-At the current commit those 658 checks all pass, both from the repository and from inside
+At the current commit those 661 checks all pass, both from the repository and from inside
 the unzipped review package
 ([`REVIEW_PACKAGE_MANIFEST_v01_6_7.md`](analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md)
 pins every file by SHA-256). Four historical suites (MGSD, MOFAD, MTF, VTBS) need the

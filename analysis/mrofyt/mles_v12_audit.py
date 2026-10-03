@@ -26,7 +26,7 @@
 # rows).
 # THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING.
 # ======================================================================
-import glob
+import fnmatch
 import json
 import os
 import re
@@ -517,13 +517,33 @@ def audit_run(manifest_path, lite=True):
 
 
 def discover_manifests(directory):
-    """Collision manifests keep a .json extension, so one glob finds
-    primary AND collision manifests."""
+    """Every *_manifest*.json in the folder (collision manifests keep a
+    .json extension, so one pattern finds primary AND collision
+    manifests).
+
+    Enumerated with os.listdir, NOT glob. glob swallows an OSError
+    raised partway through a directory listing and returns whatever it
+    had -- often nothing -- so a folder whose index Windows cannot read
+    to the end (2026-10-03: error 1392 on two damaged entries) came
+    back as "no manifest", which reads exactly like the wrong folder.
+    A listing that fails is raised as CaptureUnavailable with the
+    Windows error, never returned as an empty list."""
+    try:
+        names = os.listdir(directory)
+    except OSError as exc:
+        we = getattr(exc, 'winerror', None)
+        why = ('Windows error %s: %s' % (we, exc.strerror or exc)) if we \
+            else str(exc)
+        raise CaptureUnavailable(
+            'the capture folder %s cannot be listed to the end (%s). This '
+            'is the folder index on the drive, not one file: Windows '
+            'stopped answering partway through the listing. Nothing was '
+            'read. Do not scan or fix the drive; copy it first.'
+            % (directory, why))
     out = []
-    for p in sorted(glob.glob(os.path.join(directory, '*_manifest*.json'))):
-        if p.endswith('.tmp'):
-            continue
-        out.append(p)
+    for n in sorted(names):
+        if fnmatch.fnmatch(n, '*_manifest*.json') and not n.endswith('.tmp'):
+            out.append(os.path.join(directory, n))
     return out
 
 

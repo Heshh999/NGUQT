@@ -330,19 +330,32 @@ class Runner:
         """[(instrument, session, [manifest paths sorted by start])]"""
         by = collections.defaultdict(list)
         mans = []
-        for mp in AU.discover_manifests(self.dir):
+        found = AU.discover_manifests(self.dir)
+        # why a folder with manifest files in it yields no plan is said
+        # in the stop, not guessed (2026-10-03: "no manifest" came from a
+        # listing glob had cut short, and read like the wrong folder)
+        diag = dict(manifest_files=len(found), loaded=0, unreadable=[],
+                    other_instrument=0, other_schema=0)
+        self.plan_diag = diag
+        for mp in found:
             try:
                 man = json.load(open(mp))
             except OSError as exc:
                 # a manifest the drive cannot deliver: gone drive -> stop
                 AU.stop_if_capture_gone(self.dir, os.path.basename(mp), exc)
+                diag['unreadable'].append((os.path.basename(mp), str(exc)))
                 continue
-            except Exception:
+            except Exception as exc:
+                diag['unreadable'].append((os.path.basename(mp), str(exc)))
                 continue
             inst = man.get('instrument')
-            if inst not in self.instruments or \
-                    man.get('schema') != AD.SCHEMA:
+            if inst not in self.instruments:
+                diag['other_instrument'] += 1
                 continue
+            if man.get('schema') != AD.SCHEMA:
+                diag['other_schema'] += 1
+                continue
+            diag['loaded'] += 1
             mans.append((mp, man))
         # One run, one manifest. A run can carry two -- the recorder's own
         # and a reconstructed one -- only if a recovery tool pinned a
@@ -382,10 +395,7 @@ class Runner:
                 'connected, and is it still that letter?' % self.dir)
         plan = self.plan()
         if not plan:
-            raise NoCaptureData(
-                'no MLES-CAPTURE-1.2 manifest for %s in %s: the wrong '
-                'folder, or a drive that came back under another letter'
-                % ('/'.join(self.instruments), self.dir))
+            raise NoCaptureData(self._no_plan_reason())
         seen_sessions = []
         for inst, ses, runs in plan:
             if ses not in seen_sessions:
@@ -411,6 +421,27 @@ class Runner:
         self.ledger['baseline_sessions'] = {
             i: s.baseline_sessions for i, s in self.states.items()}
         return self.ledger
+
+    def _no_plan_reason(self):
+        d = getattr(self, 'plan_diag', None) or {}
+        inst = '/'.join(self.instruments)
+        if not d.get('manifest_files'):
+            return ('no MLES-CAPTURE-1.2 manifest for %s in %s: the wrong '
+                    'folder, or a drive that came back under another '
+                    'letter' % (inst, self.dir))
+        parts = ['%d manifest file(s) are in %s but none gave a plan for '
+                 '%s:' % (d['manifest_files'], self.dir, inst)]
+        if d['unreadable']:
+            n, e = d['unreadable'][0]
+            parts.append('%d could not be read (first: %s: %s)'
+                         % (len(d['unreadable']), n, e))
+        if d['other_instrument']:
+            parts.append('%d are for other instruments'
+                         % d['other_instrument'])
+        if d['other_schema']:
+            parts.append('%d carry another schema' % d['other_schema'])
+        parts.append('Nothing was read.')
+        return ' '.join(parts)
 
     def _close_session(self, st):
         # a decision window is FROZEN at 10 s: partial windows at the

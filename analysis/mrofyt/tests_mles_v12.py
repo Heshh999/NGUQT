@@ -779,6 +779,46 @@ t('T33b: the live harness run stamps the bumped build, so real captures '
   'are attributable',
   lvm.get('recorderBuild') == _bm.group(1))
 
+# ---------------------------------------------------------------------
+# T36: a folder listing Windows cannot finish is a stop, never "no
+# manifest" (2026-10-03: glob returned an empty list from a damaged
+# folder index and three tools read it as the wrong folder)
+# ---------------------------------------------------------------------
+d36 = os.path.join(WORK, 'listing')
+os.makedirs(d36)
+for n in ('A_manifest.json', 'B_manifest.json', 'C_manifest.json.tmp',
+          'D_depth.csv'):
+    open(os.path.join(d36, n), 'w').write('{}')
+_real_listdir = os.listdir
+
+
+def _listing_breaks(p):
+    if os.path.abspath(str(p)) == os.path.abspath(d36):
+        e = OSError(22, 'The file or directory is corrupted and unreadable')
+        e.winerror = 1392
+        raise e
+    return _real_listdir(p)
+
+
+found36 = AU.discover_manifests(d36)
+AU.os.listdir = _listing_breaks
+try:
+    stopped36 = None
+    try:
+        AU.discover_manifests(d36)
+    except AU.CaptureUnavailable as exc:
+        stopped36 = str(exc)
+finally:
+    AU.os.listdir = _real_listdir
+t('T36: discover_manifests enumerates with os.listdir and raises '
+  'CaptureUnavailable naming the Windows error when the listing fails, '
+  'instead of returning an empty list; a .tmp manifest is skipped and '
+  'the two real ones are found, sorted',
+  [os.path.basename(x) for x in found36] ==
+  ['A_manifest.json', 'B_manifest.json'] and
+  stopped36 is not None and 'cannot be listed' in stopped36 and
+  '1392' in stopped36 and 'copy it first' in stopped36)
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

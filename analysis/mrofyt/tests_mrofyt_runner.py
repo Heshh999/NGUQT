@@ -733,6 +733,40 @@ t('R13j: the guard covers row decoding only -- a ValueError raised by '
   _own_bug_escapes)
 
 
+# ---------------------------------------------------------------------
+# R16: why a folder with manifest files yields no plan is stated
+# ---------------------------------------------------------------------
+d16 = os.path.join(WORK, 'noplan')
+os.makedirs(d16)
+open(os.path.join(d16, 'MLES12_NQ_x_manifest.json'), 'w').write('{not json')
+json.dump(dict(instrument='ES', schema=AD.SCHEMA, runId='r'),
+          open(os.path.join(d16, 'MLES12_ES_y_manifest.json'), 'w'))
+json.dump(dict(instrument='NQ', schema='OTHER', runId='r2'),
+          open(os.path.join(d16, 'MLES12_NQ_z_manifest.json'), 'w'))
+msg16 = None
+try:
+    RN.Runner(d16, ('NQ', 'MNQ')).run()
+except RN.NoCaptureData as exc:
+    msg16 = str(exc)
+t('R16: three manifest files that give no plan stop with NoCaptureData '
+  'that counts them and says why: one unreadable (named, with the '
+  'error), one for another instrument, one with another schema',
+  msg16 is not None and '3 manifest file(s)' in msg16 and
+  '1 could not be read' in msg16 and 'MLES12_NQ_x_manifest.json' in msg16
+  and '1 are for other instruments' in msg16 and
+  '1 carry another schema' in msg16 and 'Nothing was read' in msg16)
+d16b = os.path.join(WORK, 'noplan_empty')
+os.makedirs(d16b)
+msg16b = None
+try:
+    RN.Runner(d16b, ('NQ', 'MNQ')).run()
+except RN.NoCaptureData as exc:
+    msg16b = str(exc)
+t('R16b: a folder with no manifest file at all keeps the plain "wrong '
+  'folder or another letter" stop',
+  msg16b is not None and 'wrong folder' in msg16b)
+
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))
