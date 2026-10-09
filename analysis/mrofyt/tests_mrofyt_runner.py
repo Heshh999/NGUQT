@@ -767,6 +767,24 @@ t('R16b: a folder with no manifest file at all keeps the plain "wrong '
   msg16b is not None and 'wrong folder' in msg16b)
 
 
+# ---------------------------------------------------------------------
+# R17: the quote fields mean what they say (until 2026-10-09 st.ask held
+# the bid SIZE and st.bsz the ask PRICE; nothing read them, so no result
+# changed, but wave four's spread feature would have)
+# ---------------------------------------------------------------------
+d17 = os.path.join(WORK, 'quotes17')
+SY.synth_run(d17, n_depth=3000, cid='q17')
+r17 = RN.Runner(d17, ('NQ',))
+r17.run()
+s17 = r17.states['NQ']
+t('R17: after a run the last quote is held as bid price < ask price one '
+  'tick apart, with the two sizes in the size fields',
+  s17.bid is not None and s17.ask is not None and
+  abs((s17.ask - s17.bid) - 0.25) < 1e-9 and s17.bid > 1000 and
+  0 < s17.bsz < 1000 and 0 < s17.asz < 1000 and
+  s17.prev_q['askPx'] == s17.ask and s17.prev_q['bidPx'] == s17.bid)
+
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

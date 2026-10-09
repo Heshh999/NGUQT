@@ -619,7 +619,11 @@ class BigMoveRunner(PI.PilotRunner):
 # scoring a finished run of the runner
 # ---------------------------------------------------------------------
 def _hours_cell(e):
-    return (e['instrument'], e['hour'])
+    # (instrument, ET hour, direction): a long event is compared with
+    # longs at that hour, a short with shorts, so a sample that drifted
+    # one way does not flatter every pattern trading that way
+    # (registration 3, corrected 2026-10-09 before any recorded run)
+    return (e['instrument'], e['hour'], e['direction'])
 
 
 def score_runner(r):
@@ -656,7 +660,7 @@ def score_runner(r):
     index = {key: PathIndex(paths[key][0], paths[key][1], by_run[key])
              for key in by_run}
 
-    # baseline cells: (instrument, hour) -> per stop -> counts; both dirs
+    # baseline cells: (instrument, hour, direction) -> per stop -> counts
     cells = collections.defaultdict(
         lambda: {s: collections.Counter() for s in STOPS_TICKS})
     census_rows = []
@@ -671,9 +675,9 @@ def score_runner(r):
             continue
         key = (g['instrument'], g['run'])
         px = index[key]
-        cell = cells[(g['instrument'], g['hour'])]
-        for s in STOPS_TICKS:
-            for d in (1, -1):
+        for d in (1, -1):
+            cell = cells[(g['instrument'], g['hour'], d)]
+            for s in STOPS_TICKS:
                 sc = px.score(i, d, s)
                 if sc is not None:
                     cell[s][sc['outcome']] += 1
@@ -800,6 +804,14 @@ def run_bigmove(capture_dir, mode='real', unblind=False, max_sessions=None):
     r = BigMoveRunner(capture_dir, mode=mode, unblind=unblind,
                       max_sessions=max_sessions)
     led = r.run()
+    return report_from_runner(r, led), r
+
+
+def report_from_runner(r, led):
+    """The wave-three report of a finished BigMoveRunner (or subclass).
+    Split out of run_bigmove so a successor wave that subclasses the
+    runner gets this report from the SAME read of the tape."""
+    mode, unblind = r.mode, r.unblind
     sc = score_runner(r)
     blocks = {}
     for pat in PATTERNS:
@@ -818,7 +830,7 @@ def run_bigmove(capture_dir, mode='real', unblind=False, max_sessions=None):
     for t_, rj in zip(tests, rej):
         t_['survives_holm'] = bool(rj) and t_['n'] >= MIN_EVENTS
         t_['enough_events'] = t_['n'] >= MIN_EVENTS
-    base_out = {'%s@%02d' % k: {'%g' % s: v for s, v in per.items()}
+    base_out = {'%s@%02d@%+d' % k: {'%g' % s: v for s, v in per.items()}
                 for k, per in sc['baseline'].items()}
     rep = dict(wave3=W3_VERSION, registration=REGISTRATION, mode=mode,
                unblind=unblind, dev_end=DEV_END,
@@ -839,7 +851,7 @@ def run_bigmove(capture_dir, mode='real', unblind=False, max_sessions=None):
                baseline_cells=base_out,
                census=census(sc['census_rows']),
                events=sc['events'], fires=r.w3_fires)
-    return rep, r
+    return rep
 
 
 def paired_placebo(real, placebo):

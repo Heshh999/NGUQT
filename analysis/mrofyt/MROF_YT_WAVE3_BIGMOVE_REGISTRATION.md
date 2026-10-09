@@ -118,8 +118,13 @@ session, pattern and direction. Events, not raw fires, are scored.
 
 Every grid tick on the sessions read (when the book is ready) is scored
 by the same rule in **both** directions. Cells are
-`(instrument, ET hour)`. A pattern's expected hit rate is the mean of
-its events' cell rates; its **lift** is observed minus expected. A
+`(instrument, ET hour, direction)`: a long event is compared with every
+long at that hour, a short with every short. A pattern's expected hit
+rate is the mean of its events' cell rates; its **lift** is observed
+minus expected. *(Corrected 2026-10-09, before the tool had read any
+recorded session: the first text pooled both directions in one cell,
+under which a sample that drifted up flatters every long pattern. See
+§10.)* A
 seeded percentile bootstrap over the pattern's events (2 000 draws, the
 pilot's seed) gives the lift's 95 % interval and a two-sided p-value.
 
@@ -214,7 +219,7 @@ module keeps the hash `tests_mles_v12` pins (`B10`).
 | §2 path | the run's mid series compressed to price changes; first touches by a right-to-left sweep over two prefix-minimum Fenwick trees keyed by half-tick price bins; the suite checks it against a plain forward scan (`B1`) | none |
 | §2 tie | a stop index `<=` the target index is a STOP | none |
 | §2 excursions | computed for events only (the baseline needs no excursion) | none |
-| §3 baseline | every grid tick with a path answer, both directions, cells `(instrument, ET hour)`; a pattern's expected rate is the mean of its events' cells; events whose cell has no resolved tick are dropped from the lift and counted in `n_resolved` | none |
+| §3 baseline | every grid tick with a path answer, both directions, cells `(instrument, ET hour, direction)` (pre-run correction of 2026-10-09: the wave-four planted-effect test showed a pooled cell gives every long rule a positive lift whenever longs did better in the sample); a pattern's expected rate is the mean of its events' cells; events whose cell has no resolved tick are dropped from the lift and counted in `n_resolved` | none |
 | §3 interval | seeded percentile bootstrap, 2 000 draws, the pilot's seed; two-sided p = 2 × min(share of draws ≤ 0, share ≥ 0), floored at 1/2 000; no interval below five events | none |
 | §4 placebo | `mode='placebo'`: the wave-two ARM-C offset rule copied verbatim (same seed expression, same magnitudes, same minimum separation); `--both` prints real against placebo for L1–L4 | none |
 | §5 Holm | over the 24 `(pattern, stop)` p-values on NQ; a test with no p-value counts toward `m` and is never rejected; "survives" also requires `>= 30` resolved NQ events | none |

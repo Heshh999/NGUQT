@@ -707,7 +707,11 @@ class Runner:
                     st.ofi.append((t, inc))
                 st.prev_q = dict(bidPx=b, bidSz=bs or 0, askPx=a,
                                  askSz=asz or 0)
-                st.bid, st.ask, st.bsz, st.asz = b, bs, a, asz
+                # bid price, bid size, ask price, ask size -- in that
+                # order (before 2026-10-09 this line assigned the bid SIZE
+                # to st.ask and the ask PRICE to st.bsz; nothing read
+                # either field, so no result changed, Amendment 20)
+                st.bid, st.bsz, st.ask, st.asz = b, bs, a, asz
                 mid = (a + b) / 2.0
                 st.mids.append((t, mid))
                 if not suppressed:

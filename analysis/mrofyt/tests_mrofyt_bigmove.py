@@ -268,11 +268,11 @@ d40 = blk['stops']['40']
 evs = [e for e in rep['events'] if e['family'] == 'G2' and
        e['instrument'] == 'NQ' and e['scores']['40']['outcome'] !=
        'UNRESOLVED']
-exp = [rep['baseline_cells']['NQ@%02d' % e['hour']]['40']['hit']
-       for e in evs]
+exp = [rep['baseline_cells']['NQ@%02d@%+d' % (e['hour'], e['direction'])]
+       ['40']['hit'] for e in evs]
 obs = [1.0 if e['scores']['40']['outcome'] == 'TARGET' else 0.0 for e in evs]
 t('B5e: the lift equals the observed hit rate minus the mean of the '
-  'events\' own (instrument, hour) baseline cells',
+  'events\' own (instrument, hour, direction) baseline cells',
   evs and abs(d40['lift']['lift'] - (sum(obs) / len(obs) -
                                      sum(exp) / len(exp))) < 1e-3 and
   abs(d40['matched_baseline_hit'] - sum(exp) / len(exp)) < 1e-3)

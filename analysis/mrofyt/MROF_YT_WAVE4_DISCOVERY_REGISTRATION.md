@@ -107,9 +107,10 @@ the denominator of every correction below, whatever the data does.
   fill, spread, slippage or commission. `UNRESOLVED` (the run ended)
   is excluded.
 - **Baseline.** Every DEV grid tick scored by the same rule in both
-  directions; cells by (instrument, ET hour). An event's expectation is
-  its cell's hit rate; a rule's **lift** is its hit rate minus the mean
-  expectation of its events.
+  directions; cells by (instrument, ET hour, direction). An event's
+  expectation is its cell's hit rate; a rule's **lift** is its hit rate
+  minus the mean expectation of its events. *(Corrected 2026-10-09,
+  before the tool had read any recorded session; see §10.)*
 - **Uncertainty.** Events within a session are not independent.
   Standard errors are cluster-robust by session (ratio estimator), the
   t-statistic is referred to Student's t with `G - 1` degrees of
@@ -195,6 +196,37 @@ on sessions not yet recorded.
 - machine-learned models of any kind
 - live, paper or simulated order placement
 
-## 10. Implementation record
+## 10. Implementation record — 2026-10-09
 
-Filled in by the commit that adds the module and its suite.
+`mrofyt_discover.py` (MROF-YT-W4-DISCOVER-1.0),
+`tests_mrofyt_discover.py`. Written against §1–§9 **before** any
+recorded session was read by it; the engineering verification ran on
+synthetic tape and on a planted-effect dataset and is asserted by the
+suite, never by market evidence.
+
+**One pre-run correction, made before any recorded session was read.**
+The planted-effect test (a long-only edge on `z_d60`'s top decile, noise
+everywhere else) showed that a baseline cell pooling both directions
+gives every *long* rule a positive lift, on any feature, because the
+pooled cell is dragged down by shorts: 27 unrelated rules passed as
+CANDIDATEs. On real tape the same thing happens whenever the sample
+drifted one way. Cells are therefore `(instrument, ET hour,
+direction)` (§3); with that, the unrelated CANDIDATEs fall from 27 to
+2, which is what a 10 % false-discovery rate allows, and pure noise
+still yields none (suite `F6`, `F6b`). Wave three's registration had
+the same pooled cell and was corrected the same way, also before any
+run.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| §1 features | added to wave three's grid record in the same hook; history per (instrument, recording run), reset at a run or session change; `D60`/`D180` need every one of their 6 / 18 grid ticks; `resp60`, `resp180`, `trend30` need the grid tick exactly 60 / 180 / 1 800 s earlier in the same run | `spread` reads the quote the runner builds order-flow imbalance from (`prev_q`), because the runner's own `st.ask` held the bid size until this commit (Amendment 20) |
+| §2 grammar | `enumerate_rules()` in a fixed order; 736 rules, ids unique (`F4`) | quantiles are nearest-rank-below on the instrument's DEV ticks |
+| §3 events | anchored 300 s cooldown per (session, direction), in time order (`F5`) | none |
+| §3 uncertainty | ratio-estimator cluster variance `G/(G-1) · Σ(d_s − lift·n_s)² / n²`; Student t by the regularized incomplete beta (checked against tabulated values, `F1`); a standard error below 1e-9 gives no p | none |
+| §4 | Benjamini–Hochberg with `m` = 2 208 always, untestable tests included (`F2`) | none |
+| §5 | overlap = share of the candidate's events with a nominated rule's event within 300 s on the same session (`F7`); a nominee that is not a CANDIDATE is labelled LEAD in the report | none |
+| §6 | `--evaluate` applies the committed numeric cut-points; on DEV it reproduces the search's numbers exactly (`F8`); Holm over the nominated set | none |
+| §8 | wave three's `plan()` gate; `--unblind` refused without `--evaluate` (`F9`) | none |
+
+One read of the DEV tape yields this report and wave three's real-level
+report, identical to a separate wave-three run (`F10`).
