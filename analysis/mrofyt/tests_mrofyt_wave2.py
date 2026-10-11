@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# MROF-YT-WAVE2-1.0 suite. Wave two is exercised on synthetic
+# MROF-YT-WAVE2-1.1 suite. Wave two is exercised on synthetic
 # recorder-format runs (mles_v12_synth) plus hand-built feature dicts
 # and bars. Synthetic events verify CODE BEHAVIOR only, never market
 # evidence. No outcome, R or P&L exists anywhere.
@@ -372,6 +372,59 @@ t('W8: a capture folder with no manifest, or one that cannot be read, '
   'stops the wave-two pass -- exit 2, no report -- instead of a clean '
   'zero-fire report',
   rc8 == 2 and rc8b == 2 and not os.path.exists(out8))
+
+
+
+def _late_corrupt_folder(d, good, bad, path, **kw):
+    """`good` sessions recorded clean, then `bad` whose depth file has one
+    row blanked at 90% (byte count unchanged), so the runner abandons it
+    after its prefix has already produced windows and fires."""
+    for i, ses in enumerate(good):
+        SY.synth_run(d, session=ses, cid='g%d' % i, seed=i, price_path=path,
+                     **kw)
+    if bad is None:
+        return
+    mp = SY.synth_run(d, session=bad, cid='bad', seed=99, price_path=path,
+                      **kw)
+    man = json.load(open(mp))
+    dp = os.path.join(d, man['depth']['file'])
+    rows = open(dp).read().splitlines(True)
+    k = int(len(rows) * 0.9)
+    rows[k] = ',' * 3 + ' ' * (len(rows[k]) - 4) + '\n'
+    open(dp, 'w').writelines(rows)
+    assert os.path.getsize(dp) == man['depth']['bytes']
+
+
+# ---------------------------------------------------------------------
+# W9: a run the runner abandons mid-stream leaves nothing in wave two
+# (2026-10-10: 53 fires from the two runs skipped as corrupt on 20260917
+# stayed in the report of runs the ledger says were never read)
+# ---------------------------------------------------------------------
+_G9 = ('20260901', '20260902', '20260903')
+d9a, d9b = os.path.join(WORK, 'w9_bad'), os.path.join(WORK, 'w9_ref')
+_late_corrupt_folder(d9a, _G9, '20260904', path5, n_depth=40000, dt_step=0.05, trade_every=10, quote_every=5)
+_late_corrupt_folder(d9b, _G9, None, path5, n_depth=40000, dt_step=0.05, trade_every=10, quote_every=5)
+r9a = W2.Wave2Runner(d9a)
+r9a.run()
+r9b = W2.Wave2Runner(d9b)
+r9b.run()
+
+
+class _OldW2(W2.Wave2Runner):
+    _mark_run = PI.PilotRunner._mark_run
+    _unwind_run = PI.PilotRunner._unwind_run
+
+
+r9o = _OldW2(d9a)
+r9o.run()
+t('W9: an abandoned run is wound back whole in wave two -- fires, '
+  'counters and per-instrument state (residual history included) equal '
+  'a pass that never saw the run -- and without the wind-back they do '
+  'not (the test has teeth)',
+  r9a.ledger['totals'].get('runs_skipped_corrupt') == 1 and
+  r9a.w2_fires == r9b.w2_fires and r9a.w2_counts == r9b.w2_counts and
+  r9a.w2['NQ'].resid.hist == r9b.w2['NQ'].resid.hist and
+  r9o.w2_counts != r9b.w2_counts)
 
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)

@@ -1,4 +1,4 @@
-"""mrofyt_wave2.py - MROF-YT-WAVE2-1.0
+"""mrofyt_wave2.py - MROF-YT-WAVE2-1.1
 
 MROF_YT_WAVE2_REGISTRATION.md turned into running code. Wave one is
 UNTOUCHED: this module subclasses the pilot runner and uses only the
@@ -40,6 +40,7 @@ the same validation blind (BLIND_FROM).
 """
 
 import collections
+import copy
 import json
 import math
 import random
@@ -51,7 +52,7 @@ import mrofyt_pilot as PI
 import mrofyt_runner as RUN
 import mrofyt_signals as SIG
 
-WAVE2_VERSION = 'MROF-YT-WAVE2-1.0'
+WAVE2_VERSION = 'MROF-YT-WAVE2-1.1'
 FAMILIES = ('W2-A1', 'W2-A4r', 'W2-A4f', 'W2-A4-OPEN', 'W2-A4r-z15',
             'W2-A4r-HC', 'ARM-B1', 'ARM-B2')
 OPEN_WINDOW_ET = (9.5 * 3600, 10.5 * 3600)          # 09:30:00-10:30:00
@@ -319,6 +320,27 @@ class Wave2Runner(PI.PilotRunner):
         _tr, D, _o, r, _b, _m = self._window_stats(st, te - RUN.DECISION_S,
                                                    te)
         w.resid.observe(sod, D, r)
+
+    # A run the runner abandons mid-stream (a corrupt or unreadable row)
+    # is wound back WHOLE: the frozen state by the runner, the pilot's
+    # buffers by the pilot, and wave two's own fires, counters and
+    # per-instrument state here. Until 2026-10-10 they were not, and 53
+    # fires from the two runs skipped as corrupt on 20260917 stayed in
+    # the report of a run the ledger says was never read (Amendment 21).
+    def _mark_run(self, st):
+        mark = PI.PilotRunner._mark_run(self, st)
+        mark['w2'] = dict(state=copy.deepcopy(self.w2[st.instrument]),
+                          fires=len(self.w2_fires),
+                          counts=collections.Counter(self.w2_counts))
+        return mark
+
+    def _unwind_run(self, st, mark):
+        PI.PilotRunner._unwind_run(self, st, mark)
+        m = mark['w2']
+        self.w2[st.instrument] = m['state']
+        del self.w2_fires[m['fires']:]
+        self.w2_counts.clear()
+        self.w2_counts.update(m['counts'])
 
     def _close_session(self, st):
         PI.PilotRunner._close_session(self, st)

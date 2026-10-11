@@ -367,6 +367,59 @@ t('B11: the census tabulates deciles of each grid feature against the '
       {k: v for k, v in c.items() if k != 'note'}) and
   all(0.0 <= c['base_rate'][k] <= 1.0 for k in ('up', 'down')))
 
+
+
+def _late_corrupt_folder(d, good, bad, path, **kw):
+    """`good` sessions recorded clean, then `bad` whose depth file has one
+    row blanked at 90% (byte count unchanged), so the runner abandons it
+    after its prefix has already produced windows and fires."""
+    for i, ses in enumerate(good):
+        SY.synth_run(d, session=ses, cid='g%d' % i, seed=i, price_path=path,
+                     **kw)
+    if bad is None:
+        return
+    mp = SY.synth_run(d, session=bad, cid='bad', seed=99, price_path=path,
+                      **kw)
+    man = json.load(open(mp))
+    dp = os.path.join(d, man['depth']['file'])
+    rows = open(dp).read().splitlines(True)
+    k = int(len(rows) * 0.9)
+    rows[k] = ',' * 3 + ' ' * (len(rows[k]) - 4) + '\n'
+    open(dp, 'w').writelines(rows)
+    assert os.path.getsize(dp) == man['depth']['bytes']
+
+
+# ---------------------------------------------------------------------
+# B12: an abandoned run leaves nothing in wave three
+# ---------------------------------------------------------------------
+_G12 = ('20260901', '20260902', '20260903')
+d12a, d12b = os.path.join(WORK, 'b12_bad'), os.path.join(WORK, 'b12_ref')
+_late_corrupt_folder(d12a, _G12, '20260904', path5, n_depth=40000, dt_step=0.05, trade_every=10, quote_every=5)
+_late_corrupt_folder(d12b, _G12, None, path5, n_depth=40000, dt_step=0.05, trade_every=10, quote_every=5)
+r12a = BM.BigMoveRunner(d12a)
+r12a.run()
+r12b = BM.BigMoveRunner(d12b)
+r12b.run()
+
+
+class _OldBM(BM.BigMoveRunner):
+    def _unwind_run(self, st, mark):          # the 1.0 wind-back
+        PI.PilotRunner._unwind_run(self, st, mark)
+        del self.w3_fires[mark['w3']['fires']:]
+        del self.grid[mark['w3']['grid']:]
+
+
+r12o = _OldBM(d12a)
+r12o.run()
+t('B12: an abandoned run is wound back whole in wave three -- fires, '
+  'grid records, counters and pattern state equal a pass that never saw '
+  'the run; the 1.0 wind-back left its counters behind',
+  r12a.ledger['totals'].get('runs_skipped_corrupt') == 1 and
+  r12a.w3_fires == r12b.w3_fires and r12a.grid == r12b.grid and
+  r12a.w3_counts == r12b.w3_counts and
+  vars(r12a.w3['NQ']) == vars(r12b.w3['NQ']) and
+  r12o.w3_counts != r12b.w3_counts)
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

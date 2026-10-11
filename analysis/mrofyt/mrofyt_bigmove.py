@@ -37,6 +37,7 @@ THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING. No order is placed.
 import array
 import bisect
 import collections
+import copy
 import json
 import math
 import os
@@ -489,13 +490,22 @@ class BigMoveRunner(PI.PilotRunner):
     # ---- memory: the observation buffers unwind with an abandoned run ----
     def _mark_run(self, st):
         mark = PI.PilotRunner._mark_run(self, st)
-        mark['w3'] = dict(fires=len(self.w3_fires), grid=len(self.grid))
+        mark['w3'] = dict(fires=len(self.w3_fires), grid=len(self.grid),
+                          state=copy.deepcopy(self.w3[st.instrument]),
+                          counts=collections.Counter(self.w3_counts))
         return mark
 
     def _unwind_run(self, st, mark):
+        # the whole abandoned run goes: fires, grid records, and the
+        # per-instrument pattern state (G3's previous tick, L4's break
+        # memory, D1's sums, the once-per-approach set) and counters
         PI.PilotRunner._unwind_run(self, st, mark)
-        del self.w3_fires[mark['w3']['fires']:]
-        del self.grid[mark['w3']['grid']:]
+        m = mark['w3']
+        del self.w3_fires[m['fires']:]
+        del self.grid[m['grid']:]
+        self.w3[st.instrument] = m['state']
+        self.w3_counts.clear()
+        self.w3_counts.update(m['counts'])
 
     # ---- placebo levels (wave two ARM-C, same seed rule) ----------------
     def _rebuild_levels(self, st):

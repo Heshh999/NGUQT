@@ -32,6 +32,7 @@ THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING. No order is placed.
 
 import bisect
 import collections
+import copy
 import functools
 import json
 import math
@@ -306,6 +307,15 @@ class DiscoverRunner(BM.BigMoveRunner):
     def _close_session(self, st):
         BM.BigMoveRunner._close_session(self, st)
         self.w4hist[st.instrument].reset(None, None)
+
+    def _mark_run(self, st):
+        mark = BM.BigMoveRunner._mark_run(self, st)
+        mark['w4'] = copy.deepcopy(self.w4hist[st.instrument])
+        return mark
+
+    def _unwind_run(self, st, mark):
+        BM.BigMoveRunner._unwind_run(self, st, mark)
+        self.w4hist[st.instrument] = mark['w4']
 
     def _observe_baselines(self, st, te):
         n0 = len(self.grid)

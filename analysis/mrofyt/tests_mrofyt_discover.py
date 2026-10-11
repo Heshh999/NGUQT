@@ -288,6 +288,47 @@ t('F13: the wave-one ledger is byte-identical through the wave-four '
   'both' in _reg and 'At most five' in _reg and
   'pre-run correction' in _reg and 'Explicitly NOT registered' in _reg)
 
+
+
+def _late_corrupt_folder(d, good, bad, path, **kw):
+    """`good` sessions recorded clean, then `bad` whose depth file has one
+    row blanked at 90% (byte count unchanged), so the runner abandons it
+    after its prefix has already produced windows and fires."""
+    for i, ses in enumerate(good):
+        SY.synth_run(d, session=ses, cid='g%d' % i, seed=i, price_path=path,
+                     **kw)
+    if bad is None:
+        return
+    mp = SY.synth_run(d, session=bad, cid='bad', seed=99, price_path=path,
+                      **kw)
+    man = json.load(open(mp))
+    dp = os.path.join(d, man['depth']['file'])
+    rows = open(dp).read().splitlines(True)
+    k = int(len(rows) * 0.9)
+    rows[k] = ',' * 3 + ' ' * (len(rows[k]) - 4) + '\n'
+    open(dp, 'w').writelines(rows)
+    assert os.path.getsize(dp) == man['depth']['bytes']
+
+
+# ---------------------------------------------------------------------
+# F14: an abandoned run leaves nothing in wave four
+# ---------------------------------------------------------------------
+_G14 = ('20260901', '20260902', '20260903')
+d14a, d14b = os.path.join(WORK, 'f14_bad'), os.path.join(WORK, 'f14_ref')
+_late_corrupt_folder(d14a, _G14, '20260904', path9, n_depth=40000, dt_step=0.05, trade_every=10, quote_every=5)
+_late_corrupt_folder(d14b, _G14, None, path9, n_depth=40000, dt_step=0.05, trade_every=10, quote_every=5)
+r14a = DI.DiscoverRunner(d14a)
+r14a.run()
+r14b = DI.DiscoverRunner(d14b)
+r14b.run()
+t('F14: an abandoned run is wound back whole in wave four -- the grid '
+  'records with their fourteen features, the feature history and wave '
+  'three\'s state equal a pass that never saw the run',
+  r14a.ledger['totals'].get('runs_skipped_corrupt') == 1 and
+  r14a.grid == r14b.grid and r14a.w3_fires == r14b.w3_fires and
+  vars(r14a.w4hist['NQ']) == vars(r14b.w4hist['NQ']) and
+  r14a.w3_counts == r14b.w3_counts)
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))
