@@ -504,8 +504,13 @@ class Runner:
                 and man[k].get('bytes') is not None
                 and os.path.getsize(p) != man[k]['bytes'])
         except OSError as exc:
+            # nothing of this run has been read yet, so there is nothing
+            # to wind back (mark=None). Until 2026-10-20 this call lacked
+            # the argument and a stat() refused here -- WinError 433 from a
+            # drive that dropped -- crashed the pass with a TypeError
+            # instead of skipping the run or stopping (Amendment 22)
             AU.stop_if_capture_gone(self.dir, man.get('runId'), exc)
-            self._skip_io_error(st, rec, man, exc)
+            self._skip_io_error(st, rec, man, exc, None)
             return
         if truncated:
             rec.update(skipped='STREAM_SIZE_MISMATCH', truncated=truncated,
@@ -559,8 +564,11 @@ class Runner:
         """A read error on one run while the capture folder still
         answers (a bad sector, a brief USB reset). The
         same handling as CORRUPT_STREAM: the run is reported skipped with
-        events=0 and everything its prefix fed in is wound back."""
-        self._unwind_run(st, mark)
+        events=0 and everything its prefix fed in is wound back. `mark`
+        is None when the error came before the first row was read (the
+        size pre-flight), where there is nothing to wind back."""
+        if mark is not None:
+            self._unwind_run(st, mark)
         rec.update(skipped='IO_ERROR', error=str(exc), events=0)
         self.ledger['runs'].append(rec)
         self.ledger['totals']['runs_skipped_io_error'] += 1

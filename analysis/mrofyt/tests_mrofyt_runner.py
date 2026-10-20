@@ -785,6 +785,71 @@ t('R17: after a run the last quote is held as bid price < ask price one '
   s17.prev_q['askPx'] == s17.ask and s17.prev_q['bidPx'] == s17.bid)
 
 
+# ---------------------------------------------------------------------
+# R18: a stat() refused in the size pre-flight (WinError 433 from a drive
+# that dropped, 2026-10-20) is that run's IO_ERROR while the folder still
+# answers, and a STOP when it does not -- never a TypeError
+# ---------------------------------------------------------------------
+d18 = os.path.join(WORK, 'stat18')
+SY.synth_run(d18, n_depth=20000, price_path=path, trade_every=10,
+             quote_every=5, cid='good18', session='20260902')
+SY.synth_run(d18, n_depth=20000, price_path=path, trade_every=10,
+             quote_every=5, cid='gone18', session='20260902', run_no=2)
+_real_getsize = os.path.getsize
+
+
+def _getsize_433(p):
+    if 'gone18' in str(p):
+        e = OSError(22, 'A device which does not exist was specified')
+        e.winerror = 433
+        raise e
+    return _real_getsize(p)
+
+
+RN.os.path.getsize = _getsize_433
+try:
+    err18 = None
+    try:
+        led18 = RN.Runner(d18, ('NQ',)).run()
+    except Exception as exc:                  # the old TypeError
+        err18 = exc
+finally:
+    RN.os.path.getsize = _real_getsize
+t('R18: a size check refused for one run while the folder answers is '
+  'that run\'s IO_ERROR skip with nothing read; the other run is ingested '
+  'in full, and nothing raises',
+  err18 is None and led18['totals'].get('runs_skipped_io_error') == 1 and
+  'does not exist' in led18['skipped_runs'][0].get('io_error', '') and
+  sum(1 for r in led18['runs'] if not r.get('skipped')) == 1 and
+  led18['totals']['events'] > 0)
+d18b = os.path.join(WORK, 'stat18b')
+SY.synth_run(d18b, n_depth=20000, price_path=path, trade_every=10,
+             quote_every=5, cid='gone18b', session='20260902')
+
+
+def _getsize_unplug(p):
+    if 'gone18b' in str(p) and os.path.isdir(d18b):
+        os.rename(d18b, d18b + '_gone')       # the drive vanishes
+        e = OSError(22, 'A device which does not exist was specified')
+        e.winerror = 433
+        raise e
+    return _real_getsize(p)
+
+
+RN.os.path.getsize = _getsize_unplug
+try:
+    err18b = None
+    try:
+        RN.Runner(d18b, ('NQ',)).run()
+    except Exception as exc:
+        err18b = exc
+finally:
+    RN.os.path.getsize = _real_getsize
+t('R18b: the same refusal with the folder gone stops the pass with '
+  'CaptureUnavailable (STOPPED), not a TypeError',
+  isinstance(err18b, RN.CaptureUnavailable))
+
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

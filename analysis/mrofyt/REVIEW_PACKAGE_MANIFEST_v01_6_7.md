@@ -61,8 +61,8 @@ Modified (one file, additively — a skip path, observation hooks and a
 run-id field):
 
 ```
-228d48c63f7a40beea53aeb0678e8e0b69e1889087edb8c635113f66f043db97  mrofyt_runner.py (MROF-YT-RUNNER-1.2.2; supersedes a382df95… — the quote fields are assigned in their own order (st.ask held the bid size and st.bsz the ask price; nothing read either, so no result changed), Amendment 20; earlier MROF-YT-RUNNER-1.2.2; supersedes a4a518b7… — a folder with manifest files that gives no plan stops with a count and the reasons (unreadable, other instrument, other schema) instead of "wrong folder", Amendment 19; earlier MROF-YT-RUNNER-1.2.2; supersedes 10485b66… — every row-decoding failure is CORRUPT_STREAM, and an abandoned run -- corrupt row or device error -- is wound back whole, Amendment 15; earlier supersedes c48dfe9e… — a capture folder that cannot be read, or stops answering mid-pass, STOPS the pass with no ledger; a read error on one run while the folder answers is that run's IO_ERROR skip; a run carrying both the recorder's manifest and a reconstructed one is ingested once; Amendment 11. Earlier c48dfe9e…: two no-op observation hooks for wave two; 99c9b277…: truncated/corrupt streams skipped whole; earlier: retroactive disconnect-gap correction. See REVIEW_PACKAGE_MANIFEST_v12.md)
-e01bf9b1b5d1a6a0011390ee03851fa707a43a9942f57220c9337cec32af485a  tests_mrofyt_runner.py (36 tests; supersedes 0eb00b3b… — R17 the quote fields; earlier 35 tests; supersedes a8737602… — R16–R16b the stated no-plan reason; earlier 33 tests; supersedes 8ea5c6be… — R13f–R13j merged, R15e, R15b/R15c inject at the row-reading boundary; earlier supersedes 51e08e10… — R15–R15d)
+86180aec30d11d15a7d71f744e9486829d2321ab785cd00aff064b4de0fd2893  mrofyt_runner.py (MROF-YT-RUNNER-1.2.2; supersedes 228d48c6… — a stat() refused in the size pre-flight is that run's IO_ERROR skip (or a STOP when the folder is gone), not a TypeError: the call lacked its wind-back argument since the 9/19 merge, Amendment 22; earlier MROF-YT-RUNNER-1.2.2; supersedes a382df95… — the quote fields are assigned in their own order (st.ask held the bid size and st.bsz the ask price; nothing read either, so no result changed), Amendment 20; earlier MROF-YT-RUNNER-1.2.2; supersedes a4a518b7… — a folder with manifest files that gives no plan stops with a count and the reasons (unreadable, other instrument, other schema) instead of "wrong folder", Amendment 19; earlier MROF-YT-RUNNER-1.2.2; supersedes 10485b66… — every row-decoding failure is CORRUPT_STREAM, and an abandoned run -- corrupt row or device error -- is wound back whole, Amendment 15; earlier supersedes c48dfe9e… — a capture folder that cannot be read, or stops answering mid-pass, STOPS the pass with no ledger; a read error on one run while the folder answers is that run's IO_ERROR skip; a run carrying both the recorder's manifest and a reconstructed one is ingested once; Amendment 11. Earlier c48dfe9e…: two no-op observation hooks for wave two; 99c9b277…: truncated/corrupt streams skipped whole; earlier: retroactive disconnect-gap correction. See REVIEW_PACKAGE_MANIFEST_v12.md)
+5b81b237709d379c06f6873960385846ebb1fb073b2fd7b67343ffd3a9fcd36b  tests_mrofyt_runner.py (38 tests; supersedes e01bf9b1… — R18–R18b the refused size check; earlier 36 tests; supersedes 0eb00b3b… — R17 the quote fields; earlier 35 tests; supersedes a8737602… — R16–R16b the stated no-plan reason; earlier 33 tests; supersedes 8ea5c6be… — R13f–R13j merged, R15e, R15b/R15c inject at the row-reading boundary; earlier supersedes 51e08e10… — R15–R15d)
 f21c6f66a0f07e58b8e71af173e6acd6c43b1ef74e66343314739cc0ace43dff  tests_mrofyt_ingest.py (69 tests; merged from the 9/19 parallel session: adapter parse, merge and pairing paths; G6 ages its partial, Amendment 15)
 146802326c487518dafab38dd8395fd51dad2bd674115ccba7b1a460d68706ba  RUNNER_GUIDE.md (merged from the 9/19 parallel session: how to run the outcome-blind ingest runner; brought up to runner 1.2.2 on merge -- IO_ERROR, STOPPED on an unreadable capture, the wider CORRUPT_STREAM catch and the wind-back)
 1159f125d72be79b0397fc36ed9739b3cf03f64c8efda6125e21d207aec554ac  mles_v12_audit.py (supersedes 6b522644… — discover_manifests enumerates with os.listdir and raises CaptureUnavailable with the Windows error when the listing fails, never an empty list (glob swallowed a cut-short listing on 2026-10-03 and three tools read it as the wrong folder), Amendment 19; earlier supersedes 003f03b8… — `--out FILE` writes the audit report as JSON for the dashboard, Amendment 12; no rule changed. 003f03b8…: a run still being recorded is OPEN, not failed; damaged originals kept beside recovered copies are KEPT, not failed; unreadable capture stops the audit; per-build disconnect evidence says whether the 1.2.2 repair was exercised or merely not contradicted; Amendment 11. See REVIEW_PACKAGE_MANIFEST_v12.md)
@@ -87,13 +87,13 @@ Delivered package (119 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-f45298471dfb0b7e679a9789cbb93ac95b6a127bfbf6d0be8edd5198014da5a3  MROF_V1_Engine_v01_6_7.zip (supersedes 4f35d37c… — waves two to four wind an abandoned run back whole; wave two 1.1; 119 files, Amendment 21; earlier 4f35d37c… supersedes f466ee1b… — wave four: the counted search, its registration and 16-test suite; direction-matched baselines in waves three and four; the runner's quote fields; 119 files, Amendment 20; earlier f466ee1b… supersedes 64002e08… — a cut-short folder listing is a stop with the Windows error, never "no manifest"; the runner's no-plan stop states its reasons; 116 files, Amendment 19; earlier 64002e08… supersedes 5285925c… — wave three: the big-move registration, mrofyt_bigmove.py and its 27-test suite, 116 files, Amendment 18; earlier 5285925c… supersedes 092a62e0… — recover 1.6: a file Windows will not date is set aside instead of stopping the dry run, 113 files, Amendment 17; earlier 092a62e0… supersedes 14adcbf4… — recover 1.5: progress per run, oldest session first, a stop that names the drive, the folder or the refused step, the check file before any bulk read, earlier-pass manifests checked, recorder-only declarations, 113 files, Amendment 16; earlier 14adcbf4… supersedes 9a8bce6c… — the 9/19 parallel-session work merged: runner 1.2.2 decode-failure catch and wind-back, the ingest suite, the run guide, 113 files, Amendment 15; earlier c5f652c5… — a known-unreadable file is not re-read; earlier 416beef6… — unreadable-file verdict on the page, capped shared-gap alerts, legible replay level labels; earlier 694c6367… — replay evidence matches the approach id; earlier 2fa33aed… — recover 1.4 bounded reads; earlier f930879f… — recover 1.4 unreadable-file guard; earlier f930879f… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+ae0f7cf379e3549c59e6259a6df2982e0b257d81b8757a064f6537d11b6e61ba  MROF_V1_Engine_v01_6_7.zip (supersedes f4529847… — the runner's refused size check skips or stops instead of crashing; 119 files, Amendment 22; earlier f4529847… supersedes 4f35d37c… — waves two to four wind an abandoned run back whole; wave two 1.1; 119 files, Amendment 21; earlier 4f35d37c… supersedes f466ee1b… — wave four: the counted search, its registration and 16-test suite; direction-matched baselines in waves three and four; the runner's quote fields; 119 files, Amendment 20; earlier f466ee1b… supersedes 64002e08… — a cut-short folder listing is a stop with the Windows error, never "no manifest"; the runner's no-plan stop states its reasons; 116 files, Amendment 19; earlier 64002e08… supersedes 5285925c… — wave three: the big-move registration, mrofyt_bigmove.py and its 27-test suite, 116 files, Amendment 18; earlier 5285925c… supersedes 092a62e0… — recover 1.6: a file Windows will not date is set aside instead of stopping the dry run, 113 files, Amendment 17; earlier 092a62e0… supersedes 14adcbf4… — recover 1.5: progress per run, oldest session first, a stop that names the drive, the folder or the refused step, the check file before any bulk read, earlier-pass manifests checked, recorder-only declarations, 113 files, Amendment 16; earlier 14adcbf4… supersedes 9a8bce6c… — the 9/19 parallel-session work merged: runner 1.2.2 decode-failure catch and wind-back, the ingest suite, the run guide, 113 files, Amendment 15; earlier c5f652c5… — a known-unreadable file is not re-read; earlier 416beef6… — unreadable-file verdict on the page, capped shared-gap alerts, legible replay level labels; earlier 694c6367… — replay evidence matches the approach id; earlier 2fa33aed… — recover 1.4 bounded reads; earlier f930879f… — recover 1.4 unreadable-file guard; earlier f930879f… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 635/635 + 46/46, identical to the repo
+# run from inside the unzipped package: 637/637 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -120,7 +120,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mles_v12.py` | 55/55 |
 | `tests_mrofyt.py` | 59/59 |
 | `tests_mrofyt_pilot.py` | 45/45 |
-| `tests_mrofyt_runner.py` | 36/36 |
+| `tests_mrofyt_runner.py` | 38/38 |
 | `tests_mrofyt_ingest.py` | 69/69 |
 | `tests_mrofyt_v01_1.py` | 56/56 |
 | `tests_mrofyt_v01_2.py` | 31/31 |
@@ -133,9 +133,9 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_wave2.py` | 30/30 |
 | `tests_mrofyt_bigmove.py` | 28/28 |
 | `tests_mrofyt_discover.py` | 17/17 |
-| **wave-one to four total** | **635/635** |
+| **wave-one to four total** | **637/637** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **681/681** |
+| **package total** | **683/683** |
 
 ## Runnable research commands
 
@@ -935,3 +935,21 @@ detector hash so registering wave two provably changed nothing.
     the leaked fires, so it is re-run with 1.1 rather than corrected by
     hand. No detector, threshold or definition changed.
     Battery: 635/635 + 46/46.
+
+22. **A refused size check is a skip or a stop, never a crash
+    (2026-10-20).** The first wave-four search on the operator's drive
+    died with `TypeError: Runner._skip_io_error() missing 1 required
+    positional argument: 'mark'`, raised while handling
+    `WinError 433: A device which does not exist was specified` from
+    the runner's size pre-flight (`os.path.getsize` on a 20260914 MNQ
+    stream). The drive had dropped. The pre-flight's error path called
+    `_skip_io_error` without the wind-back mark that the 9/19 merge
+    added to it, so instead of skipping that run (folder still
+    answering) or stopping with STOPPED (folder gone), every tool on the
+    runner — pilot, waves two to four — would crash there. Nothing has
+    been read at the pre-flight, so the call passes no mark and
+    `_skip_io_error` winds back only when it has one (`R18`, `R18b`;
+    under the old code `R18` raises). No result changed: the path had
+    never been reached by a completed run. Battery: 637/637 + 46/46
+    (`tests_mles_v12.py` needs the Mono C# compiler `mcs`, which this
+    container lacked until installed).
