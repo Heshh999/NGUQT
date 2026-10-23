@@ -819,6 +819,37 @@ t('T36: discover_manifests enumerates with os.listdir and raises '
   stopped36 is not None and 'cannot be listed' in stopped36 and
   '1392' in stopped36 and 'copy it first' in stopped36)
 
+# ---------------------------------------------------------------------
+# T37: one capture over two drives (2026-10-23: the old drive full,
+# recording moved to a new one) audits exactly as one folder holding
+# everything; a run copied onto both drives is audited once
+# ---------------------------------------------------------------------
+_d37 = {k: os.path.join(WORK, 'two_' + k) for k in ('a', 'b', 'all', 'c')}
+for _ses, _cid, _where in (('20260902', 'p1', 'a'), ('20260903', 'p2', 'a'),
+                           ('20260904', 'p3', 'b')):
+    for _inst in ('NQ', 'MNQ'):
+        for _dst in (_where, 'all'):
+            SY.synth_run(_d37[_dst], n_depth=3000, instrument=_inst,
+                         session=_ses, cid='%s%s' % (_cid, _inst))
+for _inst in ('NQ', 'MNQ'):                    # a copy of p1 on drive c
+    SY.synth_run(_d37['c'], n_depth=3000, instrument=_inst,
+                 session='20260902', cid='p1%s' % _inst)
+_two = AU.audit_capture(_d37['a'] + ';' + _d37['b'])
+_one = AU.audit_capture(_d37['all'])
+_cpy = AU.audit_capture(';'.join(_d37[k] for k in ('a', 'b', 'c')))
+_ids = lambda rep: sorted(r['info'].get('run_id') for r in rep['runs'])  # noqa
+t('T37: a capture named as two folders ("D:\\x;E:\\y") audits exactly '
+  'like one folder holding every run -- same runs, same verdict, same '
+  'failures -- and a run copied onto a third folder is audited once and '
+  'reported, not counted twice',
+  AU.split_capture_dirs(' D:\\a ; "E:\\b";') == ['D:\\a', 'E:\\b'] and
+  _ids(_two) == _ids(_one) and _two['ok'] == _one['ok'] and
+  sorted(map(str, _two['failures'])) == sorted(map(str, _one['failures']))
+  and _two['info']['manifests'] == _one['info']['manifests'] == 6 and
+  _ids(_cpy) == _ids(_one) and
+  len(_cpy['info']['duplicates_across_folders']) == 2 and
+  not AU.capture_dir_alive(_d37['a'] + ';' + _d37['a'] + '_missing'))
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

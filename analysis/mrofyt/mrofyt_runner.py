@@ -330,7 +330,12 @@ class Runner:
         """[(instrument, session, [manifest paths sorted by start])]"""
         by = collections.defaultdict(list)
         mans = []
-        found = AU.discover_manifests(self.dir)
+        dups = []
+        found = AU.discover_manifests(self.dir, dups)
+        for p, k in dups:
+            self.ledger.setdefault('duplicate_manifests_ignored', []).append(
+                dict(ignored=p, kept=k,
+                     reason='the same run is in an earlier capture folder'))
         # why a folder with manifest files in it yields no plan is said
         # in the stop, not guessed (2026-10-03: "no manifest" came from a
         # listing glob had cut short, and read like the wrong folder)

@@ -850,6 +850,41 @@ t('R18b: the same refusal with the folder gone stops the pass with '
   isinstance(err18b, RN.CaptureUnavailable))
 
 
+# ---------------------------------------------------------------------
+# R19: one capture over two drives is read as ONE study in session
+# order -- the ledger equals a single folder holding every run -- a run
+# copied onto both drives is read once, and one drive gone stops the pass
+# ---------------------------------------------------------------------
+_d19 = {k: os.path.join(WORK, 'two19_' + k) for k in ('a', 'b', 'all')}
+for _ses, _where in (('20260902', 'a'), ('20260903', 'a'),
+                     ('20260904', 'b'), ('20260905', 'b')):
+    for _dst in (_where, 'all'):
+        SY.synth_run(_d19[_dst], n_depth=20000, price_path=path,
+                     trade_every=10, quote_every=5, cid='s' + _ses,
+                     session=_ses)
+SY.synth_run(_d19['b'], n_depth=20000, price_path=path, trade_every=10,
+             quote_every=5, cid='s20260902', session='20260902')  # a copy
+_l2 = RN.Runner(_d19['a'] + ';' + _d19['b'], ('NQ',)).run()
+_l1 = RN.Runner(_d19['all'], ('NQ',)).run()
+_K19 = ('fires', 'totals', 'feature_none', 'sessions', 'baseline_sessions',
+        'regime_at_window', 'states')
+_gone19 = None
+try:
+    RN.Runner(_d19['a'] + ';' + _d19['b'] + '_unplugged', ('NQ',)).run()
+except RN.CaptureUnavailable as _exc:
+    _gone19 = str(_exc)
+t('R19: "D:\\x;E:\\y" is one study -- fires, totals, sessions and '
+  'baselines equal a single folder with every run (history carries '
+  'across the drives) -- the copy on the second drive is read once and '
+  'named, and a missing drive stops the pass',
+  json.dumps({k: _l2.get(k) for k in _K19}, sort_keys=True) ==
+  json.dumps({k: _l1.get(k) for k in _K19}, sort_keys=True) and
+  len(_l2['sessions']) == 4 and _l2['totals']['events'] > 0 and
+  len(_l2.get('duplicate_manifests_ignored', [])) == 1 and
+  'earlier capture folder' in _l2['duplicate_manifests_ignored'][0]['reason']
+  and _gone19 is not None)
+
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))

@@ -80,9 +80,24 @@ class NoCaptureData(RuntimeError):
     another letter. Never a valid result on a real capture."""
 
 
+def split_capture_dirs(spec):
+    """'D:\\MLES_Capture;E:\\MLES_Capture' -> both folders, in the order
+    given; one folder -> [that folder]. The study can span two drives
+    (2026-10-23: the old drive full, recording moved to a new one) and is
+    read as ONE capture in session order, because baselines, levels and
+    models carry from day to day. A semicolon never occurs in a Windows
+    path, so it is the separator."""
+    parts = [x.strip().strip('"') for x in str(spec).split(';')]
+    return [x for x in parts if x]
+
+
 def capture_dir_alive(directory):
+    """Every folder of the capture answers. With two drives, one gone is
+    the whole capture gone: a pass that went on would report the missing
+    drive's sessions as a quiet market."""
     try:
-        os.listdir(directory)
+        for d in split_capture_dirs(directory):
+            os.listdir(d)
         return True
     except OSError:
         return False
@@ -516,7 +531,7 @@ def audit_run(manifest_path, lite=True):
                 events=quality, manifest=man)
 
 
-def discover_manifests(directory):
+def discover_manifests(directory, duplicates=None):
     """Every *_manifest*.json in the folder (collision manifests keep a
     .json extension, so one pattern finds primary AND collision
     manifests).
@@ -528,6 +543,21 @@ def discover_manifests(directory):
     back as "no manifest", which reads exactly like the wrong folder.
     A listing that fails is raised as CaptureUnavailable with the
     Windows error, never returned as an empty list."""
+    dirs = split_capture_dirs(directory)
+    if len(dirs) > 1:
+        # one run copied onto both drives is still one run: the first
+        # folder named wins, the copy is reported, never read twice
+        out, seen = [], {}
+        for d in dirs:
+            for p in discover_manifests(d):
+                n = os.path.basename(p)
+                if n in seen:
+                    if duplicates is not None:
+                        duplicates.append((p, seen[n]))
+                    continue
+                seen[n] = p
+                out.append(p)
+        return out
     try:
         names = os.listdir(directory)
     except OSError as exc:
@@ -753,24 +783,35 @@ def audit_capture(directory, min_overlap=MIN_OVERLAP_FRAC):
             'cannot read the capture folder %s. Is the drive connected, '
             'and is it still that letter?' % directory)
     fails = []
-    mans = discover_manifests(directory)
+    dups = []
+    mans = discover_manifests(directory, dups)
     if not mans:
         _fail(fails, 'NO_MANIFESTS',
               '%s holds no MLES-CAPTURE-1.2 manifest: the wrong folder, or '
               'a drive that came back under another letter' % directory)
     runs = [audit_run(m) for m in mans]
-    info = dict(manifests=len(mans))
+    info = dict(manifests=len(mans),
+                capture_folders=split_capture_dirs(directory),
+                duplicates_across_folders=[
+                    dict(ignored=p, kept=k) for p, k in dups])
 
     # orphan artifacts
     referenced = set()
     for r in runs:
         for f in r['info'].get('referenced_files', []):
             referenced.add(f)
-    live_files, live_inst, kept = _classify_leftovers(directory)
+    live_files, live_inst, kept = {}, {}, set()
+    names = []
+    for d in split_capture_dirs(directory):
+        lf, li, kp = _classify_leftovers(d)
+        live_files.update(lf)
+        live_inst.update(li)
+        kept |= kp
+        names.extend(os.listdir(d))
     open_runs = {}
     kept_originals = []
     open_instances = set()
-    for p in sorted(os.listdir(directory)):
+    for p in sorted(set(names)):
         loose = p.endswith('.csv.partial') or \
             (p.endswith('.csv') and p not in referenced)
         if loose and p in live_files:
