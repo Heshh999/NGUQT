@@ -76,6 +76,15 @@ The pilot line above (51c2996f…) is superseded in Amendment 12 by:
 b598a10e9b7790c46462f85c8a3f5114c4d913b21100b0e4bc10ed9444204381  mrofyt_pilot.py (MROF-YT-PILOT-1.2; supersedes 2b6efce2… — merged 9/19 work: PilotRunner winds its own observation buffers back with an abandoned run, Amendment 15; earlier supersedes f81c6b14… — a window keeps the level snapshot only when its session is not blind (the validation sessions grow weekly and are never written); Amendment 14. f81c6b14… supersedes 51c2996f… — `--windows-out FILE` writes the decision windows of EXPOSED sessions only (MROF-PILOT-WINDOWS-1) for the dashboard's replay, and each window record carries the approach id, side and the runner's levels; no detector, threshold, level, window, baseline or feature definition touched — P10d re-pins the frozen signal hash; Amendment 12)
 ```
 
+Frozen DEV results (not in the package; nothing to install, Amendment 24):
+
+```
+e881a5bf9f9f72c201f7dd941cf9713713d7033c5452e2fba19e7bccbd72881a  MROF_YT_W3_W4_DEV_FREEZE.md (waves three and four on DEV, committed before any validation read: wave four's hypothesis set and wave three's carried pattern)
+88a7caf41cd48e4a5440f3d4c8cd3ffb2ee9f61988b07a3f892015bdd1a92dad  frozen_dev_20261024/w4_nominated.json (the file --evaluate reads at the checkpoint; five LEAD rules with their numeric cut-points)
+193ff50f5efc3dc96fac9ca15ee4305d9d84fb215d79a9c9e4913d4131e46252  frozen_dev_20261024/w4.json (the operator's wave-four search report)
+18a576a8e787dae311ef0737b56d314e8e0ca57b3bdd9eca102bf75fef6859ac  frozen_dev_20261024/w3.json.gz (gzip -9 -n of the wave-three real-level report d37309f7…, 29 MB uncompressed)
+```
+
 Archived source directives:
 
 ```
@@ -976,3 +985,20 @@ detector hash so registering wave two provably changed nothing.
     tool and the dashboard stay one folder at a time: repair is run per
     drive, and the dashboard watches the drive being recorded to.
     Battery: 639/639 + 46/46.
+
+24. **Waves three and four on DEV, frozen (2026-10-24).** The
+    operator's first complete wave-four search (one read of the 15 DEV
+    sessions, which also wrote wave three's real-level report) is
+    committed byte for byte under `frozen_dev_20261024/` with
+    `MROF_YT_W3_W4_DEV_FREEZE.md`, before any validation session is
+    read. Both reports list the 23 sessions 20260921 → 20261023 as
+    refused, and no event in them is later than 20260918. Wave four: 0
+    CANDIDATEs of 2 208 tests (best q 0.377), five LEAD nominees. That
+    commit is the hypothesis set §5 requires. Wave three: Holm over 24
+    rejected only L2 SWEEP_RECLAIM at the 60-tick stop (116 NQ events,
+    lift +0.155, p 0.001, +5.00 points before costs), which is carried to
+    the checkpoint at that stop. L1 fired on no session. A descriptive
+    per-session and one-position-at-a-time read of L2's DEV events is
+    recorded there as not a test: positive on all six sessions it fired
+    on, 55 of 116 events on 20260916 (FOMC). No code changed; the
+    package zip is unchanged (98bc03c1…).

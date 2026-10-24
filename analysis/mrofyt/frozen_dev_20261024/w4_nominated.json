@@ -1,0 +1,332 @@
+{
+ "wave4": "MROF-YT-W4-DISCOVER-1.0",
+ "registration": "MROF_YT_WAVE4_DISCOVERY_REGISTRATION.md",
+ "nominated": [
+  {
+   "rule": "SS:trend30.top.q+dist_vwap.bottom.q:with:trend30",
+   "text": "trend30 in its top 20% AND dist_vwap in its bottom 20% -> trade with trend30",
+   "family": "SS",
+   "parts": [
+    {
+     "feature": "trend30",
+     "tail": "top",
+     "level": "quintile",
+     "cut": {
+      "MNQ": 113.0,
+      "NQ": 112.5
+     }
+    },
+    {
+     "feature": "dist_vwap",
+     "tail": "bottom",
+     "level": "quintile",
+     "cut": {
+      "MNQ": -164.6505042983772,
+      "NQ": -155.03176381703815
+     }
+    }
+   ],
+   "dir_kind": "with",
+   "dir_ref": "trend30",
+   "stop_ticks": 40.0,
+   "target_ticks": 100.0,
+   "limit_s": 1800.0,
+   "cooldown_s": 300.0,
+   "dev": {
+    "n": 90,
+    "sessions": 8,
+    "hit": 0.4111,
+    "baseline": 0.2596,
+    "lift": 0.1515,
+    "t": 4.704,
+    "p": 0.002198866073078175,
+    "q": 0.8037930132580138,
+    "ci95": [
+     0.0753,
+     0.2276
+    ],
+    "expectancy_points": 5.92,
+    "halves": [
+     {
+      "n": 55,
+      "lift": 0.1884
+     },
+     {
+      "n": 35,
+      "lift": 0.0934
+     }
+    ],
+    "status": null
+   },
+   "other_instruments_dev": {
+    "MNQ": {
+     "n": 94,
+     "sessions": 7,
+     "hit": 0.3617,
+     "baseline": 0.254,
+     "lift": 0.1077,
+     "expectancy_points": 4.07
+    }
+   }
+  },
+  {
+   "rule": "US:dist_level.top.q+z_bi3.top.q:against:z_bi3",
+   "text": "dist_level in its top 20% AND z_bi3 in its top 20% -> trade against z_bi3",
+   "family": "US",
+   "parts": [
+    {
+     "feature": "dist_level",
+     "tail": "top",
+     "level": "quintile",
+     "cut": {
+      "MNQ": 95.0,
+      "NQ": 95.15589527928387
+     }
+    },
+    {
+     "feature": "z_bi3",
+     "tail": "top",
+     "level": "quintile",
+     "cut": {
+      "MNQ": 2.4511020461187107,
+      "NQ": 2.2089840453446516
+     }
+    }
+   ],
+   "dir_kind": "against",
+   "dir_ref": "z_bi3",
+   "stop_ticks": 60.0,
+   "target_ticks": 100.0,
+   "limit_s": 1800.0,
+   "cooldown_s": 300.0,
+   "dev": {
+    "n": 356,
+    "sessions": 7,
+    "hit": 0.3708,
+    "baseline": 0.3189,
+    "lift": 0.0519,
+    "t": 4.596,
+    "p": 0.003706670094369105,
+    "q": 0.8037930132580138,
+    "ci95": [
+     0.0242,
+     0.0795
+    ],
+    "expectancy_points": 1.63,
+    "halves": [
+     {
+      "n": 68,
+      "lift": 0.0725
+     },
+     {
+      "n": 288,
+      "lift": 0.047
+     }
+    ],
+    "status": null
+   },
+   "other_instruments_dev": {
+    "MNQ": {
+     "n": 409,
+     "sessions": 7,
+     "hit": 0.335,
+     "baseline": 0.32,
+     "lift": 0.015,
+     "expectancy_points": 0.92
+    }
+   }
+  },
+  {
+   "rule": "U:range30.top.d:against:D60",
+   "text": "range30 in its top 10% -> trade against the 60 s flow",
+   "family": "U",
+   "parts": [
+    {
+     "feature": "range30",
+     "tail": "top",
+     "level": "decile",
+     "cut": {
+      "MNQ": 372.0,
+      "NQ": 372.0
+     }
+    }
+   ],
+   "dir_kind": "against",
+   "dir_ref": "D60",
+   "stop_ticks": 80.0,
+   "target_ticks": 100.0,
+   "limit_s": 1800.0,
+   "cooldown_s": 300.0,
+   "dev": {
+    "n": 551,
+    "sessions": 13,
+    "hit": 0.4809,
+    "baseline": 0.4078,
+    "lift": 0.0732,
+    "t": 4.536,
+    "p": 0.0006828939796624465,
+    "q": 0.3769574767736705,
+    "ci95": [
+     0.038,
+     0.1083
+    ],
+    "expectancy_points": 2.22,
+    "halves": [
+     {
+      "n": 315,
+      "lift": 0.0595
+     },
+     {
+      "n": 236,
+      "lift": 0.0914
+     }
+    ],
+    "status": null
+   },
+   "other_instruments_dev": {
+    "MNQ": {
+     "n": 539,
+     "sessions": 13,
+     "hit": 0.4564,
+     "baseline": 0.4093,
+     "lift": 0.0471,
+     "expectancy_points": 0.99
+    }
+   }
+  },
+  {
+   "rule": "SS:z_d180.bottom.q+dist_vwap.bottom.q:with:z_d180",
+   "text": "z_d180 in its bottom 20% AND dist_vwap in its bottom 20% -> trade with z_d180",
+   "family": "SS",
+   "parts": [
+    {
+     "feature": "z_d180",
+     "tail": "bottom",
+     "level": "quintile",
+     "cut": {
+      "MNQ": -1.2752090921354378,
+      "NQ": -1.2760635990097748
+     }
+    },
+    {
+     "feature": "dist_vwap",
+     "tail": "bottom",
+     "level": "quintile",
+     "cut": {
+      "MNQ": -164.6505042983772,
+      "NQ": -155.03176381703815
+     }
+    }
+   ],
+   "dir_kind": "with",
+   "dir_ref": "z_d180",
+   "stop_ticks": 80.0,
+   "target_ticks": 100.0,
+   "limit_s": 1800.0,
+   "cooldown_s": 300.0,
+   "dev": {
+    "n": 167,
+    "sessions": 8,
+    "hit": 0.4072,
+    "baseline": 0.3458,
+    "lift": 0.0614,
+    "t": 3.421,
+    "p": 0.011115614805288802,
+    "q": 1.0,
+    "ci95": [
+     0.019,
+     0.1038
+    ],
+    "expectancy_points": 0.62,
+    "halves": [
+     {
+      "n": 56,
+      "lift": 0.0715
+     },
+     {
+      "n": 111,
+      "lift": 0.0562
+     }
+    ],
+    "status": null
+   },
+   "other_instruments_dev": {
+    "MNQ": {
+     "n": 168,
+     "sessions": 8,
+     "hit": 0.369,
+     "baseline": 0.3299,
+     "lift": 0.0391,
+     "expectancy_points": 0.64
+    }
+   }
+  },
+  {
+   "rule": "SS:resp180.bottom.q+trend30.top.q:against:resp180",
+   "text": "resp180 in its bottom 20% AND trend30 in its top 20% -> trade against resp180",
+   "family": "SS",
+   "parts": [
+    {
+     "feature": "resp180",
+     "tail": "bottom",
+     "level": "quintile",
+     "cut": {
+      "MNQ": -29.0,
+      "NQ": -29.0
+     }
+    },
+    {
+     "feature": "trend30",
+     "tail": "top",
+     "level": "quintile",
+     "cut": {
+      "MNQ": 113.0,
+      "NQ": 112.5
+     }
+    }
+   ],
+   "dir_kind": "against",
+   "dir_ref": "resp180",
+   "stop_ticks": 80.0,
+   "target_ticks": 100.0,
+   "limit_s": 1800.0,
+   "cooldown_s": 300.0,
+   "dev": {
+    "n": 274,
+    "sessions": 13,
+    "hit": 0.4416,
+    "baseline": 0.3863,
+    "lift": 0.0553,
+    "t": 3.359,
+    "p": 0.005685000973811468,
+    "q": 0.8207840500049212,
+    "ci95": [
+     0.0194,
+     0.0911
+    ],
+    "expectancy_points": 2.88,
+    "halves": [
+     {
+      "n": 149,
+      "lift": 0.0456
+     },
+     {
+      "n": 125,
+      "lift": 0.0668
+     }
+    ],
+    "status": null
+   },
+   "other_instruments_dev": {
+    "MNQ": {
+     "n": 278,
+     "sessions": 13,
+     "hit": 0.4388,
+     "baseline": 0.3867,
+     "lift": 0.0522,
+     "expectancy_points": 2.65
+    }
+   }
+  }
+ ]
+}
