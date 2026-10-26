@@ -192,6 +192,14 @@ after = DAYS[91].strftime('%Y%m%d')
 t('X6: the stamp check finds the cash-open volume jump at 09:30 on UTC '
   'end-stamped exports',
   chk['open_minute'] == '09:30' and rd.bad_lines == 0)
+rk = CX.Reader('NQ')
+for m, (vol, n) in {509: (100.0, 10), 510: (2500.0, 10),      # 08:29 -> 08:30
+                    569: (3000.0, 10), 570: (30000.0, 10),    # 09:29 -> 09:30
+                    958: (20000.0, 10), 959: (40000.0, 10)}.items():
+    rk.minute_vol[m], rk.minute_n[m] = vol, n
+t('X6a: the stamp check ignores a thin minute with a sharper jump (08:30 '
+  'at 25x but a tenth of the peak) and names 09:30',
+  rk.open_minute()[0] == 570)
 t('X6b: the front contract is chosen by the PREVIOUS session\'s volume: '
   'still the old one on the first day the new one leads, the new one the '
   'day after',

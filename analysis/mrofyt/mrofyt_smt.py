@@ -48,7 +48,6 @@ import datetime as _dt
 import json
 import math
 import os
-import re
 import sys
 
 import mrofyt_bigmove as BM
@@ -96,49 +95,9 @@ class BarDayAgg(CX.DayAgg):
 
 
 class BarReader(CX.Reader):
-    """mrofyt_context's Reader, aggregating with BarDayAgg."""
-
-    def read_file(self, path):
-        contract = CX.contract_of(path, self.root) or '%s CONT' % self.root
-        aggs = {}
-        n = 0
-        with open(path, 'r', errors='replace') as fh:
-            for line in fh:
-                parts = re.split(r'[;,]', line.strip())
-                if len(parts) != 6:
-                    if line.strip():
-                        self.bad_lines += 1
-                    continue
-                stamp = parts[0].split()
-                if len(stamp) < 2 or len(stamp[0]) != 8 or \
-                        len(stamp[1]) != 6 or not stamp[0].isdigit():
-                    self.bad_lines += 1
-                    continue
-                try:
-                    o, h, lo, c, v = (float(x) for x in parts[1:])
-                except ValueError:
-                    self.bad_lines += 1
-                    continue
-                ses, sod = CX.bar_session(stamp[0], stamp[1], self.stamps_tz,
-                                          self.stamps)
-                if ses >= CX.REFUSE_FROM:
-                    self.refused_sessions.add(ses)
-                    continue
-                if self.allow is not None and not self.allow(ses):
-                    self.skipped_sessions.add(ses)
-                    continue
-                a = aggs.get(ses)
-                if a is None:
-                    a = aggs[ses] = BarDayAgg()
-                a.add(sod, o, h, lo, c, v)
-                m = int(sod // 60)
-                self.minute_vol[m] += v
-                self.minute_n[m] += 1
-                n += 1
-        for ses, a in aggs.items():
-            self.days[(contract, ses)] = a.finalize()
-        self.files.append(dict(file=os.path.basename(path), contract=contract,
-                               bars=n, sessions=len(aggs)))
+    """mrofyt_context's Reader, aggregating with BarDayAgg (same parsing
+    loop, same stamp check, same refusals)."""
+    agg_class = BarDayAgg
 
 
 def sessions_of(path, root, allow, stamps_tz='UTC', stamps='end'):
@@ -148,9 +107,8 @@ def sessions_of(path, root, allow, stamps_tz='UTC', stamps='end'):
     rd = BarReader(root, stamps_tz, stamps, allow)
     rd.read_path(path)
     if not rd.days:
-        raise CX.ContextDataError(
-            'these exports hold no %s session in the years this mode '
-            'reads: export %s minute data for them' % (root, root))
+        raise CX.ContextDataError(CX._nothing_read(
+            rd, root, 'in the years this mode reads'))
     chk = rd.check_stamps()
     recs = CX.build_days(rd.days)
     # "yesterday" is the session right before, complete, same contract

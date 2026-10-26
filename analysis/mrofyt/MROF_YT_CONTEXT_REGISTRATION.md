@@ -46,9 +46,12 @@ The module is `mrofyt_context.py` (MROF-YT-CTX-1.0).
   (or one continuous file). Time stamps are UTC at the END of each bar,
   as NinjaTrader exports; `--stamps-tz ET` and `--stamps start` exist
   for other files and change nothing else.
-- **Stamp check:** the ET minute with the largest jump in average volume
-  over the minute before it must be 09:30. Otherwise the tool stops,
-  computes nothing and names the likely cause. US Eastern time uses the
+- **Stamp check:** among the ET minutes that carry at least half the
+  day's peak average volume, the one with the largest jump in average
+  volume over the minute before it must be 09:30. Otherwise the tool
+  stops, computes nothing and names the likely cause. (The peak filter
+  keeps a thin minute with a sharp jump, 08:30 on a news day or the
+  Globex reopen, from outranking the cash open.) US Eastern time uses the
   2007 DST rule from 2007 and the 1987–2006 rule before.
 - **Session:** bars from 18:00 ET belong to the next date (the CME
   session). **Cash session** = bars starting 09:30–15:59 ET.
@@ -198,7 +201,7 @@ Benjamini–Hochberg at q = 0.10 allows (`X8b`).
 
 | registered | implemented as | precision |
 | --- | --- | --- |
-| §1 | `Reader`, `bar_session`, `DayAgg`, `build_days` | the stamp check compares each minute with the nearest earlier minute that has bars, at most 10 minutes back |
+| §1 | `Reader`, `bar_session`, `DayAgg`, `build_days` | the stamp check compares each minute with the nearest earlier minute that has bars, at most 10 minutes back, among minutes at or above half the peak average volume (`X6a`); files are read BOM-tolerant; a file of lines that are not minute bars (a Tick export) stops with that reason |
 | §2 | `build_days`, `value_area` | VAH = top of the highest bin, VAL = bottom of the lowest, POC = bin centre |
 | §3 | `build_days`, `first_touch` | none |
 | §4 | `enumerate_rules`, `quantile_cuts`, `members` | a feature needs 50+ DEV values for cut-points |

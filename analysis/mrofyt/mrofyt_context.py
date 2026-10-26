@@ -323,6 +323,8 @@ def value_area(prof, share=VALUE_SHARE, binw=PROFILE_BIN):
 
 
 class Reader(object):
+    agg_class = DayAgg                     # mrofyt_smt keeps the bars too
+
     """Streams every export of the root into per-(contract, session)
     day statistics, and the minute-of-day volume the time-stamp check
     needs. Only sessions `allow` accepts are kept; every other bar is
@@ -371,7 +373,7 @@ class Reader(object):
         contract = contract_of(path, self.root) or '%s CONT' % self.root
         aggs = {}
         n = 0
-        with open(path, 'r', errors='replace') as fh:
+        with open(path, 'r', encoding='utf-8-sig', errors='replace') as fh:
             for line in fh:
                 parts = re.split(r'[;,]', line.strip())
                 if len(parts) != 6:
@@ -398,7 +400,7 @@ class Reader(object):
                     continue
                 a = aggs.get(ses)
                 if a is None:
-                    a = aggs[ses] = DayAgg()
+                    a = aggs[ses] = self.agg_class()
                 a.add(sod, o, h, lo, c, v)
                 m = int(sod // 60)
                 self.minute_vol[m] += v
@@ -409,19 +411,27 @@ class Reader(object):
         self.files.append(dict(file=os.path.basename(path), contract=contract,
                                bars=n, sessions=len(aggs)))
 
+    PEAK_SHARE = 0.5
+
     def open_minute(self):
         """The ET minute of day with the largest jump in average volume
         over the nearest earlier minute that has bars (at most 10
-        minutes before it): 570 (09:30) on correctly stamped exports."""
+        minutes before it), among the minutes that carry at least half
+        the peak average volume of the day: 570 (09:30) on correctly
+        stamped exports. The peak filter keeps a thin minute with a
+        sharp jump (08:30 on a news day, the Globex reopen) from
+        outranking the cash open."""
         best, best_m = None, None
         mins = sorted(m for m in self.minute_vol if self.minute_n[m])
+        avg = {m: self.minute_vol[m] / self.minute_n[m] for m in mins}
+        peak = max(avg.values()) if avg else 0.0
         for prev, m in zip(mins, mins[1:]):
-            if m - prev > 10:
+            if m - prev > 10 or avg[m] < self.PEAK_SHARE * peak:
                 continue
-            b = self.minute_vol[prev] / self.minute_n[prev]
+            b = avg[prev]
             if b <= 0:
                 continue
-            r = (self.minute_vol[m] / self.minute_n[m]) / b
+            r = avg[m] / b
             if best is None or r > best:
                 best, best_m = r, m
         return best_m, best
@@ -846,10 +856,7 @@ def read_days(path, root='NQ', stamps_tz='UTC', stamps='end', allow=None,
     rd = Reader(root, stamps_tz, stamps, allow)
     rd.read_path(path)
     if not rd.days:
-        raise ContextDataError(
-            'these exports hold no %s session %s: download that range of '
-            'NQ minute data in NinjaTrader and export it' % (
-                root, years or 'before %s' % REFUSE_FROM))
+        raise ContextDataError(_nothing_read(rd, root, years))
     chk = rd.check_stamps()
     recs = build_days(rd.days)
     if not any(r['eligible'] for r in recs):
@@ -857,6 +864,17 @@ def read_days(path, root='NQ', stamps_tz='UTC', stamps='end', allow=None,
                                'history %s: nothing to study'
                                % (years or 'in the exports'))
     return rd, chk, recs
+
+
+def _nothing_read(rd, root, years):
+    if rd.bad_lines and not rd.refused_sessions and not rd.skipped_sessions:
+        return ('%d line(s) in the %s files were not minute bars '
+                '("yyyyMMdd HHmmss;open;high;low;close;volume"): a Tick '
+                'export, or the wrong format. Export Minute data.'
+                % (rd.bad_lines, root))
+    return ('these exports hold no %s session %s: download that range of '
+            '%s minute data in NinjaTrader and export it'
+            % (root, years or 'before %s' % REFUSE_FROM, root))
 
 
 def _input_block(rd, chk, recs):
