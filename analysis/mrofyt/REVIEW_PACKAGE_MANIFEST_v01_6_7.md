@@ -74,9 +74,18 @@ The pilot line above (51c2996f…) is superseded in Amendment 12 by:
 
 ```
 b598a10e9b7790c46462f85c8a3f5114c4d913b21100b0e4bc10ed9444204381  mrofyt_pilot.py (MROF-YT-PILOT-1.2; supersedes 2b6efce2… — merged 9/19 work: PilotRunner winds its own observation buffers back with an abandoned run, Amendment 15; earlier supersedes f81c6b14… — a window keeps the level snapshot only when its session is not blind (the validation sessions grow weekly and are never written); Amendment 14. f81c6b14… supersedes 51c2996f… — `--windows-out FILE` writes the decision windows of EXPOSED sessions only (MROF-PILOT-WINDOWS-1) for the dashboard's replay, and each window record carries the approach id, side and the runner's levels; no detector, threshold, level, window, baseline or feature definition touched — P10d re-pins the frozen signal hash; Amendment 12)
+eee416353fd6b94f932fee21f5d0368f186e4ede75a1e15bcb8b4fd625113e44  mrofyt_costs.py (MROF-YT-COSTS-1.0: what a mid-to-mid path result keeps after commission, spread and stop slippage, every event and one position at a time, with a spread x slippage sensitivity grid; accounting, never a rule; Amendment 25)
+fd1755fb3607509b0d3e06dc8c6d6dc4e3712d7b23c74801567efde10bd6d192  mrofyt_risk.py (MROF-YT-RISK-1.0: drawdowns, losing streaks, bad days and contracts for a risk budget, resampled from the trades one account could take, in three scenarios -- as sampled, half the edge, no edge -- and sized on the half-edge one; a sample with under 20 trading sessions is flagged; Amendment 25)
+8799e95096901f05d71b6e3cb86a2c4ad392465419b1e39eb7a7a3baea43b1b8  tests_mrofyt_costs_risk.py (15 tests: the cost and path arithmetic, the daily stop, the scenarios, the seed, streaks beyond the recorded days, sizing, and the frozen DEV report reproduced; Amendment 25)
+43513abb03041ca34b426ad82fc434ed49997cef2dfb26b3e2765b1ee8180426  mrofyt_exitstudy.py (MROF-YT-W5-EXIT-1.0: wave five, when a winning run is ending -- eight tape signs against a plain 10-point trail on every 20-point run of the DEV tape, Holm over eight, at most three nominated; and the half-life curves 5 s .. 3 h of every wave-one and wave-three family; DEV only unless --evaluate --unblind; wave four's runner, hooks only; Amendment 25)
+755d5e9c574a661cc7da557f24db7810db5c3bcbf5762539e68f1457ae9ea460  tests_mrofyt_exitstudy.py (19 tests: the trail against a re-implementation, the run state, each sign, a planted exit edge found and noise rejected, the cooldown, the unblind refusal, causality under a cut tape, the abandoned-run wind-back, evaluate's two modes and the ledger, the half-life curve by hand, wave-one ledger identity and the frozen hash; Amendment 25)
+3bcd8c642dc8cf478d81cdd611bc594245dc489e95d8923696c2c3d1be6299b8  MROF_YT_WAVE5_EXIT_REGISTRATION.md (FROZEN 2026-10-26 before any recorded session was read by it; Amendment 25)
+09bf75a671d1149c288311d9ff08aab1483592def0b26db9f2bd930d733fc594  mrofyt_context.py (MROF-YT-CTX-1.0: long, short or neither by 10:30 ET from NinjaTrader minute exports -- 13 features, 676 rules, month-clustered t, Benjamini-Hochberg; searched on 2019-06-01 .. 2026-06-30, judged on every session before 2019-06-01, which no study in this repository has read; each mode drops the other's bars unread; nothing from 2026-07-01; Amendment 25)
+fc33402486126d231d9c9bc46a479efee483b3704f69dde120e10138239d45ca  tests_mrofyt_context.py (20 tests: both DST regimes, end-of-bar UTC stamps, contract names, the value area, a day's statistics, the stamp check and its two refusals, the front contract and the same-contract gap across a roll, a planted context edge found and the noise rate bounded over 40 datasets, the split never crossed, the July 2026 refusal, evaluate's two modes, causality; Amendment 25)
+2a62f7400611bf69a3fed784437f320e966207f2d9fe7cb24c766f206543ea22  MROF_YT_CONTEXT_REGISTRATION.md (FROZEN 2026-10-26 before any real bar was read; Amendment 25)
 ```
 
-Frozen DEV results (not in the package; nothing to install, Amendment 24):
+Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
 
 ```
 e881a5bf9f9f72c201f7dd941cf9713713d7033c5452e2fba19e7bccbd72881a  MROF_YT_W3_W4_DEV_FREEZE.md (waves three and four on DEV, committed before any validation read: wave four's hypothesis set and wave three's carried pattern)
@@ -96,13 +105,13 @@ Delivered package (119 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-98bc03c129995f8a50459b274a91a51fec39150c41356e7fd657fa76c93c5205  MROF_V1_Engine_v01_6_7.zip (supersedes ae0f7cf3… — one study across two drives; 119 files, Amendment 23; earlier ae0f7cf3… supersedes f4529847… — the runner's refused size check skips or stops instead of crashing; 119 files, Amendment 22; earlier f4529847… supersedes 4f35d37c… — waves two to four wind an abandoned run back whole; wave two 1.1; 119 files, Amendment 21; earlier 4f35d37c… supersedes f466ee1b… — wave four: the counted search, its registration and 16-test suite; direction-matched baselines in waves three and four; the runner's quote fields; 119 files, Amendment 20; earlier f466ee1b… supersedes 64002e08… — a cut-short folder listing is a stop with the Windows error, never "no manifest"; the runner's no-plan stop states its reasons; 116 files, Amendment 19; earlier 64002e08… supersedes 5285925c… — wave three: the big-move registration, mrofyt_bigmove.py and its 27-test suite, 116 files, Amendment 18; earlier 5285925c… supersedes 092a62e0… — recover 1.6: a file Windows will not date is set aside instead of stopping the dry run, 113 files, Amendment 17; earlier 092a62e0… supersedes 14adcbf4… — recover 1.5: progress per run, oldest session first, a stop that names the drive, the folder or the refused step, the check file before any bulk read, earlier-pass manifests checked, recorder-only declarations, 113 files, Amendment 16; earlier 14adcbf4… supersedes 9a8bce6c… — the 9/19 parallel-session work merged: runner 1.2.2 decode-failure catch and wind-back, the ingest suite, the run guide, 113 files, Amendment 15; earlier c5f652c5… — a known-unreadable file is not re-read; earlier 416beef6… — unreadable-file verdict on the page, capped shared-gap alerts, legible replay level labels; earlier 694c6367… — replay evidence matches the approach id; earlier 2fa33aed… — recover 1.4 bounded reads; earlier f930879f… — recover 1.4 unreadable-file guard; earlier f930879f… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+c69b017e4c0a18d1e794c3ca2c4f138da1cd9c673581ebda52527d95644cdcf2  MROF_V1_Engine_v01_6_7.zip (supersedes 98bc03c1… — context, exit, cost and risk tools with their registrations and suites, and the frozen DEV results their suite reproduces; 132 files, Amendment 25; earlier 98bc03c1… supersedes ae0f7cf3… — one study across two drives; 119 files, Amendment 23; earlier ae0f7cf3… supersedes f4529847… — the runner's refused size check skips or stops instead of crashing; 119 files, Amendment 22; earlier f4529847… supersedes 4f35d37c… — waves two to four wind an abandoned run back whole; wave two 1.1; 119 files, Amendment 21; earlier 4f35d37c… supersedes f466ee1b… — wave four: the counted search, its registration and 16-test suite; direction-matched baselines in waves three and four; the runner's quote fields; 119 files, Amendment 20; earlier f466ee1b… supersedes 64002e08… — a cut-short folder listing is a stop with the Windows error, never "no manifest"; the runner's no-plan stop states its reasons; 116 files, Amendment 19; earlier 64002e08… supersedes 5285925c… — wave three: the big-move registration, mrofyt_bigmove.py and its 27-test suite, 116 files, Amendment 18; earlier 5285925c… supersedes 092a62e0… — recover 1.6: a file Windows will not date is set aside instead of stopping the dry run, 113 files, Amendment 17; earlier 092a62e0… supersedes 14adcbf4… — recover 1.5: progress per run, oldest session first, a stop that names the drive, the folder or the refused step, the check file before any bulk read, earlier-pass manifests checked, recorder-only declarations, 113 files, Amendment 16; earlier 14adcbf4… supersedes 9a8bce6c… — the 9/19 parallel-session work merged: runner 1.2.2 decode-failure catch and wind-back, the ingest suite, the run guide, 113 files, Amendment 15; earlier c5f652c5… — a known-unreadable file is not re-read; earlier 416beef6… — unreadable-file verdict on the page, capped shared-gap alerts, legible replay level labels; earlier 694c6367… — replay evidence matches the approach id; earlier 2fa33aed… — recover 1.4 bounded reads; earlier f930879f… — recover 1.4 unreadable-file guard; earlier f930879f… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 639/639 + 46/46, identical to the repo
+# run from inside the unzipped package: 693/693 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -142,9 +151,12 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_wave2.py` | 30/30 |
 | `tests_mrofyt_bigmove.py` | 28/28 |
 | `tests_mrofyt_discover.py` | 17/17 |
-| **wave-one to four total** | **639/639** |
+| `tests_mrofyt_exitstudy.py` | 19/19 |
+| `tests_mrofyt_costs_risk.py` | 15/15 |
+| `tests_mrofyt_context.py` | 20/20 |
+| **wave-one to five, tools total** | **693/693** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **685/685** |
+| **package total** | **739/739** |
 
 ## Runnable research commands
 
@@ -157,6 +169,10 @@ python3 mrofyt_recover.py  "<capture folder>" --repair              # rebuild ma
 python3 mrofyt_wave2.py    "<capture folder>" --both --out wave2.json  # wave two, real + placebo, blind
 python3 mrofyt_bigmove.py  "<capture folder>" --both --out w3.json     # wave three big-move search, DEV sessions only, real + placebo
 python3 mrofyt_discover.py "<capture folder>" --out w4.json --nominated-out w4_nominated.json --w3-out w3.json  # wave four counted search + wave three real, one read of DEV
+python3 mrofyt_exitstudy.py "<capture folder>" --out w5.json --nominated-out w5_nominated.json  # wave five exit study + half-life curves, DEV only
+python3 mrofyt_costs.py    w3.json                                   # costs charged to the Holm survivor(s), one position at a time
+python3 mrofyt_risk.py     w3.json --daily-stop 40 --account 50000   # drawdowns and sizing in three scenarios
+python3 mrofyt_context.py  "<folder of NQ minute exports>" --out ctx.json --nominated-out ctx_nominated.json  # context search, 2019-06 .. 2026-06 only
 ```
 
 All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -167,7 +183,8 @@ All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
 ```
 grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|ExitShort" \
      mrofyt_swings_v016.py mrofyt_engine_v016.py mrofyt_exits_v017.py \
-     mrofyt_pilot.py mrofyt_recover.py mrofyt_wave2.py
+     mrofyt_pilot.py mrofyt_recover.py mrofyt_wave2.py \
+     mrofyt_exitstudy.py mrofyt_costs.py mrofyt_risk.py mrofyt_context.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -1001,4 +1018,43 @@ detector hash so registering wave two provably changed nothing.
     per-session and one-position-at-a-time read of L2's DEV events is
     recorded there as not a test: positive on all six sessions it fired
     on, 55 of 116 events on 20260916 (FOMC). No code changed; the
-    package zip is unchanged (98bc03c1…).
+    package zip was unchanged then (98bc03c1…); it ships them from V26.
+
+25. **What an intraday trader needs that the study lacked (2026-10-26).**
+    The operator asked for everything a consistently profitable
+    intraday order-flow trader needs that this study did not have. Four
+    tools were added; nothing frozen changed (the signal module keeps
+    06ce854a…; every earlier suite passes unchanged).
+    - **Context** (`mrofyt_context.py`, registration
+      `MROF_YT_CONTEXT_REGISTRATION.md`): long, short or neither by
+      10:30 ET, from NinjaTrader one-minute exports, which reach back to
+      about 2006 where the order-flow recordings reach weeks. A search
+      for the registration found that this repository's earlier
+      minute-bar studies already read NQ bars from 2019-06-02 to
+      2026-08-25 (NQ-DIRECTION-V1 among them, which found no robust
+      intraday directional mechanism), and nothing earlier. So the
+      search runs on 2019-06-01 .. 2026-06-30 and the verdict comes from
+      every session before 2019-06-01; each mode drops the other's bars
+      the moment their session is known (`X9`, `X11`). Exports are UTC,
+      end of bar; a stamp check refuses any file whose cash-open volume
+      jump is not at 09:30 ET and names the fix (`X7`).
+    - **Exits** (`mrofyt_exitstudy.py`, wave five, registration
+      `MROF_YT_WAVE5_EXIT_REGISTRATION.md`): when price has run 20
+      points and momentum looks to be dying, is holding worth less than
+      usual? Eight tape signs against a plain 10-point trailing stop on
+      every 20-point run of the DEV tape, plus how long each wave-one
+      and wave-three signal's edge lasts (5 s to 3 h). The operator's
+      own read was asked for and not supplied; the standard inventory
+      was fixed instead.
+    - **Costs** (`mrofyt_costs.py`): on the frozen DEV report, L2 at 60
+      ticks keeps +6.15 points a trade on NQ one position at a time after
+      $5 commission, a tick of spread and a tick of stop slippage, and
+      +0.15 on MNQ, where commission is four times larger per point.
+    - **Risk** (`mrofyt_risk.py`): resampling whole recorded sessions
+      cannot show a losing streak longer than the sample's own days held
+      (6 trading days for L2), and gave a flattering picture; trades are
+      therefore drawn one by one, in three scenarios (as sampled, half
+      the edge, no edge), and contracts are sized on the half-edge one.
+    Battery: 693/693 + 46/46 (`tests_mles_v12.py` needs the Mono C#
+    compiler `mcs`).
+
