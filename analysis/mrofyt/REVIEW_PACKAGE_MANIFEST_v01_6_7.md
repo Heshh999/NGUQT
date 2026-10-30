@@ -88,6 +88,9 @@ fd1755fb3607509b0d3e06dc8c6d6dc4e3712d7b23c74801567efde10bd6d192  mrofyt_risk.py
 24ce2cc539a662ce34fdf8ede80e718b2b548144ebf3fe2e3cf0e7ff8ee7c212  mrofyt_smt.py (supersedes d518956b… — reads through mrofyt_context's parsing loop (an aggregator class, no second copy of the loop), Amendment 27; earlier MROF-YT-W6B-SMT-1.0: wave six part B -- NQ failed and held breaks of yesterday's high and low on minute bars, ES confirming or not, four fixed tests, month-clustered, Holm; read on 2019-06 .. 2026-06, judged on the years before 2019-06-01; Amendment 26)
 d1d50f8506448287dada036d413f60ab162bf25fe12f2740752d548b2714cd64  tests_mrofyt_smt.py (6 tests: events, ES timing, the outcome, the clustered difference by hand, a planted edge found and the noise rate bounded, the split end to end; Amendment 26)
 bfb34438a90a5335df8a2265bced46d51ff40acf8bf560b7f16595249a69993b  MROF_YT_WAVE6_LEVELBREAK_REGISTRATION.md (FROZEN 2026-10-26 before either tool read real data; Amendment 26)
+d25b41dd81c82e6574bf9ba7452b98a16f47d1f324cfc8ab72bcc218d0eb2cbc  mrofyt_flowlevels.py (MROF-YT-W7-FLOWLEVELS-1.0: wave seven -- failed and held breaks of the levels the order flow builds every day (one-minute swing highs and lows, absorption prices, yesterday's value area), graded A+ / A / B / skip on five order-flow points, with a structural stop and four exits: the next level ahead, a tape exit with no target, half and half, and the original 25 / 15; nine tests, net R after costs, one position at a time, Holm over nine; DEV describes and freezes two cuts, a replay holdout folder (sessions before 2026-09-01 only) or the --unblind checkpoint judges; wave four's runner, hooks only; Amendment 28)
+02e2922721070580af1e51d4ce53ac606c5b19b092c509cf454d11f543eb9e01  tests_mrofyt_flowlevels.py (20 tests: the search tree against a brute-force scan, swing / absorption / value-area levels and merging, FAILED and HELD by hand with their stops and trapped volume, which way a level breaks, fresh and absorption, the grade and confluence, E1's target rule, the bracket, the tape exit sign by sign, E2 / E3 / E4, costs and the hybrid's halves, one position at a time, the grade slope on planted and flat data, end to end, evaluate's modes, the holdout folder rule, wave four unchanged, the wind-back; Amendment 28)
+c59c4a02e5d8e1124ab7ae7276ba362f8e4243b963f3f6cc29d4f2da7c99f63f  MROF_YT_WAVE7_FLOWLEVELS_REGISTRATION.md (FROZEN 2026-10-30 before the tool read real data; Amendment 28)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -116,7 +119,7 @@ fd06d259bc1172946c28f04ea2df49422c79735238e15b62d876dcb0021aa2a6  MROF_V1_Engine
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 711/711 + 46/46, identical to the repo
+# run from inside the unzipped package: 731/731 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -161,9 +164,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_context.py` | 21/21 |
 | `tests_mrofyt_levelbreak.py` | 11/11 |
 | `tests_mrofyt_smt.py` | 6/6 |
-| **wave-one to six, tools total** | **711/711** |
+| `tests_mrofyt_flowlevels.py` | 20/20 |
+| **wave-one to seven, tools total** | **731/731** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **757/757** |
+| **package total** | **777/777** |
 
 ## Runnable research commands
 
@@ -182,6 +186,7 @@ python3 mrofyt_risk.py     w3.json --daily-stop 40 --account 50000   # drawdowns
 python3 mrofyt_context.py  "<folder of NQ minute exports>" --out ctx.json --nominated-out ctx_nominated.json  # context search, 2019-06 .. 2026-06 only
 python3 mrofyt_levelbreak.py "<capture folder>" --out w6.json --frozen-out w6_frozen.json  # wave six A on DEV: describes, freezes the trapped cut
 python3 mrofyt_smt.py      "<folder of NQ and ES minute exports>" --out smt_dev.json       # wave six B, 2019-06 .. 2026-06 first look
+python3 mrofyt_flowlevels.py "<capture folder>" --out w7.json --frozen-out w7_frozen.json  # wave seven on DEV: describes, freezes the two cuts
 ```
 
 All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -194,7 +199,7 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|Exit
      mrofyt_swings_v016.py mrofyt_engine_v016.py mrofyt_exits_v017.py \
      mrofyt_pilot.py mrofyt_recover.py mrofyt_wave2.py \
      mrofyt_exitstudy.py mrofyt_costs.py mrofyt_risk.py mrofyt_context.py \
-     mrofyt_levelbreak.py mrofyt_smt.py
+     mrofyt_levelbreak.py mrofyt_smt.py mrofyt_flowlevels.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -1103,4 +1108,33 @@ detector hash so registering wave two provably changed nothing.
     Tick export (lines that are not minute bars) stops with that reason.
     No threshold, feature, split or test changed. Battery: 711/711 +
     46/46.
+
+28. **Order-flow levels, graded, with targets from the order flow
+    (2026-10-30).** L2's September DEV result (+351 points net, 57
+    trades, one position at a time) owes 260 points to one day, the
+    16 September Fed day: the six daily levels it watches are reached
+    on few days. The operator proposed trading the levels the order
+    flow builds every day (swing highs and lows), grading each setup
+    A+ / A / B / skip from the order flow at the level, and taking the
+    target from the order flow too ("could be 10R, not the same every
+    time"), and asked that both target ideas be registered.
+    `MROF_YT_WAVE7_FLOWLEVELS_REGISTRATION.md` fixes, before the tool
+    read real data: three level types (one-minute swing highs and lows,
+    absorption prices, yesterday's POC / VAH / VAL), one attempt per
+    level, FAILED (fade) and HELD (follow) entries 09:30-15:30 ET, five
+    grade points (trapped volume, absorption at the level, a strong
+    turn, a fresh level, confluence with a daily level), a structural
+    stop of 12-60 ticks, and four exits judged side by side: E1 the next
+    level ahead (at least 1.5 x the stop, no cap; a nearer level means no
+    trade), E2 no target and an exit when 2 of 4 tape signs say the move
+    is dying, E3 half and half, E4 the original 25 / 15 as the baseline.
+    Nine tests (FAILED and HELD at grade A or A+ on each exit, and
+    whether net R rises with the grade), Holm over nine. DEV describes
+    and freezes two cuts; the replay holdout folder or the December
+    checkpoint judges. Wave six and wave seven are both registered
+    before anyone has read the replay folder, so each reads it once as a
+    fresh test. `mrofyt_flowlevels.py` uses wave four's runner, hooks
+    only (`FL10`: wave four's grid, wave three's fires and the wave-one
+    ledger identical); nothing frozen changed (06ce854a…). Battery:
+    731/731 + 46/46.
 
