@@ -97,6 +97,9 @@ dd79fdbb059236200a87088d178c606c9b01baa3a83ec20f2d2a88d3fde85ec3  MROF_YT_WAVE8_
 e05963e70d2070510c864cac5a0a5a305a89885c690a396ef52dd0b128cc50c5  mrofyt_l2targets.py (MROF-YT-W9-L2TARGETS-1.0: wave nine -- wave eight's L2 trades, same 15-point stop and 30 minutes, with three targets on the same trades: FIXED 25 points, NEXT LEVEL (the nearest of the six daily range levels and the session VWAP at least 10 points ahead, 2 ticks short), SCALED (25 points x the recent average daily range over its DEV median, 10-75 points); four paired tests against FIXED on every L2 and on the first test, session-clustered, Holm over four; the uncapped excursion described; DEV describes and freezes the median range, a replay holdout folder or the --unblind checkpoint judges; wave eight's runner, hooks only; Amendment 31)
 47c8833f66443b4b398103fe3add634f5376f0e82b2ea3d2440d9302f9ae2911  tests_mrofyt_l2targets.py (10 tests: the two targets and their fallbacks, the uncapped excursion, the recent range, the paired test on planted and null records, end to end with wave six's suite-only plumbing detector, evaluate's modes, the holdout folder rule, wave eight unchanged, the wind-back and the registration; Amendment 31)
 e1f651a02feb7fdb80de6ecaed00b55f69f5477911a379ac8bcb395380bde683  MROF_YT_WAVE9_L2TARGETS_REGISTRATION.md (FROZEN 2026-10-31 before any held-out session was read; Amendment 31)
+a73c599d36b5eb68a3abb3f5808497bf3e53d3e44722d0daea7cc0d459be3e9c  mrofyt_closereclaim.py (MROF-YT-W10-CLOSERECLAIM-1.0: wave ten -- break and reclaim on one-minute candle closes at the six daily range levels: a close a tick or more through, a close back within 5 candles, the order flow confirming the reclaim (the candle's net aggression and the last 10 s, z >= 1.0); faded at the reclaim close with wave six's T1 exit; every filtered reclaim and the first test, Holm over two; the unfiltered reclaims and L2 (wave eight V0 / V1) beside from the same read; nothing frozen from DEV; wave nine's runner, hooks only; Amendment 32)
+40f149d5d8126c42b1079839912973ffb03686a73cd3af84997352ad367d46b8  tests_mrofyt_closereclaim.py (8 tests: sides and minute closes, the episode by hand (reclaim, held break, the break the other way, numbering), the order-flow filter, clock-minute counting across skipped minutes, end to end, the holdout folder rule, wave nine unchanged, the wind-back and the registration; Amendment 32)
+3a79729e9dddee1dd341187c6182fef39c093ba684781a3abfa4834f6f05cd64  MROF_YT_WAVE10_CLOSERECLAIM_REGISTRATION.md (FROZEN 2026-10-31 before any held-out session was read; Amendment 32)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -133,7 +136,7 @@ e21f707b86d6c3ed72d4eb8f505f1bf3114e40f13ff4fbd26e09b71fa62daf8d  MROF_V1_Engine
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 748/748 + 46/46, identical to the repo
+# run from inside the unzipped package: 756/756 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -181,9 +184,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_flowlevels.py` | 20/20 |
 | `tests_mrofyt_l2variants.py` | 7/7 |
 | `tests_mrofyt_l2targets.py` | 10/10 |
-| **wave-one to nine, tools total** | **748/748** |
+| `tests_mrofyt_closereclaim.py` | 8/8 |
+| **wave-one to ten, tools total** | **756/756** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **794/794** |
+| **package total** | **802/802** |
 
 ## Runnable research commands
 
@@ -205,6 +209,7 @@ python3 mrofyt_smt.py      "<folder of NQ and ES minute exports>" --out smt_dev.
 python3 mrofyt_flowlevels.py "<capture folder>" --out w7.json --frozen-out w7_frozen.json  # wave seven on DEV: describes, freezes the two cuts
 python3 mrofyt_l2variants.py "<replay folder>" --holdout --out w8_replay.json  # wave eight on the replay holdout (nothing to freeze first)
 python3 mrofyt_l2targets.py "<capture folder>" --out w9.json --frozen-out w9_frozen.json  # wave nine on DEV: describes, freezes the median range
+python3 mrofyt_closereclaim.py "<capture folder>" --out w10.json  # wave ten on DEV: describes (nothing to freeze)
 ```
 
 All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -218,7 +223,7 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|Exit
      mrofyt_pilot.py mrofyt_recover.py mrofyt_wave2.py \
      mrofyt_exitstudy.py mrofyt_costs.py mrofyt_risk.py mrofyt_context.py \
      mrofyt_levelbreak.py mrofyt_smt.py mrofyt_flowlevels.py \
-     mrofyt_l2variants.py mrofyt_l2targets.py
+     mrofyt_l2variants.py mrofyt_l2targets.py mrofyt_closereclaim.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -1206,4 +1211,22 @@ detector hash so registering wave two provably changed nothing.
     its close and the levels at each fire, on wave eight's runner (`LT8`:
     wave eight's fires, grid and the wave-one ledger identical). Nothing
     frozen changed (06ce854a…). Battery: 748/748 + 46/46.
+
+32. **Break and reclaim on candle closes (2026-10-31).** L2 fades a
+    failed test of a big level within seconds of the order flow
+    flipping: on a chart, a wick. The operator asked for the same
+    principle on candle closes. `MROF_YT_WAVE10_CLOSERECLAIM_REGISTRATION.md`
+    fixes, before any held-out session is read by any tool: a one-minute
+    close a tick or more through one of the six daily range levels, a
+    close back within 5 one-minute candles, and an order-flow filter at
+    the reclaim close (the candle's net aggression and the last 10 s,
+    z >= 1.0, against the break); faded at that close with wave six's T1
+    exit. C1 every filtered reclaim, C2 the first test of the level;
+    Holm over two; the unfiltered reclaims and L2 (wave eight V0 / V1)
+    reported beside from the same read. Nothing is frozen from DEV.
+    `mrofyt_closereclaim.py` puts the six levels on every grid record of
+    wave nine's runner (`CR6`: wave nine's grid, fires and ranges and the
+    wave-one ledger identical), so one read also yields waves three, six,
+    eight and nine. Nothing frozen changed (06ce854a…). Battery: 756/756
+    + 46/46.
 
