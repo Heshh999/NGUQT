@@ -94,6 +94,9 @@ c59c4a02e5d8e1124ab7ae7276ba362f8e4243b963f3f6cc29d4f2da7c99f63f  MROF_YT_WAVE7_
 7773c52c771a6ef2ec66fd92aec6b633a7a933f999f7148ad6bb103d967ecf50  mrofyt_l2variants.py (MROF-YT-W8-L2VARIANTS-1.0: wave eight -- wave six's L2 trades restricted to the first test of the level that session (V1), the 09:30-11:30 ET window (V2), both (V3, the operator's pick), or held at most 5 minutes (V4); every L2 (wave six's T1) beside as the reference; net of costs, session-clustered, Holm over four; nothing frozen from DEV; a replay holdout folder or the --unblind checkpoint judges; wave six's runner, hooks only; Amendment 30)
 657cac9741b66a043e79bf91420f82de53f6d4608a9a496113254d104ec59723  tests_mrofyt_l2variants.py (7 tests: the per-level test count, the variant rules and window edges, the 5-minute exit, end to end with wave six's suite-only plumbing detector, the holdout folder rule, wave six unchanged, the wind-back and the registration; Amendment 30)
 dd79fdbb059236200a87088d178c606c9b01baa3a83ec20f2d2a88d3fde85ec3  MROF_YT_WAVE8_L2VARIANTS_REGISTRATION.md (FROZEN 2026-10-31 before any held-out session was read; Amendment 30)
+e05963e70d2070510c864cac5a0a5a305a89885c690a396ef52dd0b128cc50c5  mrofyt_l2targets.py (MROF-YT-W9-L2TARGETS-1.0: wave nine -- wave eight's L2 trades, same 15-point stop and 30 minutes, with three targets on the same trades: FIXED 25 points, NEXT LEVEL (the nearest of the six daily range levels and the session VWAP at least 10 points ahead, 2 ticks short), SCALED (25 points x the recent average daily range over its DEV median, 10-75 points); four paired tests against FIXED on every L2 and on the first test, session-clustered, Holm over four; the uncapped excursion described; DEV describes and freezes the median range, a replay holdout folder or the --unblind checkpoint judges; wave eight's runner, hooks only; Amendment 31)
+47c8833f66443b4b398103fe3add634f5376f0e82b2ea3d2440d9302f9ae2911  tests_mrofyt_l2targets.py (10 tests: the two targets and their fallbacks, the uncapped excursion, the recent range, the paired test on planted and null records, end to end with wave six's suite-only plumbing detector, evaluate's modes, the holdout folder rule, wave eight unchanged, the wind-back and the registration; Amendment 31)
+e1f651a02feb7fdb80de6ecaed00b55f69f5477911a379ac8bcb395380bde683  MROF_YT_WAVE9_L2TARGETS_REGISTRATION.md (FROZEN 2026-10-31 before any held-out session was read; Amendment 31)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -130,7 +133,7 @@ f178b353c7d69be286b39cb7bcae741b7f287d002d34967c813d3c65170af935  MROF_V1_Engine
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 738/738 + 46/46, identical to the repo
+# run from inside the unzipped package: 748/748 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -177,9 +180,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_smt.py` | 6/6 |
 | `tests_mrofyt_flowlevels.py` | 20/20 |
 | `tests_mrofyt_l2variants.py` | 7/7 |
-| **wave-one to eight, tools total** | **738/738** |
+| `tests_mrofyt_l2targets.py` | 10/10 |
+| **wave-one to nine, tools total** | **748/748** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **784/784** |
+| **package total** | **794/794** |
 
 ## Runnable research commands
 
@@ -200,6 +204,7 @@ python3 mrofyt_levelbreak.py "<capture folder>" --out w6.json --frozen-out w6_fr
 python3 mrofyt_smt.py      "<folder of NQ and ES minute exports>" --out smt_dev.json       # wave six B, 2019-06 .. 2026-06 first look
 python3 mrofyt_flowlevels.py "<capture folder>" --out w7.json --frozen-out w7_frozen.json  # wave seven on DEV: describes, freezes the two cuts
 python3 mrofyt_l2variants.py "<replay folder>" --holdout --out w8_replay.json  # wave eight on the replay holdout (nothing to freeze first)
+python3 mrofyt_l2targets.py "<capture folder>" --out w9.json --frozen-out w9_frozen.json  # wave nine on DEV: describes, freezes the median range
 ```
 
 All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -213,7 +218,7 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|Exit
      mrofyt_pilot.py mrofyt_recover.py mrofyt_wave2.py \
      mrofyt_exitstudy.py mrofyt_costs.py mrofyt_risk.py mrofyt_context.py \
      mrofyt_levelbreak.py mrofyt_smt.py mrofyt_flowlevels.py \
-     mrofyt_l2variants.py
+     mrofyt_l2variants.py mrofyt_l2targets.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -1183,4 +1188,22 @@ detector hash so registering wave two provably changed nothing.
     six's runner (`LV5`: wave six's fires, grid and the wave-one ledger
     identical). Nothing frozen changed (06ce854a…). Battery: 738/738 +
     46/46.
+
+31. **L2 without the fixed 25-point target (2026-10-31).** The operator
+    asked whether the target can come from the market. Wave five's tape
+    signs and trail, and wave seven's tape exit, did not beat a fixed
+    target on DEV, so they are not repeated; two targets never tried on
+    L2 are registered in `MROF_YT_WAVE9_L2TARGETS_REGISTRATION.md` before
+    any held-out session is read by any tool: NEXT LEVEL (the nearest of
+    the six daily range levels and the session VWAP at least 10 points
+    ahead, 2 ticks short of it, no cap) and SCALED (25 points x the
+    recent average daily range over its DEV median, 10-75 points). Each
+    is judged against the fixed 25 on the same trades, on every L2 and on
+    the first test (wave eight's V1), with the same stop and limit:
+    paired, session-clustered, Holm over four. The DEV run freezes only
+    the median range (no outcome) and describes how far each trade ran
+    without a target. `mrofyt_l2targets.py` keeps each session's range at
+    its close and the levels at each fire, on wave eight's runner (`LT8`:
+    wave eight's fires, grid and the wave-one ledger identical). Nothing
+    frozen changed (06ce854a…). Battery: 748/748 + 46/46.
 

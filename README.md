@@ -279,7 +279,7 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 24 suites, 738 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 25 suites, 748 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
