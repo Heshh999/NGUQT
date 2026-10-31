@@ -1,0 +1,9 @@
+{
+ "wave6": "MROF-YT-W6-LEVELBREAK-1.0",
+ "registration": "MROF_YT_WAVE6_LEVELBREAK_REGISTRATION.md",
+ "trapped_cut": {
+  "MNQ": 0.0,
+  "NQ": 0.0
+ },
+ "rule": "trapped cut = the median trapped volume of the DEV L2 events per instrument, fixed by registration A4"
+}

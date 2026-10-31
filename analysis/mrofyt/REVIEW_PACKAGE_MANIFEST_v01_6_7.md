@@ -102,6 +102,14 @@ e881a5bf9f9f72c201f7dd941cf9713713d7033c5452e2fba19e7bccbd72881a  MROF_YT_W3_W4_
 18a576a8e787dae311ef0737b56d314e8e0ca57b3bdd9eca102bf75fef6859ac  frozen_dev_20261024/w3.json.gz (gzip -9 -n of the wave-three real-level report d37309f7…, 29 MB uncompressed)
 ```
 
+Frozen DEV cuts of waves six and seven (Amendment 29; in the repository, read by `--evaluate` on held-out sessions):
+
+```
+d09cef66ac9d84a2f3df2713973990a19b6bd0ed8cfa8dd5d1426faee71d5689  frozen_dev_20261031/w6_frozen.json (wave six A4 trapped cut: NQ 0.0, MNQ 0.0)
+030ee8bb3f7815ec6bd560a551615298060d812abb33101451eb32685cf798d3  frozen_dev_20261031/w7_frozen.json (wave seven trapped medians and |D| 90th percentiles)
+8acd658e36af878de088dae9aed7f78de9d7389e4b2eb35084a850f6703254a2  MROF_YT_W6_W7_DEV_FREEZE.md (the DEV runs of waves five to seven, the sessions read and refused, the frozen files, committed before any held-out read)
+```
+
 Archived source directives:
 
 ```
@@ -1137,4 +1145,16 @@ detector hash so registering wave two provably changed nothing.
     only (`FL10`: wave four's grid, wave three's fires and the wave-one
     ledger identical); nothing frozen changed (06ce854a…). Battery:
     731/731 + 46/46.
+
+29. **Waves five to seven run on DEV; their cuts frozen (2026-10-31).**
+    The operator ran `mrofyt_levelbreak.py`, `mrofyt_flowlevels.py` and
+    `mrofyt_exitstudy.py` on the old drive: 15 DEV sessions read, 23
+    later sessions refused unread. `w6_frozen.json` and
+    `w7_frozen.json` are committed under `frozen_dev_20261031/` before
+    any held-out read, and `MROF_YT_W6_W7_DEV_FREEZE.md` records the
+    descriptive DEV results. Wave six's trapped cut is 0 on both
+    instruments (the median L2 event traded nothing beyond its level),
+    so T5 equals T1 as registered; it stays frozen. Wave seven shows no
+    edge after costs on DEV and its grade does not order results. Wave
+    five nominated no sign. No code, threshold or test changed.
 

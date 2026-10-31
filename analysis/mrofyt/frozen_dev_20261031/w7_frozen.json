@@ -1,0 +1,14 @@
+{
+ "big_d": {
+  "MNQ": 135.0,
+  "NQ": 33.0
+ },
+ "trapped": {
+  "MNQ|HELD": 358.0,
+  "MNQ|FAILED": 90.0,
+  "NQ|HELD": 103.0,
+  "NQ|FAILED": 17.0
+ },
+ "wave7": "MROF-YT-W7-FLOWLEVELS-1.0",
+ "registration": "MROF_YT_WAVE7_FLOWLEVELS_REGISTRATION.md"
+}
