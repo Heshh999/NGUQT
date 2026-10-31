@@ -91,6 +91,9 @@ bfb34438a90a5335df8a2265bced46d51ff40acf8bf560b7f16595249a69993b  MROF_YT_WAVE6_
 d25b41dd81c82e6574bf9ba7452b98a16f47d1f324cfc8ab72bcc218d0eb2cbc  mrofyt_flowlevels.py (MROF-YT-W7-FLOWLEVELS-1.0: wave seven -- failed and held breaks of the levels the order flow builds every day (one-minute swing highs and lows, absorption prices, yesterday's value area), graded A+ / A / B / skip on five order-flow points, with a structural stop and four exits: the next level ahead, a tape exit with no target, half and half, and the original 25 / 15; nine tests, net R after costs, one position at a time, Holm over nine; DEV describes and freezes two cuts, a replay holdout folder (sessions before 2026-09-01 only) or the --unblind checkpoint judges; wave four's runner, hooks only; Amendment 28)
 02e2922721070580af1e51d4ce53ac606c5b19b092c509cf454d11f543eb9e01  tests_mrofyt_flowlevels.py (20 tests: the search tree against a brute-force scan, swing / absorption / value-area levels and merging, FAILED and HELD by hand with their stops and trapped volume, which way a level breaks, fresh and absorption, the grade and confluence, E1's target rule, the bracket, the tape exit sign by sign, E2 / E3 / E4, costs and the hybrid's halves, one position at a time, the grade slope on planted and flat data, end to end, evaluate's modes, the holdout folder rule, wave four unchanged, the wind-back; Amendment 28)
 c59c4a02e5d8e1124ab7ae7276ba362f8e4243b963f3f6cc29d4f2da7c99f63f  MROF_YT_WAVE7_FLOWLEVELS_REGISTRATION.md (FROZEN 2026-10-30 before the tool read real data; Amendment 28)
+7773c52c771a6ef2ec66fd92aec6b633a7a933f999f7148ad6bb103d967ecf50  mrofyt_l2variants.py (MROF-YT-W8-L2VARIANTS-1.0: wave eight -- wave six's L2 trades restricted to the first test of the level that session (V1), the 09:30-11:30 ET window (V2), both (V3, the operator's pick), or held at most 5 minutes (V4); every L2 (wave six's T1) beside as the reference; net of costs, session-clustered, Holm over four; nothing frozen from DEV; a replay holdout folder or the --unblind checkpoint judges; wave six's runner, hooks only; Amendment 30)
+657cac9741b66a043e79bf91420f82de53f6d4608a9a496113254d104ec59723  tests_mrofyt_l2variants.py (7 tests: the per-level test count, the variant rules and window edges, the 5-minute exit, end to end with wave six's suite-only plumbing detector, the holdout folder rule, wave six unchanged, the wind-back and the registration; Amendment 30)
+dd79fdbb059236200a87088d178c606c9b01baa3a83ec20f2d2a88d3fde85ec3  MROF_YT_WAVE8_L2VARIANTS_REGISTRATION.md (FROZEN 2026-10-31 before any held-out session was read; Amendment 30)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -127,7 +130,7 @@ edf699bcdd46bc7bc6b6678b4af0e623f145c6f568ca7002b41e0b0a206ab9f3  MROF_V1_Engine
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 731/731 + 46/46, identical to the repo
+# run from inside the unzipped package: 738/738 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -173,9 +176,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_levelbreak.py` | 11/11 |
 | `tests_mrofyt_smt.py` | 6/6 |
 | `tests_mrofyt_flowlevels.py` | 20/20 |
-| **wave-one to seven, tools total** | **731/731** |
+| `tests_mrofyt_l2variants.py` | 7/7 |
+| **wave-one to eight, tools total** | **738/738** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **777/777** |
+| **package total** | **784/784** |
 
 ## Runnable research commands
 
@@ -195,6 +199,7 @@ python3 mrofyt_context.py  "<folder of NQ minute exports>" --out ctx.json --nomi
 python3 mrofyt_levelbreak.py "<capture folder>" --out w6.json --frozen-out w6_frozen.json  # wave six A on DEV: describes, freezes the trapped cut
 python3 mrofyt_smt.py      "<folder of NQ and ES minute exports>" --out smt_dev.json       # wave six B, 2019-06 .. 2026-06 first look
 python3 mrofyt_flowlevels.py "<capture folder>" --out w7.json --frozen-out w7_frozen.json  # wave seven on DEV: describes, freezes the two cuts
+python3 mrofyt_l2variants.py "<replay folder>" --holdout --out w8_replay.json  # wave eight on the replay holdout (nothing to freeze first)
 ```
 
 All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -207,7 +212,8 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|Exit
      mrofyt_swings_v016.py mrofyt_engine_v016.py mrofyt_exits_v017.py \
      mrofyt_pilot.py mrofyt_recover.py mrofyt_wave2.py \
      mrofyt_exitstudy.py mrofyt_costs.py mrofyt_risk.py mrofyt_context.py \
-     mrofyt_levelbreak.py mrofyt_smt.py mrofyt_flowlevels.py
+     mrofyt_levelbreak.py mrofyt_smt.py mrofyt_flowlevels.py \
+     mrofyt_l2variants.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -1157,4 +1163,24 @@ detector hash so registering wave two provably changed nothing.
     so T5 equals T1 as registered; it stays frozen. Wave seven shows no
     edge after costs on DEV and its grade does not order results. Wave
     five nominated no sign. No code, threshold or test changed.
+
+30. **L2 on the first test, in the morning, both, or held five minutes
+    (2026-10-31).** The operator asked whether the first test of a level
+    and the 09:30-11:30 window were treated differently. They were not:
+    L2 traded every approach at every hour. On the saved DEV report the
+    first L2 signal at a level made +12.79 points a trade net (12 trades,
+    67 %) against +4.38 for later ones, and the morning +7.25 (14) against
+    +4.39 for the afternoon; wave five's half-life showed L2's move in its
+    favour to 5 minutes and against it from 10. These are DEV numbers,
+    seen, so `MROF_YT_WAVE8_L2VARIANTS_REGISTRATION.md` fixes four
+    variants before any held-out session is read by any tool: V1 the
+    first approach to the level that CME session (every approach counted,
+    signal or not), V2 09:30-11:30 ET, V3 both (the operator's pick), V4
+    out at the mid after 5 minutes; wave six's T1 is reported beside as
+    the reference. Holm over four; nothing is frozen from DEV.
+    `mrofyt_l2variants.py` numbers approaches through the hook where the
+    runner opens one (`_select_wall`, called once per approach), on wave
+    six's runner (`LV5`: wave six's fires, grid and the wave-one ledger
+    identical). Nothing frozen changed (06ce854a…). Battery: 738/738 +
+    46/46.
 
