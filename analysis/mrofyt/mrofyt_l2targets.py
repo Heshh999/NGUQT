@@ -42,6 +42,7 @@ import mrofyt_costs as CO
 import mrofyt_discover as DI
 import mrofyt_l2variants as V
 import mrofyt_levelbreak as LB
+import mrofyt_ledgers as LG
 import mrofyt_pilot as PI
 import mrofyt_runner as RUN
 import mrofyt_signals as SIG
@@ -189,8 +190,7 @@ def a_ref(events, inst):
 def score_targets(r, events, refs):
     """[(event, {FIXED|NEXT|SCALED: (outcome, ticks, target, real)},
     mfe ticks)] for every event whose three versions all resolved."""
-    paths = {k: BM.compress(ts, ps) for k, (ts, ps) in r.series.items()
-             if len(ts)}
+    paths = V.compressed_paths(r)
     out = []
     for e in events:
         key = (e['instrument'], e.get('run'))
@@ -390,50 +390,11 @@ def text(rep):
 
 
 def record_holdout_read(rep, path):
-    old = dict(reads=[])
-    if os.path.exists(path):
-        try:
-            old = json.load(open(path))
-        except Exception:
-            pass
-    old.setdefault('reads', []).append(dict(
-        version=W9_VERSION, sessions=rep['sessions_inspected']))
-    old['rule'] = ('Replay holdout sessions are read once by each '
-                   'registered wave; a later read of NEW rules on them is '
-                   'not a fresh test.')
-    json.dump(old, open(path, 'w'), indent=1)
-    return len(old['reads'])
+    return LG.record_holdout_read(rep, path, W9_VERSION)
 
 
 def record_exposure(rep, path):
-    old = []
-    if os.path.exists(path):
-        try:
-            old = json.load(open(path)).get('exposed_days', [])
-        except Exception:
-            old = []
-    by = {d['session']: d for d in old}
-    for s in rep['sessions_inspected']:
-        cur = by.get(s)
-        if cur is None:
-            by[s] = dict(session=s, label=PI.EXPOSURE_LABEL,
-                         exposed_by=W9_VERSION, bulk_csv_present=None)
-        elif cur.get('label') != PI.EXPOSURE_LABEL:
-            cur.update(label=PI.EXPOSURE_LABEL, exposed_by=W9_VERSION,
-                       previously_blind=True)
-        by[s].setdefault('also_exposed_by', [])
-        if W9_VERSION not in by[s]['also_exposed_by']:
-            by[s]['also_exposed_by'].append(W9_VERSION)
-    days = sorted(by.values(), key=lambda d: d['session'])
-    json.dump(dict(label=PI.EXPOSURE_LABEL, blind_label=PI.BLIND_LABEL,
-                   rule='EXPOSED days may remain in later DEV/training where '
-                        'the governing protocol permits; they can never '
-                        'become untouched prospective validation. BLIND '
-                        'days had fire counts read and markouts withheld; '
-                        'they remain valid validation until explicitly '
-                        'unblinded.',
-                   exposed_days=days), open(path, 'w'), indent=1)
-    return len(days)
+    return LG.record_exposure(rep, path, W9_VERSION)
 
 
 def main(argv=None):

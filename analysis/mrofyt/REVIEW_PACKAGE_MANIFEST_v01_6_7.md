@@ -88,28 +88,30 @@ fd1755fb3607509b0d3e06dc8c6d6dc4e3712d7b23c74801567efde10bd6d192  mrofyt_risk.py
 24ce2cc539a662ce34fdf8ede80e718b2b548144ebf3fe2e3cf0e7ff8ee7c212  mrofyt_smt.py (supersedes d518956b… — reads through mrofyt_context's parsing loop (an aggregator class, no second copy of the loop), Amendment 27; earlier MROF-YT-W6B-SMT-1.0: wave six part B -- NQ failed and held breaks of yesterday's high and low on minute bars, ES confirming or not, four fixed tests, month-clustered, Holm; read on 2019-06 .. 2026-06, judged on the years before 2019-06-01; Amendment 26)
 d1d50f8506448287dada036d413f60ab162bf25fe12f2740752d548b2714cd64  tests_mrofyt_smt.py (6 tests: events, ES timing, the outcome, the clustered difference by hand, a planted edge found and the noise rate bounded, the split end to end; Amendment 26)
 bfb34438a90a5335df8a2265bced46d51ff40acf8bf560b7f16595249a69993b  MROF_YT_WAVE6_LEVELBREAK_REGISTRATION.md (FROZEN 2026-10-26 before either tool read real data; Amendment 26)
-d25b41dd81c82e6574bf9ba7452b98a16f47d1f324cfc8ab72bcc218d0eb2cbc  mrofyt_flowlevels.py (MROF-YT-W7-FLOWLEVELS-1.0: wave seven -- failed and held breaks of the levels the order flow builds every day (one-minute swing highs and lows, absorption prices, yesterday's value area), graded A+ / A / B / skip on five order-flow points, with a structural stop and four exits: the next level ahead, a tape exit with no target, half and half, and the original 25 / 15; nine tests, net R after costs, one position at a time, Holm over nine; DEV describes and freezes two cuts, a replay holdout folder (sessions before 2026-09-01 only) or the --unblind checkpoint judges; wave four's runner, hooks only; Amendment 28)
+759f808b16eec78bc3edf15fa8cce7f72e3e049c6303762816629089069d5063  mrofyt_flowlevels.py (supersedes d25b41dd… — yesterday's POC / VAH / VAL count in every recording run of the session from the run's first mid (they had never been reachable after the session's first run), and a HELD entry must still be beyond the level at its entry tick; the ledgers through mrofyt_ledgers; Amendment 36; earlier MROF-YT-W7-FLOWLEVELS-1.0: wave seven -- failed and held breaks of the levels the order flow builds every day (one-minute swing highs and lows, absorption prices, yesterday's value area), graded A+ / A / B / skip on five order-flow points, with a structural stop and four exits: the next level ahead, a tape exit with no target, half and half, and the original 25 / 15; nine tests, net R after costs, one position at a time, Holm over nine; DEV describes and freezes two cuts, a replay holdout folder (sessions before 2026-09-01 only) or the --unblind checkpoint judges; wave four's runner, hooks only; Amendment 28)
 02e2922721070580af1e51d4ce53ac606c5b19b092c509cf454d11f543eb9e01  tests_mrofyt_flowlevels.py (20 tests: the search tree against a brute-force scan, swing / absorption / value-area levels and merging, FAILED and HELD by hand with their stops and trapped volume, which way a level breaks, fresh and absorption, the grade and confluence, E1's target rule, the bracket, the tape exit sign by sign, E2 / E3 / E4, costs and the hybrid's halves, one position at a time, the grade slope on planted and flat data, end to end, evaluate's modes, the holdout folder rule, wave four unchanged, the wind-back; Amendment 28)
 c59c4a02e5d8e1124ab7ae7276ba362f8e4243b963f3f6cc29d4f2da7c99f63f  MROF_YT_WAVE7_FLOWLEVELS_REGISTRATION.md (FROZEN 2026-10-30 before the tool read real data; Amendment 28)
-7773c52c771a6ef2ec66fd92aec6b633a7a933f999f7148ad6bb103d967ecf50  mrofyt_l2variants.py (MROF-YT-W8-L2VARIANTS-1.0: wave eight -- wave six's L2 trades restricted to the first test of the level that session (V1), the 09:30-11:30 ET window (V2), both (V3, the operator's pick), or held at most 5 minutes (V4); every L2 (wave six's T1) beside as the reference; net of costs, session-clustered, Holm over four; nothing frozen from DEV; a replay holdout folder or the --unblind checkpoint judges; wave six's runner, hooks only; Amendment 30)
+1d60048710432ba4302b6c8c85bf4c333bb1b3b4ad264c72a319ffc9408168e7  mrofyt_l2variants.py (supersedes 7773c52c… — compressed_paths: one set of compressed mid paths per read, shared by every wave that scores it; the wind-back logs only the run's own test-number writes instead of copying the whole dict; the ledgers through mrofyt_ledgers; no result changed; Amendment 36; earlier MROF-YT-W8-L2VARIANTS-1.0: wave eight -- wave six's L2 trades restricted to the first test of the level that session (V1), the 09:30-11:30 ET window (V2), both (V3, the operator's pick), or held at most 5 minutes (V4); every L2 (wave six's T1) beside as the reference; net of costs, session-clustered, Holm over four; nothing frozen from DEV; a replay holdout folder or the --unblind checkpoint judges; wave six's runner, hooks only; Amendment 30)
 657cac9741b66a043e79bf91420f82de53f6d4608a9a496113254d104ec59723  tests_mrofyt_l2variants.py (7 tests: the per-level test count, the variant rules and window edges, the 5-minute exit, end to end with wave six's suite-only plumbing detector, the holdout folder rule, wave six unchanged, the wind-back and the registration; Amendment 30)
 dd79fdbb059236200a87088d178c606c9b01baa3a83ec20f2d2a88d3fde85ec3  MROF_YT_WAVE8_L2VARIANTS_REGISTRATION.md (FROZEN 2026-10-31 before any held-out session was read; Amendment 30)
-e05963e70d2070510c864cac5a0a5a305a89885c690a396ef52dd0b128cc50c5  mrofyt_l2targets.py (MROF-YT-W9-L2TARGETS-1.0: wave nine -- wave eight's L2 trades, same 15-point stop and 30 minutes, with three targets on the same trades: FIXED 25 points, NEXT LEVEL (the nearest of the six daily range levels and the session VWAP at least 10 points ahead, 2 ticks short), SCALED (25 points x the recent average daily range over its DEV median, 10-75 points); four paired tests against FIXED on every L2 and on the first test, session-clustered, Holm over four; the uncapped excursion described; DEV describes and freezes the median range, a replay holdout folder or the --unblind checkpoint judges; wave eight's runner, hooks only; Amendment 31)
+202ba97eaa51b597558ded7181d9b46b41df32816dab2686fddef805372a9ed9  mrofyt_l2targets.py (supersedes e05963e7… — the shared compressed paths and ledgers; no result changed; Amendment 36; earlier MROF-YT-W9-L2TARGETS-1.0: wave nine -- wave eight's L2 trades, same 15-point stop and 30 minutes, with three targets on the same trades: FIXED 25 points, NEXT LEVEL (the nearest of the six daily range levels and the session VWAP at least 10 points ahead, 2 ticks short), SCALED (25 points x the recent average daily range over its DEV median, 10-75 points); four paired tests against FIXED on every L2 and on the first test, session-clustered, Holm over four; the uncapped excursion described; DEV describes and freezes the median range, a replay holdout folder or the --unblind checkpoint judges; wave eight's runner, hooks only; Amendment 31)
 47c8833f66443b4b398103fe3add634f5376f0e82b2ea3d2440d9302f9ae2911  tests_mrofyt_l2targets.py (10 tests: the two targets and their fallbacks, the uncapped excursion, the recent range, the paired test on planted and null records, end to end with wave six's suite-only plumbing detector, evaluate's modes, the holdout folder rule, wave eight unchanged, the wind-back and the registration; Amendment 31)
 e1f651a02feb7fdb80de6ecaed00b55f69f5477911a379ac8bcb395380bde683  MROF_YT_WAVE9_L2TARGETS_REGISTRATION.md (FROZEN 2026-10-31 before any held-out session was read; Amendment 31)
-a73c599d36b5eb68a3abb3f5808497bf3e53d3e44722d0daea7cc0d459be3e9c  mrofyt_closereclaim.py (MROF-YT-W10-CLOSERECLAIM-1.0: wave ten -- break and reclaim on one-minute candle closes at the six daily range levels: a close a tick or more through, a close back within 5 candles, the order flow confirming the reclaim (the candle's net aggression and the last 10 s, z >= 1.0); faded at the reclaim close with wave six's T1 exit; every filtered reclaim and the first test, Holm over two; the unfiltered reclaims and L2 (wave eight V0 / V1) beside from the same read; nothing frozen from DEV; wave nine's runner, hooks only; Amendment 32)
+205aaeedb5eca77b530c873546dd48e02675ba403c6ed3f878cf9094065aec61  mrofyt_closereclaim.py (supersedes a73c599d… — the shared compressed paths and ledgers; no result changed; Amendment 36; earlier MROF-YT-W10-CLOSERECLAIM-1.0: wave ten -- break and reclaim on one-minute candle closes at the six daily range levels: a close a tick or more through, a close back within 5 candles, the order flow confirming the reclaim (the candle's net aggression and the last 10 s, z >= 1.0); faded at the reclaim close with wave six's T1 exit; every filtered reclaim and the first test, Holm over two; the unfiltered reclaims and L2 (wave eight V0 / V1) beside from the same read; nothing frozen from DEV; wave nine's runner, hooks only; Amendment 32)
 40f149d5d8126c42b1079839912973ffb03686a73cd3af84997352ad367d46b8  tests_mrofyt_closereclaim.py (8 tests: sides and minute closes, the episode by hand (reclaim, held break, the break the other way, numbering), the order-flow filter, clock-minute counting across skipped minutes, end to end, the holdout folder rule, wave nine unchanged, the wind-back and the registration; Amendment 32)
 3a79729e9dddee1dd341187c6182fef39c093ba684781a3abfa4834f6f05cd64  MROF_YT_WAVE10_CLOSERECLAIM_REGISTRATION.md (FROZEN 2026-10-31 before any held-out session was read; Amendment 32)
-17b13bc91930ac83dc4bb73317472d06f49969668f3df1281f9a2d396a59fb60  mrofyt_earlylevels.py (MROF-YT-W11-EARLYLEVELS-1.0: wave eleven -- an EARLY entry after a one-minute close through a level (the first 10 s tick back through with aggression against the break, z >= 1.0, within 5 candles) on the six daily range levels, E1 / E2 under Holm over two with L2, wave ten and a 10 s WICK analogue beside; and four more level groups judged apart, each with WICK, EARLY and CLOSE entries: A confirmed 1-hour and 4-hour swings (with first tests), B the opens, C VWAP and its bands, D PP / R1 / S1 / M2 / M3, Holm within each group; fixed 25 / 15 tested, wave nine's scaled target beside; nothing frozen from DEV; wave ten's runner, hooks only; Amendment 33)
+b7d56c9108472df1c1df199a14ee7d923d16e66a89341a48fcc0f65f71659a10  mrofyt_earlylevels.py (supersedes 17b13bc9… — a WICK window that runs out on the far side of the level starts the next break at that tick, as EARLY and CLOSE do; the hourly Eastern offset is public (et_offset_hourly); the shared compressed paths and ledgers; Amendment 36; earlier MROF-YT-W11-EARLYLEVELS-1.0: wave eleven -- an EARLY entry after a one-minute close through a level (the first 10 s tick back through with aggression against the break, z >= 1.0, within 5 candles) on the six daily range levels, E1 / E2 under Holm over two with L2, wave ten and a 10 s WICK analogue beside; and four more level groups judged apart, each with WICK, EARLY and CLOSE entries: A confirmed 1-hour and 4-hour swings (with first tests), B the opens, C VWAP and its bands, D PP / R1 / S1 / M2 / M3, Holm within each group; fixed 25 / 15 tested, wave nine's scaled target beside; nothing frozen from DEV; wave ten's runner, hooks only; Amendment 33)
 bf60724e3d51adb5d973915ce8498f079d12448394d7db12bd9403d8a7390a9e  tests_mrofyt_earlylevels.py (10 tests: candle buckets in Eastern time, confirmed swings and their expiry, the swing session limit, the three entries by hand, CLOSE on the MAIN levels equal to wave ten, end to end with the scaled column, unblind, the holdout folder and A_ref refusals, wave ten unchanged, the wind-back and the registration; Amendment 33)
 a00d0f9d6accf7fb6d220093a9a824d442c3bd463cba79f9b8959eeed9925063  MROF_YT_WAVE11_EARLY_LEVELS_REGISTRATION.md (FROZEN 2026-11-01 before any held-out session was read; Amendment 33)
-cc648ca154e6a186e1e5fd87f9cfb31c30ae895b33008b6986a988619e7076fd  mrofyt_l2context.py (MROF-YT-W12-L2CONTEXT-1.0: wave twelve -- two day-context filters on L2 fixed in advance and known at each trade, any hour: TREND removes a fade against a strong day trend (price at least 0.25 x the recent average daily range from the session VWAP, the trade against that side), BIG DAY removes trades once the session range so far reaches 1.0 x that range; kept minus removed on every L2 and the first test, session-clustered, Holm over four; an event-calendar split described when given; nothing frozen from DEV; wave eleven's runner, hooks only; Amendment 34)
+ae021dd8fdf07ef955345df002c0c7d1fff580270c9812a1a9cb34204d4ca0b8  mrofyt_l2context.py (supersedes cc648ca1… — the shared compressed paths and ledgers; no result changed; Amendment 36; earlier MROF-YT-W12-L2CONTEXT-1.0: wave twelve -- two day-context filters on L2 fixed in advance and known at each trade, any hour: TREND removes a fade against a strong day trend (price at least 0.25 x the recent average daily range from the session VWAP, the trade against that side), BIG DAY removes trades once the session range so far reaches 1.0 x that range; kept minus removed on every L2 and the first test, session-clustered, Holm over four; an event-calendar split described when given; nothing frozen from DEV; wave eleven's runner, hooks only; Amendment 34)
 0aaa060d73a5f96739412ad7b0dd08a52797949e24b8e6020c11dd07d465f079  tests_mrofyt_l2context.py (7 tests: both filters and their boundaries, the kept-minus-removed test on planted, null and thin records, the calendar file, end to end with the calendar split, the holdout folder and calendar refusals, wave eleven unchanged, the wind-back and the registration; Amendment 34)
 7c1c23907426610b2e2b9d6315961e6ec988ba82780cda30493272fbd441265a  MROF_YT_WAVE12_L2CONTEXT_REGISTRATION.md (FROZEN 2026-11-01 before any held-out session was read; Amendment 34)
 907340ac90c1d3bef162d5149d82da5e5985c9b2965cdbacf13addc35d3ba95a  calendar_2026_events.csv (FOMC, CPI and jobs-report days July-December 2026 for wave twelve's described event split; taken from several published calendars that agree, the official Fed and BLS pages being unreachable from the build environment, so to be checked against them; Amendment 34)
-771a4458d5f934c4bf217dadcceadfbc18032bac01d459b230e84e0c6c470f42  mrofyt_valuearea.py (MROF-YT-W13-VALUEAREA-1.0: wave thirteen -- back into yesterday's value area with speed: the cash-session volume profile from real trades (1-point bins, 70 %), out 2 points beyond VAH or VAL, back in by a tick after a 4-point move in 30 s with aggression into value at z >= 2.0, faded into value 09:30-15:30 ET; VA1 the fixed 25 / 15, VA2 the POC, VA3 the far edge and VA4 wave nine's scaled target each against the fixed 25 on the same trades, Holm over four; nothing frozen from DEV; wave twelve's runner, hooks only; Amendment 35)
+1b547f5622603f4bec4ebb4f43959e9aa6ea081fce58cd738a0fe26e5131e349  mrofyt_valuearea.py (supersedes 771a4458… — yesterday's value area looked up once per run and session instead of on every 10 s tick; the Eastern offset from wave eleven's public helper; the shared compressed paths and ledgers; no result changed; Amendment 36; earlier MROF-YT-W13-VALUEAREA-1.0: wave thirteen -- back into yesterday's value area with speed: the cash-session volume profile from real trades (1-point bins, 70 %), out 2 points beyond VAH or VAL, back in by a tick after a 4-point move in 30 s with aggression into value at z >= 2.0, faded into value 09:30-15:30 ET; VA1 the fixed 25 / 15, VA2 the POC, VA3 the far edge and VA4 wave nine's scaled target each against the fixed 25 on the same trades, Holm over four; nothing frozen from DEV; wave twelve's runner, hooks only; Amendment 35)
 5a041781ff76ee7fa3991a8ad68b1b3d57a9fa6e588b1cfeeab45e06d5b25402  tests_mrofyt_valuearea.py (8 tests: the cash profile and value area with the completeness rule, yesterday's value area, the re-entry by hand (fast, slow, weak, late, none), the targets, end to end with suite-only plumbing (completeness, speed and flow relaxed and restored), the holdout folder and A_ref refusals, wave twelve unchanged, the wind-back of the profile and the registration; Amendment 35)
 a9ec51fe4a27cf49c78093f84788ef749d96bd1e8c1e89999beceb95812ea0a0  MROF_YT_WAVE13_VALUEAREA_REGISTRATION.md (FROZEN 2026-11-01 before any held-out session was read; Amendment 35)
+bd8b8e7cb4749aa828508e5b98d00525075f704c2a3eedd0c8a9ce4833358eb4  mrofyt_ledgers.py (the replay-holdout and EXPOSED_PILOT_DEV ledgers that waves seven to thirteen write, one copy keyed by the wave's version string; byte-for-byte the records the seven copies wrote; Amendment 36)
+6ff7f5f868a703599368f023b31478bd1adba5e5e6c08c53e8f895d7b7d06c55  tests_mrofyt_shared.py (8 tests, SH1–SH8, one per code-review finding: the shared ledgers, yesterday's value levels in a later run, HELD still beyond at its entry, the WICK window that runs out on the far side, one value-area lookup per session, the public Eastern offset across both clock changes, the shared compressed paths, the wind-back log with a reused approach number; SH3 and SH4 fail on the code before the fix; Amendment 36)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -125,7 +127,7 @@ Frozen DEV cuts of waves six and seven (Amendment 29; in the repository, read by
 
 ```
 d09cef66ac9d84a2f3df2713973990a19b6bd0ed8cfa8dd5d1426faee71d5689  frozen_dev_20261031/w6_frozen.json (wave six A4 trapped cut: NQ 0.0, MNQ 0.0)
-030ee8bb3f7815ec6bd560a551615298060d812abb33101451eb32685cf798d3  frozen_dev_20261031/w7_frozen.json (wave seven trapped medians and |D| 90th percentiles)
+030ee8bb3f7815ec6bd560a551615298060d812abb33101451eb32685cf798d3  frozen_dev_20261031/w7_frozen.json (wave seven trapped medians and |D| 90th percentiles; computed by the code before Amendment 36, whose two wave-seven fixes change the DEV events the trapped medians come from: to be replaced by a repeated DEV run before any held-out read by wave seven, and not to be used by --evaluate until then)
 8acd658e36af878de088dae9aed7f78de9d7389e4b2eb35084a850f6703254a2  MROF_YT_W6_W7_DEV_FREEZE.md (the DEV runs of waves five to seven, the sessions read and refused, the frozen files, committed before any held-out read)
 ```
 
@@ -146,7 +148,7 @@ from inside it unchanged):
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 781/781 + 46/46, identical to the repo
+# run from inside the unzipped package: 789/789 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -198,9 +200,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_earlylevels.py` | 10/10 |
 | `tests_mrofyt_l2context.py` | 7/7 |
 | `tests_mrofyt_valuearea.py` | 8/8 |
-| **wave-one to thirteen, tools total** | **781/781** |
+| `tests_mrofyt_shared.py` | 8/8 |
+| **wave-one to thirteen, tools total** | **789/789** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **827/827** |
+| **package total** | **835/835** |
 
 ## Runnable research commands
 
@@ -240,7 +243,8 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|Exit
      mrofyt_exitstudy.py mrofyt_costs.py mrofyt_risk.py mrofyt_context.py \
      mrofyt_levelbreak.py mrofyt_smt.py mrofyt_flowlevels.py \
      mrofyt_l2variants.py mrofyt_l2targets.py mrofyt_closereclaim.py \
-     mrofyt_earlylevels.py mrofyt_l2context.py mrofyt_valuearea.py
+     mrofyt_earlylevels.py mrofyt_l2context.py mrofyt_valuearea.py \
+     mrofyt_ledgers.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -1306,4 +1310,58 @@ detector hash so registering wave two provably changed nothing.
     twelve's runner (`VA-7`: its fires, grid and ranges and the
     wave-one ledger identical). Nothing frozen changed (06ce854a…).
     Battery: 781/781 + 46/46.
+
+36. **Eight code-review findings on waves seven to thirteen
+    (2026-11-01).** The operator asked for a review of the code of
+    waves seven to thirteen and then for its eight findings to be
+    applied with minimal edits. No held-out session had been read by
+    any of these waves. Three change what a wave counts:
+
+    - *Wave seven, yesterday's value levels.* The registration (§1)
+      makes POC / VAH / VAL known from the session's first grid tick.
+      A recording run that started later in the session saw them as
+      starting before its first mid, so they could never break there
+      (one reason wave seven's DEV read had no POC / VAH / VAL trade).
+      They now count from the later of that tick and the run's first
+      mid (`run_levels`), as registered.
+    - *Wave seven, HELD.* The return through the level was looked for
+      only up to 120 s after the break, while the entry is the first
+      grid tick up to 20 s later. A break that failed in between was
+      still entered as HELD. A HELD entry now also needs no return a
+      tick through the level up to its entry tick. The registration
+      does not state this case, so it is a precision added here. It was
+      made after wave seven's DEV read (HELD: 26 NQ DEV events, 0–5
+      trades per test), for correctness and not from those numbers. No threshold,
+      window, stop or exit changed.
+    - *Wave eleven, WICK.* When the 300 s window ran out, the tick that
+      ended it could not start the next break even when it was on the
+      other side of the level. It now can, as in EARLY and CLOSE and as
+      §1 describes ("the next break needs a close on the other side").
+      Wave eleven has not been run on any recorded session.
+
+    Five leave every result unchanged:
+
+    - the two read ledgers in one module, `mrofyt_ledgers.py`;
+    - yesterday's value area looked up once per run and session in
+      wave thirteen;
+    - wave eleven's hourly Eastern offset made public
+      (`et_offset_hourly`) for wave thirteen's profile;
+    - one set of compressed mid paths per read, shared by waves eight
+      to thirteen (`V.compressed_paths`), ready for the combined read;
+    - wave eight's wind-back logging only the run's own writes. Approach
+      numbers restart each session, so the log keeps an entry's old
+      value and does not just count new keys; LV6 caught the first,
+      size-only version.
+
+    `tests_mrofyt_shared.py` has one test per finding. SH3 and SH4 fail
+    on the code before the fix. All earlier suites pass unchanged.
+
+    **Wave seven must be re-frozen.** Its DEV cuts in
+    `frozen_dev_20261031/w7_frozen.json` (trapped medians by instrument
+    and kind) came from the events before these fixes. Wave seven's DEV
+    run is to be repeated and the new file committed before wave seven
+    reads any held-out session. That repeated DEV run is still DEV and
+    exposes nothing new. Wave six's frozen cut is untouched, since wave
+    six's code did not change. Nothing frozen changed (06ce854a…).
+    Battery: 789/789 + 46/46.
 

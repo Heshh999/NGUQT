@@ -40,6 +40,7 @@ import mrofyt_l2targets as W
 import mrofyt_l2variants as V
 import mrofyt_levelbreak as LB
 import mrofyt_levels as LV
+import mrofyt_ledgers as LG
 import mrofyt_pilot as PI
 import mrofyt_runner as RUN
 import mrofyt_signals as SIG
@@ -106,7 +107,9 @@ class LevelsRunner(C.CloseRunner):
 _OFF = {}
 
 
-def _offset(t):
+def et_offset_hourly(t):
+    """The runner's Eastern offset, looked up once per UTC hour (the
+    clock changes on the hour)."""
     k = int(t // 3600)
     if k not in _OFF:
         _OFF[k] = RUN.et_offset(t)
@@ -116,7 +119,7 @@ def _offset(t):
 def bucket(t, hours):
     """The Eastern-time candle a time falls in: hours (1) or 4-hour
     candles starting 18:00, 22:00, ... ET."""
-    h = int((t + _offset(t)) // 3600)
+    h = int((t + et_offset_hourly(t)) // 3600)
     return h if hours == 1 else (h - 18) // 4
 
 
@@ -124,7 +127,7 @@ def bucket_end(k, hours, t_ref):
     """Epoch at which candle k closes (the Eastern offset taken near
     t_ref, a time inside it)."""
     loc = (k + 1) * 3600 if hours == 1 else (18 + 4 * (k + 1)) * 3600
-    return float(loc - _offset(t_ref))
+    return float(loc - et_offset_hourly(t_ref))
 
 
 def candles(paths, hours):
@@ -185,9 +188,8 @@ def htf_swings(cands, hours):
 def swings_by_instrument(r):
     """{instrument: [swings]} with each swing's confirming session."""
     by = collections.defaultdict(list)
-    for (inst, run), (ts, ps) in r.series.items():
-        if len(ts):
-            by[inst].append(BM.compress(ts, ps))
+    for (inst, run), path in V.compressed_paths(r).items():
+        by[inst].append(path)
     out = {}
     for inst, paths in by.items():
         paths.sort(key=lambda p: p[0][0])
@@ -252,10 +254,7 @@ def run_episodes(grid, gmap, swings, ses_index, counts, mode):
                         if ev is None:
                             continue
                     else:
-                        st['brk'] = None
-                        if s != 0:
-                            st['last'] = s
-                        continue
+                        st['brk'] = None     # the window ran out: no trade
                 if ev is None:
                     if s != 0 and st['last'] == -s:
                         ck = _count_key(g['instrument'], key, g)
@@ -343,8 +342,7 @@ def all_events(r):
 def score(r, events, a_ref=None):
     """[(event, outcome, gross ticks, risk ticks, seconds)], each event
     also carrying its scaled-target net points (or None)."""
-    paths = {k: BM.compress(ts, ps) for k, (ts, ps) in r.series.items()
-             if len(ts)}
+    paths = V.compressed_paths(r)
     out = []
     for e in events:
         key = (e['instrument'], e['run'])
@@ -520,50 +518,11 @@ def text(rep):
 
 
 def record_holdout_read(rep, path):
-    old = dict(reads=[])
-    if os.path.exists(path):
-        try:
-            old = json.load(open(path))
-        except Exception:
-            pass
-    old.setdefault('reads', []).append(dict(
-        version=W11_VERSION, sessions=rep['sessions_inspected']))
-    old['rule'] = ('Replay holdout sessions are read once by each '
-                   'registered wave; a later read of NEW rules on them is '
-                   'not a fresh test.')
-    json.dump(old, open(path, 'w'), indent=1)
-    return len(old['reads'])
+    return LG.record_holdout_read(rep, path, W11_VERSION)
 
 
 def record_exposure(rep, path):
-    old = []
-    if os.path.exists(path):
-        try:
-            old = json.load(open(path)).get('exposed_days', [])
-        except Exception:
-            old = []
-    by = {d['session']: d for d in old}
-    for s in rep['sessions_inspected']:
-        cur = by.get(s)
-        if cur is None:
-            by[s] = dict(session=s, label=PI.EXPOSURE_LABEL,
-                         exposed_by=W11_VERSION, bulk_csv_present=None)
-        elif cur.get('label') != PI.EXPOSURE_LABEL:
-            cur.update(label=PI.EXPOSURE_LABEL, exposed_by=W11_VERSION,
-                       previously_blind=True)
-        by[s].setdefault('also_exposed_by', [])
-        if W11_VERSION not in by[s]['also_exposed_by']:
-            by[s]['also_exposed_by'].append(W11_VERSION)
-    days = sorted(by.values(), key=lambda d: d['session'])
-    json.dump(dict(label=PI.EXPOSURE_LABEL, blind_label=PI.BLIND_LABEL,
-                   rule='EXPOSED days may remain in later DEV/training where '
-                        'the governing protocol permits; they can never '
-                        'become untouched prospective validation. BLIND '
-                        'days had fire counts read and markouts withheld; '
-                        'they remain valid validation until explicitly '
-                        'unblinded.',
-                   exposed_days=days), open(path, 'w'), indent=1)
-    return len(days)
+    return LG.record_exposure(rep, path, W11_VERSION)
 
 
 def main(argv=None):

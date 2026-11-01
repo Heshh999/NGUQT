@@ -26,7 +26,6 @@ THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING. No order is placed.
 
 import bisect
 import collections
-import copy
 import json
 import os
 import sys
@@ -35,6 +34,7 @@ import mrofyt_bigmove as BM
 import mrofyt_costs as CO
 import mrofyt_discover as DI
 import mrofyt_levelbreak as LB
+import mrofyt_ledgers as LG
 import mrofyt_pilot as PI
 import mrofyt_runner as RUN
 
@@ -55,6 +55,17 @@ HOLM_ALPHA = 0.05
 PRIMARY = PI.SIGNAL_SOURCE_INSTRUMENT
 
 
+def compressed_paths(r):
+    """{(instrument, run): (ts, ps)}: the read's compressed mid paths,
+    built once per runner and shared by every wave that scores it."""
+    cache = getattr(r, '_compressed_paths', None)
+    if cache is None:
+        cache = {k: BM.compress(ts, ps) for k, (ts, ps) in r.series.items()
+                 if len(ts)}
+        r._compressed_paths = cache
+    return cache
+
+
 def in_morning(t):
     return MORNING_FROM <= RUN.sod_seconds(t) < MORNING_TO
 
@@ -62,6 +73,9 @@ def in_morning(t):
 # ---------------------------------------------------------------------
 # the runner: wave six's, plus the test number of every approach
 # ---------------------------------------------------------------------
+_UNSET = object()
+
+
 class L2VariantRunner(LB.LevelBreakRunner):
     """Wave six's runner; every approach is numbered within its level and
     session, and every L2/L4 fire carries its approach's number. Hooks
@@ -72,12 +86,16 @@ class L2VariantRunner(LB.LevelBreakRunner):
                                      holdout=holdout, **kw)
         self.tests_seen = collections.Counter()   # (inst, level) -> n
         self.test_no = {}                          # (inst, approach) -> n
+        self._w8_log = None                        # this run's test_no writes
         self.ledger['wave8'] = dict(version=W8_VERSION)
 
     def _count_test(self, st, ap):
         k = (st.instrument, ap.level_id)
         self.tests_seen[k] += 1
-        self.test_no[(st.instrument, ap.id)] = self.tests_seen[k]
+        key = (st.instrument, ap.id)
+        if self._w8_log is not None:
+            self._w8_log.append((key, self.test_no.get(key, _UNSET)))
+        self.test_no[key] = self.tests_seen[k]
 
     def _select_wall(self, st, ap, t):
         # the runner calls this exactly once, when it opens an approach
@@ -91,13 +109,21 @@ class L2VariantRunner(LB.LevelBreakRunner):
 
     def _mark_run(self, st):
         mark = LB.LevelBreakRunner._mark_run(self, st)
-        mark['w8'] = (collections.Counter(self.tests_seen),
-                      copy.copy(self.test_no))
+        # only this run's writes to test_no are logged (approach numbers
+        # restart each session, so a write can replace an older entry)
+        self._w8_log = []
+        mark['w8'] = (collections.Counter(self.tests_seen), self._w8_log)
         return mark
 
     def _unwind_run(self, st, mark):
         LB.LevelBreakRunner._unwind_run(self, st, mark)
-        self.tests_seen, self.test_no = mark['w8']
+        self.tests_seen, log = mark['w8']
+        for key, old in reversed(log):
+            if old is _UNSET:
+                del self.test_no[key]
+            else:
+                self.test_no[key] = old
+        del log[:]
 
     def _w3_fire(self, st, pat, direction, t, ap, g):
         LB.LevelBreakRunner._w3_fire(self, st, pat, direction, t, ap, g)
@@ -140,8 +166,7 @@ def takes(vid, e):
 
 def score_variants(r, events):
     """{variant id: [(event, outcome, gross ticks, risk ticks, seconds)]}."""
-    paths = {k: BM.compress(ts, ps) for k, (ts, ps) in r.series.items()
-             if len(ts)}
+    paths = compressed_paths(r)
     out = collections.defaultdict(list)
     for e in events:
         key = (e['instrument'], e.get('run'))
@@ -279,50 +304,11 @@ def text(rep):
 
 
 def record_holdout_read(rep, path):
-    old = dict(reads=[])
-    if os.path.exists(path):
-        try:
-            old = json.load(open(path))
-        except Exception:
-            pass
-    old.setdefault('reads', []).append(dict(
-        version=W8_VERSION, sessions=rep['sessions_inspected']))
-    old['rule'] = ('Replay holdout sessions are read once by each '
-                   'registered wave; a later read of NEW rules on them is '
-                   'not a fresh test.')
-    json.dump(old, open(path, 'w'), indent=1)
-    return len(old['reads'])
+    return LG.record_holdout_read(rep, path, W8_VERSION)
 
 
 def record_exposure(rep, path):
-    old = []
-    if os.path.exists(path):
-        try:
-            old = json.load(open(path)).get('exposed_days', [])
-        except Exception:
-            old = []
-    by = {d['session']: d for d in old}
-    for s in rep['sessions_inspected']:
-        cur = by.get(s)
-        if cur is None:
-            by[s] = dict(session=s, label=PI.EXPOSURE_LABEL,
-                         exposed_by=W8_VERSION, bulk_csv_present=None)
-        elif cur.get('label') != PI.EXPOSURE_LABEL:
-            cur.update(label=PI.EXPOSURE_LABEL, exposed_by=W8_VERSION,
-                       previously_blind=True)
-        by[s].setdefault('also_exposed_by', [])
-        if W8_VERSION not in by[s]['also_exposed_by']:
-            by[s]['also_exposed_by'].append(W8_VERSION)
-    days = sorted(by.values(), key=lambda d: d['session'])
-    json.dump(dict(label=PI.EXPOSURE_LABEL, blind_label=PI.BLIND_LABEL,
-                   rule='EXPOSED days may remain in later DEV/training where '
-                        'the governing protocol permits; they can never '
-                        'become untouched prospective validation. BLIND '
-                        'days had fire counts read and markouts withheld; '
-                        'they remain valid validation until explicitly '
-                        'unblinded.',
-                   exposed_days=days), open(path, 'w'), indent=1)
-    return len(days)
+    return LG.record_exposure(rep, path, W8_VERSION)
 
 
 def main(argv=None):

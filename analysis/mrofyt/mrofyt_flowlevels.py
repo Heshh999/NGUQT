@@ -54,6 +54,7 @@ import mrofyt_bigmove as BM
 import mrofyt_context as CX
 import mrofyt_costs as CO
 import mrofyt_discover as DI
+import mrofyt_ledgers as LG
 import mrofyt_pilot as PI
 import mrofyt_runner as RUN
 import mrofyt_signals as SIG
@@ -303,6 +304,14 @@ def value_levels(prev_grid, t_on):
     return [(t_on, poc, 'POC'), (t_on, vah, 'VAH'), (t_on, val, 'VAL')]
 
 
+def run_levels(prior_values, ts):
+    """Yesterday's value levels as one run sees them: active from the
+    later of the session's start and the run's first mid, and only if the
+    run is still going then."""
+    return [(max(t_on, ts[0]), px, typ) for t_on, px, typ in prior_values
+            if t_on <= ts[-1]]
+
+
 def merge_levels(levels):
     """In time order; a level within 2 ticks of an earlier one is the
     same level."""
@@ -392,6 +401,10 @@ def detect(level, path, grid, gt):
         if k >= len(grid) or grid[k]['t'] > t_break + HOLD_S + CONFIRM_S:
             return None
         g = grid[k]
+        # still beyond at the entry: no return through the level up to it
+        if tree.first_beyond(ib + 1, _i_at(ts, g['t']), -b,
+                             L - b * RECLAIM_TICKS * TICK) is not None:
+            return None
         k0 = bisect.bisect_left(gt, t_break)
         if sum(b * (x.get('D') or 0.0) for x in grid[k0:k + 1]) <= 0:
             return None
@@ -596,7 +609,7 @@ def build(r, cuts=None):
                 gt = [g['t'] for g in grid]
                 lv = merge_levels(swing_levels(ts, ps) +
                                   absorption_levels(grid) +
-                                  [x for x in prior_values if x[0] <= ts[-1]])
+                                  run_levels(prior_values, ts))
                 for level in lv:
                     ev = detect(level, path, grid, gt)
                     if ev is None:
@@ -849,52 +862,11 @@ def text(rep):
 
 
 def record_holdout_read(rep, path):
-    old = dict(reads=[])
-    if os.path.exists(path):
-        try:
-            old = json.load(open(path))
-        except Exception:
-            pass
-    old.setdefault('reads', []).append(dict(
-        version=W7_VERSION, sessions=rep['sessions_inspected']))
-    old['rule'] = ('Replay holdout sessions are read once by each '
-                   'registered wave; a later read of NEW rules on them is '
-                   'not a fresh test.')
-    json.dump(old, open(path, 'w'), indent=1)
-    return len(old['reads'])
+    return LG.record_holdout_read(rep, path, W7_VERSION)
 
 
 def record_exposure(rep, path):
-    """Every session an --unblind read inspected becomes EXPOSED_PILOT_DEV
-    for good (the ledger the earlier waves keep)."""
-    old = []
-    if os.path.exists(path):
-        try:
-            old = json.load(open(path)).get('exposed_days', [])
-        except Exception:
-            old = []
-    by = {d['session']: d for d in old}
-    for s in rep['sessions_inspected']:
-        cur = by.get(s)
-        if cur is None:
-            by[s] = dict(session=s, label=PI.EXPOSURE_LABEL,
-                         exposed_by=W7_VERSION, bulk_csv_present=None)
-        elif cur.get('label') != PI.EXPOSURE_LABEL:
-            cur.update(label=PI.EXPOSURE_LABEL, exposed_by=W7_VERSION,
-                       previously_blind=True)
-        by[s].setdefault('also_exposed_by', [])
-        if W7_VERSION not in by[s]['also_exposed_by']:
-            by[s]['also_exposed_by'].append(W7_VERSION)
-    days = sorted(by.values(), key=lambda d: d['session'])
-    json.dump(dict(label=PI.EXPOSURE_LABEL, blind_label=PI.BLIND_LABEL,
-                   rule='EXPOSED days may remain in later DEV/training where '
-                        'the governing protocol permits; they can never '
-                        'become untouched prospective validation. BLIND '
-                        'days had fire counts read and markouts withheld; '
-                        'they remain valid validation until explicitly '
-                        'unblinded.',
-                   exposed_days=days), open(path, 'w'), indent=1)
-    return len(days)
+    return LG.record_exposure(rep, path, W7_VERSION)
 
 
 def main(argv=None):
