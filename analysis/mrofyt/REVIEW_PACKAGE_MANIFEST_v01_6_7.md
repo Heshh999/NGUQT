@@ -112,6 +112,9 @@ ae021dd8fdf07ef955345df002c0c7d1fff580270c9812a1a9cb34204d4ca0b8  mrofyt_l2conte
 a9ec51fe4a27cf49c78093f84788ef749d96bd1e8c1e89999beceb95812ea0a0  MROF_YT_WAVE13_VALUEAREA_REGISTRATION.md (FROZEN 2026-11-01 before any held-out session was read; Amendment 35)
 bd8b8e7cb4749aa828508e5b98d00525075f704c2a3eedd0c8a9ce4833358eb4  mrofyt_ledgers.py (the replay-holdout and EXPOSED_PILOT_DEV ledgers that waves seven to thirteen write, one copy keyed by the wave's version string; byte-for-byte the records the seven copies wrote; Amendment 36)
 6ff7f5f868a703599368f023b31478bd1adba5e5e6c08c53e8f895d7b7d06c55  tests_mrofyt_shared.py (8 tests, SH1–SH8, one per code-review finding: the shared ledgers, yesterday's value levels in a later run, HELD still beyond at its entry, the WICK window that runs out on the far side, one value-area lookup per session, the public Eastern offset across both clock changes, the shared compressed paths, the wind-back log with a reused approach number; SH3 and SH4 fail on the code before the fix; Amendment 36)
+18785d76963af6ce89225931def167a4a7dff2a83c08425d4821fe4c8b8c202d  mrofyt_l2firstsignal.py (MROF-YT-W14-L2FIRSTSIGNAL-1.0: wave fourteen -- the primary test on the unseen days: wave six's L2, only the first L2 signal at each level per CME session, any hour, target 25 / stop 15 / 30 min, one position at a time, net of costs; NQ PASS = 30+ trades, the session-clustered 95 % interval of net a trade above 0 and still > 0 without the best day, else NOT PROVEN with the reason; a held-out read under 30 trades shows the count only and withholds every result; MNQ described; wave eight's runner, hooks only; Amendment 37)
+ab77fef39512cac5b9673138a46715d49a0359069d5457e75ec3ba2d70830566  tests_mrofyt_l2firstsignal.py (6 tests: the first-signal rule by hand (shared levels, used-up levels, no level, sessions and instruments apart), the verdict by hand (too few, PASS, one big day, a loss, MNQ), the registration's DEV row from the saved DEV report (12 / 7 / +9.44, and 13 by the earlier set-of-levels key), end to end with wave six's suite-only plumbing detector, the withheld held-out report (nothing but the count on screen or in the file) and the shown verdict, wave eight's runner unchanged, the refusals, the exposure ledger and the registration; Amendment 37)
+ee8b0729b8f25ff269cb4278d63f08522363135a99f1cc32522aa6c1fc0bb8ce  MROF_YT_WAVE14_L2FIRSTSIGNAL_REGISTRATION.md (FROZEN 2026-11-01 before any validation or replay holdout session was read by any tool; Amendment 37)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -148,7 +151,7 @@ from inside it unchanged):
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 789/789 + 46/46, identical to the repo
+# run from inside the unzipped package: 795/795 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -201,9 +204,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_l2context.py` | 7/7 |
 | `tests_mrofyt_valuearea.py` | 8/8 |
 | `tests_mrofyt_shared.py` | 8/8 |
-| **wave-one to thirteen, tools total** | **789/789** |
+| `tests_mrofyt_l2firstsignal.py` | 6/6 |
+| **wave-one to fourteen, tools total** | **795/795** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **835/835** |
+| **package total** | **841/841** |
 
 ## Runnable research commands
 
@@ -229,6 +233,8 @@ python3 mrofyt_closereclaim.py "<capture folder>" --out w10.json  # wave ten on 
 python3 mrofyt_earlylevels.py "<capture folder>" --a-ref w9_frozen.json --out w11.json  # wave eleven on DEV: describes
 python3 mrofyt_l2context.py "<capture folder>" --out w12.json  # wave twelve on DEV: describes (optional --calendar events.csv)
 python3 mrofyt_valuearea.py "<capture folder>" --a-ref w9_frozen.json --out w13.json  # wave thirteen on DEV: describes
+python3 mrofyt_l2firstsignal.py "<capture folder>" --out w14.json  # wave fourteen on DEV: describes (expect NQ 12 trades, 7 won, +9.44)
+python3 mrofyt_l2firstsignal.py "<capture folder>" --unblind --out w14_eval.json  # THE TEST on sessions >= 20260921; exposes them for good
 ```
 
 All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -244,7 +250,7 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|Exit
      mrofyt_levelbreak.py mrofyt_smt.py mrofyt_flowlevels.py \
      mrofyt_l2variants.py mrofyt_l2targets.py mrofyt_closereclaim.py \
      mrofyt_earlylevels.py mrofyt_l2context.py mrofyt_valuearea.py \
-     mrofyt_ledgers.py
+     mrofyt_ledgers.py mrofyt_l2firstsignal.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -1364,4 +1370,39 @@ detector hash so registering wave two provably changed nothing.
     exposes nothing new. Wave six's frozen cut is untouched, since wave
     six's code did not change. Nothing frozen changed (06ce854a…).
     Battery: 789/789 + 46/46.
+
+37. **The one test the unseen days decide (2026-11-01).** After wave
+    nine's DEV run the operator learned that wave eight's V1 (the very
+    first touch of a level) holds 3 NQ DEV trades, all on one session,
+    too rare to reach a verdict on the unseen days. The version the
+    operator had been looking at counts the first L2 *signal* at a
+    level, even when earlier touches gave none. The operator chose it
+    as the version to test. `MROF_YT_WAVE14_L2FIRSTSIGNAL_REGISTRATION.md`
+    fixes it, before any validation or replay holdout session was read
+    by any tool, as the **primary test** of those sessions:
+
+    - **Trades:** wave six's L2 events. Only the first L2 signal at each
+      level per CME session, at any hour; an event uses up every level
+      it touches, taken or not.
+    - **Exit:** 25-point target, 15-point stop, 30 minutes. One position
+      at a time, net of costs.
+    - **Verdict (NQ only):** PASS needs 30 or more trades, the
+      session-clustered 95 % interval of net a trade above 0, and a
+      profit still without the best day. Anything else is NOT PROVEN,
+      with the reason.
+    - **Withholding:** a held-out read with fewer than 30 trades shows
+      the count only and withholds every result from screen and file,
+      so the verdict comes at the first read that holds 30. No threshold
+      is lowered.
+    - MNQ, every L2 and the strict first touch are reported beside,
+      never tested.
+
+    The count shown to the operator earlier (13 trades, 62 %, +10.60)
+    keyed signals by the set of levels each touched. One signal at two
+    levels at once let a later signal at one of them through. Counting
+    each level separately, as registered, the saved DEV report gives 12
+    trades, 7 won (58 %), +9.44 net a trade over 6 sessions; FS3
+    reproduces both counts. `mrofyt_l2firstsignal.py` runs on wave
+    eight's runner (FS6: its fires and grid identical). Nothing frozen
+    changed (06ce854a…). Battery: 795/795 + 46/46.
 
