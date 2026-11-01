@@ -106,6 +106,7 @@ a00d0f9d6accf7fb6d220093a9a824d442c3bd463cba79f9b8959eeed9925063  MROF_YT_WAVE11
 cc648ca154e6a186e1e5fd87f9cfb31c30ae895b33008b6986a988619e7076fd  mrofyt_l2context.py (MROF-YT-W12-L2CONTEXT-1.0: wave twelve -- two day-context filters on L2 fixed in advance and known at each trade, any hour: TREND removes a fade against a strong day trend (price at least 0.25 x the recent average daily range from the session VWAP, the trade against that side), BIG DAY removes trades once the session range so far reaches 1.0 x that range; kept minus removed on every L2 and the first test, session-clustered, Holm over four; an event-calendar split described when given; nothing frozen from DEV; wave eleven's runner, hooks only; Amendment 34)
 0aaa060d73a5f96739412ad7b0dd08a52797949e24b8e6020c11dd07d465f079  tests_mrofyt_l2context.py (7 tests: both filters and their boundaries, the kept-minus-removed test on planted, null and thin records, the calendar file, end to end with the calendar split, the holdout folder and calendar refusals, wave eleven unchanged, the wind-back and the registration; Amendment 34)
 7c1c23907426610b2e2b9d6315961e6ec988ba82780cda30493272fbd441265a  MROF_YT_WAVE12_L2CONTEXT_REGISTRATION.md (FROZEN 2026-11-01 before any held-out session was read; Amendment 34)
+907340ac90c1d3bef162d5149d82da5e5985c9b2965cdbacf13addc35d3ba95a  calendar_2026_events.csv (FOMC, CPI and jobs-report days July-December 2026 for wave twelve's described event split; taken from several published calendars that agree, the official Fed and BLS pages being unreachable from the build environment, so to be checked against them; Amendment 34)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -1278,6 +1279,8 @@ detector hash so registering wave two provably changed nothing.
     helps is combined with L2 only in a later registration judged on
     sessions read by nothing before it. `mrofyt_l2context.py` runs on
     wave eleven's runner (`CX6`: its fires, grid and ranges and the
-    wave-one ledger identical). Nothing frozen changed (06ce854a…).
+    wave-one ledger identical). `calendar_2026_events.csv` lists the
+    FOMC, CPI and jobs-report days of July-December 2026 for the event
+    split, which is described only. Nothing frozen changed (06ce854a…).
     Battery: 773/773 + 46/46.
 

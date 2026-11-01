@@ -1,0 +1,27 @@
+# US event days, July-December 2026, one line per day: YYYYMMDD,EVENT
+# The CME session that contains the release (8:30 ET for CPI and NFP,
+# 14:00 ET for the FOMC decision) has the same date.
+# Taken 2026-11-01 from several published economic calendars that agree;
+# federalreserve.gov and bls.gov could not be reached from the build
+# environment, so check these against the official calendars:
+#   FOMC  https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+#   CPI   https://www.bls.gov/schedule/news_release/cpi.htm
+#   NFP   https://www.bls.gov/schedule/news_release/empsit.htm
+# Used only by mrofyt_l2context.py --calendar, for a described split
+# (never a test).
+20260702,NFP
+20260714,CPI
+20260729,FOMC
+20260807,NFP
+20260812,CPI
+20260904,NFP
+20260911,CPI
+20260916,FOMC
+20261002,NFP
+20261014,CPI
+20261028,FOMC
+20261106,NFP
+20261110,CPI
+20261204,NFP
+20261209,FOMC
+20261210,CPI
