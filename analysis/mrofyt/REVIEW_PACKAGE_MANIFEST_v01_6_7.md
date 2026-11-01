@@ -100,6 +100,9 @@ e1f651a02feb7fdb80de6ecaed00b55f69f5477911a379ac8bcb395380bde683  MROF_YT_WAVE9_
 a73c599d36b5eb68a3abb3f5808497bf3e53d3e44722d0daea7cc0d459be3e9c  mrofyt_closereclaim.py (MROF-YT-W10-CLOSERECLAIM-1.0: wave ten -- break and reclaim on one-minute candle closes at the six daily range levels: a close a tick or more through, a close back within 5 candles, the order flow confirming the reclaim (the candle's net aggression and the last 10 s, z >= 1.0); faded at the reclaim close with wave six's T1 exit; every filtered reclaim and the first test, Holm over two; the unfiltered reclaims and L2 (wave eight V0 / V1) beside from the same read; nothing frozen from DEV; wave nine's runner, hooks only; Amendment 32)
 40f149d5d8126c42b1079839912973ffb03686a73cd3af84997352ad367d46b8  tests_mrofyt_closereclaim.py (8 tests: sides and minute closes, the episode by hand (reclaim, held break, the break the other way, numbering), the order-flow filter, clock-minute counting across skipped minutes, end to end, the holdout folder rule, wave nine unchanged, the wind-back and the registration; Amendment 32)
 3a79729e9dddee1dd341187c6182fef39c093ba684781a3abfa4834f6f05cd64  MROF_YT_WAVE10_CLOSERECLAIM_REGISTRATION.md (FROZEN 2026-10-31 before any held-out session was read; Amendment 32)
+17b13bc91930ac83dc4bb73317472d06f49969668f3df1281f9a2d396a59fb60  mrofyt_earlylevels.py (MROF-YT-W11-EARLYLEVELS-1.0: wave eleven -- an EARLY entry after a one-minute close through a level (the first 10 s tick back through with aggression against the break, z >= 1.0, within 5 candles) on the six daily range levels, E1 / E2 under Holm over two with L2, wave ten and a 10 s WICK analogue beside; and four more level groups judged apart, each with WICK, EARLY and CLOSE entries: A confirmed 1-hour and 4-hour swings (with first tests), B the opens, C VWAP and its bands, D PP / R1 / S1 / M2 / M3, Holm within each group; fixed 25 / 15 tested, wave nine's scaled target beside; nothing frozen from DEV; wave ten's runner, hooks only; Amendment 33)
+bf60724e3d51adb5d973915ce8498f079d12448394d7db12bd9403d8a7390a9e  tests_mrofyt_earlylevels.py (10 tests: candle buckets in Eastern time, confirmed swings and their expiry, the swing session limit, the three entries by hand, CLOSE on the MAIN levels equal to wave ten, end to end with the scaled column, unblind, the holdout folder and A_ref refusals, wave ten unchanged, the wind-back and the registration; Amendment 33)
+a00d0f9d6accf7fb6d220093a9a824d442c3bd463cba79f9b8959eeed9925063  MROF_YT_WAVE11_EARLY_LEVELS_REGISTRATION.md (FROZEN 2026-11-01 before any held-out session was read; Amendment 33)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -136,7 +139,7 @@ from inside it unchanged):
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 756/756 + 46/46, identical to the repo
+# run from inside the unzipped package: 766/766 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -185,9 +188,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_l2variants.py` | 7/7 |
 | `tests_mrofyt_l2targets.py` | 10/10 |
 | `tests_mrofyt_closereclaim.py` | 8/8 |
-| **wave-one to ten, tools total** | **756/756** |
+| `tests_mrofyt_earlylevels.py` | 10/10 |
+| **wave-one to eleven, tools total** | **766/766** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **802/802** |
+| **package total** | **812/812** |
 
 ## Runnable research commands
 
@@ -210,6 +214,7 @@ python3 mrofyt_flowlevels.py "<capture folder>" --out w7.json --frozen-out w7_fr
 python3 mrofyt_l2variants.py "<replay folder>" --holdout --out w8_replay.json  # wave eight on the replay holdout (nothing to freeze first)
 python3 mrofyt_l2targets.py "<capture folder>" --out w9.json --frozen-out w9_frozen.json  # wave nine on DEV: describes, freezes the median range
 python3 mrofyt_closereclaim.py "<capture folder>" --out w10.json  # wave ten on DEV: describes (nothing to freeze)
+python3 mrofyt_earlylevels.py "<capture folder>" --a-ref w9_frozen.json --out w11.json  # wave eleven on DEV: describes
 ```
 
 All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -223,7 +228,8 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|Exit
      mrofyt_pilot.py mrofyt_recover.py mrofyt_wave2.py \
      mrofyt_exitstudy.py mrofyt_costs.py mrofyt_risk.py mrofyt_context.py \
      mrofyt_levelbreak.py mrofyt_smt.py mrofyt_flowlevels.py \
-     mrofyt_l2variants.py mrofyt_l2targets.py mrofyt_closereclaim.py
+     mrofyt_l2variants.py mrofyt_l2targets.py mrofyt_closereclaim.py \
+     mrofyt_earlylevels.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -1229,4 +1235,25 @@ detector hash so registering wave two provably changed nothing.
     wave-one ledger identical), so one read also yields waves three, six,
     eight and nine. Nothing frozen changed (06ce854a…). Battery: 756/756
     + 46/46.
+
+33. **An earlier entry, and more key levels judged apart (2026-11-01).**
+    The operator asked to enter before wave ten's reclaim close, using
+    the order flow, and to add VWAP and its bands, the pivots (with R1
+    and S1), confirmed 1-hour and 4-hour swings and the two opens.
+    `MROF_YT_WAVE11_EARLY_LEVELS_REGISTRATION.md` fixes, before any
+    held-out session is read by any tool: the EARLY entry (a one-minute
+    close through, then the first 10 s tick back through with the
+    aggression against the break, z >= 1.0, within 5 candles), tested on
+    the six daily range levels (E1, E2; Holm over two) beside L2, wave
+    ten and a 10 s WICK analogue; and four groups never mixed into those
+    six, each judged alone with WICK, EARLY and CLOSE entries and its own
+    Holm: A swings (2 candles each side, confirmed, until a close beyond
+    or 5 more sessions), B opens, C VWAP and bands, D PP / R1 / S1 / M2 /
+    M3. A promising group joins the main levels only after the combined
+    set is judged again on later unseen days. The tests use the fixed
+    25 / 15 exit; wave nine's scaled target is shown beside. On the six
+    levels the CLOSE entry reproduces wave ten exactly (`EL4`).
+    `mrofyt_earlylevels.py` runs on wave ten's runner (`EL8`: its grid,
+    fires and ranges and the wave-one ledger identical). Nothing frozen
+    changed (06ce854a…). Battery: 766/766 + 46/46.
 
