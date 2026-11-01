@@ -103,6 +103,9 @@ a73c599d36b5eb68a3abb3f5808497bf3e53d3e44722d0daea7cc0d459be3e9c  mrofyt_closere
 17b13bc91930ac83dc4bb73317472d06f49969668f3df1281f9a2d396a59fb60  mrofyt_earlylevels.py (MROF-YT-W11-EARLYLEVELS-1.0: wave eleven -- an EARLY entry after a one-minute close through a level (the first 10 s tick back through with aggression against the break, z >= 1.0, within 5 candles) on the six daily range levels, E1 / E2 under Holm over two with L2, wave ten and a 10 s WICK analogue beside; and four more level groups judged apart, each with WICK, EARLY and CLOSE entries: A confirmed 1-hour and 4-hour swings (with first tests), B the opens, C VWAP and its bands, D PP / R1 / S1 / M2 / M3, Holm within each group; fixed 25 / 15 tested, wave nine's scaled target beside; nothing frozen from DEV; wave ten's runner, hooks only; Amendment 33)
 bf60724e3d51adb5d973915ce8498f079d12448394d7db12bd9403d8a7390a9e  tests_mrofyt_earlylevels.py (10 tests: candle buckets in Eastern time, confirmed swings and their expiry, the swing session limit, the three entries by hand, CLOSE on the MAIN levels equal to wave ten, end to end with the scaled column, unblind, the holdout folder and A_ref refusals, wave ten unchanged, the wind-back and the registration; Amendment 33)
 a00d0f9d6accf7fb6d220093a9a824d442c3bd463cba79f9b8959eeed9925063  MROF_YT_WAVE11_EARLY_LEVELS_REGISTRATION.md (FROZEN 2026-11-01 before any held-out session was read; Amendment 33)
+cc648ca154e6a186e1e5fd87f9cfb31c30ae895b33008b6986a988619e7076fd  mrofyt_l2context.py (MROF-YT-W12-L2CONTEXT-1.0: wave twelve -- two day-context filters on L2 fixed in advance and known at each trade, any hour: TREND removes a fade against a strong day trend (price at least 0.25 x the recent average daily range from the session VWAP, the trade against that side), BIG DAY removes trades once the session range so far reaches 1.0 x that range; kept minus removed on every L2 and the first test, session-clustered, Holm over four; an event-calendar split described when given; nothing frozen from DEV; wave eleven's runner, hooks only; Amendment 34)
+0aaa060d73a5f96739412ad7b0dd08a52797949e24b8e6020c11dd07d465f079  tests_mrofyt_l2context.py (7 tests: both filters and their boundaries, the kept-minus-removed test on planted, null and thin records, the calendar file, end to end with the calendar split, the holdout folder and calendar refusals, wave eleven unchanged, the wind-back and the registration; Amendment 34)
+7c1c23907426610b2e2b9d6315961e6ec988ba82780cda30493272fbd441265a  MROF_YT_WAVE12_L2CONTEXT_REGISTRATION.md (FROZEN 2026-11-01 before any held-out session was read; Amendment 34)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -139,7 +142,7 @@ from inside it unchanged):
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 766/766 + 46/46, identical to the repo
+# run from inside the unzipped package: 773/773 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -189,9 +192,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_l2targets.py` | 10/10 |
 | `tests_mrofyt_closereclaim.py` | 8/8 |
 | `tests_mrofyt_earlylevels.py` | 10/10 |
-| **wave-one to eleven, tools total** | **766/766** |
+| `tests_mrofyt_l2context.py` | 7/7 |
+| **wave-one to twelve, tools total** | **773/773** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **812/812** |
+| **package total** | **819/819** |
 
 ## Runnable research commands
 
@@ -215,6 +219,7 @@ python3 mrofyt_l2variants.py "<replay folder>" --holdout --out w8_replay.json  #
 python3 mrofyt_l2targets.py "<capture folder>" --out w9.json --frozen-out w9_frozen.json  # wave nine on DEV: describes, freezes the median range
 python3 mrofyt_closereclaim.py "<capture folder>" --out w10.json  # wave ten on DEV: describes (nothing to freeze)
 python3 mrofyt_earlylevels.py "<capture folder>" --a-ref w9_frozen.json --out w11.json  # wave eleven on DEV: describes
+python3 mrofyt_l2context.py "<capture folder>" --out w12.json  # wave twelve on DEV: describes (optional --calendar events.csv)
 ```
 
 All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -229,7 +234,7 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|Exit
      mrofyt_exitstudy.py mrofyt_costs.py mrofyt_risk.py mrofyt_context.py \
      mrofyt_levelbreak.py mrofyt_smt.py mrofyt_flowlevels.py \
      mrofyt_l2variants.py mrofyt_l2targets.py mrofyt_closereclaim.py \
-     mrofyt_earlylevels.py
+     mrofyt_earlylevels.py mrofyt_l2context.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -1256,4 +1261,23 @@ detector hash so registering wave two provably changed nothing.
     `mrofyt_earlylevels.py` runs on wave ten's runner (`EL8`: its grid,
     fires and ranges and the wave-one ledger identical). Nothing frozen
     changed (06ce854a…). Battery: 766/766 + 46/46.
+
+34. **Skip L2 on the wrong kind of day (2026-11-01).** The operator
+    asked for the day-type filter: fade failed breaks on normal days,
+    not on strong trend days or unusually big days. The context study
+    reads day type from years of minute bars but only at 10:30 ET, and
+    several of L2's best DEV trades came earlier.
+    `MROF_YT_WAVE12_L2CONTEXT_REGISTRATION.md` fixes, before any
+    held-out session is read by any tool, two filters known at each
+    trade at any hour, every threshold set in advance: TREND (a fade
+    against price that is at least 0.25 x the recent average daily
+    range from the session VWAP is removed) and BIG DAY (trades after the
+    session range reaches 1.0 x that range are removed). Each is judged
+    by whether the kept trades beat the removed ones, on every L2 and
+    on the first test, session-clustered, Holm over four; a filter that
+    helps is combined with L2 only in a later registration judged on
+    sessions read by nothing before it. `mrofyt_l2context.py` runs on
+    wave eleven's runner (`CX6`: its fires, grid and ranges and the
+    wave-one ledger identical). Nothing frozen changed (06ce854a…).
+    Battery: 773/773 + 46/46.
 
