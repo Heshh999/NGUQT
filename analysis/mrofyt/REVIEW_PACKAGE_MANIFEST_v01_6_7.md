@@ -107,6 +107,9 @@ cc648ca154e6a186e1e5fd87f9cfb31c30ae895b33008b6986a988619e7076fd  mrofyt_l2conte
 0aaa060d73a5f96739412ad7b0dd08a52797949e24b8e6020c11dd07d465f079  tests_mrofyt_l2context.py (7 tests: both filters and their boundaries, the kept-minus-removed test on planted, null and thin records, the calendar file, end to end with the calendar split, the holdout folder and calendar refusals, wave eleven unchanged, the wind-back and the registration; Amendment 34)
 7c1c23907426610b2e2b9d6315961e6ec988ba82780cda30493272fbd441265a  MROF_YT_WAVE12_L2CONTEXT_REGISTRATION.md (FROZEN 2026-11-01 before any held-out session was read; Amendment 34)
 907340ac90c1d3bef162d5149d82da5e5985c9b2965cdbacf13addc35d3ba95a  calendar_2026_events.csv (FOMC, CPI and jobs-report days July-December 2026 for wave twelve's described event split; taken from several published calendars that agree, the official Fed and BLS pages being unreachable from the build environment, so to be checked against them; Amendment 34)
+771a4458d5f934c4bf217dadcceadfbc18032bac01d459b230e84e0c6c470f42  mrofyt_valuearea.py (MROF-YT-W13-VALUEAREA-1.0: wave thirteen -- back into yesterday's value area with speed: the cash-session volume profile from real trades (1-point bins, 70 %), out 2 points beyond VAH or VAL, back in by a tick after a 4-point move in 30 s with aggression into value at z >= 2.0, faded into value 09:30-15:30 ET; VA1 the fixed 25 / 15, VA2 the POC, VA3 the far edge and VA4 wave nine's scaled target each against the fixed 25 on the same trades, Holm over four; nothing frozen from DEV; wave twelve's runner, hooks only; Amendment 35)
+5a041781ff76ee7fa3991a8ad68b1b3d57a9fa6e588b1cfeeab45e06d5b25402  tests_mrofyt_valuearea.py (8 tests: the cash profile and value area with the completeness rule, yesterday's value area, the re-entry by hand (fast, slow, weak, late, none), the targets, end to end with suite-only plumbing (completeness, speed and flow relaxed and restored), the holdout folder and A_ref refusals, wave twelve unchanged, the wind-back of the profile and the registration; Amendment 35)
+a9ec51fe4a27cf49c78093f84788ef749d96bd1e8c1e89999beceb95812ea0a0  MROF_YT_WAVE13_VALUEAREA_REGISTRATION.md (FROZEN 2026-11-01 before any held-out session was read; Amendment 35)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -143,7 +146,7 @@ from inside it unchanged):
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 773/773 + 46/46, identical to the repo
+# run from inside the unzipped package: 781/781 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -194,9 +197,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_closereclaim.py` | 8/8 |
 | `tests_mrofyt_earlylevels.py` | 10/10 |
 | `tests_mrofyt_l2context.py` | 7/7 |
-| **wave-one to twelve, tools total** | **773/773** |
+| `tests_mrofyt_valuearea.py` | 8/8 |
+| **wave-one to thirteen, tools total** | **781/781** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **819/819** |
+| **package total** | **827/827** |
 
 ## Runnable research commands
 
@@ -221,6 +225,7 @@ python3 mrofyt_l2targets.py "<capture folder>" --out w9.json --frozen-out w9_fro
 python3 mrofyt_closereclaim.py "<capture folder>" --out w10.json  # wave ten on DEV: describes (nothing to freeze)
 python3 mrofyt_earlylevels.py "<capture folder>" --a-ref w9_frozen.json --out w11.json  # wave eleven on DEV: describes
 python3 mrofyt_l2context.py "<capture folder>" --out w12.json  # wave twelve on DEV: describes (optional --calendar events.csv)
+python3 mrofyt_valuearea.py "<capture folder>" --a-ref w9_frozen.json --out w13.json  # wave thirteen on DEV: describes
 ```
 
 All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -235,7 +240,7 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|Exit
      mrofyt_exitstudy.py mrofyt_costs.py mrofyt_risk.py mrofyt_context.py \
      mrofyt_levelbreak.py mrofyt_smt.py mrofyt_flowlevels.py \
      mrofyt_l2variants.py mrofyt_l2targets.py mrofyt_closereclaim.py \
-     mrofyt_earlylevels.py mrofyt_l2context.py
+     mrofyt_earlylevels.py mrofyt_l2context.py mrofyt_valuearea.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -1283,4 +1288,22 @@ detector hash so registering wave two provably changed nothing.
     FOMC, CPI and jobs-report days of July-December 2026 for the event
     split, which is described only. Nothing frozen changed (06ce854a…).
     Battery: 773/773 + 46/46.
+
+35. **Back into yesterday's value area with speed (2026-11-01).** The
+    operator proposed a fair-value setup: price leaves the value area,
+    is not accepted outside, and comes back fast with the order flow
+    behind it; and asked that the volatility-scaled target be tested
+    with it. `MROF_YT_WAVE13_VALUEAREA_REGISTRATION.md` fixes, before
+    any held-out session is read by any tool: yesterday's cash-session
+    value area from real trades, out 2 points beyond VAH or VAL, back
+    in by a tick after a 4-point move in 30 s with aggression into
+    value at z >= 2.0, faded into value 09:30-15:30 ET, 15-point stop,
+    30 minutes; VA1 the fixed 25 (does it make money), VA2 the POC, VA3
+    the far edge, VA4 the scaled target, each against the fixed 25 on
+    the same trades; Holm over four. Wave seven's POC / VAH / VAL
+    levels made no trade (their one attempt was used up overnight), so
+    this idea had not been tested. `mrofyt_valuearea.py` runs on wave
+    twelve's runner (`VA-7`: its fires, grid and ranges and the
+    wave-one ledger identical). Nothing frozen changed (06ce854a…).
+    Battery: 781/781 + 46/46.
 
