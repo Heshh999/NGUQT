@@ -115,6 +115,9 @@ bd8b8e7cb4749aa828508e5b98d00525075f704c2a3eedd0c8a9ce4833358eb4  mrofyt_ledgers
 18785d76963af6ce89225931def167a4a7dff2a83c08425d4821fe4c8b8c202d  mrofyt_l2firstsignal.py (MROF-YT-W14-L2FIRSTSIGNAL-1.0: wave fourteen -- the primary test on the unseen days: wave six's L2, only the first L2 signal at each level per CME session, any hour, target 25 / stop 15 / 30 min, one position at a time, net of costs; NQ PASS = 30+ trades, the session-clustered 95 % interval of net a trade above 0 and still > 0 without the best day, else NOT PROVEN with the reason; a held-out read under 30 trades shows the count only and withholds every result; MNQ described; wave eight's runner, hooks only; Amendment 37)
 ab77fef39512cac5b9673138a46715d49a0359069d5457e75ec3ba2d70830566  tests_mrofyt_l2firstsignal.py (6 tests: the first-signal rule by hand (shared levels, used-up levels, no level, sessions and instruments apart), the verdict by hand (too few, PASS, one big day, a loss, MNQ), the registration's DEV row from the saved DEV report (12 / 7 / +9.44, and 13 by the earlier set-of-levels key), end to end with wave six's suite-only plumbing detector, the withheld held-out report (nothing but the count on screen or in the file) and the shown verdict, wave eight's runner unchanged, the refusals, the exposure ledger and the registration; Amendment 37)
 ee8b0729b8f25ff269cb4278d63f08522363135a99f1cc32522aa6c1fc0bb8ce  MROF_YT_WAVE14_L2FIRSTSIGNAL_REGISTRATION.md (FROZEN 2026-11-01 before any validation or replay holdout session was read by any tool; Amendment 37)
+fdc359e0cea63fc5c591619b1ac001fcb23f660cb55beb5a7e2f4c9125dae2cf  mrofyt_obviouslevels.py (MROF-YT-W15-OBVIOUSLEVELS-1.0: wave fifteen -- L2's 10-second analogue (wave eleven's WICK entry) at three more obvious level groups, each judged alone: IB the 09:30-10:30 ET high and low (known 10:30-17:00, the window covered or none), ROUND every 100 points, EQUAL two 15-minute swing highs (lows) within 4 ticks; the first signal at each level per session, 25 / 15 / 30 min, one position at a time per group, net of costs; NQ PASS = 30+ trades, Holm over the three, the 95 % interval above 0 and a profit without the best day; a held-out read withholds a group under 30 trades; secondary to wave fourteen on sessions >= 20260921; wave fourteen's runner, no new hooks; Amendment 38)
+e37724ce6404e6c72e4f6107270ad7a6aa866afd6c71ea9df9ff55107947768d  tests_mrofyt_obviouslevels.py (7 tests: the IB in summer and winter time with its coverage rule, round numbers per session, equal highs and lows from 15-minute candles (tolerance, merge, the 5-session limit), the WICK entry at these levels only and the first signal, the verdicts with Holm over the three (a group that passes alone fails after Holm), end to end on synthetic tape poking through 15,000, the withheld held-out report, wave fourteen's runner unchanged, the refusals, the ledger and the registration; Amendment 38)
+e1b25326b08db205d03c7096099736e221356684ff67b182931fa6e56ee06f5e  MROF_YT_WAVE15_OBVIOUSLEVELS_REGISTRATION.md (FROZEN 2026-11-01 before any validation or replay holdout session was read by any tool and before these levels were computed on any recorded session; Amendment 38)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -141,17 +144,17 @@ Archived source directives:
 b2a0122b40e6ef140a1cb6fe7011068bfa3cc52039a75b19da54c9fc1e7ae389  ../../docs/prompts/MROF_GODS_EYE_VIEW_CLAUDE_PROMPT_PINOKIO.md (the dashboard directive, Amendment 12; archived from the upload as it was read — 166 lines — so the hash is of this archived copy)
 ```
 
-Delivered package (167 files, repo layout preserved so every suite runs
+Delivered package (170 files, repo layout preserved so every suite runs
 from inside it unchanged):
 
 ```
-378f7c1587c9fe5ed1f001376e4fb72771c5d905f013c32dcde84687b544c4c9  MROF_V1_Engine_v01_6_7.zip (supersedes 8a9eba41… — wave fourteen: the first L2 signal at each level as the primary test of the unseen days, its registration and 6-test suite; 167 files, Amendment 37; earlier 8a9eba41… supersedes 9b3f0f6a… — the eight code-review fixes to waves seven to thirteen, the shared ledgers module and the 8-test regression suite; 164 files, Amendment 36; earlier 9b3f0f6a… supersedes 551aa3bb… — wave thirteen: back into yesterday's value area with speed, its registration and 8-test suite; 162 files, Amendment 35; earlier 551aa3bb… supersedes 04aa05f0… — wave twelve: the two L2 day-context filters, their registration and 7-test suite, and the 2026 event calendar; 159 files, Amendment 34; earlier 04aa05f0… supersedes 5a9c3c57… — wave eleven: the early order-flow entry and four more level groups judged apart, its registration and 10-test suite; 155 files, Amendment 33; earlier 5a9c3c57… supersedes e21f707b… — wave ten: break and reclaim on candle closes at the big levels, filtered by the order flow, its registration and 8-test suite; 152 files, Amendment 32; earlier e21f707b… supersedes f178b353… — wave nine: L2 with a next-big-level or a volatility-scaled target against the fixed 25, its registration and 10-test suite; 149 files, Amendment 31; earlier f178b353… supersedes edf699bc… — wave eight: L2 on the first test, in the morning, both, or held 5 minutes, its registration and 7-test suite, and the frozen DEV cuts of waves six and seven with their freeze note; 146 files, Amendments 29-30; earlier edf699bc… supersedes fd06d259… — wave seven: order-flow levels graded A+ / A / B / skip with four exits, its registration and 20-test suite; 140 files, Amendment 28; earlier fd06d259… supersedes 3e934e75… — the context stamp check's peak filter and the shared parsing loop, after a review of V26–V27; 137 files, Amendment 27; earlier 3e934e75… supersedes c69b017e… — wave six: the level-break stops, L4 and trapped volume on the recordings, ES confirmation on minute bars, their registration and suites; 137 files, Amendment 26; earlier c69b017e… supersedes 98bc03c1… — context, exit, cost and risk tools with their registrations and suites, and the frozen DEV results their suite reproduces; 132 files, Amendment 25; earlier 98bc03c1… supersedes ae0f7cf3… — one study across two drives; 119 files, Amendment 23; earlier ae0f7cf3… supersedes f4529847… — the runner's refused size check skips or stops instead of crashing; 119 files, Amendment 22; earlier f4529847… supersedes 4f35d37c… — waves two to four wind an abandoned run back whole; wave two 1.1; 119 files, Amendment 21; earlier 4f35d37c… supersedes f466ee1b… — wave four: the counted search, its registration and 16-test suite; direction-matched baselines in waves three and four; the runner's quote fields; 119 files, Amendment 20; earlier f466ee1b… supersedes 64002e08… — a cut-short folder listing is a stop with the Windows error, never "no manifest"; the runner's no-plan stop states its reasons; 116 files, Amendment 19; earlier 64002e08… supersedes 5285925c… — wave three: the big-move registration, mrofyt_bigmove.py and its 27-test suite, 116 files, Amendment 18; earlier 5285925c… supersedes 092a62e0… — recover 1.6: a file Windows will not date is set aside instead of stopping the dry run, 113 files, Amendment 17; earlier 092a62e0… supersedes 14adcbf4… — recover 1.5: progress per run, oldest session first, a stop that names the drive, the folder or the refused step, the check file before any bulk read, earlier-pass manifests checked, recorder-only declarations, 113 files, Amendment 16; earlier 14adcbf4… supersedes 9a8bce6c… — the 9/19 parallel-session work merged: runner 1.2.2 decode-failure catch and wind-back, the ingest suite, the run guide, 113 files, Amendment 15; earlier c5f652c5… — a known-unreadable file is not re-read; earlier 416beef6… — unreadable-file verdict on the page, capped shared-gap alerts, legible replay level labels; earlier 694c6367… — replay evidence matches the approach id; earlier 2fa33aed… — recover 1.4 bounded reads; earlier f930879f… — recover 1.4 unreadable-file guard; earlier f930879f… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
+9f31025170830ac09d92eb6ad23b0bdf36608219b295eee05d54033b26dc9443  MROF_V1_Engine_v01_6_7.zip (supersedes 378f7c15… — wave fifteen: the initial balance, round numbers and equal highs and lows, its registration and 7-test suite; 170 files, Amendment 38; earlier 378f7c15… supersedes 8a9eba41… — wave fourteen: the first L2 signal at each level as the primary test of the unseen days, its registration and 6-test suite; 167 files, Amendment 37; earlier 8a9eba41… supersedes 9b3f0f6a… — the eight code-review fixes to waves seven to thirteen, the shared ledgers module and the 8-test regression suite; 164 files, Amendment 36; earlier 9b3f0f6a… supersedes 551aa3bb… — wave thirteen: back into yesterday's value area with speed, its registration and 8-test suite; 162 files, Amendment 35; earlier 551aa3bb… supersedes 04aa05f0… — wave twelve: the two L2 day-context filters, their registration and 7-test suite, and the 2026 event calendar; 159 files, Amendment 34; earlier 04aa05f0… supersedes 5a9c3c57… — wave eleven: the early order-flow entry and four more level groups judged apart, its registration and 10-test suite; 155 files, Amendment 33; earlier 5a9c3c57… supersedes e21f707b… — wave ten: break and reclaim on candle closes at the big levels, filtered by the order flow, its registration and 8-test suite; 152 files, Amendment 32; earlier e21f707b… supersedes f178b353… — wave nine: L2 with a next-big-level or a volatility-scaled target against the fixed 25, its registration and 10-test suite; 149 files, Amendment 31; earlier f178b353… supersedes edf699bc… — wave eight: L2 on the first test, in the morning, both, or held 5 minutes, its registration and 7-test suite, and the frozen DEV cuts of waves six and seven with their freeze note; 146 files, Amendments 29-30; earlier edf699bc… supersedes fd06d259… — wave seven: order-flow levels graded A+ / A / B / skip with four exits, its registration and 20-test suite; 140 files, Amendment 28; earlier fd06d259… supersedes 3e934e75… — the context stamp check's peak filter and the shared parsing loop, after a review of V26–V27; 137 files, Amendment 27; earlier 3e934e75… supersedes c69b017e… — wave six: the level-break stops, L4 and trapped volume on the recordings, ES confirmation on minute bars, their registration and suites; 137 files, Amendment 26; earlier c69b017e… supersedes 98bc03c1… — context, exit, cost and risk tools with their registrations and suites, and the frozen DEV results their suite reproduces; 132 files, Amendment 25; earlier 98bc03c1… supersedes ae0f7cf3… — one study across two drives; 119 files, Amendment 23; earlier ae0f7cf3… supersedes f4529847… — the runner's refused size check skips or stops instead of crashing; 119 files, Amendment 22; earlier f4529847… supersedes 4f35d37c… — waves two to four wind an abandoned run back whole; wave two 1.1; 119 files, Amendment 21; earlier 4f35d37c… supersedes f466ee1b… — wave four: the counted search, its registration and 16-test suite; direction-matched baselines in waves three and four; the runner's quote fields; 119 files, Amendment 20; earlier f466ee1b… supersedes 64002e08… — a cut-short folder listing is a stop with the Windows error, never "no manifest"; the runner's no-plan stop states its reasons; 116 files, Amendment 19; earlier 64002e08… supersedes 5285925c… — wave three: the big-move registration, mrofyt_bigmove.py and its 27-test suite, 116 files, Amendment 18; earlier 5285925c… supersedes 092a62e0… — recover 1.6: a file Windows will not date is set aside instead of stopping the dry run, 113 files, Amendment 17; earlier 092a62e0… supersedes 14adcbf4… — recover 1.5: progress per run, oldest session first, a stop that names the drive, the folder or the refused step, the check file before any bulk read, earlier-pass manifests checked, recorder-only declarations, 113 files, Amendment 16; earlier 14adcbf4… supersedes 9a8bce6c… — the 9/19 parallel-session work merged: runner 1.2.2 decode-failure catch and wind-back, the ingest suite, the run guide, 113 files, Amendment 15; earlier c5f652c5… — a known-unreadable file is not re-read; earlier 416beef6… — unreadable-file verdict on the page, capped shared-gap alerts, legible replay level labels; earlier 694c6367… — replay evidence matches the approach id; earlier 2fa33aed… — recover 1.4 bounded reads; earlier f930879f… — recover 1.4 unreadable-file guard; earlier f930879f… — Amendment 14: replay split, recover 1.3 free-space guard, reconstructed-session completeness, pilot level trim, launcher open/refresh; earlier 4e67cd09… — God's Eye 1.1: the Mechanism theatre, study progress, runway, Amendment 13; earlier 108325dd…: adds analysis/godseye/ (19 files) and the archived dashboard directive, Amendment 12; earlier 15852c89…: recover 1.2 asks Windows, stop-never-report guards, auditor OPEN/KEPT/repair evidence; earlier 5b8e8ceb…: recover 1.1 refuses live runs; earlier ae256920…: wave two as code (mrofyt_wave2.py + suite), runner hooks, 90 files; earlier 3d34a1cb…: instant --dry-run; earlier: adds mrofyt_recover.py; earlier: pilot 1.2 validation blind + bootstrap intervals, auditor churn-after-BOOK_READY rule; earlier: truncated/corrupt-stream guard and the wave-two registration; earlier: pilot 1.1, recorder BOOK_READY repair, depth-completeness guard, retroactive runner correction. This file ships inside the zip it names, so the in-zip copy records the preceding zip hash by construction; hash the delivered artifact against the value here, not against its own embedded copy.)
 ```
 
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 795/795 + 46/46, identical to the repo
+# run from inside the unzipped package: 802/802 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -205,9 +208,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_valuearea.py` | 8/8 |
 | `tests_mrofyt_shared.py` | 8/8 |
 | `tests_mrofyt_l2firstsignal.py` | 6/6 |
-| **wave-one to fourteen, tools total** | **795/795** |
+| `tests_mrofyt_obviouslevels.py` | 7/7 |
+| **wave-one to fifteen, tools total** | **802/802** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **841/841** |
+| **package total** | **848/848** |
 
 ## Runnable research commands
 
@@ -235,6 +239,8 @@ python3 mrofyt_l2context.py "<capture folder>" --out w12.json  # wave twelve on 
 python3 mrofyt_valuearea.py "<capture folder>" --a-ref w9_frozen.json --out w13.json  # wave thirteen on DEV: describes
 python3 mrofyt_l2firstsignal.py "<capture folder>" --out w14.json  # wave fourteen on DEV: describes (expect NQ 12 trades, 7 won, +9.44)
 python3 mrofyt_l2firstsignal.py "<capture folder>" --unblind --out w14_eval.json  # THE TEST on sessions >= 20260921; exposes them for good
+python3 mrofyt_obviouslevels.py "<capture folder>" --out w15.json  # wave fifteen on DEV: describes, counts each group's trades
+python3 mrofyt_obviouslevels.py "<capture folder>" --unblind --out w15_eval.json  # secondary test, sessions >= 20260921
 ```
 
 All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -250,7 +256,7 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|Exit
      mrofyt_levelbreak.py mrofyt_smt.py mrofyt_flowlevels.py \
      mrofyt_l2variants.py mrofyt_l2targets.py mrofyt_closereclaim.py \
      mrofyt_earlylevels.py mrofyt_l2context.py mrofyt_valuearea.py \
-     mrofyt_ledgers.py mrofyt_l2firstsignal.py
+     mrofyt_ledgers.py mrofyt_l2firstsignal.py mrofyt_obviouslevels.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -1405,4 +1411,38 @@ detector hash so registering wave two provably changed nothing.
     reproduces both counts. `mrofyt_l2firstsignal.py` runs on wave
     eight's runner (FS6: its fires and grid identical). Nothing frozen
     changed (06ce854a…). Battery: 795/795 + 46/46.
+
+38. **Three more obvious levels (2026-11-01).** The operator asked to
+    add three levels that many traders watch for the reason L2 works
+    (stop and breakout orders sitting just beyond them):
+
+    - the initial balance high and low (09:30–10:30 ET);
+    - round numbers every 100 points;
+    - equal highs and lows.
+
+    `MROF_YT_WAVE15_OBVIOUSLEVELS_REGISTRATION.md` fixes them before any
+    tool computed them on any recorded session and before any validation
+    or replay holdout session was read:
+
+    - **IB:** known 10:30–17:00 ET, and only when the recording covers
+      the window.
+    - **ROUND:** every multiple of 100.00 points, per session.
+    - **EQUAL:** two 15-minute swing highs (lows) within 4 ticks,
+      standing until a 15-minute close a tick beyond it, or 5 sessions.
+    - **Signal:** wave eleven's WICK entry, the 10-second L2 analogue,
+      unchanged. Only the first signal at each level per session is
+      taken.
+    - **Trade:** 25 / 15 / 30 minutes, one position at a time per group,
+      net of costs.
+    - **Verdict:** each group judged alone on NQ: 30 or more trades,
+      Holm over the three, the 95 % interval above 0 and a profit
+      without the best day. A held-out read withholds a group that has
+      fewer than 30 trades.
+    - It is **secondary** to wave fourteen on sessions on or after
+      2026-09-21, and judged separately on the replay holdout.
+
+    `mrofyt_obviouslevels.py` adds no runner hook: the levels are built
+    after the read from the mids and the grid, on wave fourteen's runner
+    (OL6: its fires and grid identical). Nothing frozen changed
+    (06ce854a…). Battery: 802/802 + 46/46.
 
