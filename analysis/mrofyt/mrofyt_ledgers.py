@@ -35,6 +35,28 @@ def record_holdout_read(rep, path, version):
     return len(old['reads'])
 
 
+def record_history_read(rep, path, version):
+    """MROF_MINUTE_HISTORY_EXPOSURE.json: which wave read which years of
+    minute exports in its judging (--unblind) mode. Those years are read
+    once by each registered question."""
+    import datetime as _dt
+    old = dict(reads=[])
+    if os.path.exists(path):
+        try:
+            old = json.load(open(path))
+        except Exception:
+            pass
+    old.setdefault('reads', []).append(dict(
+        version=version, first=rep.get('first_session'),
+        last=rep.get('last_session'), n=rep.get('n_trades'),
+        at=_dt.datetime.now(_dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')))
+    old['rule'] = ('The minute-export years before 2019-06-01 are judged '
+                   'once by each registered question; a later read of NEW '
+                   'rules on them is not a fresh test.')
+    json.dump(old, open(path, 'w'), indent=1)
+    return len(old['reads'])
+
+
 def record_exposure(rep, path, version):
     old = []
     if os.path.exists(path):
