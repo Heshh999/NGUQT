@@ -94,14 +94,21 @@ flowchart TB
     CF --> RN["Outcome-blind runner<br/>mrofyt_runner"]
     RN --> PI["Pilot diagnostic<br/>mrofyt_pilot"]
     RN --> W2["Wave-two families<br/>mrofyt_wave2"]
-    RN --> W3["Wave-three big-move search<br/>mrofyt_bigmove"]
-    W3 --> W4["Wave-four counted search<br/>mrofyt_discover"]
+    PI --> W3["Wave three: big-move search<br/>mrofyt_bigmove"]
+    W3 --> W4["Wave four: counted search<br/>mrofyt_discover"]
+    W4 --> W7["Wave seven: order-flow levels<br/>mrofyt_flowlevels"]
+    W3 --> CH["The L2 chain, hooks only, each wave a subclass of the last:<br/>6 level break → 8 variants → 9 targets → 10 candle close →<br/>11 early entry + level groups → 12 day type → 13 value area;<br/>14 first signal, 15 obvious levels, 16A, 16B on the same runner"]
+    CH --> CP["One-read checkpoint<br/>mrofyt_checkpoint: every wave's own report on one read"]
+    MB["NQ / ES minute exports"] --> CX["Context, ES confirmation,<br/>16A history, 16C momentum"]
     PI -->|"labels every inspected day"| LG[("Exposure ledger<br/>EXPOSED_PILOT_DEV")]
-    AU --> RP[("Reports<br/>audit, recovery, ledger,<br/>pilot, wave two, wave three, windows")]
+    CP -->|"every wave's version"| LG
+    AU --> RP[("Reports<br/>audit, recovery, ledgers,<br/>pilot, waves two to sixteen, checkpoint")]
     RC --> RP
     RN --> RP
     PI --> RP
     W2 --> RP
+    CP --> RP
+    CX --> RP
     LOCK["Outcome lock<br/>STATE-C file absent"] -.->|"outcomes stay locked"| RN
     subgraph GE["God's Eye View - read-only, 127.0.0.1"]
         EX["Exporter<br/>bounded reads + blind policy"] --> SN[("Snapshot JSON")]
@@ -333,11 +340,23 @@ capture installation and operation.
 - Recorder build 1.2.2 is compiled in NinjaTrader and recording NQ and MNQ; the auditor
   confirms its disconnect repair on real feed disconnects. Mono stub compiles elsewhere in
   the repository prove syntax only.
-- The order-flow pilot has inspected five sessions (2026-09-01 to 09-05), each labelled
-  `EXPOSED_PILOT_DEV` for good. Sessions from 2026-09-21 onward are a validation hold-out
-  that the tools and the dashboard withhold. Two wave-one families are
-  `IMPLEMENTED_NOT_WIRED`. A5 has four of its five frozen inputs uncomputed, so it cannot
-  fire on real data. A4 runs with one of its two alternative residual inputs uncomputed.
+- The order-flow program has inspected the fifteen DEV sessions of 2026-09-01 to 09-18,
+  each labelled `EXPOSED_PILOT_DEV` for good. Sessions from 2026-09-21 onward are a
+  validation hold-out that no tool has read; the tools and the dashboard withhold them.
+  Two wave-one families are `IMPLEMENTED_NOT_WIRED`. A5 has four of its five frozen
+  inputs uncomputed, so it cannot fire on real data. A4 runs with one of its two
+  alternative residual inputs uncomputed.
+- Sixteen registered waves sit on the runner through observation hooks (see
+  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–40). On DEV, wave
+  six's L2 (fade the failed break of a daily range level when the order flow turns) is
+  the one idea with support: 57 trades, +6.15 points a trade net of costs, most of it from
+  one session. Wave fourteen fixes the first L2 signal at each level per session as the
+  **primary test** of the hold-out, with its verdict rule written in advance (30 or more
+  NQ trades, a session-clustered 95% interval above zero, profitable without the best
+  day; fewer than 30 trades shows the count only). Waves ten to sixteen are built and
+  registered but have never run on a recorded session. `mrofyt_checkpoint.py` (V40) runs
+  every recordings test on one read, each wave's report byte-identical to its own command.
+  Package V40: 820/820 research checks and 46/46 dashboard checks from inside the zip.
 - The capture drive recorded file-system damage in two depth files after a disconnect on
   2026-09-22. The audit and recovery tools set those runs aside rather than reading
   guessed data. The first full repair pass, on 2026-09-26, stopped partway when Windows
