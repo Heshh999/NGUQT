@@ -33,6 +33,7 @@ import mrofyt_levelbreak as LB       # noqa: E402
 import mrofyt_limitentry as LE       # noqa: E402
 import mrofyt_minutelevels as ML     # noqa: E402
 import mrofyt_obviouslevels as OL    # noqa: E402
+import mrofyt_scaledbracket as SB    # noqa: E402
 import mrofyt_valuearea as VA        # noqa: E402
 
 OK = []
@@ -49,7 +50,7 @@ CLASSES = [(LB, 'LevelBreakRunner'), (V, 'L2VariantRunner'),
            (X, 'ContextRunner'), (VA, 'ValueRunner'),
            (FS, 'FirstSignalRunner'), (OL, 'ObviousLevelsRunner'),
            (ML, 'MinuteLevelsRunner'), (LE, 'LimitRunner'),
-           (CF, 'ConfluenceRunner')]
+           (CF, 'ConfluenceRunner'), (SB, 'ScaledBracketRunner')]
 REAL = [getattr(m, c) for m, c in CLASSES]
 
 
@@ -93,7 +94,8 @@ def alone(u):
             'wave 15': OL.run(D5, u)[0],
             '16A': ML.run_recordings(D5, u)[0],
             '16B': LE.run(D5, u)[0],
-            'wave 17': CF.run(D5, u)[0]}
+            'wave 17': CF.run(D5, u)[0],
+            'wave 18': SB.run(D5, W9, u)[0]}
 
 
 _FROZEN_L2 = BM.l2_sweep_reclaim
@@ -111,7 +113,8 @@ restored = [getattr(m, c) for m, c in CLASSES] == REAL and \
     BM.l2_sweep_reclaim is _FROZEN_L2
 
 t('CP1: on DEV, every wave\'s report from the one read is byte-identical '
-  'to its own command (waves 6, 8-15, 16A, 16B, 17), and the runner classes '
+  'to its own command (waves 6, 8-15, 16A, 16B, 17, 18), and the runner '
+  'classes '
   'are restored afterwards',
   set(repD['reports']) == set(aloneD) and
   all(dump(repD['reports'][k]) == dump(aloneD[k]) for k in aloneD) and
@@ -137,8 +140,8 @@ t('CP3: the headline is wave fourteen\'s NQ verdict; the scorecard lists '
   all(lab.upper() in txt for lab in repD['waves']) and
   'HEADLINE' in txt and 'wave 7' in ' '.join(repD['not_run']) and
   '16C' in ' '.join(repD['not_run']) and
-  'wave 9' not in repN['waves'] and
-  any(x.startswith('wave 9') for x in repN['not_run']))
+  'wave 9' not in repN['waves'] and 'wave 18' not in repN['waves'] and
+  any(x.startswith('waves 9 and 18') for x in repN['not_run']))
 
 bad = os.path.join(WORK, 'not_w9.json')
 json.dump({'x': 1}, open(bad, 'w'))

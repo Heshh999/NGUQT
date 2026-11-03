@@ -21,6 +21,8 @@ verdicts and withholding.
     16A       does the order flow add to the levels?
     16B       limit entry against market entry
     wave 17   confluence grades A+ / A / B over every level family; sizing
+    wave 18   wave 14's trades with the stop and target scaled together
+              (needs --a-ref)
 
 Not here: wave seven (its own engine; refresh its DEV cuts first), and
 the minute-export parts 16A-history and 16C (other data).
@@ -48,6 +50,7 @@ import mrofyt_limitentry as LE
 import mrofyt_minutelevels as ML
 import mrofyt_obviouslevels as OL
 import mrofyt_runner as RUN
+import mrofyt_scaledbracket as SB
 import mrofyt_valuearea as VA
 
 CHECKPOINT_VERSION = 'MROF-YT-CHECKPOINT-1.0'
@@ -92,6 +95,10 @@ def _plan(w6_frozen, w9_frozen, calendar):
          lambda d, u, h, m: LE.run(d, u, h, m), LE.text),
         ('wave 17', CF, 'ConfluenceRunner', CF.W17_VERSION,
          lambda d, u, h, m: CF.run(d, u, h, m), CF.text)]
+    if w9_frozen is not None:
+        plan.append(('wave 18', SB, 'ScaledBracketRunner', SB.W18_VERSION,
+                     lambda d, u, h, m: SB.run(d, w9_frozen, u, h, m),
+                     SB.text))
     return plan
 
 
@@ -164,8 +171,8 @@ def run(capture_dir, unblind=False, holdout=False, w6_frozen=None,
                waves=[lab for lab in reports],
                not_run=[x for x in (
                    None if w9_frozen is not None else
-                   'wave 9: needs its frozen DEV file (--a-ref '
-                   'w9_frozen.json)',
+                   'waves 9 and 18: need wave nine\'s frozen DEV file '
+                   '(--a-ref w9_frozen.json)',
                    'wave 7: its own engine; refresh its DEV cuts, then run '
                    'mrofyt_flowlevels.py',
                    '16A history and 16C: NQ minute exports, their own '
