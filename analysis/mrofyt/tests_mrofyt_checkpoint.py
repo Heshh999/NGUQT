@@ -23,6 +23,7 @@ import mles_v12_synth as SY          # noqa: E402
 import mrofyt_bigmove as BM          # noqa: E402
 import mrofyt_checkpoint as CP       # noqa: E402
 import mrofyt_closereclaim as C      # noqa: E402
+import mrofyt_confluence as CF       # noqa: E402
 import mrofyt_earlylevels as E       # noqa: E402
 import mrofyt_l2context as X         # noqa: E402
 import mrofyt_l2firstsignal as FS    # noqa: E402
@@ -47,7 +48,8 @@ CLASSES = [(LB, 'LevelBreakRunner'), (V, 'L2VariantRunner'),
            (W, 'TargetRunner'), (C, 'CloseRunner'), (E, 'LevelsRunner'),
            (X, 'ContextRunner'), (VA, 'ValueRunner'),
            (FS, 'FirstSignalRunner'), (OL, 'ObviousLevelsRunner'),
-           (ML, 'MinuteLevelsRunner'), (LE, 'LimitRunner')]
+           (ML, 'MinuteLevelsRunner'), (LE, 'LimitRunner'),
+           (CF, 'ConfluenceRunner')]
 REAL = [getattr(m, c) for m, c in CLASSES]
 
 
@@ -90,7 +92,8 @@ def alone(u):
             'wave 14': FS.run(D5, u)[0],
             'wave 15': OL.run(D5, u)[0],
             '16A': ML.run_recordings(D5, u)[0],
-            '16B': LE.run(D5, u)[0]}
+            '16B': LE.run(D5, u)[0],
+            'wave 17': CF.run(D5, u)[0]}
 
 
 _FROZEN_L2 = BM.l2_sweep_reclaim
@@ -108,7 +111,7 @@ restored = [getattr(m, c) for m, c in CLASSES] == REAL and \
     BM.l2_sweep_reclaim is _FROZEN_L2
 
 t('CP1: on DEV, every wave\'s report from the one read is byte-identical '
-  'to its own command (waves 6, 8-15, 16A, 16B), and the runner classes '
+  'to its own command (waves 6, 8-15, 16A, 16B, 17), and the runner classes '
   'are restored afterwards',
   set(repD['reports']) == set(aloneD) and
   all(dump(repD['reports'][k]) == dump(aloneD[k]) for k in aloneD) and

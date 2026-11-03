@@ -20,6 +20,7 @@ verdicts and withholding.
     wave 15   initial balance, round 100s, equal highs and lows
     16A       does the order flow add to the levels?
     16B       limit entry against market entry
+    wave 17   confluence grades A+ / A / B over every level family; sizing
 
 Not here: wave seven (its own engine; refresh its DEV cuts first), and
 the minute-export parts 16A-history and 16C (other data).
@@ -35,6 +36,7 @@ import os
 import sys
 
 import mrofyt_closereclaim as C
+import mrofyt_confluence as CF
 import mrofyt_earlylevels as E
 import mrofyt_l2context as X
 import mrofyt_l2firstsignal as FS
@@ -87,7 +89,9 @@ def _plan(w6_frozen, w9_frozen, calendar):
          lambda d, u, h, m: ML.run_recordings(d, u, h, m),
          ML.text_recordings),
         ('16B', LE, 'LimitRunner', LE.W16B_VERSION,
-         lambda d, u, h, m: LE.run(d, u, h, m), LE.text)]
+         lambda d, u, h, m: LE.run(d, u, h, m), LE.text),
+        ('wave 17', CF, 'ConfluenceRunner', CF.W17_VERSION,
+         lambda d, u, h, m: CF.run(d, u, h, m), CF.text)]
     return plan
 
 
