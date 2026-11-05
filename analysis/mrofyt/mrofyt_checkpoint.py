@@ -23,6 +23,7 @@ verdicts and withholding.
     wave 17   confluence grades A+ / A / B over every level family; sizing
     wave 18   wave 14's trades with the stop and target scaled together
               (needs --a-ref)
+    wave 19   L2 at the first signal from each side of a level
 
 Not here: wave seven (its own engine; refresh its DEV cuts first), and
 the minute-export parts 16A-history and 16C (other data).
@@ -41,6 +42,7 @@ import mrofyt_closereclaim as C
 import mrofyt_confluence as CF
 import mrofyt_earlylevels as E
 import mrofyt_l2context as X
+import mrofyt_l2firstside as FD
 import mrofyt_l2firstsignal as FS
 import mrofyt_l2targets as W
 import mrofyt_l2variants as V
@@ -99,6 +101,8 @@ def _plan(w6_frozen, w9_frozen, calendar):
         plan.append(('wave 18', SB, 'ScaledBracketRunner', SB.W18_VERSION,
                      lambda d, u, h, m: SB.run(d, w9_frozen, u, h, m),
                      SB.text))
+    plan.append(('wave 19', FD, 'FirstSideRunner', FD.W19_VERSION,
+                 lambda d, u, h, m: FD.run(d, u, h, m), FD.text))
     return plan
 
 

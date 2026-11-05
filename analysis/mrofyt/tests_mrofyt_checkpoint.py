@@ -26,6 +26,7 @@ import mrofyt_closereclaim as C      # noqa: E402
 import mrofyt_confluence as CF       # noqa: E402
 import mrofyt_earlylevels as E       # noqa: E402
 import mrofyt_l2context as X         # noqa: E402
+import mrofyt_l2firstside as FD      # noqa: E402
 import mrofyt_l2firstsignal as FS    # noqa: E402
 import mrofyt_l2targets as W         # noqa: E402
 import mrofyt_l2variants as V        # noqa: E402
@@ -50,7 +51,8 @@ CLASSES = [(LB, 'LevelBreakRunner'), (V, 'L2VariantRunner'),
            (X, 'ContextRunner'), (VA, 'ValueRunner'),
            (FS, 'FirstSignalRunner'), (OL, 'ObviousLevelsRunner'),
            (ML, 'MinuteLevelsRunner'), (LE, 'LimitRunner'),
-           (CF, 'ConfluenceRunner'), (SB, 'ScaledBracketRunner')]
+           (CF, 'ConfluenceRunner'), (SB, 'ScaledBracketRunner'),
+           (FD, 'FirstSideRunner')]
 REAL = [getattr(m, c) for m, c in CLASSES]
 
 
@@ -95,7 +97,8 @@ def alone(u):
             '16A': ML.run_recordings(D5, u)[0],
             '16B': LE.run(D5, u)[0],
             'wave 17': CF.run(D5, u)[0],
-            'wave 18': SB.run(D5, W9, u)[0]}
+            'wave 18': SB.run(D5, W9, u)[0],
+            'wave 19': FD.run(D5, u)[0]}
 
 
 _FROZEN_L2 = BM.l2_sweep_reclaim
@@ -113,7 +116,7 @@ restored = [getattr(m, c) for m, c in CLASSES] == REAL and \
     BM.l2_sweep_reclaim is _FROZEN_L2
 
 t('CP1: on DEV, every wave\'s report from the one read is byte-identical '
-  'to its own command (waves 6, 8-15, 16A, 16B, 17, 18), and the runner '
+  'to its own command (waves 6, 8-15, 16A, 16B, 17-19), and the runner '
   'classes '
   'are restored afterwards',
   set(repD['reports']) == set(aloneD) and
