@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# MROF-YT-CHECKPOINT-1.0 suite. The one-read checkpoint is checked
+# MROF-YT-CHECKPOINT-1.1 suite. The one-read checkpoint is checked
 # against every wave's own command on the same synthetic recorder-format
 # runs (mles_v12_synth) with wave six's suite-only plumbing L2 detector,
 # restored afterwards: each wave's report must be byte-identical, on DEV

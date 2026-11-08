@@ -19,11 +19,22 @@ import os
 import mrofyt_pilot as PI
 
 
+def _write(path, doc):
+    """Write and close at once: every record_* call reads back the file
+    the call before it wrote, so the write must be on disk before it
+    returns, under any Python (PyPy closes an unreferenced file only
+    when its garbage collector gets to it). The bytes are the same as
+    json.dump's to an open file."""
+    with open(path, 'w') as fh:
+        json.dump(doc, fh, indent=1)
+
+
 def record_holdout_read(rep, path, version):
     old = dict(reads=[])
     if os.path.exists(path):
         try:
-            old = json.load(open(path))
+            with open(path) as fh:
+                old = json.load(fh)
         except Exception:
             pass
     old.setdefault('reads', []).append(dict(
@@ -31,7 +42,7 @@ def record_holdout_read(rep, path, version):
     old['rule'] = ('Replay holdout sessions are read once by each '
                    'registered wave; a later read of NEW rules on them is '
                    'not a fresh test.')
-    json.dump(old, open(path, 'w'), indent=1)
+    _write(path, old)
     return len(old['reads'])
 
 
@@ -43,7 +54,8 @@ def record_history_read(rep, path, version):
     old = dict(reads=[])
     if os.path.exists(path):
         try:
-            old = json.load(open(path))
+            with open(path) as fh:
+                old = json.load(fh)
         except Exception:
             pass
     old.setdefault('reads', []).append(dict(
@@ -53,7 +65,7 @@ def record_history_read(rep, path, version):
     old['rule'] = ('The minute-export years before 2019-06-01 are judged '
                    'once by each registered question; a later read of NEW '
                    'rules on them is not a fresh test.')
-    json.dump(old, open(path, 'w'), indent=1)
+    _write(path, old)
     return len(old['reads'])
 
 
@@ -61,7 +73,8 @@ def record_exposure(rep, path, version):
     old = []
     if os.path.exists(path):
         try:
-            old = json.load(open(path)).get('exposed_days', [])
+            with open(path) as fh:
+                old = json.load(fh).get('exposed_days', [])
         except Exception:
             old = []
     by = {d['session']: d for d in old}
@@ -77,12 +90,12 @@ def record_exposure(rep, path, version):
         if version not in by[s]['also_exposed_by']:
             by[s]['also_exposed_by'].append(version)
     days = sorted(by.values(), key=lambda d: d['session'])
-    json.dump(dict(label=PI.EXPOSURE_LABEL, blind_label=PI.BLIND_LABEL,
+    _write(path, dict(label=PI.EXPOSURE_LABEL, blind_label=PI.BLIND_LABEL,
                    rule='EXPOSED days may remain in later DEV/training where '
                         'the governing protocol permits; they can never '
                         'become untouched prospective validation. BLIND '
                         'days had fire counts read and markouts withheld; '
                         'they remain valid validation until explicitly '
                         'unblinded.',
-                   exposed_days=days), open(path, 'w'), indent=1)
+                   exposed_days=days))
     return len(days)

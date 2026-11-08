@@ -5,6 +5,7 @@
 # recorder-format runs (mles_v12_synth) with wave six's suite-only
 # plumbing L2 detector, restored afterwards. Synthetic events verify CODE
 # BEHAVIOR only, never market evidence. No order, fill or P&L exists.
+import gc
 import gzip
 import io
 import json
@@ -127,6 +128,10 @@ for i, s in enumerate(SESSIONS):
     SY.synth_run(D5, n_depth=60000, dt_step=0.05, price_path=_path(30 + 3 * i),
                  trade_every=10, quote_every=5, cid='w19c%d' % i, session=s,
                  seed=i)
+# mles_v12_synth leaves each manifest to be closed when collected;
+# collect now, so a Python without reference counting (PyPy) has
+# written them before they are read
+gc.collect()
 BM.l2_sweep_reclaim = _l2_plumbing
 try:
     repD, rD = FD.run(D5)

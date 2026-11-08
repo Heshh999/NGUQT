@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mrofyt_checkpoint.py - MROF-YT-CHECKPOINT-1.0
+"""mrofyt_checkpoint.py - MROF-YT-CHECKPOINT-1.1
 
 Every registered test that reads the recordings, in ONE pass. The
 recordings are read once by the last runner of the chain (wave
@@ -31,6 +31,13 @@ the minute-export parts 16A-history and 16C (other data).
     python3 mrofyt_checkpoint.py "<capture>" --a-ref w9_frozen.json --out cp_dev.json
     python3 mrofyt_checkpoint.py "<old>;<new>" --unblind --a-ref w9_frozen.json --out cp_eval.json
 
+--nq-only reads NQ's recordings only, about half the work: every test is
+judged on NQ and each instrument's state is kept apart, so NQ's results
+are those of the full read; MNQ, described beside and never tested, is
+not read. Prove it on DEV first: run the DEV command with --nq-only and
+compare it with the full DEV report (mrofyt_cpcompare.py); every NQ
+number must agree.
+
 THIS PROJECT DOES NOT AUTHORIZE LIVE TRADING. No order is placed.
 """
 
@@ -55,7 +62,7 @@ import mrofyt_runner as RUN
 import mrofyt_scaledbracket as SB
 import mrofyt_valuearea as VA
 
-CHECKPOINT_VERSION = 'MROF-YT-CHECKPOINT-1.0'
+CHECKPOINT_VERSION = 'MROF-YT-CHECKPOINT-1.1'
 HERE = os.path.dirname(os.path.abspath(__file__))
 W6_FROZEN = os.path.join(HERE, 'frozen_dev_20261031', 'w6_frozen.json')
 CALENDAR = os.path.join(HERE, 'calendar_2026_events.csv')
@@ -138,12 +145,17 @@ def is_test(status):
 
 
 def run(capture_dir, unblind=False, holdout=False, w6_frozen=None,
-        w9_frozen=None, calendar=None, max_sessions=None):
-    """One read, every wave's report on it: {label: rep}, the runner."""
+        w9_frozen=None, calendar=None, max_sessions=None, instruments=None):
+    """One read, every wave's report on it: {label: rep}, the runner.
+    instruments=('NQ',) reads NQ's recordings only (--nq-only): every
+    test is judged on NQ, and the runner keeps each instrument's state
+    apart, so NQ's results are those of the full read; MNQ, described
+    beside and never tested, is then not read at all."""
     if unblind and holdout:
         raise ValueError('--unblind and --holdout are separate reads')
+    kw = {} if instruments is None else dict(instruments=tuple(instruments))
     r = VA.ValueRunner(capture_dir, unblind=unblind, holdout=holdout,
-                       max_sessions=max_sessions)
+                       max_sessions=max_sessions, **kw)
     led = r.run()
     r.run = lambda: led                      # every wave reuses this read
     reports, texts = {}, {}
@@ -170,6 +182,7 @@ def run(capture_dir, unblind=False, holdout=False, w6_frozen=None,
                mode='unblind' if unblind else ('holdout' if holdout
                                                else 'dev'),
                runner=led['runner'],
+               instruments=list(r.instruments),
                sessions_inspected=sorted(led['sessions']),
                sessions_refused=list(r.refused_sessions),
                waves=[lab for lab in reports],
@@ -187,8 +200,12 @@ def run(capture_dir, unblind=False, holdout=False, w6_frozen=None,
 
 def text(rep, texts):
     s = rep['summary']
+    insts = rep.get('instruments') or ['NQ', 'MNQ']
     lines = ['%s  %s  (one read, every recordings test)'
              % (rep['checkpoint'], rep['mode']),
+             'instruments read: %s%s' % (
+                 ', '.join(insts), '' if 'MNQ' in insts else
+                 '  (NQ only: MNQ, never tested, not read)'),
              'sessions read: %s' % ', '.join(rep['sessions_inspected']),
              'sessions REFUSED: %s' % (', '.join(rep['sessions_refused'])
                                        or '-'),
@@ -223,7 +240,8 @@ def text(rep, texts):
 
 def _load(path, what):
     try:
-        return json.load(open(path))
+        with open(path) as fh:
+            return json.load(fh)
     except (OSError, ValueError) as exc:
         raise ValueError('%s: cannot read %s (%s)' % (what, path, exc))
 
@@ -256,18 +274,23 @@ def main(argv=None):
         print('STOPPED: %s' % exc)
         return 2
     ms = int(arg('--max-sessions')) if arg('--max-sessions') else None
+    insts = ('NQ',) if '--nq-only' in argv else None
     if unblind or holdout:
         print('*** %s: every registered recordings test, once, in one '
               'read. ***\n' % ('UNBLIND' if unblind else 'HOLDOUT'))
+    if insts:
+        print('NQ only: MNQ\'s recordings are not read.\n')
     try:
-        rep, texts, _r = run(argv[0], unblind, holdout, w6, w9, cal, ms)
+        rep, texts, _r = run(argv[0], unblind, holdout, w6, w9, cal, ms,
+                             insts)
     except (RUN.CaptureUnavailable, RUN.NoCaptureData) as exc:
         print('STOPPED: %s' % exc)
         return 2
     print(text(rep, texts))
     out = arg('--out')
     if out:
-        json.dump(rep, open(out, 'w'), indent=1, default=str)
+        with open(out, 'w') as fh:
+            json.dump(rep, fh, indent=1, default=str)
         print('\ncheckpoint report -> %s' % out)
     versions = [ver for lab, _m, _c, ver, _f, _t in _plan(w6, w9, cal)]
     if holdout:
