@@ -97,12 +97,12 @@ flowchart TB
     PI --> W3["Wave three: big-move search<br/>mrofyt_bigmove"]
     W3 --> W4["Wave four: counted search<br/>mrofyt_discover"]
     W4 --> W7["Wave seven: order-flow levels<br/>mrofyt_flowlevels"]
-    W3 --> CH["The L2 chain, hooks only, each wave a subclass of the last:<br/>6 level break → 8 variants → 9 targets → 10 candle close →<br/>11 early entry + level groups → 12 day type → 13 value area;<br/>14 first signal, 15 obvious levels, 16A, 16B, 17 confluence,<br/>18 scaled bracket, 19 first signal per side on the same runner"]
+    W3 --> CH["The L2 chain, hooks only, each wave a subclass of the last:<br/>6 level break → 8 variants → 9 targets → 10 candle close →<br/>11 early entry + level groups → 12 day type → 13 value area;<br/>14 first signal, 15 obvious levels, 16A, 16B, 17 confluence,<br/>18 scaled bracket, 19 first signal per side, 20 profile levels on the same runner"]
     CH --> CP["One-read checkpoint<br/>mrofyt_checkpoint: every wave's own report on one read"]
     MB["NQ / ES minute exports"] --> CX["Context, ES confirmation,<br/>16A history, 16C momentum"]
     PI -->|"labels every inspected day"| LG[("Exposure ledger<br/>EXPOSED_PILOT_DEV")]
     CP -->|"every wave's version"| LG
-    AU --> RP[("Reports<br/>audit, recovery, ledgers,<br/>pilot, waves two to nineteen, checkpoint")]
+    AU --> RP[("Reports<br/>audit, recovery, ledgers,<br/>pilot, waves two to twenty, checkpoint")]
     RC --> RP
     RN --> RP
     PI --> RP
@@ -286,7 +286,7 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 41 suites, 847 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 42 suites, 859 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
@@ -346,18 +346,20 @@ capture installation and operation.
   Two wave-one families are `IMPLEMENTED_NOT_WIRED`. A5 has four of its five frozen
   inputs uncomputed, so it cannot fire on real data. A4 runs with one of its two
   alternative residual inputs uncomputed.
-- Nineteen registered waves sit on the runner through observation hooks (see
-  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–45). On DEV, wave
+- Twenty registered waves sit on the runner through observation hooks (see
+  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–46). On DEV, wave
   six's L2 (fade the failed break of a daily range level when the order flow turns) is
   the one idea with support: 57 trades, +6.15 points a trade net of costs, most of it from
   one session. Wave fourteen fixes the first L2 signal at each level per session as the
   **primary test** of the hold-out, with its verdict rule written in advance (30 or more
   NQ trades, a session-clustered 95% interval above zero, profitable without the best
   day; fewer than 30 trades shows the count only). Wave nineteen tests one first signal
-  from each side of a level beside it, as a secondary test. Waves ten to nineteen are built
+  from each side of a level beside it, and wave twenty tests levels like the value area
+  (overnight and weekly value areas, yesterday's close and midpoint, untested POC
+  targets), all as secondary tests. Waves ten to twenty are built
   and registered but have never run on a recorded session. `mrofyt_checkpoint.py` (V40,
-  extended through V44) runs every recordings test on one read, each wave's report
-  byte-identical to its own command; `--nq-only` reads NQ alone, about half the work. Package V45: 847/847 research checks and 46/46
+  extended through V46) runs every recordings test on one read, each wave's report
+  byte-identical to its own command; `--nq-only` reads NQ alone, about half the work. Package V46: 859/859 research checks and 46/46
   dashboard checks from inside the zip.
 - The capture drive recorded file-system damage in two depth files after a disconnect on
   2026-09-22. The audit and recovery tools set those runs aside rather than reading

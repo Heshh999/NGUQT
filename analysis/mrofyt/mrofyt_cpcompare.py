@@ -14,7 +14,9 @@ instrument is MNQ), and the bookkeeping that counts both instruments
 together (the runner's ledger, the session lists, wave eighteen's count
 of trades without a recent range, the checkpoint's version and the
 instruments it read). A difference in the sessions read is shown as a
-note, never hidden.
+note, never hidden. A wave only one of the two reports holds (a later
+package adds one) is named in a note; the waves both hold are compared,
+and the headline with them.
 
     python3 mrofyt_cpcompare.py cp_dev.json cp_dev_fast.json
 
@@ -93,8 +95,25 @@ def compare(rep_a, rep_b):
     if rep_a.get('mode') != rep_b.get('mode'):
         raise ValueError('not the same kind of read: %s against %s'
                          % (rep_a.get('mode'), rep_b.get('mode')))
-    diffs, n = differences(nq_view(rep_a), nq_view(rep_b))
+    va, vb = nq_view(rep_a), nq_view(rep_b)
     notes = []
+    wa, wb = set(rep_a['reports']), set(rep_b['reports'])
+    if wa != wb:
+        # a later package adds a wave: the waves both reports hold are
+        # compared; the counts that sum over every wave are not
+        both = wa & wb
+        for v in (va, vb):
+            v['reports'] = {k: x for k, x in v['reports'].items()
+                            if k in both}
+            v['scorecard'] = {k: x for k, x in
+                              (v.get('scorecard') or {}).items() if k in both}
+            v.pop('waves', None)
+            v['summary'] = {'headline': (v.get('summary') or {}).get(
+                'headline')}
+        notes.append('waves in one report only, not compared: %s; the %d '
+                     'both hold are compared' % (
+                         ', '.join(sorted(wa ^ wb)), len(both)))
+    diffs, n = differences(va, vb)
     sa = set(rep_a.get('sessions_inspected') or ())
     sb = set(rep_b.get('sessions_inspected') or ())
     if sa != sb:

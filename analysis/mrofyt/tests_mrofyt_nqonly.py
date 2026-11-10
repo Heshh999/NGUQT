@@ -144,6 +144,15 @@ noise = copy.deepcopy(nqD)
 h = noise['reports']['wave 14']['results']['NQ']['test']
 h['net_points'] = (h['net_points'] or 0.0) * (1 + 1e-13)
 r_planted = CC.compare(fullD, planted)
+# a report from a package before the last wave was added
+LAST = fullD['waves'][-1]
+older = copy.deepcopy(fullD)
+del older['reports'][LAST], older['scorecard'][LAST]
+older['waves'].remove(LAST)
+older['summary']['tests'] -= sum(1 for x in fullD['scorecard'][LAST]
+                                 if CP.is_test(x[3]))
+r_older = CC.compare(older, nqD)
+r_older_bad = CC.compare(older, planted)
 try:
     CC.compare(fullD, fullU)
     refused = False
@@ -151,12 +160,19 @@ except ValueError as exc:
     refused = 'not the same kind of read' in str(exc)
 t('NQ3: a changed NQ number is DIFFERENT and named by its path; a changed '
   'MNQ result is not compared; a last-digit float difference (another '
-  'Python) is the same value; DEV against unblind is refused',
+  'Python) is the same value; DEV against unblind is refused; a report '
+  'from before the last wave was added is compared on the waves both '
+  'hold, the missing wave named, a changed number still found',
   not r_planted['match'] and len(r_planted['diffs']) == 1 and
   r_planted['diffs'][0][0] == 'reports/wave 14/results/NQ/test/n' and
   'DIFFERENT: 1 of' in CC.text(r_planted) and
   CC.compare(fullD, mnq_only)['match'] and
-  CC.compare(nqD, noise)['match'] and refused)
+  CC.compare(nqD, noise)['match'] and refused and
+  r_older['match'] and any(LAST in x and 'not compared' in x
+                           for x in r_older['notes']) and
+  not r_older_bad['match'] and
+  [d[0] for d in r_older_bad['diffs']] ==
+  ['reports/wave 14/results/NQ/test/n'])
 
 # ---------------------------------------------------------------------
 # NQ4: the two commands
