@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""mrofyt_checkpoint.py - MROF-YT-CHECKPOINT-1.2
+"""mrofyt_checkpoint.py - MROF-YT-CHECKPOINT-1.3
 
 Every registered test that reads the recordings, in ONE pass. The
 recordings are read once by the last runner of the chain (wave
-twenty's, which carries every wave's hooks); each wave's own,
+twenty-one's, which carries every wave's hooks); each wave's own,
 unchanged report code then runs on that same finished read, so every
 test is scored exactly as its own command would score it. Nothing is
 added, merged or re-tuned: each wave keeps its own registration,
@@ -27,6 +27,9 @@ verdicts and withholding.
     wave 20   levels like the value area: the overnight and last week's
               value areas, yesterday's close and midpoint, untested POCs
               as targets
+    wave 21   the Traders Reality levels: the weekly Psy high and low
+              (two windows), the Tokyo and London highs and lows, the
+              two ADR lines
 
 Not here: wave seven (its own engine; refresh its DEV cuts first), and
 the minute-export parts 16A-history and 16C (other data).
@@ -64,9 +67,10 @@ import mrofyt_obviouslevels as OL
 import mrofyt_profilelevels as PL
 import mrofyt_runner as RUN
 import mrofyt_scaledbracket as SB
+import mrofyt_sessionlevels as SL
 import mrofyt_valuearea as VA
 
-CHECKPOINT_VERSION = 'MROF-YT-CHECKPOINT-1.2'
+CHECKPOINT_VERSION = 'MROF-YT-CHECKPOINT-1.3'
 HERE = os.path.dirname(os.path.abspath(__file__))
 W6_FROZEN = os.path.join(HERE, 'frozen_dev_20261031', 'w6_frozen.json')
 CALENDAR = os.path.join(HERE, 'calendar_2026_events.csv')
@@ -116,6 +120,8 @@ def _plan(w6_frozen, w9_frozen, calendar):
                  lambda d, u, h, m: FD.run(d, u, h, m), FD.text))
     plan.append(('wave 20', PL, 'ProfileLevelsRunner', PL.W20_VERSION,
                  lambda d, u, h, m: PL.run(d, u, h, m), PL.text))
+    plan.append(('wave 21', SL, 'SessionLevelsRunner', SL.W21_VERSION,
+                 lambda d, u, h, m: SL.run(d, u, h, m), SL.text))
     return plan
 
 
@@ -160,7 +166,7 @@ def run(capture_dir, unblind=False, holdout=False, w6_frozen=None,
     if unblind and holdout:
         raise ValueError('--unblind and --holdout are separate reads')
     kw = {} if instruments is None else dict(instruments=tuple(instruments))
-    r = PL.ProfileLevelsRunner(capture_dir, unblind=unblind,
+    r = SL.SessionLevelsRunner(capture_dir, unblind=unblind,
                                holdout=holdout, max_sessions=max_sessions,
                                **kw)
     led = r.run()

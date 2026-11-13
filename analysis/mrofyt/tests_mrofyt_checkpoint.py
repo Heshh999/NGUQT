@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# MROF-YT-CHECKPOINT-1.2 suite. The one-read checkpoint is checked
+# MROF-YT-CHECKPOINT-1.3 suite. The one-read checkpoint is checked
 # against every wave's own command on the same synthetic recorder-format
 # runs (mles_v12_synth) with wave six's suite-only plumbing L2 detector,
 # restored afterwards: each wave's report must be byte-identical, on DEV
@@ -36,6 +36,7 @@ import mrofyt_minutelevels as ML     # noqa: E402
 import mrofyt_obviouslevels as OL    # noqa: E402
 import mrofyt_profilelevels as PL    # noqa: E402
 import mrofyt_scaledbracket as SB    # noqa: E402
+import mrofyt_sessionlevels as SL    # noqa: E402
 import mrofyt_valuearea as VA        # noqa: E402
 
 OK = []
@@ -53,7 +54,8 @@ CLASSES = [(LB, 'LevelBreakRunner'), (V, 'L2VariantRunner'),
            (FS, 'FirstSignalRunner'), (OL, 'ObviousLevelsRunner'),
            (ML, 'MinuteLevelsRunner'), (LE, 'LimitRunner'),
            (CF, 'ConfluenceRunner'), (SB, 'ScaledBracketRunner'),
-           (FD, 'FirstSideRunner'), (PL, 'ProfileLevelsRunner')]
+           (FD, 'FirstSideRunner'), (PL, 'ProfileLevelsRunner'),
+           (SL, 'SessionLevelsRunner')]
 REAL = [getattr(m, c) for m, c in CLASSES]
 
 
@@ -100,7 +102,8 @@ def alone(u):
             'wave 17': CF.run(D5, u)[0],
             'wave 18': SB.run(D5, W9, u)[0],
             'wave 19': FD.run(D5, u)[0],
-            'wave 20': PL.run(D5, u)[0]}
+            'wave 20': PL.run(D5, u)[0],
+            'wave 21': SL.run(D5, u)[0]}
 
 
 _FROZEN_L2 = BM.l2_sweep_reclaim
@@ -118,9 +121,8 @@ restored = [getattr(m, c) for m, c in CLASSES] == REAL and \
     BM.l2_sweep_reclaim is _FROZEN_L2
 
 t('CP1: on DEV, every wave\'s report from the one read is byte-identical '
-  'to its own command (waves 6, 8-15, 16A, 16B, 17-20), and the runner '
-  'classes '
-  'are restored afterwards',
+  'to its own command (waves 6, 8-15, 16A, 16B, 17-21), and the runner '
+  'classes are restored afterwards',
   set(repD['reports']) == set(aloneD) and
   all(dump(repD['reports'][k]) == dump(aloneD[k]) for k in aloneD) and
   restored and repD['waves'][0] == 'wave 6' and
