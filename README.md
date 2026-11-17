@@ -286,7 +286,7 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 44 suites, 877 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 45 suites, 885 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
@@ -347,8 +347,8 @@ capture installation and operation.
   Two wave-one families are `IMPLEMENTED_NOT_WIRED`. A5 has four of its five frozen
   inputs uncomputed, so it cannot fire on real data. A4 runs with one of its two
   alternative residual inputs uncomputed.
-- Twenty-two registered waves sit on the runner through observation hooks (see
-  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–48). On DEV, wave
+- Twenty-three registered waves sit on the runner through observation hooks (see
+  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–49). On DEV, wave
   six's L2 (fade the failed break of a daily range level when the order flow turns) is
   the one idea with support: 57 trades, +6.15 points a trade net of costs, most of it from
   one session. Wave fourteen fixes the first L2 signal at each level per session as the
@@ -363,10 +363,14 @@ capture installation and operation.
   fourteen's headline came to 48 trades, +1.02 points a trade, NOT PROVEN, and every L2
   signal lost (379 trades, −0.65). Wave twenty-two (V48) puts the one cut that held on
   both instruments, a failed break faded back toward VWAP from a stretched price, to years
-  of NQ minute bars, with its rules frozen first (Amendment 48).
+  of NQ minute bars, with its rules frozen first (Amendment 48). Wave twenty-three (V49)
+  reads the September order flow as direction apart from activity: the order flow marked
+  how much price would move, while VWAP distance (two zones) and the last 30 minutes
+  carried the direction. Three rules from that reading (RUBBER, MOMENTUM, ACCEPT) go to
+  the same minute export (Amendment 49).
   `mrofyt_checkpoint.py` (V40, extended through V47) runs every recordings test on one
   read, each wave's report byte-identical to its own command; `--nq-only` reads NQ
-  alone, about half the work. Package V48: 877/877 research checks and 46/46
+  alone, about half the work. Package V49: 885/885 research checks and 46/46
   dashboard checks from inside the zip.
 - The capture drive recorded file-system damage in two depth files after a disconnect on
   2026-09-22. The audit and recovery tools set those runs aside rather than reading
