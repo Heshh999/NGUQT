@@ -286,7 +286,7 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 43 suites, 870 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 44 suites, 877 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
@@ -340,14 +340,15 @@ capture installation and operation.
 - Recorder build 1.2.2 is compiled in NinjaTrader and recording NQ and MNQ; the auditor
   confirms its disconnect repair on real feed disconnects. Mono stub compiles elsewhere in
   the repository prove syntax only.
-- The order-flow program has inspected the fifteen DEV sessions of 2026-09-01 to 09-18,
-  each labelled `EXPOSED_PILOT_DEV` for good. Sessions from 2026-09-21 onward are a
-  validation hold-out that no tool has read; the tools and the dashboard withhold them.
+- The order-flow program read the fifteen DEV sessions of 2026-09-01 to 09-18 first, then,
+  in the one-read checkpoint of 13-17 November 2026, every session through 2026-11-13 (the
+  40 from 2026-09-21 were the validation hold-out). All 55 are labelled `EXPOSED_PILOT_DEV`
+  for good; sessions from 2026-11-16 on have been read by nothing.
   Two wave-one families are `IMPLEMENTED_NOT_WIRED`. A5 has four of its five frozen
   inputs uncomputed, so it cannot fire on real data. A4 runs with one of its two
   alternative residual inputs uncomputed.
-- Twenty-one registered waves sit on the runner through observation hooks (see
-  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–47). On DEV, wave
+- Twenty-two registered waves sit on the runner through observation hooks (see
+  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–48). On DEV, wave
   six's L2 (fade the failed break of a daily range level when the order flow turns) is
   the one idea with support: 57 trades, +6.15 points a trade net of costs, most of it from
   one session. Wave fourteen fixes the first L2 signal at each level per session as the
@@ -358,13 +359,14 @@ capture installation and operation.
   (overnight and weekly value areas, yesterday's close and midpoint, untested POC
   targets), and wave twenty-one tests the Traders Reality levels (the weekly Psy high
   and low in two windows, the Tokyo and London highs and lows, the two ADR lines), all
-  as secondary tests. The operator's DEV checkpoint (V43) ran waves six and eight to
-  nineteen on the September sessions; waves twenty and twenty-one have not run on a
-  recorded session, and no held-out read has been completed (two were started and
-  stopped; they wrote nothing).
+  as secondary tests. **The held-out checkpoint (V47) passed none of its 67 tests:** wave
+  fourteen's headline came to 48 trades, +1.02 points a trade, NOT PROVEN, and every L2
+  signal lost (379 trades, −0.65). Wave twenty-two (V48) puts the one cut that held on
+  both instruments, a failed break faded back toward VWAP from a stretched price, to years
+  of NQ minute bars, with its rules frozen first (Amendment 48).
   `mrofyt_checkpoint.py` (V40, extended through V47) runs every recordings test on one
   read, each wave's report byte-identical to its own command; `--nq-only` reads NQ
-  alone, about half the work. Package V47: 870/870 research checks and 46/46
+  alone, about half the work. Package V48: 877/877 research checks and 46/46
   dashboard checks from inside the zip.
 - The capture drive recorded file-system damage in two depth files after a disconnect on
   2026-09-22. The audit and recovery tools set those runs aside rather than reading
