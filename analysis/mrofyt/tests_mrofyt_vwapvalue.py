@@ -396,7 +396,7 @@ with redirect_stdout(buf):
     rc_tz = VV.main([F7, '--stamps-tz', 'ET'])
     rc_ok = VV.main([F7, '--out', out8])
 said = buf.getvalue()
-_reg = open(os.path.join(HERE, VV.REGISTRATION)).read()
+_reg = open(os.path.join(HERE, VV.REGISTRATION), encoding='utf-8').read()
 t('VV8: the command prints the report and writes it; no folder, a missing '
   'folder or time stamps in the wrong zone stop before anything is '
   'computed; the registration states the three rules, their brackets, '

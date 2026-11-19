@@ -435,7 +435,7 @@ with redirect_stdout(buf):
     rc_tz = SF.main([F3, '--stamps-tz', 'ET'])
     rc_ok = SF.main([F3, '--out', out7])
 said = buf.getvalue()
-_reg = open(os.path.join(HERE, SF.REGISTRATION)).read()
+_reg = open(os.path.join(HERE, SF.REGISTRATION), encoding='utf-8').read()
 t('SF7: the command prints the report and writes it; no folder, a missing '
   'folder or time stamps in the wrong zone stop before anything is '
   'computed; the registration states the signal, the stretch, the two '
