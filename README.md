@@ -370,7 +370,7 @@ capture installation and operation.
   the same minute export (Amendment 49).
   `mrofyt_checkpoint.py` (V40, extended through V47) runs every recordings test on one
   read, each wave's report byte-identical to its own command; `--nq-only` reads NQ
-  alone, about half the work. Package V49: 885/885 research checks and 46/46
+  alone, about half the work. Package V49.1: 885/885 research checks and 46/46
   dashboard checks from inside the zip.
 - The capture drive recorded file-system damage in two depth files after a disconnect on
   2026-09-22. The audit and recovery tools set those runs aside rather than reading
