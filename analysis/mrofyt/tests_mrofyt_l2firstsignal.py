@@ -117,7 +117,7 @@ for e, sc in sorted(rows3, key=lambda x: x[0]['t']):
     seen3[(e['session'], tuple(e['levels']))] += 1
     if seen3[(e['session'], tuple(e['levels']))] == 1:
         old3.append(sc)
-reg = open(os.path.join(HERE, FS.REGISTRATION)).read()
+reg = open(os.path.join(HERE, FS.REGISTRATION), encoding='utf-8').read()
 t('FS3: on the saved DEV report the rule gives the registration\'s row: '
   '12 NQ trades one at a time, 7 won, +9.44 net a trade over 6 sessions; '
   'keyed by the set of levels instead it gives the earlier 13',

@@ -170,7 +170,7 @@ buf = io.StringIO()
 with redirect_stdout(buf):
     rc_uh = SB.main([D5, '--unblind', '--holdout'])
     rc_ref = SB.main([D5])
-reg = open(os.path.join(HERE, SB.REGISTRATION)).read()
+reg = open(os.path.join(HERE, SB.REGISTRATION), encoding='utf-8').read()
 t('SB5: a held-out read under 30 trades withholds every result; '
   '--unblind with --holdout and a missing A_ref file are refused; the '
   'registration fixes the scale, both brackets, both tests and that the '

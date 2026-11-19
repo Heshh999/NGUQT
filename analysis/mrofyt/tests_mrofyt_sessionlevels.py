@@ -565,7 +565,7 @@ buf = io.StringIO()
 with redirect_stdout(buf):
     rc0 = SL.main([])
     rc_uh = SL.main([D, '--unblind', '--holdout'])
-_reg = open(os.path.join(HERE, SL.REGISTRATION)).read()
+_reg = open(os.path.join(HERE, SL.REGISTRATION), encoding='utf-8').read()
 t('SL10: a held-out read shows only the count for every group under 30 NQ '
   'trades; --unblind with --holdout is refused; the registration states '
   'the windows, the completeness rule, the ADR lines, the five tests, '

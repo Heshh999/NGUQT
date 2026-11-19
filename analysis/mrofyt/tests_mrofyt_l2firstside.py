@@ -89,7 +89,7 @@ lvl_ids = {id(e) for e, _ in lvl_sel}
 extra = [v for (e, _sc), v in zip(side_sel, side_v) if id(e) not in lvl_ids]
 nofed = [v for (e, _sc), v in zip(side_sel, side_v)
          if e['session'] != '20260916']
-reg = open(os.path.join(HERE, FD.REGISTRATION)).read()
+reg = open(os.path.join(HERE, FD.REGISTRATION), encoding='utf-8').read()
 t('FD2: on the saved DEV report the rule gives the registration\'s rows: '
   '16 trades, 11 won, +13.20 a trade; 5 trades only this rule takes '
   '(+16.45); 10 trades and +10.45 without 16 September',

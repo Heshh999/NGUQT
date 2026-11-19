@@ -234,7 +234,7 @@ r9a = V.L2VariantRunner(d9a)
 r9a.run()
 r9b = V.L2VariantRunner(d9b)
 r9b.run()
-_reg = open(os.path.join(HERE, V.REGISTRATION)).read()
+_reg = open(os.path.join(HERE, V.REGISTRATION), encoding='utf-8').read()
 t('LV6: an abandoned run is wound back whole (test numbers and the '
   'per-level counts); the registration states the four variants, the '
   'test count, the holdout rule and Holm',

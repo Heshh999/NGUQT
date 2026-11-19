@@ -260,7 +260,7 @@ r9a = W.TargetRunner(d9a)
 r9a.run()
 r9b = W.TargetRunner(d9b)
 r9b.run()
-_reg = open(os.path.join(HERE, W.REGISTRATION)).read()
+_reg = open(os.path.join(HERE, W.REGISTRATION), encoding='utf-8').read()
 t('LT9: an abandoned run is wound back whole (the fires with their levels '
   'and range); the registration states the three targets, the four tests, '
   'the holdout rule and Holm',

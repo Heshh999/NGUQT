@@ -156,7 +156,7 @@ t('G2b: the outcome-unlock file is absent and the policy only reads its '
   'state -- no code path in the dashboard names it for writing',
   not os.path.exists(LOCK) and
   GP.outcome_lock_state(os.path.join(HERE, '..', 'mrof'))['exists'] is False and
-  all('MROF_V1_STATE_C_AUTHORIZED' not in open(os.path.join(HERE, f)).read()
+  all('MROF_V1_STATE_C_AUTHORIZED' not in open(os.path.join(HERE, f), encoding='utf-8').read()
       or f == 'godseye_policy.py'
       for f in ('godseye_export.py', 'godseye_server.py', 'godseye_replay.py',
                 'godseye_demo.py', 'godseye_registry.py')))
@@ -462,7 +462,7 @@ t('G8f: when two levels are approached at the same instant (same t_end), '
   'the evidence is for the approach asked about -- its level, not the '
   'first one found (the demo has such twins; the page sends the id)',
   _ok_twins and 'approach_id=${encodeURIComponent(rp.approach.approach_id)}'
-  in open(os.path.join(HERE, 'static', 'app.js')).read())
+  in open(os.path.join(HERE, 'static', 'app.js'), encoding='utf-8').read())
 
 cs, _ = get('/static/../godseye_policy.py')
 ci, idx = get('/')
@@ -523,7 +523,7 @@ _ORDER_TOKENS = ('Submit' + 'Order', 'Enter' + 'Long', 'Enter' + 'Short',
                  'entry_' + 'fill(')
 t('G10b: no dashboard module names an order API or the outcome stage '
   '(the tokens are assembled here so this file does not trip itself)',
-  not any(any(tok in open(f).read() for tok in _ORDER_TOKENS)
+  not any(any(tok in open(f, encoding='utf-8').read() for tok in _ORDER_TOKENS)
           for f in glob.glob(os.path.join(HERE, 'godseye_*.py'))))
 
 # ---------------------------------------------------------------------
@@ -760,11 +760,11 @@ t('G13b: the server reads one piece per (session, instrument), holds at '
   pol_b is not pol_a and not pol_b.may_inspect(prot[0]) and
   pol_b.may_inspect(exposed[0]))
 
-_bat = open(os.path.join(HERE, 'launch_godseye.bat')).read()
+_bat = open(os.path.join(HERE, 'launch_godseye.bat'), encoding='utf-8').read()
 t('G13c: the Windows launcher lets the server open the browser once it is '
   'listening, instead of racing it',
   '--open' in _bat and 'start ""' not in _bat and
-  'webbrowser.open' in open(os.path.join(HERE, 'godseye_server.py')).read())
+  'webbrowser.open' in open(os.path.join(HERE, 'godseye_server.py'), encoding='utf-8').read())
 
 # the refresher: one export, run as a SEPARATE process by the server
 _cfgp = os.path.join(DEMO, 'godseye.config.json')
@@ -779,7 +779,7 @@ t('G13d: while the dashboard is open the server keeps it fresh -- one '
   '300 s), so the snapshot never silently goes stale during market hours',
   _rc == 0 and _stat['ok'] and _after['generated_epoch'] > _before_gen and
   '--refresh 300' in _bat and
-  '--refresh 300' in open(os.path.join(HERE, 'pinokio', 'start.js')).read())
+  '--refresh 300' in open(os.path.join(HERE, 'pinokio', 'start.js'), encoding='utf-8').read())
 
 # ---------------------------------------------------------------------
 # G14: a file the drive refuses to read (recover 1.4) reaches the page
@@ -815,7 +815,7 @@ _other = [r for k, r in _r14.items() if k != _victim['run_id'] and not r['live']
 _ses14 = next(s for s in s14['sessions'] if s['session'] == _victim['session'])
 _run14 = next(r for r in _ses14['instruments']['NQ']['runs']
               if r['run_id'] == _victim['run_id'])
-_js14 = open(os.path.join(HERE, 'static', 'app.js')).read()
+_js14 = open(os.path.join(HERE, 'static', 'app.js'), encoding='utf-8').read()
 t('G14: a run with a file the drive cannot read is shown as '
   'SKIPPED_UNREADABLE_FILE with the file name and the Windows error, the '
   'other orphan keeps its own verdict, the session timeline carries it, '

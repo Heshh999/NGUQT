@@ -246,7 +246,7 @@ try:
     r9b.run()
 finally:
     VA.COMPLETE_LAST = _KEEP[0]
-_reg = open(os.path.join(HERE, VA.REGISTRATION)).read()
+_reg = open(os.path.join(HERE, VA.REGISTRATION), encoding='utf-8').read()
 t('VA-8: an abandoned run\'s trades leave the profile, so the value areas '
   'match the clean folder; the registration states the profile, the '
   'speed and flow rule, the four tests, the holdout rule and Holm',

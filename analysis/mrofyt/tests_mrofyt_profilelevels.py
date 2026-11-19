@@ -507,7 +507,7 @@ buf = io.StringIO()
 with redirect_stdout(buf):
     rc0 = PL.main([])
     rc_uh = PL.main([D, '--unblind', '--holdout'])
-_reg = open(os.path.join(HERE, PL.REGISTRATION)).read()
+_reg = open(os.path.join(HERE, PL.REGISTRATION), encoding='utf-8').read()
 t('PL11: a held-out read shows only the count for every test under 30 NQ '
   'trades; --unblind with --holdout is refused; the registration states '
   'the levels, the completeness rules, the three kinds of test, Holm, the '

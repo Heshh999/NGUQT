@@ -242,7 +242,7 @@ try:
     r9b.run()
 finally:
     BM.l2_sweep_reclaim = _FROZEN_L2
-_reg = open(os.path.join(HERE, X.REGISTRATION)).read()
+_reg = open(os.path.join(HERE, X.REGISTRATION), encoding='utf-8').read()
 t('CX7: an abandoned run is wound back whole (fires with their context); '
   'the registration states both filters, the four tests, the holdout rule '
   'and Holm',

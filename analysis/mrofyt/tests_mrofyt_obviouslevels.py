@@ -267,7 +267,7 @@ with redirect_stdout(buf):
     rc_uh = OL.main([D5, '--unblind', '--holdout'])
 led = os.path.join(WORK, 'exposed.json')
 OL.record_exposure(dict(sessions_inspected=['20260921']), led)
-reg = open(os.path.join(HERE, OL.REGISTRATION)).read()
+reg = open(os.path.join(HERE, OL.REGISTRATION), encoding='utf-8').read()
 t('OL7: a held-out read withholds every group under 30 NQ trades (count '
   'only, on screen and in the file) and shows a group that has them; '
   '--unblind with --holdout is refused; the ledger names wave fifteen; '
