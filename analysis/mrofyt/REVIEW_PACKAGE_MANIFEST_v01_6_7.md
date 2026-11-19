@@ -80,8 +80,8 @@ fd1755fb3607509b0d3e06dc8c6d6dc4e3712d7b23c74801567efde10bd6d192  mrofyt_risk.py
 43513abb03041ca34b426ad82fc434ed49997cef2dfb26b3e2765b1ee8180426  mrofyt_exitstudy.py (MROF-YT-W5-EXIT-1.0: wave five, when a winning run is ending -- eight tape signs against a plain 10-point trail on every 20-point run of the DEV tape, Holm over eight, at most three nominated; and the half-life curves 5 s .. 3 h of every wave-one and wave-three family; DEV only unless --evaluate --unblind; wave four's runner, hooks only; Amendment 25)
 755d5e9c574a661cc7da557f24db7810db5c3bcbf5762539e68f1457ae9ea460  tests_mrofyt_exitstudy.py (19 tests: the trail against a re-implementation, the run state, each sign, a planted exit edge found and noise rejected, the cooldown, the unblind refusal, causality under a cut tape, the abandoned-run wind-back, evaluate's two modes and the ledger, the half-life curve by hand, wave-one ledger identity and the frozen hash; Amendment 25)
 3bcd8c642dc8cf478d81cdd611bc594245dc489e95d8923696c2c3d1be6299b8  MROF_YT_WAVE5_EXIT_REGISTRATION.md (FROZEN 2026-10-26 before any recorded session was read by it; Amendment 25)
-708c38efec9338ac2f8748f8920bcf5153772f63f5e4ac995d2dd0c60009d5df  mrofyt_context.py (supersedes 09bf75a6… — the stamp check ranks only minutes at or above half the peak average volume, so a thin minute with a sharp jump cannot outrank the cash open; BOM-tolerant reading; one parsing loop shared with mrofyt_smt; a Tick export stops with that reason, Amendment 27; earlier MROF-YT-CTX-1.0: long, short or neither by 10:30 ET from NinjaTrader minute exports -- 13 features, 676 rules, month-clustered t, Benjamini-Hochberg; searched on 2019-06-01 .. 2026-06-30, judged on every session before 2019-06-01, which no study in this repository has read; each mode drops the other's bars unread; nothing from 2026-07-01; Amendment 25)
-7fbdefccf00b7a618788402aa21cf62c32177fabd7037f943913162f9a7a321a  tests_mrofyt_context.py (21 tests; supersedes fc334024… — X6a the peak filter of the stamp check, Amendment 27; earlier 20 tests: both DST regimes, end-of-bar UTC stamps, contract names, the value area, a day's statistics, the stamp check and its two refusals, the front contract and the same-contract gap across a roll, a planted context edge found and the noise rate bounded over 40 datasets, the split never crossed, the July 2026 refusal, evaluate's two modes, causality; Amendment 25)
+f4c13bfce9c504df6f1b27b04fb2faff01ad1cb67a27fdcc13764f6cd85acd3e  mrofyt_context.py (MROF-YT-CTX-1.1; supersedes 708c38ef… — the export's file name may give the contract as NinjaTrader's newer "NQ SEP16" as well as "NQ 09-16", both read as NQ 09-16; two files of one contract (the same contract under both names, or two series without a month) stop the read before anything is computed instead of one overwriting the other's sessions; nothing else changed, Amendment 51; earlier 708c38ef… supersedes 09bf75a6… — the stamp check ranks only minutes at or above half the peak average volume, so a thin minute with a sharp jump cannot outrank the cash open; BOM-tolerant reading; one parsing loop shared with mrofyt_smt; a Tick export stops with that reason, Amendment 27; earlier MROF-YT-CTX-1.0: long, short or neither by 10:30 ET from NinjaTrader minute exports -- 13 features, 676 rules, month-clustered t, Benjamini-Hochberg; searched on 2019-06-01 .. 2026-06-30, judged on every session before 2019-06-01, which no study in this repository has read; each mode drops the other's bars unread; nothing from 2026-07-01; Amendment 25)
+51c0778ae9959741bb9ddbfd0d9db921f62b16a86727f83d60833418d159ed08  tests_mrofyt_context.py (22 tests; supersedes 7fbdefcc… — X14 the newer contract names read identically to the numbered ones, and a folder with one contract twice or two month-less series stops, Amendment 51; earlier 21 tests, 7fbdefcc… supersedes fc334024… — X6a the peak filter of the stamp check, Amendment 27; earlier 20 tests: both DST regimes, end-of-bar UTC stamps, contract names, the value area, a day's statistics, the stamp check and its two refusals, the front contract and the same-contract gap across a roll, a planted context edge found and the noise rate bounded over 40 datasets, the split never crossed, the July 2026 refusal, evaluate's two modes, causality; Amendment 25)
 55539749c0d916c6035b443c125fb5e41a4e445bc1235f837c3334486372aed5  MROF_YT_CONTEXT_REGISTRATION.md (supersedes 2a62f740… — §1 and §10 state the stamp check's peak filter, a precision of the implementation made before any real bar was read, Amendment 27; FROZEN 2026-10-26; Amendment 25)
 9a2aca7a98aa2237dafc1520e51a993bcb48be872ec8954bc32f5d177adefb2e  mrofyt_levelbreak.py (MROF-YT-W6-LEVELBREAK-1.0: wave six part A -- L2 with a fixed, a STRUCTURAL and a FLOW-INVALIDATION stop, L4, and L2 filtered by TRAPPED volume, net of costs, Holm over five; DEV describes, a replay holdout folder (sessions before 2026-09-01 only) or the --unblind checkpoint judges; wave three's runner, hooks only; Amendment 26)
 1e2a0b8a6696c4b5be78dd5a16e9ffe61d2022755e1133972e6b45f9f22a4737  tests_mrofyt_levelbreak.py (11 tests: the path exit against wave three's reference scan, the structural stop, the flow invalidation, the trapped-volume hook, end to end with a suite-only plumbing detector, the trapped filter, evaluate's modes, the holdout folder rule, wave three unchanged, the wind-back; Amendment 26)
@@ -189,7 +189,7 @@ from inside it unchanged):
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 885/885 + 46/46, identical to the repo
+# run from inside the unzipped package: 886/886 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -231,7 +231,7 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_discover.py` | 17/17 |
 | `tests_mrofyt_exitstudy.py` | 19/19 |
 | `tests_mrofyt_costs_risk.py` | 15/15 |
-| `tests_mrofyt_context.py` | 21/21 |
+| `tests_mrofyt_context.py` | 22/22 |
 | `tests_mrofyt_levelbreak.py` | 11/11 |
 | `tests_mrofyt_smt.py` | 6/6 |
 | `tests_mrofyt_flowlevels.py` | 20/20 |
@@ -257,9 +257,9 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_sessionlevels.py` | 11/11 |
 | `tests_mrofyt_stretchfade.py` | 7/7 |
 | `tests_mrofyt_vwapvalue.py` | 8/8 |
-| **wave-one to twenty-three, tools total** | **885/885** |
+| **wave-one to twenty-three, tools total** | **886/886** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **931/931** |
+| **package total** | **932/932** |
 
 ## Runnable research commands
 
@@ -1900,3 +1900,29 @@ detector hash so registering wave two provably changed nothing.
     hash is as in Amendment 49 (the checkpoint and the recorder tools
     had already run on the operator's machine). Battery: 885/885 +
     46/46.
+
+51. **NinjaTrader's newer contract names (2026-11-19).** Before
+    exporting, the operator sent a picture of NinjaTrader's Historical
+    Data window: the contracts are listed as "NQ SEP16", "NQ DEC26",
+    not "NQ 09-16". The minute reader every minute-bar tool shares
+    (`mrofyt_context.Reader`) took the contract from the file name in
+    the numbered form only; a file named "NQ SEP16.Last.txt" was read
+    as a series without a month, "NQ CONT". With one file per contract
+    under the newer names, every file would have been "NQ CONT", and on
+    the days two contracts overlap one file's bars would have replaced
+    the other's, with no error. Shown here on the context suite's
+    planted export renamed to "NQ MAR15" and "NQ JUN15": the old reader
+    labelled all 260 sessions "NQ CONT" and none of its day records
+    matched the numbered read.
+
+    `contract_of` now also takes the month-name form and returns the
+    same contract string ("NQ SEP16" is NQ 09-16), so everything after
+    it is unchanged; and the reader refuses, before reading a bar, a
+    folder in which two files hold one contract (the same contract under
+    both names, or two series without a month), naming them. X14 checks
+    the names, that the renamed export reads exactly as the numbered
+    one, and both refusals. MROF-YT-CTX-1.1; no rule, registration,
+    threshold or frozen file changed, and no export had been read with
+    either version. Every minute-bar tool reads through it: the context
+    study, wave six's ES check, waves sixteen (A and C), twenty-two and
+    twenty-three. Battery: 886/886 + 46/46.
