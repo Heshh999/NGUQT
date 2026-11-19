@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mrofyt_context.py - MROF-YT-CTX-1.0
+"""mrofyt_context.py - MROF-YT-CTX-1.1
 
 MROF_YT_CONTEXT_REGISTRATION.md turned into running code. The question:
 by 10:30 ET, does what the day has shown so far (the gap, the first
@@ -62,7 +62,7 @@ import sys
 import mrofyt_bigmove as BM
 import mrofyt_discover as DI
 
-CTX_VERSION = 'MROF-YT-CTX-1.0'
+CTX_VERSION = 'MROF-YT-CTX-1.1'
 REGISTRATION = 'MROF_YT_CONTEXT_REGISTRATION.md'
 REFUSE_FROM = '20260701'
 VALIDATION_BEFORE = '20190601'     # registration 5: the untouched years
@@ -196,16 +196,26 @@ def bar_session(stamp_ymd, stamp_hms, stamps_tz='UTC', stamps='end'):
 # reading the exports
 # ---------------------------------------------------------------------
 _CONTRACT = re.compile(r'^(?P<root>[A-Z0-9]+)\s+(?P<mm>\d{2})-(?P<yy>\d{2})')
+# NinjaTrader's newer contract names: 'NQ DEC26' for 'NQ 12-26'
+_MONTHS = ('JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP',
+           'OCT', 'NOV', 'DEC')
+_CONTRACT_MON = re.compile(r'^(?P<root>[A-Z0-9]+)\s+(?P<mon>%s)(?P<yy>\d{2})'
+                           r'(?![0-9])' % '|'.join(_MONTHS), re.IGNORECASE)
 
 
 def contract_of(filename, root):
-    """'NQ 12-26.Last.txt' -> 'NQ 12-26'; a file of the root without a
-    month (a continuous series) -> 'NQ CONT'; another root -> None."""
+    """'NQ 12-26.Last.txt' or 'NQ DEC26.Last.txt' -> 'NQ 12-26'; a file
+    of the root without a month (a continuous series) -> 'NQ CONT';
+    another root -> None."""
     base = os.path.basename(filename)
     m = _CONTRACT.match(base)
     if m:
         return None if m.group('root') != root else \
             '%s %s-%s' % (root, m.group('mm'), m.group('yy'))
+    m = _CONTRACT_MON.match(base)
+    if m:
+        return None if m.group('root') != root else '%s %02d-%s' % (
+            root, _MONTHS.index(m.group('mon').upper()) + 1, m.group('yy'))
     if base.split(' ')[0].split('.')[0] == root:
         return '%s CONT' % root
     return None
@@ -365,7 +375,23 @@ class Reader(object):
         if not paths:
             raise ContextDataError(
                 'no %s minute exports found in %s (expected files named '
-                'like "%s 12-26.Last.txt")' % (self.root, path, self.root))
+                'like "%s 12-26.Last.txt" or "%s DEC26.Last.txt")'
+                % (self.root, path, self.root, self.root))
+        # one file per contract: two files of one contract (the same
+        # contract under both names, or two series without a month)
+        # would overwrite each other's sessions
+        held = collections.defaultdict(list)
+        for p in paths:
+            held[contract_of(p, self.root) or '%s CONT' % self.root].append(
+                os.path.basename(p))
+        twice = sorted((c, names) for c, names in held.items()
+                       if len(names) > 1)
+        if twice:
+            raise ContextDataError(
+                'more than one file holds the same contract (%s); keep one '
+                'file per contract, or a single continuous series alone. '
+                'Nothing was computed.' % '; '.join(
+                    '%s: %s' % (c, ', '.join(names)) for c, names in twice))
         for p in paths:
             self.read_file(p)
 

@@ -381,6 +381,50 @@ t('X13: --unblind without --evaluate is refused; a search writes the '
   'Explicitly NOT registered' in _reg and
   all(f in _reg for f in CX.FEATURES))
 
+# X14: NinjaTrader's newer contract names ('NQ MAR15') read as the same
+# contracts as 'NQ 03-15'; two files of one contract are refused
+FN = os.path.join(WORK, 'month_names')
+os.makedirs(FN)
+for old, new in (('NQ 03-15', 'NQ MAR15'), ('NQ 06-15', 'NQ JUN15')):
+    shutil.copy(os.path.join(F1, old + '.Last.txt'),
+                os.path.join(FN, new + '.Last.txt'))
+rdn, chkn, recn = CX.read_days(FN)
+_stops = []
+for nm, files in (('both_names', (('NQ 03-15', 'NQ 03-15'),
+                                  ('NQ 03-15', 'NQ MAR15'),
+                                  ('NQ 06-15', 'NQ 06-15'),
+                                  ('NQ 06-15', 'NQ JUN15'))),
+                  ('two_series', (('NQ 03-15', 'NQ ##-##'),
+                                  ('NQ 06-15', 'NQ CONT2')))):
+    fd = os.path.join(WORK, nm)
+    os.makedirs(fd)
+    for src, dst in files:
+        shutil.copy(os.path.join(F1, src + '.Last.txt'),
+                    os.path.join(fd, dst + '.Last.txt'))
+    try:
+        CX.read_days(fd)
+        _stops.append('')
+    except CX.ContextDataError as exc:
+        _stops.append(str(exc))
+t('X14: NinjaTrader\'s newer contract names ("NQ SEP16") are the same '
+  'contracts as "NQ 09-16" and read identically; a folder holding one '
+  'contract twice, or two series without a month, stops before anything '
+  'is computed instead of one file overwriting the other',
+  CX.contract_of('NQ SEP16.Last.txt', 'NQ') == 'NQ 09-16' and
+  CX.contract_of('NQ DEC26.Last.txt', 'NQ') == 'NQ 12-26' and
+  CX.contract_of('NQ MAR19.Last.txt', 'NQ') == 'NQ 03-19' and
+  CX.contract_of('MNQ SEP16.Last.txt', 'NQ') is None and
+  CX.contract_of('ES DEC26.Last.txt', 'NQ') is None and
+  CX.contract_of('NQ ##-##.Last.txt', 'NQ') == 'NQ CONT' and
+  json.dumps(recn, sort_keys=True, default=str) ==
+  json.dumps(recs, sort_keys=True, default=str) and
+  chkn == chk and
+  sorted(f['contract'] for f in rdn.files) == ['NQ 03-15', 'NQ 06-15'] and
+  'NQ 03-15: NQ 03-15.Last.txt, NQ MAR15.Last.txt' in _stops[0] and
+  'NQ 06-15: NQ 06-15.Last.txt, NQ JUN15.Last.txt' in _stops[0] and
+  'NQ CONT: NQ ##-##.Last.txt, NQ CONT2.Last.txt' in _stops[1] and
+  all('Nothing was computed' in m for m in _stops))
+
 shutil.rmtree(WORK, ignore_errors=True)
 n_fail = sum(1 for _, ok in OK if not ok)
 print('\n%d/%d tests passed' % (len(OK) - n_fail, len(OK)))
