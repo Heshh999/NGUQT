@@ -227,3 +227,25 @@ day. Daily chain.
 `mrofyt_screen15.py`, `tests_mrofyt_screen15.py`. Written against this
 file before any of the fifteen was computed; verified on hand-built bars
 and synthetic exports, never on market evidence.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| §1 bars, eligible | `read` (wave twenty-two's `VolReader`), `build` (the context study's front contract and its 14 earlier sessions) | **"yesterday" is the previous trading day.** The export holds a stray bar on most weekends, and wave twenty-two's `history_sessions` takes the session before in the file as yesterday, so it kept 137 of the 486 complete Mondays (a count of sessions, seen while building; no rule was computed). Here Mondays are kept |
+| §1 trading day | a weekday with 100 or more one-minute cash bars | a half day counts, a stray bar does not |
+| §1 O, P, VWAP | `grid`, `Day.p`, `Day.vwap` | none |
+| §1 daily chain | `build` (`ret`), `_hold` | the day's front contract, else yesterday's, must hold both closes |
+| §1 costs | `RT`, `RT_STOP`, `SIDE` from `mrofyt_costs` | none |
+| §2 the bar | `nets`, `judge`; `night_returns`, `session_returns` for the long-only rules | a trade belongs to the half and the month of its entry; the average night is over every eligible session of the half, the average session over every trading day with a return |
+| O1 | `rule_o1` | the 20th percentile of 100 = the 20th smallest |
+| O2 | `bench_o2` | the variance is around the half's mean |
+| O4, Q4 | `big_nights`, `rule_o4`, `rule_q4` | none |
+| O5 | `rule_o5` | none |
+| A | `trade_a`, `rule_a` | sized result = leverage × (move − cost) |
+| B | `day_b`, `rule_b` | σ(m) and the bounds at every minute; the day's result in units of the open, × leverage; daily returns from the daily chain |
+| C | `rule_c` | none |
+| D | `day_d`, `rule_d` | the day's result in units of the open |
+| E | `rule_e` | a day without a cash range is passed over; a trade still open at the end is not counted |
+| Q1 | `rule_q1` | the standard deviation with 19 degrees of freedom |
+| Q2 | `rule_q2` | the history of a time is kept whether or not a trade is open |
+| Q3 | `rule_q3` | needs two trading days in the month and three in the next |
+| Q5 | `rule_q5` | needs a month before and one after in the bars, and five trading days in the month |
