@@ -153,6 +153,9 @@ a7977d4c75a6fe1b392efc643f143350a16378cf693b505dce0ae3e78c42b6fc  mrofyt_stretch
 8e6a60210d84c69fa62cec784ac0fe5ba68b4f231e5267ce2a91f4d42e3a1950  MROF_YT_WAVE23_VWAPVALUE_REGISTRATION.md (FROZEN 2026-11-17 before any minute export was read for these questions; shows the reading of wave four's order-flow anatomy and the checkpoint results the three rules come from; Amendment 49)
 5e9687c368d26734d81c9ddabd3118a00a2e594968d88e16bc09d2b5e39f08cb  mrofyt_vwapvalue.py (MROF-YT-W23-VWAPVALUE-1.0: three rules on NQ one-minute bars, with wave twenty-two's reader, VWAP and A -- RUBBER, a close 0.15 x A or more from the session VWAP with the last 30 minutes moving back toward it by 0.08 x A or more, traded toward VWAP, 25 / 15; MOMENTUM, a close 0.03 to 0.13 x A away with the 30 minutes moving further away by 0.03 x A or more, traded with it, 25 / 15; ACCEPT, part 16A's failed break of the overnight POC, VAH or VAL (the bars of 18:00-09:29, volume spread over each bar's range, 70 %) traded with the break, 15 / 25; first per direction (per level for ACCEPT) per session, 30 min, one at a time within each rule, net of costs; each rule month-clustered, 100+ trades, Holm over the three, judged in each era (2019-06 to 2026-06 without a flag, before 2019-06-01 once with --unblind); Amendment 49)
 24468af3160cea65806fa6bdd50ba446349e3e938eac9f2a38bca5c1d9fdac78  tests_mrofyt_vwapvalue.py (8 tests: the overnight value area; the 30-minute move; the two zones and their edges; the brackets and costs; the accepted break against part 16A's fade; the verdicts and Holm; end to end on a synthetic export across 2019-06-01 with every trade re-derived without the module's helpers, the older era read only with --unblind and recorded, a read repeatable; the command's stops and the registration; runs under CPython and PyPy; Amendment 49; Amendment 50, supersedes 8e5f7f74…: reads its registration as UTF-8, so it passes on Windows as well)
+37e99dd6765f229e9389052f7b05b07ded795c9cabc25cede81e546f90496a49  MROF_YT_WAVE24_SCREEN15_REGISTRATION.md (FROZEN 2026-11-24 before any of its fifteen rules was computed; a screen on the ten years of NQ minute bars, already read, not a test; Amendment 52)
+bcf93be3e2d0371c2a3ce20fd1bafbb4a934c4514ac94ed29362f5080b2af091  mrofyt_screen15.py (MROF-YT-W24-SCREEN15-1.0: thirteen judged rules, the O2 benchmark and the pass bar -- a profit after costs in each half (to 2020-12-31, from 2021-01-01), also without the month of the largest total, 30 trades or days at least in each; long-only rules judged over the half's average holding; "yesterday" is the previous trading day, so Mondays are kept; not in the delivered package; Amendment 52)
+9b10e242797685cdc18d1f8ed59b2f67a46522aa3946c3f1b33046fdc6ca83bf  tests_mrofyt_screen15.py (11 tests: the minute grid; each judged rule on hand-built sessions; the pass bar; the benchmark; end to end on a synthetic export with a stray bar every weekend and one planted effect; runs with cp1252 as the default encoding as well; Amendment 52)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -257,9 +260,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_sessionlevels.py` | 11/11 |
 | `tests_mrofyt_stretchfade.py` | 7/7 |
 | `tests_mrofyt_vwapvalue.py` | 8/8 |
-| **wave-one to twenty-three, tools total** | **886/886** |
+| `tests_mrofyt_screen15.py` | 11/11 |
+| **wave-one to twenty-four, tools total** | **897/897** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **932/932** |
+| **package total** | **943/943** |
 
 ## Runnable research commands
 
@@ -1926,3 +1930,36 @@ detector hash so registering wave two provably changed nothing.
     either version. Every minute-bar tool reads through it: the context
     study, wave six's ES check, waves sixteen (A and C), twenty-two and
     twenty-three. Battery: 886/886 + 46/46.
+
+52. **Fifteen ideas, screened on the ten years (2026-11-24).** The
+    operator ran the eight minute-bar commands of waves sixteen,
+    twenty-two and twenty-three through this session on the exports sent
+    on 2026-11-22 (43 contract files, 2016 to June 2026): no test
+    passed. The four reads of the years before 2019-06-01 are in the
+    operator's `MROF_MINUTE_HISTORY_EXPOSURE.json`; the reports are with
+    the operator and not in this repository.
+
+    The operator then set a funnel: fifteen ideas as exact rules, a
+    screen on the ten years, the survivors to the recorded order flow,
+    and what is left to sessions nothing has read.
+    `MROF_YT_WAVE24_SCREEN15_REGISTRATION.md` fixes the fifteen (five of
+    our own, five public trading ideas, five from quantitative research)
+    and the bar before any was computed. `mrofyt_screen15.py` applies
+    them; `tests_mrofyt_screen15.py` (11) checks each rule on hand-built
+    sessions and the pipeline on a synthetic export. The screen was run
+    once on 2026-11-24; its report is with the operator and not in this
+    repository. It is a screen on bars already read: a pass earns the
+    next step and proves nothing.
+
+    **Found while building it:** the export holds a stray bar on most
+    weekends. Wave twenty-two's `history_sessions` (and part 16A's)
+    takes the session before in the file as yesterday, so on this export
+    it kept 137 of the 486 complete Mondays; the eight tests above ran
+    on the rest (about 83 % of the sessions). Their verdicts stand as
+    read, and they were not run again. The screen counts trading days,
+    and keeps Mondays.
+
+    No package was built: nothing here has to run on the operator's
+    machine yet, and the files above are not in V49.2. Nothing frozen
+    changed (06ce854a…). Battery: 897/897 + 46/46 (`tests_mles_v12.py`
+    needs the Mono compiler, `mcs`).
