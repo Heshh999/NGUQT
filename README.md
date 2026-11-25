@@ -286,7 +286,7 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 46 suites, 897 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 47 suites, 906 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
@@ -348,7 +348,7 @@ capture installation and operation.
   inputs uncomputed, so it cannot fire on real data. A4 runs with one of its two
   alternative residual inputs uncomputed.
 - Twenty-three registered waves sit on the runner through observation hooks (see
-  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–52). On DEV, wave
+  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–53). On DEV, wave
   six's L2 (fade the failed break of a daily range level when the order flow turns) is
   the one idea with support: 57 trades, +6.15 points a trade net of costs, most of it from
   one session. Wave fourteen fixes the first L2 signal at each level per session as the
@@ -367,10 +367,14 @@ capture installation and operation.
   reads the September order flow as direction apart from activity: the order flow marked
   how much price would move, while VWAP distance (two zones) and the last 30 minutes
   carried the direction. Three rules from that reading (RUBBER, MOMENTUM, ACCEPT) go to
-  the same minute export (Amendment 49).
+  the same minute export (Amendment 49). None of V49's eight tests passed. Wave
+  twenty-four then screened fifteen ideas, written as exact rules first, on the same ten
+  years (Amendment 52); wave twenty-five takes the three that passed the screen,
+  unchanged, to other index futures and to NQ's later months, with the verdicts fixed
+  in advance (Amendment 53).
   `mrofyt_checkpoint.py` (V40, extended through V47) runs every recordings test on one
   read, each wave's report byte-identical to its own command; `--nq-only` reads NQ
-  alone, about half the work. Package V49.2 (886/886); the repository since: 897/897 research checks and 46/46
+  alone, about half the work. Package V49.2 (886/886); the repository since: 906/906 research checks and 46/46
   dashboard checks from inside the zip.
 - The capture drive recorded file-system damage in two depth files after a disconnect on
   2026-09-22. The audit and recovery tools set those runs aside rather than reading

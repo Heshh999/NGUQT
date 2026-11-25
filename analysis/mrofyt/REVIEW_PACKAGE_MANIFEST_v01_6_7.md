@@ -156,6 +156,9 @@ a7977d4c75a6fe1b392efc643f143350a16378cf693b505dce0ae3e78c42b6fc  mrofyt_stretch
 37e99dd6765f229e9389052f7b05b07ded795c9cabc25cede81e546f90496a49  MROF_YT_WAVE24_SCREEN15_REGISTRATION.md (FROZEN 2026-11-24 before any of its fifteen rules was computed; a screen on the ten years of NQ minute bars, already read, not a test; Amendment 52)
 bcf93be3e2d0371c2a3ce20fd1bafbb4a934c4514ac94ed29362f5080b2af091  mrofyt_screen15.py (MROF-YT-W24-SCREEN15-1.0: thirteen judged rules, the O2 benchmark and the pass bar -- a profit after costs in each half (to 2020-12-31, from 2021-01-01), also without the month of the largest total, 30 trades or days at least in each; long-only rules judged over the half's average holding; "yesterday" is the previous trading day, so Mondays are kept; not in the delivered package; Amendment 52)
 9b10e242797685cdc18d1f8ed59b2f67a46522aa3946c3f1b33046fdc6ca83bf  tests_mrofyt_screen15.py (11 tests: the minute grid; each judged rule on hand-built sessions; the pass bar; the benchmark; end to end on a synthetic export with a stray bar every weekend and one planted effect; runs with cp1252 as the default encoding as well; Amendment 52)
+cec855d22abbcabdd868ca38eb553778b22edd66aea14a1871024caeaddac6ef  MROF_YT_WAVE25_CONFIRM_REGISTRATION.md (FROZEN 2026-11-25 before any of its bars or recordings was read; the three rules that passed the screen, unchanged, on other markets over the same ten years (2a), on NQ's months after the screen, read once (2b), and against the measured cost of a trade on the recordings (2c); the implementation record was added with the tool; Amendment 53)
+5bc4c2112453c3fd9e8039366353fb4c4b90d95d09e9fea0b0488772f4dec489  mrofyt_confirm25.py (MROF-YT-W25-CONFIRM-1.0: sections 2a and 2b with wave twenty-four's own rule functions -- the market's tick and costs set around them (NQ 0.50/0.75, ES 0.35/0.60, RTY 0.20/0.30, YM 2.00/3.00) and put back; 2b's gate at 2026-11-14 for the one read, which is recorded before it is shown and refused a second time; a run stops before any rule is computed when a contract was not exported; not in the delivered package; Amendment 53)
+9ee5428cf1dd75d2d7b9daf8a247912856b3bef8487aa6c7d2cd7f648f64f01e  tests_mrofyt_confirm25.py (9 tests: the cost table against the registration; the tick and the costs reaching A, B and E; wave twenty-four trade for trade under NQ's costs; 2a through the command on another market; the missing-contract stop and --gaps-ok; 2b's gate, window, bench, ledger and second-read refusal; a collapse named and the three half-export stops; the four verdicts; the command's stops and the frozen constants; runs with cp1252 as the default encoding as well; Amendment 53)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -261,9 +264,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_stretchfade.py` | 7/7 |
 | `tests_mrofyt_vwapvalue.py` | 8/8 |
 | `tests_mrofyt_screen15.py` | 11/11 |
-| **wave-one to twenty-four, tools total** | **897/897** |
+| `tests_mrofyt_confirm25.py` | 9/9 |
+| **wave-one to twenty-five, tools total** | **906/906** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **943/943** |
+| **package total** | **952/952** |
 
 ## Runnable research commands
 
@@ -1963,3 +1967,44 @@ detector hash so registering wave two provably changed nothing.
     machine yet, and the files above are not in V49.2. Nothing frozen
     changed (06ce854a…). Battery: 897/897 + 46/46 (`tests_mles_v12.py`
     needs the Mono compiler, `mcs`).
+
+53. **The second step changed: the three survivors on data they have
+    not seen (2026-11-25).** Three of the fifteen passed the screen: A
+    (the 5-minute opening range breakout), B (out of the noise area)
+    and E (buy weakness at the close). The funnel's second step was to
+    be a check on the recorded order flow. A review of how order flow
+    is used on index futures (published research and practitioners)
+    found no support for order flow choosing direction beyond about a
+    second, which is what every test in this repository had found. The
+    operator changed the step: the three rules are confirmed on data
+    they have not seen, and the recordings are used for what they
+    measure well, the real cost of a trade.
+
+    `MROF_YT_WAVE25_CONFIRM_REGISTRATION.md` fixes it before any of its
+    bars was read. 2a: the same rules on ES and RTY (YM if the feed has
+    it) over the same ten years, each with its own tick and costs, by
+    wave twenty-four's bar. 2b: NQ from 2026-07-01 to 2026-11-13, read
+    once with `--later-months`, the reader's refusal moved to 2026-11-14
+    for that read only; about 96 sessions cannot prove a rule, so only a
+    collapse counts against one. 2c: the spread, the size shown and the
+    stop slip of every A and B trade on the 55 recorded sessions; its
+    tool is still to be written. A rule that passes all three goes to
+    the third step, tracked day by day without orders on sessions from
+    2026-11-16, which stay unread until then.
+
+    `mrofyt_confirm25.py` runs 2a and 2b. It calls wave twenty-four's
+    own rule functions and sets only the market's tick and costs around
+    them. `tests_mrofyt_confirm25.py` (9) checks the cost table against
+    the registration, that under NQ's costs the tool is wave twenty-four
+    trade for trade, the gate, the once-only read and its ledger, the
+    four verdicts and the stops. A run stops before any rule is computed
+    when a contract was not exported, so a half-read cannot happen by
+    accident; the later-months read is recorded before it is shown.
+
+    One regression was run on real bars: on the NQ exports the screen
+    had already read, the tool gave wave twenty-four's numbers for A, B
+    and E exactly. A, B and E have not been computed on any session
+    after 2026-06-11 or on any other market: no such export has been
+    read. No package was built; the files above are not in V49.2.
+    Nothing frozen changed (06ce854a…). Battery: 906/906 + 46/46
+    (`tests_mles_v12.py` needs the Mono compiler, `mcs`).

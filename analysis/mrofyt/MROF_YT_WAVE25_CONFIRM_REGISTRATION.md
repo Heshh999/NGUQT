@@ -138,4 +138,29 @@ data. Still no live orders in any case.
 
 `mrofyt_confirm25.py`, `tests_mrofyt_confirm25.py` (§2a, §2b). Written
 against this file before any of its bars was read; verified on
-synthetic exports, never on market evidence.
+hand-built days and synthetic exports, never on market evidence. One
+regression was run on real bars: on the NQ exports the screen had
+already read, under NQ's costs, the tool gave wave twenty-four's own
+numbers for A, B and E, digit for digit. Nothing new was computed by it.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| §1 the rules | `three` calls `rule_a`, `rule_b`, `rule_e` of `mrofyt_screen15.py`; `judged` its `nets`, `judge`, `session_returns` | nothing is copied or rewritten: the screen's own functions run |
+| §2a markets | `read`: wave twenty-two's reader under the market's root (`ES`, `RTY`, `YM`) | files of another root in the folder are passed over; the reader's refusal at 2026-07-01 stands, so the ten years end on 2026-06-30 |
+| §2a costs | `market_costs`, `costs` | the screen's `RT`, `RT_STOP`, `SIDE` and tick are set for the run and put back after it; the tick is also A's smallest risk (a first candle under one tick is no trade), as on NQ |
+| §2a the bar | `judged` | as in wave twenty-four: a trade belongs to the half and the month of its entry |
+| §2a beside | `costs(market, 2.0)` | both costs doubled, the tick unchanged |
+| §2b bars, the gate | `read(..., later=True)` | the refusal stands at 2026-11-14 for that one call and is put back whatever happens; a session read from 2026-11-14 on stops the run |
+| §2b the window | `in_window`, `run_later` | a trade belongs to the window by its entry session; E must be bought and sold within the bars read; E's bench is the mean return of the window's trading days, times the days held |
+| §2b the verdict | `window_verdict` | the standard error is the plain one: the standard deviation of the net results (n − 1) over the root of their number; exactly two standard errors below 0 is still WEAK |
+| §2b once | `later_read_made`, `record_read` | the read is written to `MROF_MINUTE_HISTORY_EXPOSURE.json` before any result is shown; `--later-months` is refused while that record stands; a ledger that cannot be read stops the run |
+
+**Operating checks, not registered.** They change no rule and are made
+before any rule is computed, so that an incomplete export cannot give a
+half-read. §2a stops under 200 usable sessions, or when two trading
+days in a row are more than 5 calendar days apart (a contract that was
+not exported; `--gaps-ok` runs it when the feed has no bars for those
+days, and the report names them). §2b stops under 200 trading days
+before the window, under 90 of the window's 96 trading days, or on such
+a hole anywhere; nothing is computed and the read is not used up. A §2a
+read is written to the same ledger, and may be repeated.
