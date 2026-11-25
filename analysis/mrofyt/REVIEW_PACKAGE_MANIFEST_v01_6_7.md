@@ -154,11 +154,13 @@ a7977d4c75a6fe1b392efc643f143350a16378cf693b505dce0ae3e78c42b6fc  mrofyt_stretch
 5e9687c368d26734d81c9ddabd3118a00a2e594968d88e16bc09d2b5e39f08cb  mrofyt_vwapvalue.py (MROF-YT-W23-VWAPVALUE-1.0: three rules on NQ one-minute bars, with wave twenty-two's reader, VWAP and A -- RUBBER, a close 0.15 x A or more from the session VWAP with the last 30 minutes moving back toward it by 0.08 x A or more, traded toward VWAP, 25 / 15; MOMENTUM, a close 0.03 to 0.13 x A away with the 30 minutes moving further away by 0.03 x A or more, traded with it, 25 / 15; ACCEPT, part 16A's failed break of the overnight POC, VAH or VAL (the bars of 18:00-09:29, volume spread over each bar's range, 70 %) traded with the break, 15 / 25; first per direction (per level for ACCEPT) per session, 30 min, one at a time within each rule, net of costs; each rule month-clustered, 100+ trades, Holm over the three, judged in each era (2019-06 to 2026-06 without a flag, before 2019-06-01 once with --unblind); Amendment 49)
 24468af3160cea65806fa6bdd50ba446349e3e938eac9f2a38bca5c1d9fdac78  tests_mrofyt_vwapvalue.py (8 tests: the overnight value area; the 30-minute move; the two zones and their edges; the brackets and costs; the accepted break against part 16A's fade; the verdicts and Holm; end to end on a synthetic export across 2019-06-01 with every trade re-derived without the module's helpers, the older era read only with --unblind and recorded, a read repeatable; the command's stops and the registration; runs under CPython and PyPy; Amendment 49; Amendment 50, supersedes 8e5f7f74…: reads its registration as UTF-8, so it passes on Windows as well)
 37e99dd6765f229e9389052f7b05b07ded795c9cabc25cede81e546f90496a49  MROF_YT_WAVE24_SCREEN15_REGISTRATION.md (FROZEN 2026-11-24 before any of its fifteen rules was computed; a screen on the ten years of NQ minute bars, already read, not a test; Amendment 52)
-bcf93be3e2d0371c2a3ce20fd1bafbb4a934c4514ac94ed29362f5080b2af091  mrofyt_screen15.py (MROF-YT-W24-SCREEN15-1.0: thirteen judged rules, the O2 benchmark and the pass bar -- a profit after costs in each half (to 2020-12-31, from 2021-01-01), also without the month of the largest total, 30 trades or days at least in each; long-only rules judged over the half's average holding; "yesterday" is the previous trading day, so Mondays are kept; not in the delivered package; Amendment 52)
+bcf93be3e2d0371c2a3ce20fd1bafbb4a934c4514ac94ed29362f5080b2af091  mrofyt_screen15.py (MROF-YT-W24-SCREEN15-1.0: thirteen judged rules, the O2 benchmark and the pass bar -- a profit after costs in each half (to 2020-12-31, from 2021-01-01), also without the month of the largest total, 30 trades or days at least in each; long-only rules judged over the half's average holding; "yesterday" is the previous trading day, so Mondays are kept; in the package from V50; Amendment 52)
 9b10e242797685cdc18d1f8ed59b2f67a46522aa3946c3f1b33046fdc6ca83bf  tests_mrofyt_screen15.py (11 tests: the minute grid; each judged rule on hand-built sessions; the pass bar; the benchmark; end to end on a synthetic export with a stray bar every weekend and one planted effect; runs with cp1252 as the default encoding as well; Amendment 52)
-cec855d22abbcabdd868ca38eb553778b22edd66aea14a1871024caeaddac6ef  MROF_YT_WAVE25_CONFIRM_REGISTRATION.md (FROZEN 2026-11-25 before any of its bars or recordings was read; the three rules that passed the screen, unchanged, on other markets over the same ten years (2a), on NQ's months after the screen, read once (2b), and against the measured cost of a trade on the recordings (2c); the implementation record was added with the tool; Amendment 53)
-5bc4c2112453c3fd9e8039366353fb4c4b90d95d09e9fea0b0488772f4dec489  mrofyt_confirm25.py (MROF-YT-W25-CONFIRM-1.0: sections 2a and 2b with wave twenty-four's own rule functions -- the market's tick and costs set around them (NQ 0.50/0.75, ES 0.35/0.60, RTY 0.20/0.30, YM 2.00/3.00) and put back; 2b's gate at 2026-11-14 for the one read, which is recorded before it is shown and refused a second time; a run stops before any rule is computed when a contract was not exported; not in the delivered package; Amendment 53)
-9ee5428cf1dd75d2d7b9daf8a247912856b3bef8487aa6c7d2cd7f648f64f01e  tests_mrofyt_confirm25.py (9 tests: the cost table against the registration; the tick and the costs reaching A, B and E; wave twenty-four trade for trade under NQ's costs; 2a through the command on another market; the missing-contract stop and --gaps-ok; 2b's gate, window, bench, ledger and second-read refusal; a collapse named and the three half-export stops; the four verdicts; the command's stops and the frozen constants; runs with cp1252 as the default encoding as well; Amendment 53)
+09061cdeae16a40fdeaf92a48a53f53232c5dd44e9c035d2edeba6b316009668  MROF_YT_WAVE25_CONFIRM_REGISTRATION.md (supersedes cec855d2… — the implementation record of section 2c added with its tool, and two operating notes; nothing above them changed, Amendment 54; FROZEN 2026-11-25 before any of its bars or recordings was read; the three rules that passed the screen, unchanged, on other markets over the same ten years (2a), on NQ's months after the screen, read once (2b), and against the measured cost of a trade on the recordings (2c); the implementation record was added with the tool; Amendment 53)
+3ca08accbe85f8ecbcdc541fe727574a1ed7a0c5e5cc84a981b3233439ebefb0  mrofyt_confirm25.py (supersedes 5bc4c211… — the report file is tried before any read, so the once-only read cannot be used up by a report that cannot be written; no rule, verdict or number changed, Amendment 54; MROF-YT-W25-CONFIRM-1.0: sections 2a and 2b with wave twenty-four's own rule functions -- the market's tick and costs set around them (NQ 0.50/0.75, ES 0.35/0.60, RTY 0.20/0.30, YM 2.00/3.00) and put back; 2b's gate at 2026-11-14 for the one read, which is recorded before it is shown and refused a second time; a run stops before any rule is computed when a contract was not exported; in the package from V50; Amendment 53)
+18b94b6b140ba0a20c8eb03dcbb4a1837ded4a85daef01fc5a7d7b15bb9d20be  tests_mrofyt_confirm25.py (9 tests; supersedes 9ee5428c… — C9 also the report that cannot be written, Amendment 54; earlier 9 tests: the cost table against the registration; the tick and the costs reaching A, B and E; wave twenty-four trade for trade under NQ's costs; 2a through the command on another market; the missing-contract stop and --gaps-ok; 2b's gate, window, bench, ledger and second-read refusal; a collapse named and the three half-export stops; the four verdicts; the command's stops and the frozen constants; runs with cp1252 as the default encoding as well; Amendment 53)
+316eada7788a78644d6e0e8e3fd8289ec65b2a50faa8a2fccdcb11f6a8cb3353  mrofyt_tradecost.py (MROF-YT-W25C-TRADECOST-1.0: section 2c -- one-minute bars of the recorded NQ trades, wave twenty-four's own functions deciding every A and B trade on them, and at each entry and exit the spread, the contracts shown on the side taken and, for A's stops, the slip; the measured average round trip against the assumed one, at most twice it; reads NQ's quote, trade and quality files only, and only sessions from 2026-09-01 to 2026-11-13 marked EXPOSED_PILOT_DEV in the ledger, any other listed and never opened; with --out the read is saved before anything is computed from it, and --from-raw makes the report again without the recordings; Amendment 54)
+d4d10ce3a21c9ab48408e1923d67ea64fa421105f67f754699c6b54135fbd183  tests_mrofyt_tradecost.py (10 tests: the clock in both seasons and the bars; the quote in force, the new lows and highs and the first touch; B's position changes and A's stop and target against wave twenty-four's functions; thirty recorder-format sessions across a contract roll and the November clock change with every measured number checked against a hand count, A and B; sessions that stay unopened, a missing depth file and a damaged run; a run that breaks mid-read leaving nothing behind; the bar; the command and the registration; the saved read giving the same report, and a report that cannot be written stopping the run before the read; runs with cp1252 as the default encoding as well; Amendment 54)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -195,7 +197,7 @@ from inside it unchanged):
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 886/886 + 46/46, identical to the repo
+# run from inside the unzipped package: 916/916 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -265,9 +267,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_vwapvalue.py` | 8/8 |
 | `tests_mrofyt_screen15.py` | 11/11 |
 | `tests_mrofyt_confirm25.py` | 9/9 |
-| **wave-one to twenty-five, tools total** | **906/906** |
+| `tests_mrofyt_tradecost.py` | 10/10 |
+| **wave-one to twenty-five, tools total** | **916/916** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **952/952** |
+| **package total** | **962/962** |
 
 ## Runnable research commands
 
@@ -318,6 +321,10 @@ python3 mrofyt_stretchfade.py "<NQ minute exports>" --out w22_new.json  # wave t
 python3 mrofyt_stretchfade.py "<NQ minute exports>" --unblind --out w22_old.json  # the older years (before 2019-06-01), once
 python3 mrofyt_vwapvalue.py "<NQ minute exports>" --out w23_new.json  # wave twenty-three on the newer years: RUBBER, MOMENTUM, ACCEPT
 python3 mrofyt_vwapvalue.py "<NQ minute exports>" --unblind --out w23_old.json  # the older years, once
+python3 mrofyt_screen15.py "<NQ minute exports>" --out w24.json  # wave twenty-four: the fifteen-idea screen on the ten years, bars already read
+python3 mrofyt_confirm25.py "<ES minute exports>" --market ES --out w25_es.json  # wave twenty-five, 2a: A, B and E on another market (ES, RTY, YM)
+python3 mrofyt_confirm25.py "<every NQ minute export>" --later-months --out w25_later.json  # 2b: NQ 2026-07-01 to 2026-11-13, once
+python3 mrofyt_tradecost.py "<capture folder>" --out w25c.json  # 2c: what an A or B trade costs on the recorded quotes; NQ quotes and trades only
 ```
 
 All of them stream at flat memory. `mrofyt_runner.py --outcomes` and
@@ -338,7 +345,8 @@ grep -nE "SubmitOrder|ChangeOrder|CancelOrder|EnterLong|EnterShort|ExitLong|Exit
      mrofyt_checkpoint.py mrofyt_confluence.py mrofyt_scaledbracket.py \
      mrofyt_l2firstside.py mrofyt_cpcompare.py mrofyt_psycheck.py \
      mrofyt_profilelevels.py mrofyt_sessionlevels.py mrofyt_stretchfade.py \
-     mrofyt_vwapvalue.py
+     mrofyt_vwapvalue.py mrofyt_screen15.py mrofyt_confirm25.py \
+     mrofyt_tradecost.py
 # -> no matches outside header comments documenting the prohibition
 ```
 
@@ -2007,4 +2015,43 @@ detector hash so registering wave two provably changed nothing.
     after 2026-06-11 or on any other market: no such export has been
     read. No package was built; the files above are not in V49.2.
     Nothing frozen changed (06ce854a…). Battery: 906/906 + 46/46
+    (`tests_mles_v12.py` needs the Mono compiler, `mcs`).
+
+54. **What a trade costs, measured on the recordings (2026-11-25).**
+    Section 2c of wave twenty-five as a tool. `mrofyt_tradecost.py`
+    reads NQ's recorded quotes and trades, not the depth files, for the
+    sessions from 2026-09-01 to 2026-11-13 that the exposure ledger
+    marks EXPOSED_PILOT_DEV. It builds one-minute bars of the trades,
+    lets wave twenty-four's own functions decide every A and B trade on
+    them, and measures at each entry and exit the spread and the
+    contracts shown on the side taken, and for A's stops the slip. The
+    measured average round trip is set against the assumed one; the bar
+    is at most twice it. A session outside those dates, or not in the
+    ledger, is listed and never opened, so the sessions from 2026-11-16
+    stay unread.
+
+    `tests_mrofyt_tradecost.py` (10) writes thirty recorder-format
+    sessions with known spreads, sizes and slips, across a contract roll
+    and the November clock change, and checks every measured number
+    against a hand count; then sessions that must stay unopened, a
+    missing depth file, a damaged run, and a run that breaks mid-read.
+
+    The registration's second implementation record states the
+    precisions, fixed before any recording was read for this: the quote
+    taken for a stop is the first one after the triggering trade when it
+    comes within a second; a quote older than 10 seconds is no quote;
+    the histories come from the recordings alone, so A can trade from
+    the 15th recorded session and B from the 29th. No recording has been
+    read by the tool: it runs on the operator's machine.
+
+    The read takes hours, so with `--out` it is written to its own file
+    before anything is computed from it, and `--from-raw` makes the
+    report again from that file. Both wave twenty-five tools now try the
+    report file before they read, so the once-only read of section 2b
+    cannot be used up by a report that cannot be written
+    (`mrofyt_confirm25.py` changed in that alone).
+
+    Package V50 carries waves twenty-four and twenty-five: the two
+    registrations, the three tools and their three suites (212 files).
+    Nothing frozen changed (06ce854a…). Battery: 916/916 + 46/46
     (`tests_mles_v12.py` needs the Mono compiler, `mcs`).

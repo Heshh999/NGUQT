@@ -386,6 +386,19 @@ def record_read(rep, path):
     return len(doc['reads'])
 
 
+def can_write(path):
+    """Whether a file can be written there: asked before a read."""
+    was = os.path.exists(path)
+    try:
+        with open(path, 'a'):
+            pass
+    except OSError:
+        return False
+    if not was:
+        os.remove(path)
+    return True
+
+
 def main(argv=None, ledger=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0].startswith('--'):
@@ -406,6 +419,11 @@ def main(argv=None, ledger=None):
     if market and market not in OTHER_MARKETS:
         print('STOPPED: --market is one of %s.' % ', '.join(OTHER_MARKETS))
         return 2
+    out = arg('--out')
+    if out and not can_write(out):
+        print('STOPPED: %s cannot be written (does the folder exist?). '
+              'Nothing was read.' % out)
+        return 2
     try:
         if later and later_read_made(ledger):
             print('REFUSED: the later months have been read (%s). The read '
@@ -417,11 +435,11 @@ def main(argv=None, ledger=None):
     except CX.ContextDataError as exc:
         print('STOPPED: %s' % exc)
         return 2
-    print(text(rep))
-    out = arg('--out')
     if out:
         with open(out, 'w') as fh:
             json.dump(rep, fh, indent=1, default=str)
+    print(text(rep))
+    if out:
         print('\nwave-twenty-five report -> %s' % out)
     print('read recorded (%d read(s) in %s)' % (n, HISTORY_LEDGER))
     return 0

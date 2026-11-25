@@ -476,6 +476,11 @@ rc_dir, said_dir = said_by(lambda: W.main(
     [os.path.join(WORK, 'no_such_folder'), '--market', 'ES'], ledger=led9))
 rc_ym, said_ym = said_by(lambda: W.main([FE, '--market', 'YM'],
                                         ledger=led9))
+no_dir = os.path.join(WORK, 'no_such_folder', 'report.json')
+rc_out, said_out = said_by(lambda: W.main(
+    [FL, '--later-months', '--out', no_dir], ledger=led9))
+probe = os.path.join(WORK, 'probe.json')
+can = (W.can_write(probe), os.path.exists(probe), W.can_write(no_dir))
 try:
     W.read(FE, 'ES', later=True)
     later_es = False
@@ -484,7 +489,8 @@ except CX.ContextDataError:
 home_after = open(HOME_LEDGER, 'rb').read() \
     if os.path.exists(HOME_LEDGER) else None
 t('C9: the command wants one of --market ES|RTY|YM and --later-months, '
-  'stops on a missing folder or a market with no files, never reads the '
+  'stops on a missing folder, a market with no files or a report it '
+  'cannot write (before the once-only read is used), never reads the '
   'later months on another market, and leaves the folder\'s own ledger '
   'alone; the constants are the frozen registration\'s',
   rc0 == 2 and 'mrofyt_confirm25.py' in said0 and
@@ -494,6 +500,9 @@ t('C9: the command wants one of --market ES|RTY|YM and --later-months, '
   rc_nq == 2 and '--market is one of ES, RTY, YM' in said_nq and
   rc_dir == 2 and 'STOPPED: cannot read' in said_dir and
   rc_ym == 2 and 'STOPPED: no YM minute exports found' in said_ym and
+  rc_out == 2 and 'cannot be written' in said_out and
+  'Nothing was read' in said_out and 'LATER MONTHS' not in said_out and
+  can == (True, False, False) and
   later_es and CX.REFUSE_FROM == '20260701' and
   not os.path.exists(led9) and home_after == home_before and
   W.RULES == ('A', 'B', 'E') and W.REQUIRED == ('ES', 'RTY') and

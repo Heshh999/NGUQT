@@ -164,3 +164,32 @@ days, and the report names them). §2b stops under 200 trading days
 before the window, under 90 of the window's 96 trading days, or on such
 a hole anywhere; nothing is computed and the read is not used up. A §2a
 read is written to the same ledger, and may be repeated.
+
+## Implementation record, §2c — 2026-11-25
+
+`mrofyt_tradecost.py`, `tests_mrofyt_tradecost.py`. Written against §2c
+before any recording was read for it; verified on recorder-format runs
+the suite writes itself, with known spreads, sizes and slips, never on
+market evidence.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| the sessions | `CostRunner.plan`, `exposed_sessions` | a session is opened only when it lies from 2026-09-01 to 2026-11-13 **and** the exposure ledger marks it `EXPOSED_PILOT_DEV`; any other is listed and never opened. Only NQ's quote, trade and quality files are read; the depth file is not opened. The runner's own discovery, file checks and handling of a damaged run are kept |
+| one-minute bars of the recorded trades | `Acc.trade`, `day_stats`, `build` | every recorded trade, in the minute of its receive time in New York; each session under its own contract, so the day after a roll has no yesterday and is not traded, as on the exports. The rules' histories come from the recordings alone: A can trade from the 15th recorded session, B from the 29th |
+| the trades | `measure_a` (`trade_a`), `measure_b` (`rule_b`, `day_b`) | wave twenty-four's functions decide every trade. This file only finds where each execution falls (A's direction, stop and target; B's position changes) and stops with an error if that does not reproduce their result |
+| the spread at that second | `quote_at` at the whole minute (09:35, each half hour, 16:00) | the last quote before that instant; none when the recorder flagged it (`DATA_SUPPRESSED`, `DISCONNECTED`), a disconnect followed it, or it is more than 10 seconds old. An execution without a quote is counted and left out of the averages |
+| contracts shown on the side taken | `shown` | the ask size for a buy, the bid size for a sell |
+| the first trade at or through the stop | `Acc.lows`, `Acc.highs`, `touch_quote` | the first trade from 09:35 at or beyond the price. **The quote taken is the first one after that trade when it comes within one second (the book a market order meets once the stop is touched), else the one in force at the trade.** The same for a target |
+| the slip | `measure_a` | the stop price against that quote's bid (a long) or ask (a short), in ticks, as measured: not floored at 0 |
+| the measured round trip | `measure_a`, `summary_a`, `summary_b` | A: 0.25 points of commission + half the spread at entry + half at exit + the slip on a stop, averaged over the trades measured at both ends; the assumed cost is averaged over the same trades (0.75 on a stop, 0.50 otherwise). B: 0.25 + the average spread a contract bought or sold (a turn from long to short is two contracts), against 0.50 |
+| the bar | `verdict` | WITHIN at most twice the assumed average, exactly twice included; OVER above it; NOT MEASURED when no execution has a quote |
+
+On a stop the registered sum counts half the spread at exit as well as
+the slip from the stop price to the far side, which already crosses the
+spread: it overstates that cost and never understates it.
+
+**Operating notes, not registered.** With `--out` the read is written to
+its own file before anything is computed from it, and `--from-raw` makes
+the report again from that file, so a read of hours is not made twice.
+Both tools try the report file before they read: a once-only read cannot
+be used up by a report that cannot be written.
