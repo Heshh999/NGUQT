@@ -138,7 +138,34 @@ that would have lasted. It uses A and B unchanged.
 - machine-learned models of any kind
 - live, paper or simulated order placement
 
-## Implementation record
+## Implementation record — 2026-11-26
 
-`mrofyt_improve26.py`, `tests_mrofyt_improve26.py`, written against
-this file before any of its rules was computed on any bar.
+`mrofyt_improve26.py`, `tests_mrofyt_improve26.py` (10 tests), written
+against this file before any of its rules was computed on any bar;
+verified on hand-built sessions and synthetic exports, never on market
+evidence.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| A | `a_core` with no change | wave twenty-four's `trade_a` line for line; the suite checks it trade for trade against `trade_a` |
+| A1 | `rule_a1` | "previous eligible sessions" are the sessions before in the list of eligible sessions; V5 is the front contract's volume |
+| A2 | `normal_range`, `rule_a2` | the 14 trading days of the daily chain strictly before the session; the stop at P(09:35) − d × 0.10 × D |
+| A3 | `b_want`, `b_inputs`, `rule_a3` | at minute m of 10:00 … 15:30, before bar m's stop and target; B's bounds and volatility rebuilt as `rule_b` builds them (checked in the suite) |
+| the bar, better than A | `judge_four`, `decide` | the mean result per session is the sum of the sized results over the number of eligible sessions; `decide` needs the NQ, ES and RTY reports |
+| §3 sizes | `a_micros`, `b_micros` | round half up for B |
+| §3 a day | `day_path` | marked at each minute close P(m), m = 0 … 390; A pays half a round trip at 09:35 and the rest at its exit; each contract B buys or sells pays half; the daily stop closes at that minute's P, paying half a round trip a micro |
+| §3 the account | `account`, `prop` | a failure is the lowest minute mark of a day 4,500 or more below the highest end-of-day value; the day's result still counts in the year; the halving rule applies to the version kept for step 3 (with or without the daily stop) |
+| §4 reads | `main`, `read_made`, `record_read` | each (part, market) of this version once, in `MROF_MINUTE_HISTORY_EXPOSURE.json`, recorded before any result is shown |
+
+**Expected beforehand (written 2026-11-26, before any of it was
+computed).** A1 keeps about half of A's trades; each a little better,
+the total per session about the same or lower: about one chance in four
+of being better than A on both ES and RTY. A2 changes A's stop little on
+most days (the first candle and a tenth of the day's range are of a
+similar size): also about one in four. A3 rarely acts, because B turns
+against A mostly after A's own stop has been hit: about one in ten. Most
+likely none of the three is better than A. On the prop account: B about
+2,000 to 4,000 dollars a year, A less, both positive in most years; the
+largest fall of the two together about 4,000 to 6,000 dollars, so one to
+three failures in the ten years and the budgets halved; the daily stop
+rarely reached, changing little.

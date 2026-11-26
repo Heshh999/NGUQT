@@ -286,7 +286,7 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 48 suites, 916 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 49 suites, 926 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
@@ -348,7 +348,7 @@ capture installation and operation.
   inputs uncomputed, so it cannot fire on real data. A4 runs with one of its two
   alternative residual inputs uncomputed.
 - Twenty-three registered waves sit on the runner through observation hooks (see
-  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–54). On DEV, wave
+  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–55). On DEV, wave
   six's L2 (fade the failed break of a daily range level when the order flow turns) is
   the one idea with support: 57 trades, +6.15 points a trade net of costs, most of it from
   one session. Wave fourteen fixes the first L2 signal at each level per session as the
@@ -372,10 +372,11 @@ capture installation and operation.
   years (Amendment 52); wave twenty-five takes the three that passed the screen,
   unchanged, to other index futures and to NQ's later months, with the verdicts fixed
   in advance (Amendment 53), and measures on the recordings what such a trade really
-  costs (Amendment 54).
+  costs (Amendment 54). Wave twenty-six fixes three changes to A and a prop-account plan
+  for A and B before those data are read (Amendment 55).
   `mrofyt_checkpoint.py` (V40, extended through V47) runs every recordings test on one
   read, each wave's report byte-identical to its own command; `--nq-only` reads NQ
-  alone, about half the work. Package V50: 916/916 research checks and 46/46
+  alone, about half the work. Package V50 (916/916); the repository since: 926/926 research checks and 46/46
   dashboard checks from inside the zip.
 - The capture drive recorded file-system damage in two depth files after a disconnect on
   2026-09-22. The audit and recovery tools set those runs aside rather than reading

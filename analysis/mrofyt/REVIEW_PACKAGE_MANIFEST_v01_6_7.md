@@ -161,6 +161,9 @@ bcf93be3e2d0371c2a3ce20fd1bafbb4a934c4514ac94ed29362f5080b2af091  mrofyt_screen1
 18b94b6b140ba0a20c8eb03dcbb4a1837ded4a85daef01fc5a7d7b15bb9d20be  tests_mrofyt_confirm25.py (9 tests; supersedes 9ee5428c… — C9 also the report that cannot be written, Amendment 54; earlier 9 tests: the cost table against the registration; the tick and the costs reaching A, B and E; wave twenty-four trade for trade under NQ's costs; 2a through the command on another market; the missing-contract stop and --gaps-ok; 2b's gate, window, bench, ledger and second-read refusal; a collapse named and the three half-export stops; the four verdicts; the command's stops and the frozen constants; runs with cp1252 as the default encoding as well; Amendment 53)
 316eada7788a78644d6e0e8e3fd8289ec65b2a50faa8a2fccdcb11f6a8cb3353  mrofyt_tradecost.py (MROF-YT-W25C-TRADECOST-1.0: section 2c -- one-minute bars of the recorded NQ trades, wave twenty-four's own functions deciding every A and B trade on them, and at each entry and exit the spread, the contracts shown on the side taken and, for A's stops, the slip; the measured average round trip against the assumed one, at most twice it; reads NQ's quote, trade and quality files only, and only sessions from 2026-09-01 to 2026-11-13 marked EXPOSED_PILOT_DEV in the ledger, any other listed and never opened; with --out the read is saved before anything is computed from it, and --from-raw makes the report again without the recordings; Amendment 54)
 d4d10ce3a21c9ab48408e1923d67ea64fa421105f67f754699c6b54135fbd183  tests_mrofyt_tradecost.py (10 tests: the clock in both seasons and the bars; the quote in force, the new lows and highs and the first touch; B's position changes and A's stop and target against wave twenty-four's functions; thirty recorder-format sessions across a contract roll and the November clock change with every measured number checked against a hand count, A and B; sessions that stay unopened, a missing depth file and a damaged run; a run that breaks mid-read leaving nothing behind; the bar; the command and the registration; the saved read giving the same report, and a report that cannot be written stopping the run before the read; runs with cp1252 as the default encoding as well; Amendment 54)
+d259f7f02ad1384d317ca9024b005cc06c07b753ce615aa9850bf512513c3e7a  MROF_YT_WAVE26_IMPROVE_REGISTRATION.md (FROZEN 2026-11-26 before any of its rules was computed and before any ES or RTY bar, or NQ bar after 2026-06-11, was read: A1 busy opens only, A2 a stop from the normal day, A3 out when B is against it, judged against A itself; A and B in micros on a $150,000 prop account; the implementation record and the expectations written before anything was computed; not in V50; Amendment 55)
+a0a73ff51a9ed6e1a9dba51dc3498a288025abecbc92500ae4cca24281f0b5eb  mrofyt_improve26.py (MROF-YT-W26-IMPROVE-1.0: the three changes to A through wave twenty-four's functions and wave twenty-five's costs and reader; the verdict from the NQ, ES and RTY reports; the prop account with and without the daily stop; each read once, recorded before it is shown; not in V50; Amendment 55)
+1f66cf43e9d938ef46f26042755549e2d6750be855e8bfcb703acc7b428eaa2b  tests_mrofyt_improve26.py (10 tests: A against trade_a trade for trade; A1, A2, A3 on hand-built sessions; B's inputs against rule_b; the sizing; a day's dollars with and without the daily stop; the account's failures; the reads, verdict and ledger end to end; the decision rule and the registration; runs with cp1252 as the default encoding as well; Amendment 55)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -268,9 +271,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_screen15.py` | 11/11 |
 | `tests_mrofyt_confirm25.py` | 9/9 |
 | `tests_mrofyt_tradecost.py` | 10/10 |
-| **wave-one to twenty-five, tools total** | **916/916** |
+| `tests_mrofyt_improve26.py` | 10/10 |
+| **wave-one to twenty-six, tools total** | **926/926** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **962/962** |
+| **package total** | **972/972** |
 
 ## Runnable research commands
 
@@ -2055,3 +2059,22 @@ detector hash so registering wave two provably changed nothing.
     registrations, the three tools and their three suites (212 files).
     Nothing frozen changed (06ce854a…). Battery: 916/916 + 46/46
     (`tests_mles_v12.py` needs the Mono compiler, `mcs`).
+
+55. **Three changes to A, and A and B on a prop account
+    (2026-11-26).** The operator asked whether A and B can be improved.
+    `MROF_YT_WAVE26_IMPROVE_REGISTRATION.md` fixes the only changes
+    that will be tried, before ES, RTY or NQ's later months are read,
+    so that those data judge them too: A1 trades only on busy opens, A2
+    puts the stop at a tenth of the normal day's range, A3 closes A when
+    B's own rule turns against it. Each must pass wave twenty-four's bar
+    on NQ, ES and RTY and beat unchanged A on ES and RTY; none goes on
+    unless A itself passes wave twenty-five. It also fixes how A and B
+    would be sized and stopped in micros on a $150,000 prop account, and
+    what follows from the ten years of NQ (halved budgets after more
+    than one failure; a daily stop kept only if it helps and costs little).
+
+    `mrofyt_improve26.py` applies it with wave twenty-four's functions
+    and wave twenty-five's costs and reader; `tests_mrofyt_improve26.py`
+    (10). The expectations were written into the registration before
+    anything was computed. The files are not in V50. Nothing frozen
+    changed (06ce854a…). Battery: 926/926 + 46/46.
