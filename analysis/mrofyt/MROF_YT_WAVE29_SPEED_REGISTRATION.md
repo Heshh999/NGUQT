@@ -260,11 +260,15 @@ anything the tape forecasts, at every speed.
 
 ## Implementation record — 2026-11-26
 
-`mrofyt_speed29.py`, `tests_mrofyt_speed29.py` (26 tests), written
+`mrofyt_speed29.py`, `tests_mrofyt_speed29.py` (29 tests), written
 after this file was frozen and before any recording was read by it;
 verified on hand-built tape, on panels built in the suite with and
 without a planted effect, and on recorder-format runs, never on market
-evidence. Nothing above this line was changed.
+evidence. Two of the tests set the code against a slow second
+implementation written from this file's words alone: every column of
+every row on random tapes, and the usable rows, σ, the 48 inputs and
+what followed on random sessions with holes in them. Nothing above
+this line was changed.
 
 | registered | implemented as | precision |
 | --- | --- | --- |
@@ -282,7 +286,7 @@ evidence. Nothing above this line was changed.
 | §4 T | `run_take` | no trade without a quote at t + 0.5 s; a trade whose closing quote is missing is counted apart (`void`) and not judged; the next entry may be made at the row of the exit |
 | §4 M | `run_join` | a filled order is closed at the first row at or after its fill plus h, by taking 0.5 s after that row (held between h and h + 5.5 seconds) |
 | §4 D | `deep_price`, `run_deep` | the exit is h seconds after the end of the order's 5 seconds |
-| §5 the map | `input_map`, `pooled`, `_top` | **differs from the text.** See below |
+| §5 the map | `input_map`, `pooled`, `best_null`, `_top` | **differs from the text.** See below. Beside the best single input the report gives the t that the largest of the 48 reaches one time in twenty when each session's sign is drawn at random (1,000 draws, always the same ones): the best of 48 always looks like something |
 | §5 the usual move and cost | `analyze` | the median σ times the root of h; the median spread plus the commission |
 | §6 the verdict | `summarize`, `qualifies`, `analyze` | every way that qualifies is listed; the frozen file holds, for each of T, M and D, the one with the highest t (of two the same, the one listed first: the shorter hold; for D the smaller k, then the shorter hold). The halves are the first and the second half of the sessions by date |
 | §6 frozen | `seal` | the frozen file carries a SHA-256 of itself; a file changed afterwards is refused |
@@ -300,9 +304,12 @@ by session inherits the tie. The code therefore centres each input on
 its average over the *other* sessions, leaves what followed as it is,
 and reports one correlation over all sessions together, with a t that
 is the mean of the sessions' sums of products over its standard error.
-On six simulated tapes with nothing in them this gave 6 cells of 1,728
-beyond a t of 3, no more than chance gives. The forecast's own figure is
-computed the same way. Nothing in §6 or §8 uses the map.
+On sixty simulated panels of twenty sessions with nothing in them, the
+16,200 values of t had a mean of −0.02 and a standard deviation of
+1.09 (a t with 19 degrees of freedom has 1.06), and 5.4 % of them lay
+beyond its 5 % level. The forecast's own figure is computed the same
+way; on eighteen such panels it was centred on zero. Nothing in §6 or
+§8 uses the map.
 
 **Dry runs, on simulated panels only.** With nothing planted, nothing
 qualified and nothing was frozen. With a forecast planted in the flow,

@@ -50,6 +50,7 @@ import heapq
 import json
 import math
 import os
+import random
 import sys
 import time
 
@@ -1322,9 +1323,10 @@ def _median(v):
     return v[n // 2] if n % 2 else 0.5 * (v[n // 2 - 1] + v[n // 2])
 
 
-def input_map(sessions):
+def input_map(sessions, with_null=False):
     """{input: {h: [correlation, t, sessions]}} of each input with what
-    followed, on the rows whose outcome is known at every horizon.
+    followed, on the rows whose outcome is known at every horizon; with
+    `with_null`, also {h: what the best of them reaches by chance}.
 
     Nothing is ranked within a session and no session's own average is
     taken off: either ties an input that follows the price (its
@@ -1353,8 +1355,49 @@ def input_map(sessions):
             xc = [col[i] - m for i in ix]
             for h in HORIZONS:
                 per[f][h].append(products(xc, ys[h]))
-    return {f: {str(h): pooled(per[f][h]) for h in HORIZONS}
-            for f in FEATURES}
+    out = {f: {str(h): pooled(per[f][h]) for h in HORIZONS}
+           for f in FEATURES}
+    if not with_null:
+        return out
+    return out, {str(h): best_null([[p[0] for p in per[f][h]]
+                                    for f in FEATURES]) for h in HORIZONS}
+
+
+NULL_DRAWS = 1000
+
+
+def best_null(sums, draws=None, seed=29):
+    """What the best of the inputs looks like when nothing is there: the
+    value that the largest |t| among them stays under 19 times in 20
+    when each session's sign is drawn at random. `sums` is one list of
+    session sums of products for each input, over the same sessions.
+
+    The sums keep their sizes and what ties one input to another; only
+    whether a session counts for or against is left to chance, which is
+    what a tape with nothing in it would do. A sum of squares does not
+    change with the signs, so each draw needs one sum of products an
+    input."""
+    draws = NULL_DRAWS if draws is None else draws
+    n = len(sums[0]) if sums else 0
+    live = [(v, sum(x * x for x in v)) for v in sums
+            if len(v) == n and any(v)]
+    if n < 3 or not live:
+        return None
+    rng = random.Random(seed)
+    best = []
+    for _ in range(draws):
+        e = [1.0 if rng.random() < 0.5 else -1.0 for _k in range(n)]
+        top = 0.0
+        for v, q in live:
+            d = sum(a * b for a, b in zip(e, v))
+            var = (q - d * d / n) / (n - 1)
+            if var > 0:
+                t = abs(d / n) / math.sqrt(var / n)
+                if t > top:
+                    top = t
+        best.append(top)
+    best.sort()
+    return round(best[min(draws - 1, int(0.95 * draws))], 3)
 
 
 def spread_facts(sessions):
@@ -1475,9 +1518,10 @@ def analyze(panel, progress=None):
     first = TRAIN_MIN
     oos = names[first:]
     rep = _base(panel, used, unused)
+    inputs, chance = input_map(used, with_null=True)
     rep.update(part='dev', forecast_sessions=oos,
                spread=spread_facts(used), join_alone=join_facts(used),
-               inputs=input_map(used), map={}, take={}, join={}, deep={},
+               inputs=inputs, map={}, take={}, join={}, deep={},
                penalties={})
     sig = [x for s in used for x in s.sigma]
     spr = [x for s in used for x in s.spread]
@@ -1512,7 +1556,8 @@ def analyze(panel, progress=None):
             cost=round(_median(spr) + COMMISSION, 3),
             forecast=pooled(ic), top_move=top, top_calls=top_n,
             best_inputs=[[f, rep['inputs'][f][str(h)][0],
-                          rep['inputs'][f][str(h)][1]] for _a, f in best])
+                          rep['inputs'][f][str(h)][1]] for _a, f in best],
+            best_by_chance=chance[str(h)])
         rep['penalties'][str(h)] = {str(k): v for k, v in lams.items()}
         st = summarize(tk, oos, tv)
         st['qualifies'] = qualifies(st, h)
@@ -1698,10 +1743,17 @@ def text(rep):
         L.append('  %-7s %12.2f %12.2f %13s (%s) %24s   %s' % (
             _hold(h), m['move'], m['cost'], _n(m['forecast'][0], '%+.4f'),
             _n(m['forecast'][1], '%+.1f'), _n(m['top_move'], '%+.2f'),
-            '%s (%s)' % (b[0], _n(b[1], '%+.4f')) if b else 'n/a'))
+            '%s (%s, t %s; chance reaches %s)' % (
+                b[0], _n(b[1], '%+.4f'), _n(b[2], '%+.1f'),
+                _n(m.get('best_by_chance'), '%.1f')) if b else 'n/a'))
     L.append('  A way to trade has to move more than a round trip. "Its '
              'best 1 in 20" is what followed the forecast\'s strongest '
              'calls, before any cost.')
+    L.append('  The best single input is the largest of %d, so it always '
+             'looks like something: "chance reaches" is the t it gets to '
+             'one time in twenty with nothing in the tape (these '
+             'sessions\' own sums, each session\'s sign drawn at random).'
+             % K)
     ja = rep['join_alone']
     if ja and ja['placed']:
         a = ja['after']

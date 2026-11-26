@@ -13,6 +13,7 @@ import collections
 import csv
 import datetime as _dt
 import io
+import itertools
 import json
 import math
 import os
@@ -521,6 +522,274 @@ t('S6: the panel is written whole and read back the same (prices, '
 
 
 # ---------------------------------------------------------------------
+# S7: the rows against a slow second implementation, on random tape
+# ---------------------------------------------------------------------
+def random_tape(seed, rows_from, rows_to):
+    """Events ('Q', t, b, bs, a, az) / ('T', t, px, sz, sign) / ('B', t),
+    in time order, times on eighths of a second (so many fall exactly on
+    marks)."""
+    rng = random.Random(seed)
+    t = T0 + 5 * rows_from - 30.0
+    end = T0 + 5 * rows_to + 20.0
+    bid = 20000.0
+    spread = 1
+    ev = []
+    while t < end:
+        r = rng.random()
+        if r < 0.004:
+            ev.append(('B', t))
+        elif r < 0.55:
+            bid += W.TICK * rng.choice((-2, -1, -1, 0, 0, 0, 1, 1, 2))
+            if rng.random() < 0.15:
+                spread = rng.choice((1, 1, 1, 2, 3))
+            ev.append(('Q', t, bid, float(rng.randint(0, 6)),
+                       bid + W.TICK * spread, float(rng.randint(0, 6))))
+        else:
+            where = rng.random()
+            ask = bid + W.TICK * spread
+            if where < 0.4:
+                px, sign = bid, rng.choice((-1, -1, -1, 0))
+            elif where < 0.8:
+                px, sign = ask, rng.choice((1, 1, 1, 0))
+            elif where < 0.9:                    # through the bid
+                px = bid - W.TICK * rng.randint(1, 3)
+                sign = rng.choice((-1, 0))
+            else:                                # through the ask
+                px = ask + W.TICK * rng.randint(1, 3)
+                sign = rng.choice((1, 0))
+            ev.append(('T', t, px, float(rng.randint(1, 5)), sign))
+        gap = rng.random()
+        if gap < 0.003:
+            t += rng.choice((11.0, 12.5, 16.0, 23.0))     # a silence
+        elif gap < 0.35:
+            t += 0.0                                       # the same instant
+        else:
+            t += rng.choice((0.125, 0.125, 0.25, 0.375, 0.5, 0.75, 1.0, 1.5))
+    return ev
+
+
+def slow_rows(ev, rows_from, rows_to):
+    """{column: {row: value}} for rows_from..rows_to, by brute force."""
+    # the first event stands for the beginning of a run: an interruption
+    breaks = [ev[0][1]] + [e[1] for e in ev if e[0] == 'B']
+    quotes = [e for e in ev if e[0] == 'Q']
+    trades = [e for e in ev if e[0] == 'T']
+    order = {id(e): i for i, e in enumerate(ev)}
+
+    def quote_at(x):
+        """The quote in force at mark x: the last quote received before
+        x, not older than 10 s, no interruption since it."""
+        qs = [q for q in quotes if q[1] < x]
+        if not qs:
+            return None
+        q = qs[-1]
+        # an interruption at or after the quote (later in the tape) kills it
+        for e in ev:
+            if e[0] == 'B' and e[1] < x and (
+                    e[1] > q[1] or (e[1] == q[1] and order[id(e)] >
+                                    order[id(q)])):
+                return None
+        if x - q[1] > W.MAX_QUOTE_AGE:
+            return None
+        return q
+
+    def before(e, f):
+        """Whether event e comes before event f on the tape."""
+        return order[id(e)] < order[id(f)]
+
+    out = {c: {} for c in W.COLS}
+    for g in range(rows_from, rows_to + 1):
+        T = T0 + 5.0 * g
+        q = quote_at(T)
+        out['v'][g] = 1.0 if q else 0.0
+        out['bid'][g] = q[2] if q else 0.0
+        out['bs'][g] = q[3] if q else 0.0
+        out['ask'][g] = q[4] if q else 0.0
+        out['az'][g] = q[5] if q else 0.0
+        for name, dly in (('05', 0.5), ('10', 1.0)):
+            qq = quote_at(T + dly)
+            out['b' + name][g] = qq[2] if qq else 0.0
+            out['a' + name][g] = qq[4] if qq else 0.0
+        # ---- sums over [T - 5, T) ----------------------------------
+        lo, hi = T - 5.0, T
+        tr = [e for e in trades if lo <= e[1] < hi]
+        out['vol'][g] = sum(e[3] for e in tr)
+        out['pv'][g] = sum(e[2] * e[3] for e in tr)
+        out['buy'][g] = sum(e[3] for e in tr if e[4] > 0)
+        out['sell'][g] = sum(e[3] for e in tr if e[4] < 0)
+        out['nb'][g] = float(sum(1 for e in tr if e[4] > 0))
+        out['ns'][g] = float(sum(1 for e in tr if e[4] < 0))
+        out['tfi1'][g] = sum(e[4] * e[3] for e in trades
+                             if T - 1.0 <= e[1] < T)
+        out['gap'][g] = 1.0 if any(lo <= x < hi for x in breaks) else 0.0
+
+        def ofi_of(k):
+            """The imbalance quote k adds: against the quote before it,
+            unless an interruption lies between them (the first event
+            of the tape stands for one)."""
+            if k == 0:
+                return 0.0
+            q0, q1 = quotes[k - 1], quotes[k]
+            for e in ev:
+                if e[0] == 'B' and before(q0, e) and before(e, q1):
+                    return 0.0
+            e_ = 0.0
+            if q1[2] >= q0[2]:
+                e_ += q1[3]
+            if q1[2] <= q0[2]:
+                e_ -= q0[3]
+            if q1[4] <= q0[4]:
+                e_ -= q1[5]
+            if q1[4] >= q0[4]:
+                e_ += q0[5]
+            return e_
+        out['ofi'][g] = sum(ofi_of(k) for k, q1 in enumerate(quotes)
+                            if lo <= q1[1] < hi)
+        out['ofi1'][g] = sum(ofi_of(k) for k, q1 in enumerate(quotes)
+                             if T - 1.0 <= q1[1] < T)
+        # ---- time integrals over [T - 5, T) --------------------------
+        qt = qi = spr = s1 = s2 = 0.0
+        for k, q1 in enumerate(quotes):
+            a = q1[1]
+            b = a + W.MAX_QUOTE_AGE
+            if k + 1 < len(quotes):
+                b = min(b, quotes[k + 1][1])
+            later = [e[1] for e in ev if e[0] == 'B' and before(q1, e)]
+            if later:
+                b = min(b, min(later))
+            a2, b2 = max(a, lo), min(b, hi)
+            if b2 <= a2:
+                continue
+            dt = b2 - a2
+            qt += dt
+            if q1[3] + q1[5] > 0:
+                qi += dt * (q1[3] - q1[5]) / (q1[3] + q1[5])
+            sp = (q1[4] - q1[2]) / W.TICK
+            spr += dt * sp
+            if sp < 1.5:
+                s1 += dt
+            elif sp < 2.5:
+                s2 += dt
+        out['qt'][g], out['qi'][g], out['spr'][g] = qt, qi, spr
+        out['s1'][g], out['s2'][g] = s1, s2
+        # ---- squared one-second changes: the seconds T-4 .. T --------
+        sq = n = 0.0
+        for k in range(5):
+            s = T - 4.0 + k
+            qa, qb = quote_at(s - 1.0), quote_at(s)
+            if qa is None or qb is None:
+                continue
+            if any(s - 1.0 <= x < s for x in breaks):
+                continue
+            d = 0.5 * (qb[2] + qb[4]) - 0.5 * (qa[2] + qa[4])
+            sq += d * d
+            n += 1.0
+        out['sq'][g], out['sqn'][g] = sq, n
+        # ---- the two join orders -------------------------------------
+        tj = T + 0.5
+        qj = quote_at(tj)
+        for side, name in ((1, 'fb'), (-1, 'fs')):
+            out[name][g] = -1.0
+            if qj is None:
+                continue
+            p = qj[2] if side > 0 else qj[4]
+            ahead = qj[3] if side > 0 else qj[5]
+            cum, through, conf = 0.0, False, False
+            for e in ev:
+                if e[1] < tj:
+                    continue
+                if e[1] >= tj + 11.0:
+                    break                # taken off at the mark 11 s on
+                if e[0] == 'B':
+                    break                # dropped, unfilled
+                if e[0] == 'T':
+                    px, sz, sign = e[2], e[3], e[4]
+                    if side > 0:
+                        if px < p:
+                            through = True
+                        elif px == p and sign <= 0:
+                            cum += sz
+                    else:
+                        if px > p:
+                            through = True
+                        elif px == p and sign >= 0:
+                            cum += sz
+                else:
+                    if (e[2] < p) if side > 0 else (e[4] > p):
+                        conf = True
+                if cum >= ahead + 1.0 or (through and conf):
+                    out[name][g] = max(0.0, float(round((e[1] - tj)
+                                                        * 1000.0)))
+                    break
+        # ---- the deep window [T + 0.5, T + 5.5) ----------------------
+        w0, w1 = T + 0.5, T + 5.5
+        out['lo'][g] = out['hi'][g] = out['lob'][g] = out['hia'][g] = 0.0
+        if qj is not None and not any(w0 <= x < w1 for x in breaks):
+            px = [e[2] for e in trades if w0 <= e[1] < w1]
+            if px:
+                out['lo'][g], out['hi'][g] = min(px), max(px)
+            bids = [qj[2]] + [e[2] for e in quotes if w0 <= e[1] < w1]
+            asks = [qj[4]] + [e[4] for e in quotes if w0 <= e[1] < w1]
+            out['lob'][g], out['hia'][g] = min(bids), max(asks)
+    return out
+
+
+
+def rows_differ(seed, g0=700, g1=745):
+    """The columns in which the Book and the slow implementation differ
+    on one random tape (none when they agree), and what the tape held."""
+    ev = random_tape(seed, g0, g1)
+    out = {}
+    for exe in (True, False):
+        bk = W.Book(SES, exe)
+        for e in ev:
+            if e[0] == 'Q':
+                bk.quote(*e[1:])
+            elif e[0] == 'T':
+                bk.trade(*e[1:])
+            else:
+                bk.brk(e[1])
+        bk.finish()
+        out[exe] = bk.col
+    ref = slow_rows(ev, g0, g1)
+    bad = set()
+    for exe, names in ((True, W.COLS), (False, W.COLS_MICRO)):
+        for c in names:
+            for g in range(g0, g1 + 1):
+                if abs(out[exe][c][g] - ref[c][g]) > \
+                        1e-6 * max(1.0, abs(ref[c][g])):
+                    bad.add((exe, c))
+    seen = dict(
+        fills=sum(1 for g in range(g0, g1 + 1) for c in ('fb', 'fs')
+                  if ref[c][g] >= 0),
+        unfilled=sum(1 for g in range(g0, g1 + 1) for c in ('fb', 'fs')
+                     if ref[c][g] < 0 and ref['b05'][g] > 0),
+        no_quote=sum(1 for g in range(g0, g1 + 1) if not ref['v'][g]),
+        gaps=sum(1 for g in range(g0, g1 + 1) if ref['gap'][g]),
+        deep=sum(1 for g in range(g0, g1 + 1) if ref['lo'][g] > 0),
+        no_deep=sum(1 for g in range(g0, g1 + 1) if ref['lob'][g] == 0),
+        wide=sum(1 for g in range(g0, g1 + 1) if ref['s2'][g] > 0))
+    return bad, seen
+
+
+S7 = [rows_differ(seed) for seed in (1, 2, 3, 4, 5, 6, 7, 8)]
+seen7 = collections.Counter()
+for _bad, seen in S7:
+    seen7.update(seen)
+t('S7: on eight random tapes (quotes, trades and interruptions falling on '
+  'and between the marks, several in one instant, silences longer than a '
+  'quote lasts) every column of every row is the one a slow second '
+  'implementation gives, written from the registration without the '
+  'book\'s running sums: the quote in force, the sums and integrals, '
+  'the squared moves, both join orders and the deep window; and so is '
+  'the micro contract\'s book',
+  all(not bad for bad, _seen in S7) and seen7['fills'] > 300 and
+  seen7['unfilled'] > 100 and seen7['no_quote'] > 5 and
+  seen7['gaps'] > 5 and seen7['deep'] > 200 and seen7['no_deep'] > 5 and
+  seen7['wide'] > 50)
+
+
+# ---------------------------------------------------------------------
 # panels built here
 # ---------------------------------------------------------------------
 def blank_cols():
@@ -719,6 +988,190 @@ t('A1b: nothing after a row changes that row\'s inputs, and nothing after '
   W.derive('20260901', thin) is None and before.n == 4561)
 
 # ---------------------------------------------------------------------
+# A1c: the inputs against a slow second implementation
+# ---------------------------------------------------------------------
+def held(x, lim=5.0):
+    return max(-lim, min(lim, x))
+
+
+def slow_inputs(d, g):
+    """(inputs by name, sigma) of row g, or None when it is not usable."""
+    c, mc = d['cols'], d['mcols']
+    g_open = (9 * 3600 + 1800 - 8 * 3600) // 5
+    g_from = (9 * 3600 + 2100 - 8 * 3600) // 5
+    g_to = (15 * 3600 + 3300 - 8 * 3600) // 5
+
+    def tot(col, w, src=c):
+        return sum(src[col][k] for k in range(max(0, g - w // 5 + 1), g + 1))
+
+    def mid(k):
+        return 0.5 * (c['bid'][k] + c['ask'][k]) if c['v'][k] else None
+    if not (g_from <= g <= g_to) or mid(g) is None:
+        return None
+    if tot('gap', 600) > 0:
+        return None
+    steps, sq = tot('sqn', 600), tot('sq', 600)
+    if steps < 300 or sq <= 0:
+        return None
+    sig = math.sqrt(sq / steps)
+    m = mid(g)
+    f = {}
+    for w in (5, 30, 120, 600, 1800):
+        k = g - w // 5
+        f['r%d' % w] = held((m - mid(k)) / (sig * math.sqrt(w))) \
+            if k >= 0 and mid(k) is not None else 0.0
+    last = range(g - 119, g + 1)
+    os_ = math.sqrt(sum(c['ofi'][k] ** 2 for k in last) / 120.0)
+    ts_ = math.sqrt(sum((c['buy'][k] - c['sell'][k]) ** 2 for k in last)
+                    / 120.0)
+    f['o1'] = held(c['ofi1'][g] / (os_ * math.sqrt(1 / 5.0))) if os_ else 0.0
+    for w in (5, 30, 120, 600):
+        f['o%d' % w] = held(tot('ofi', w) / (os_ * math.sqrt(w / 5.0))) \
+            if os_ else 0.0
+    f['t1'] = held(c['tfi1'][g] / (ts_ * math.sqrt(1 / 5.0))) if ts_ else 0.0
+
+    def share(a, b):
+        return (a - b) / (a + b) if a + b > 0 else 0.0
+    for w in (5, 30, 120, 600):
+        f['t%d' % w] = share(tot('buy', w), tot('sell', w))
+    for w in (30, 120, 600):
+        f['c%d' % w] = share(tot('nb', w), tot('ns', w))
+    f['z120'] = f['t120'] - f['c120']
+    f['q0'] = share(c['bs'][g], c['az'][g])
+    for w in (5, 30):
+        f['q%d' % w] = tot('qi', w) / tot('qt', w) if tot('qt', w) > 0 else 0.0
+    f['s0'] = min((c['ask'][g] - c['bid'][g]) / 0.25, 8.0)
+    f['srel'] = 0.0
+    if tot('qt', 30) > 0 and tot('qt', 600) > 0 and tot('spr', 600) > 0:
+        f['srel'] = held((tot('spr', 30) / tot('qt', 30)) /
+                         (tot('spr', 600) / tot('qt', 600)) - 1.0, 3.0)
+    f['a30'] = held(math.log((tot('vol', 30) / 30.0) /
+                             (tot('vol', 600) / 600.0)), 3.0) \
+        if tot('vol', 30) > 0 and tot('vol', 600) > 0 else 0.0
+    f['v30'] = 0.0
+    if tot('sqn', 30) > 0 and tot('sq', 30) > 0:
+        f['v30'] = held(math.log((tot('sq', 30) / tot('sqn', 30)) /
+                                 (sq / steps)), 3.0)
+    day = [mid(k) for k in range(g_open, g + 1) if mid(k) is not None]
+    f['pday'] = (m - min(day)) / (max(day) - min(day)) - 0.5 \
+        if max(day) > min(day) else 0.0
+    dv = sum(c['vol'][k] for k in range(g_open + 1, g + 1))
+    f['dvwap'] = held((m - sum(c['pv'][k] for k in range(g_open + 1, g + 1))
+                       / dv) / (sig * math.sqrt(1800.0))) if dv > 0 else 0.0
+    mids = [mid(k) for k in last if mid(k) is not None]
+    f['d600'] = held((m - sum(mids) / len(mids)) / (sig * math.sqrt(600.0)))
+    for name in ('mt5', 'mt30', 'mt120', 'mt600', 'mc120', 'mq0', 'x30',
+                 'x120', 'x600', 'ma120', 'basis'):
+        f[name] = 0.0
+    if mc is not None and mc['v'][g]:
+        for w in (5, 30, 120, 600):
+            f['mt%d' % w] = share(tot('buy', w, mc), tot('sell', w, mc))
+        f['mc120'] = share(tot('nb', 120, mc), tot('ns', 120, mc))
+        f['mq0'] = share(mc['bs'][g], mc['az'][g])
+        for w in (30, 120, 600):
+            f['x%d' % w] = f['mt%d' % w] - f['t%d' % w]
+        a, b = tot('vol', 120, mc), 10.0 * tot('vol', 120)
+        f['ma120'] = held(math.log(a / b), 3.0) if a > 0 and b > 0 else 0.0
+        f['basis'] = held((0.5 * (mc['bid'][g] + mc['ask'][g]) - m) / 0.25,
+                          4.0)
+    sod = 8 * 3600 + 5 * g
+    f['u1'] = 1.0 if sod < 10 * 3600 else 0.0
+    f['u2'] = 1.0 if sod >= 15 * 3600 else 0.0
+    f['r120u1'], f['r120u2'] = f['r120'] * f['u1'], f['r120'] * f['u2']
+    f['t120u1'], f['t120u2'] = f['t120'] * f['u1'], f['t120'] * f['u2']
+    f['r600v30'] = f['r600'] * f['v30']
+    f['o30a30'] = f['o30'] * f['a30']
+    return f, sig
+
+
+def slow_outcome(d, g, sig, h):
+    """What followed row g over h seconds, in sigmas; None if unknown."""
+    c = d['cols']
+    e = g + h // 5
+    if 8 * 3600 + 5 * g > 15 * 3600 + 3300 - h or e >= W.ROWS:
+        return None
+    if not c['v'][e] or any(c['gap'][k] for k in range(g + 1, e + 1)):
+        return None
+    move = 0.5 * (c['bid'][e] + c['ask'][e]) - 0.5 * (c['bid'][g] +
+                                                    c['ask'][g])
+    return held(move / (sig * math.sqrt(h)))
+
+
+def holes(d, seed):
+    """Rows without a quote, interruption marks, rows without the micro's
+    quote, a silent stretch and a wide spread, put into a walk."""
+    rng = random.Random(seed)
+    c, mc = d['cols'], d['mcols']
+    for _ in range(40):
+        g = rng.randint(1100, 5700)
+        for k in range(g, g + rng.randint(1, 4)):
+            c['v'][k] = 0.0
+            c['bid'][k] = c['ask'][k] = 0.0
+    for _ in range(6):
+        c['gap'][rng.randint(1100, 5700)] = 1.0
+    g = rng.randint(1500, 5000)
+    for k in range(g, g + 90):                   # 450 s with no quote
+        c['v'][k] = 0.0
+        c['bid'][k] = c['ask'][k] = 0.0
+        c['sqn'][k] = c['sq'][k] = c['qt'][k] = c['spr'][k] = 0.0
+        c['vol'][k] = c['buy'][k] = c['sell'][k] = 0.0
+    for _ in range(200):
+        k = rng.randint(1100, 5700)
+        if c['v'][k]:
+            c['ask'][k] += 0.25 * rng.randint(1, 12)
+            c['spr'][k] = 5.0 * (c['ask'][k] - c['bid'][k]) / 0.25
+    if mc is not None:
+        for _ in range(60):
+            mc['v'][rng.randint(1100, 5700)] = 0.0
+    return d
+
+
+
+def inputs_differ(seed, micro, every=53):
+    """What derive() and the slow implementation disagree on, for one
+    random session with holes in it: the usable rows, sigma, each of the
+    48 inputs and what followed at each horizon."""
+    d = holes(walk_session(seed, effect=0.4, micro=micro), seed)
+    s = W.derive('20260901', d)
+    bad, n = [], 0
+    for i in range(0, s.n, every):
+        g = s.rows[i]
+        got = slow_inputs(d, g)
+        if got is None:
+            bad.append(('usable', g))
+            continue
+        f, sig = got
+        n += 1
+        if abs(sig - s.sigma[i]) > 1e-9:
+            bad.append(('sigma', g))
+        bad += [(name, g) for k, name in enumerate(W.FEATURES)
+                if abs(f[name] - s.x[k][i]) > 1e-9]
+        for h in W.HORIZONS:
+            y = slow_outcome(d, g, sig, h)
+            if (y is None) != (s.y[h][i] is None) or (
+                    y is not None and abs(y - s.y[h][i]) > 1e-9):
+                bad.append(('y%d' % h, g))
+    rows = set(s.rows)
+    grid = list(range(1100, 5760, 11))
+    bad += [('usable?', g) for g in grid
+            if (slow_inputs(d, g) is not None) != (g in rows)]
+    return bad, n, sum(1 for g in grid if g not in rows), \
+        sum(1 for h in W.HORIZONS for y in s.y[h] if y is None)
+
+
+c1 = [inputs_differ(21, True), inputs_differ(22, False)]
+t('A1c: on two random sessions with holes in them (rows without a quote, '
+  'interruption marks, a silence of 450 seconds, wide spreads, the micro '
+  'contract missing at times or altogether) the usable rows, sigma, each '
+  'of the 48 inputs and what followed at each horizon are the ones a '
+  'slow second implementation gives, written from the registration with '
+  'plain sums over each window',
+  all(not bad for bad, _n, _u, _k in c1) and
+  all(n >= 60 and unusable >= 40 and unknown >= 300
+      for _bad, n, unusable, unknown in c1))
+
+
+# ---------------------------------------------------------------------
 # A2: the forecast's arithmetic, against the rows themselves
 # ---------------------------------------------------------------------
 ss = [W.derive('2026090%d' % (k + 1), walk_session(90 + k, effect=0.3))
@@ -894,6 +1347,32 @@ t('A6: a way\'s trades, net, net as MNQ, the session sums\' t, the halves '
                                         math.sqrt(3.0)), 3)) and
   pooled6[2] == 3 and W.pooled([(1.0, 1.0, 1.0)])[0] is None)
 
+# what the best of several inputs reaches by chance: three inputs over
+# six sessions, every one of the 64 ways to sign the sessions written out
+sums6 = [[1.0, 2.0, -1.0, 3.0, 0.5, -2.0], [0.5, -1.0, 2.0, 1.0, 1.5, 0.0],
+         [-1.0, -2.0, 0.5, 1.0, 3.0, 2.0]]
+
+
+def abs_t(v):
+    m = sum(v) / len(v)
+    sd = math.sqrt(sum((x - m) ** 2 for x in v) / (len(v) - 1))
+    return abs(m) / (sd / math.sqrt(len(v))) if sd > 0 else 0.0
+
+
+every6 = sorted(max(abs_t([e * x for e, x in zip(es, v)]) for v in sums6)
+                for es in itertools.product((1.0, -1.0), repeat=6))
+t('A6b: what the best of the inputs reaches by chance is the level the '
+  'largest t among them stays under 19 times in 20 when each session\'s '
+  'sign is drawn at random: on three inputs and six sessions it is the '
+  'one that writing out all 64 ways gives; the same every time; none '
+  'without three sessions or with sums that are all zero',
+  near(W.best_null(sums6, draws=40000), round(every6[60], 3)) and
+  every6[59] < every6[60] and
+  W.best_null(sums6) == W.best_null(sums6) and
+  W.best_null(sums6, seed=1, draws=200) is not None and
+  W.best_null([]) is None and W.best_null([[1.0, 2.0]]) is None and
+  W.best_null([[0.0, 0.0, 0.0]]) is None and W.NULL_DRAWS == 1000)
+
 
 
 # ---------------------------------------------------------------------
@@ -946,6 +1425,9 @@ t('A7b: with nothing in the tape nothing qualifies and nothing is frozen; '
   not any(st['qualifies'] for tab in ('take', 'join', 'deep')
           for st in rep_n[tab].values()) and
   'Nothing qualifies' in txt_n and 'THE MAP' in txt_n and
+  all(2.0 < rep_n['map'][str(h)]['best_by_chance'] < 9.0
+      for h in W.HORIZONS) and 'chance reaches' in txt_n and
+  'the largest of 48' in txt_n and
   'A JOIN ORDER WITH NO FORECAST' in txt_n and
   rep_n['join_alone']['share'] > 0.3 and
   rep_n['join_alone']['after']['60'][0] < 0 and

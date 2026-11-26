@@ -286,7 +286,7 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 54 suites, 1003 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 54 suites, 1006 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
@@ -389,7 +389,7 @@ capture installation and operation.
   (Amendment 60); no recording has been read by it yet.
   `mrofyt_checkpoint.py` (V40, extended through V47) runs every recordings test on one
   read, each wave's report byte-identical to its own command; `--nq-only` reads NQ
-  alone, about half the work. Package V52: 1003/1003 research checks and 46/46
+  alone, about half the work. Package V52: 1006/1006 research checks and 46/46
   dashboard checks from inside the zip.
 - The capture drive recorded file-system damage in two depth files after a disconnect on
   2026-09-22. The audit and recovery tools set those runs aside rather than reading
