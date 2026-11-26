@@ -250,7 +250,34 @@ on these bars.
 | Pairs and lead–lag between NQ, ES and RTY; relative strength | | a later wave, when ES and RTY are read |
 | Fibonacci retracements, moving-average crosses, candle patterns alone | | not here: no level fixed before the bar, or a recent-move rule (§1) |
 
-## Implementation record
+## Implementation record — 2026-11-26
 
-`mrofyt_levels27.py`, `tests_mrofyt_levels27.py`, written against this
-file before any of its strategies was computed on any bar.
+`mrofyt_levels27.py`, `tests_mrofyt_levels27.py` (14 tests), written
+against this file before any of its strategies was computed on any bar;
+verified on hand-built sessions and a synthetic export, never on market
+evidence.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| §2 the grid | `grid_of`, `sessions` | minute i of the grid is 18:00 + i; a session without a bar at 18:00 starts with its first close; the suite checks the cash session against wave twenty-four's bar for bar |
+| §2 usable, s | `daily_vol`, `sessions` | s is `rule_b`'s own; ONX's two levels need the same overnight bars as the overnight families |
+| §3 levels | `rth_levels`, `swings`, `on_signals`, `week_ranges` | last week's range is the previous ISO week's, on the session's contract; the 10:00 hour level uses 09:00–10:00; round hundreds are listed from the session's own range, which changes no event |
+| §4 events | `machine` | a bar whose close is exactly on the level has not closed beyond it; when the close before is exactly on the level there is no test on that bar |
+| §4 the squeeze | `widths`, `sqz_signals` | the median of 14 is the mean of the 7th and 8th |
+| §5 strategies | `day_results`, `family_of` | entry at the close of the event's bar, exit at P(entry + H); two events of one family on one bar: the first listed is taken |
+| §5 EPROP | `eprop_sessions`, `series` | the session's first bar must lie before 19:00; the mean session is taken over the discovery sessions and used in both stages |
+| §6 the split | `week_label`, `is_lockbox`, `compute` | stage 1 skips a lockbox session before any signal is computed; only its 30-bar ranges enter the squeeze's history |
+| §7 statistics | `slopes`, `weekly_t`, `assess` | A is `trade_a`'s result at one contract, B is `day_b`'s, both over s; weeks without a usable session are no observations |
+| §8 stages | `stage1`, `stage2`, `main` | ties in t by name; the lockbox command runs stage 1 again itself, so the forwarded list cannot be handed in; the lockbox read is written to `MROF_MINUTE_HISTORY_EXPOSURE.json` before any result is shown, and refused a second time |
+
+**Expected beforehand (written 2026-11-26, before any of it was
+computed).** Most of the 181 will show nothing. Breaks and retests of
+the opening ranges, the hour and the morning range will make money
+before A and B are taken out and little after, because they are the
+same trend-following bet. Rejections at swings and at the hour's high
+and low will lose by about their costs, as the fades of part 16A did.
+EPROP is the likeliest to go forward, since E was strong and unrelated
+to A and B, though paying a round trip a session and missing 16:00 to
+18:00 will cost it. In all: nought to three forwarded, about one chance
+in three of none; of those forwarded, nought or one confirmed on the
+lockbox.

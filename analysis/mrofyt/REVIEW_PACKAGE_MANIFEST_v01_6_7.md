@@ -164,6 +164,9 @@ d4d10ce3a21c9ab48408e1923d67ea64fa421105f67f754699c6b54135fbd183  tests_mrofyt_t
 d259f7f02ad1384d317ca9024b005cc06c07b753ce615aa9850bf512513c3e7a  MROF_YT_WAVE26_IMPROVE_REGISTRATION.md (FROZEN 2026-11-26 before any of its rules was computed and before any ES or RTY bar, or NQ bar after 2026-06-11, was read: A1 busy opens only, A2 a stop from the normal day, A3 out when B is against it, judged against A itself; A and B in micros on a $150,000 prop account; the implementation record and the expectations written before anything was computed; not in V50; Amendment 55)
 a0a73ff51a9ed6e1a9dba51dc3498a288025abecbc92500ae4cca24281f0b5eb  mrofyt_improve26.py (MROF-YT-W26-IMPROVE-1.0: the three changes to A through wave twenty-four's functions and wave twenty-five's costs and reader; the verdict from the NQ, ES and RTY reports; the prop account with and without the daily stop; each read once, recorded before it is shown; not in V50; Amendment 55)
 1f66cf43e9d938ef46f26042755549e2d6750be855e8bfcb703acc7b428eaa2b  tests_mrofyt_improve26.py (10 tests: A against trade_a trade for trade; A1, A2, A3 on hand-built sessions; B's inputs against rule_b; the sizing; a day's dollars with and without the daily stop; the account's failures; the reads, verdict and ledger end to end; the decision rule and the registration; runs with cp1252 as the default encoding as well; Amendment 55)
+a7405809f82697e8c9e03b6c8cebbd9c229c9ac25c14938dd5371ed5ff40c8ea  MROF_YT_WAVE27_LEVELS_REGISTRATION.md (FROZEN 2026-11-26 before any of its 877 strategies was computed: fourteen level groups, four events, the entry windows and five holds, both directions, counted as 181 hypotheses; half of the ISO weeks locked away by a hash of their label; stage 1 on the discovery weeks with A and B taken out, stage 2 once on the lockbox by Benjamini-Hochberg; the rules already judged on these bars listed and left out; the public ideas collected and where each went; the implementation record and the expectations written before anything was computed; not in V50; Amendment 56)
+c828e3c779c278094ea996aa29e7a2c8cc4f3518bcd165cfa9e34c909c050cc5  mrofyt_levels27.py (MROF-YT-W27-LEVELS-1.0: the session grid from 18:00, the levels, the level machine (break, rejection, retest, failed breakout), the squeeze, the overnight ranges, EPROP, results in R, the week-clustered t with A and B regressed out, the two stages; stage 1 computes nothing on a lockbox session; the lockbox read once, recorded before it is shown; not in V50; Amendment 56)
+0722d8a073793bfaa3a18922f308993bdaebe84fe837eaa584ed437b090017ab  tests_mrofyt_levels27.py (14 tests: the registry against the registration; the week split; the level machine; each group's levels; swings; the trades; the squeeze; the overnight ranges; EPROP; the statistics; the two stages on built data; the grid against wave twenty-four's sessions on an export; no signal changing when later bars do; a planted effect forwarded on the discovery weeks and confirmed on the lockbox, read once; runs with cp1252 as the default encoding as well; Amendment 56)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -272,9 +275,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_confirm25.py` | 9/9 |
 | `tests_mrofyt_tradecost.py` | 10/10 |
 | `tests_mrofyt_improve26.py` | 10/10 |
-| **wave-one to twenty-six, tools total** | **926/926** |
+| `tests_mrofyt_levels27.py` | 14/14 |
+| **wave-one to twenty-seven, tools total** | **940/940** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **972/972** |
+| **package total** | **986/986** |
 
 ## Runnable research commands
 
@@ -2078,3 +2082,28 @@ detector hash so registering wave two provably changed nothing.
     (10). The expectations were written into the registration before
     anything was computed. The files are not in V50. Nothing frozen
     changed (06ce854a…). Battery: 926/926 + 46/46.
+
+56. **Every key level, every way of trading it, counted (2026-11-26).**
+    The operator asked for the widest search: every idea that research,
+    books, forums and well-known futures traders offer for NQ, ES, QQQ
+    and SPY, key levels and swing highs and lows in particular, with
+    trades of about 15 minutes to 3 hours. The ideas collected reduce to
+    a level being reached and then broken or rejected, so
+    `MROF_YT_WAVE27_LEVELS_REGISTRATION.md` runs all the combinations
+    instead of a chosen few: 877 strategies, counted as 181 hypotheses.
+
+    Testing many and keeping the best breeds lucky winners, so the file
+    fixes first how luck is kept out. Half of the ISO weeks are locked
+    away by a hash of their label. Stage 1 selects on the other half,
+    after regressing out what A and B already earn, so that a copy of
+    them cannot pass as something new. Stage 2 reads the lockbox once
+    and confirms by Benjamini-Hochberg at 10 %. The rules already judged
+    on these bars (wave twenty-four's ten failures, part 16A, waves
+    twenty-two and twenty-three) are listed and left out.
+
+    `mrofyt_levels27.py` applies it; `tests_mrofyt_levels27.py` (14)
+    checks every level and event on hand-built bars, that no signal
+    changes when later bars do, and the two stages on an export with a
+    planted effect. The expectations were written into the registration
+    before anything was computed. The files are not in V50. Nothing
+    frozen changed (06ce854a…). Battery: 940/940 + 46/46.
