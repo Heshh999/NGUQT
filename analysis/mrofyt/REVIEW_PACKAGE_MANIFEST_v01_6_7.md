@@ -2107,3 +2107,15 @@ detector hash so registering wave two provably changed nothing.
     planted effect. The expectations were written into the registration
     before anything was computed. The files are not in V50. Nothing
     frozen changed (06ce854a…). Battery: 940/940 + 46/46.
+
+57. **Wave twenty-seven, stage 1: nothing went forward (2026-11-26).**
+    Stage 1 was run once on NQ's discovery weeks through this session,
+    on the exports of 2026-11-22. Of the 181 hypotheses none met the
+    rule for going forward; one reached t of 2.5, about what luck alone
+    gives among 181, and its strategies averaged fewer than 150 trades.
+    The report is with the operator and not in this repository.
+
+    **The lockbox weeks were not read**: with nothing forwarded there is
+    nothing to confirm, and stage 2 was not run. They stay locked for a
+    later wave. By the registration, the hypotheses of this wave are
+    dropped and no variant of them is tried on these bars.

@@ -348,7 +348,7 @@ capture installation and operation.
   inputs uncomputed, so it cannot fire on real data. A4 runs with one of its two
   alternative residual inputs uncomputed.
 - Twenty-three registered waves sit on the runner through observation hooks (see
-  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–56). On DEV, wave
+  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–57). On DEV, wave
   six's L2 (fade the failed break of a daily range level when the order flow turns) is
   the one idea with support: 57 trades, +6.15 points a trade net of costs, most of it from
   one session. Wave fourteen fixes the first L2 signal at each level per session as the
@@ -375,7 +375,8 @@ capture installation and operation.
   costs (Amendment 54). Wave twenty-six fixes three changes to A and a prop-account plan
   for A and B before those data are read (Amendment 55). Wave twenty-seven runs every
   key level and every way of trading it, 877 strategies counted as 181 hypotheses, with
-  half of the weeks locked away for a one-time confirmation (Amendment 56).
+  half of the weeks locked away for a one-time confirmation (Amendment 56). Its first
+  stage forwarded nothing, so the locked weeks were not read (Amendment 57).
   `mrofyt_checkpoint.py` (V40, extended through V47) runs every recordings test on one
   read, each wave's report byte-identical to its own command; `--nq-only` reads NQ
   alone, about half the work. Package V50 (916/916); the repository since: 940/940 research checks and 46/46
