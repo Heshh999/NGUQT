@@ -257,3 +257,57 @@ one in seven. Something qualifying here: about one chance in four;
 qualifying and then being confirmed: about one in eight. The most
 likely outcome is a clear map showing that the costs are larger than
 anything the tape forecasts, at every speed.
+
+## Implementation record — 2026-11-26
+
+`mrofyt_speed29.py`, `tests_mrofyt_speed29.py` (26 tests), written
+after this file was frozen and before any recording was read by it;
+verified on hand-built tape, on panels built in the suite with and
+without a planted effect, and on recorder-format runs, never on market
+evidence. Nothing above this line was changed.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| §1 the clock, the rows | `panel_start`, `Book` | a row at t holds what the computer had received before t; a row received at exactly t belongs to the next. The one-second changes of the mid are taken between whole seconds at which a quote is in force |
+| §1 quotes in force, interruptions | `Book.brk`, `SpeedRunner._stream_run` | the beginning and the end of a run, the recorder's disconnect and reconnect rows and a quote it marked suppressed or disconnected are interruptions: no quote is in force, resting orders are dropped unfilled, the row after it carries the mark. A crossed or locked quote is passed over and the quote before it stays in force for its 10 seconds |
+| §1 the front contract | `build_panel` | NQ's contract with the most volume from 08:00 to 16:15; MNQ's contract of the same month, and without one the session has no micro columns (its micro inputs are 0) |
+| §1 only the hours | `window_events` | each run's quote, trade and quality files are read from 07:58:55 to 16:15:12 New York with the adapter's own decoding; a run that lies wholly outside is not opened; the depth file is never opened |
+| §1 a session is used | `derive` | a row is usable from 09:35:00 to 15:55:00 with a quote in force, no interruption mark in the 600 seconds before, and at least 300 one-second changes in those 600 seconds that are not all zero |
+| §2 the join order | `Book.quote`, `Book.trade` | the time of a fill is counted from the moment it joined; a fill later than 10.5 seconds is none. A buy counts trades at its price by sellers or of unknown side; "prints through" is a trade below its price (above, for a sell) |
+| §2 the deep order | `Book._mark`, `run_deep` | no order is placed on a side when the best price at t + 0.5 s already stands at or beyond the order's price |
+| §2 the stress | `run_take`, `_close` | T: entry and exit at the quotes of t + 1.0 s. M and D: the resting order is the one §1 and §2 define, placed at t + 0.5 s; the stress repeats the closing trade at 1.0 s |
+| §3 volatility and the inputs | `derive` | moves and flows over their usual size are held to ±5, logs to ±3, the spread to 8 ticks, the micro's distance to ±4 ticks. The usual size of the imbalance and of the signed volume is the root mean square of their 5-second sums over the last 600 seconds, scaled by the root of the window. The day's range and VWAP start at 09:30:00 |
+| §3 what is forecast | `derive` | unknown, and left out, where the row at t + h has no quote or an interruption lies between |
+| §3 the forecast | `session_sums`, `fit`, `choose`, `forecast_model` | fitted from sums of products; the penalty is added to the diagonal of the inputs' correlation matrix; an input that does not vary on the earlier sessions gets no weight; of two penalties that forecast the five sessions equally the larger is taken |
+| §4 T | `run_take` | no trade without a quote at t + 0.5 s; a trade whose closing quote is missing is counted apart (`void`) and not judged; the next entry may be made at the row of the exit |
+| §4 M | `run_join` | a filled order is closed at the first row at or after its fill plus h, by taking 0.5 s after that row (held between h and h + 5.5 seconds) |
+| §4 D | `deep_price`, `run_deep` | the exit is h seconds after the end of the order's 5 seconds |
+| §5 the map | `input_map`, `pooled`, `_top` | **differs from the text.** See below |
+| §5 the usual move and cost | `analyze` | the median σ times the root of h; the median spread plus the commission |
+| §6 the verdict | `summarize`, `qualifies`, `analyze` | every way that qualifies is listed; the frozen file holds, for each of T, M and D, the one with the highest t (of two the same, the one listed first: the shorter hold; for D the smaller k, then the shorter hold). The halves are the first and the second half of the sessions by date |
+| §6 frozen | `seal` | the frozen file carries a SHA-256 of itself; a file changed afterwards is refused |
+| §7 read once, panel first | `main`, `write_panel`, `read_panel` | the panel is written before anything is computed, and the study is made from the file as read back, so the file alone gives the same report to the last digit (`--from-panel`). Prices, sizes, counts and squared moves are kept exactly, the five time integrals to the millisecond. Each report the command makes is recorded in `MROF_W29_SPEED_READS.json` |
+| §8 the confirmation | `confirm`, `main` | it takes only the frozen file that the last study on record wrote; with fewer than 20 used sessions it stops with nothing saved or recorded and can be run again later; it is recorded before it is shown and refused a second time. Its report can be made again from its own saved panel with the same frozen file, which shows nothing new |
+
+**Where the code differs from the text (§5 only, which is never
+judged).** The text asks for each input's rank correlation with what
+followed, session by session. On a simulated tape with nothing in it,
+that figure came out clearly below zero for every input that follows
+the price (its distance from the day's VWAP, its place in the day's
+range, its past moves): within one session such an input and the rest
+of the session's path are tied together, and an average taken session
+by session inherits the tie. The code therefore centres each input on
+its average over the *other* sessions, leaves what followed as it is,
+and reports one correlation over all sessions together, with a t that
+is the mean of the sessions' sums of products over its standard error.
+On six simulated tapes with nothing in them this gave 6 cells of 1,728
+beyond a t of 3, no more than chance gives. The forecast's own figure is
+computed the same way. Nothing in §6 or §8 uses the map.
+
+**Dry runs, on simulated panels only.** With nothing planted, nothing
+qualified and nothing was frozen. With a forecast planted in the flow,
+T qualified at a minute and more, was frozen and was confirmed on
+simulated later sessions, while the ten- and thirty-second holds could
+not qualify however good, and M lost. With prints planted far beyond
+the path, D qualified and was confirmed. These show that the code does
+what this file says; they say nothing about the market.

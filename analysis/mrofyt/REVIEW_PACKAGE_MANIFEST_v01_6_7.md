@@ -176,6 +176,9 @@ e35d930d58643c8bf02013d77bed9f4429e3ea3801d74829ab77e0c609af0c93  tests_mrofyt_e
 13f3a2858cb94f785bb7ccfad258c0ab62a1b9baa3cdc7dd068f537536ef042a  MROF_YT_WAVE28_MARKETS_REGISTRATION.md (FROZEN 2026-11-26 before any bar of its markets was read: A and B, unchanged, on crude oil, natural gas, gold, silver, copper, the euro, the yen and bitcoin, each on its own day session and costs; four data gates before any result; one number per session in units of its own risk; a pooled test per rule and class tests under Benjamini and Hochberg at 10 %; what goes on in each case; one read a market and one decision; the implementation record was added with the tool; Amendment 59)
 6c0bbb7d04a5be425dd1aa8ea1402144e2c42b3ba76ecd9fbad9cf03eca7fb2c  mrofyt_markets28.py (MROF-YT-W28-MARKETS-1.0: wave twenty-four's own reader and rule functions with the market's day session, tick and costs set around them and put back; the tick seen in the files; the four gates; the per-session numbers; the decision; each market read once and the decision made once, both recorded before anything is shown; Amendment 59)
 c7ae17e9880ac0602f22e8edabb1069410ebc66c70ef8859b735e57496821dd1  tests_mrofyt_markets28.py (17 tests: the table against the registration; the session and costs set and put back, after a failure too; the rules on gold's 310 minutes; the per-session numbers and the weekly statistic; the tick seen; gold from a synthetic export; the stock session against wave twenty-four's untouched path; the four gates; the reader's gate; the pooled and class verdicts on fabricated series; the once-only reads and decision through the command; the real ledger untouched; Amendment 59)
+e16e31e203e782af0fc87a772854ed1a08b0f9ffff672d6d39c766649d05b1b4  MROF_YT_WAVE29_SPEED_REGISTRATION.md (FROZEN 2026-11-26 before the tool was written and before anything of it was computed on any recording: the fastest trade a retail account can win. NQ and MNQ quotes and trades of the 55 exposed sessions as one row every 5 seconds; a linear forecast from 48 inputs walked forward by session, for 10 seconds to 10 minutes; three ways to trade it (take, join the best price, rest deep), each paying commission, spread and a delay of 0.5 s, 1.0 s as the stress, the passive orders filled less easily than in a real book; a way qualifies at 60 seconds or more, 200 trades, a session t of 3.0, both halves and the stress; the best of each kind is frozen and confirmed once on the sessions from 2026-11-16; the implementation record was added with the tool and names the one place the code differs from the text, in the map that is never judged; Amendment 60)
+c9c81eadb214dd6ff50356671ec044e19a2e4f8e25b5358098b86bffe5f858bc  mrofyt_speed29.py (MROF-YT-W29-SPEED-1.0: the runner's discovery and checks with its own reader of the quote, trade and quality files inside 08:00 to 16:15 New York, the depth file never opened; one book per contract and session into the 5-second panel with the two passive orders; the panel saved before anything is computed and the study always made from the file as read back; the 48 inputs, the ridge forecast from sums of products, T, M and D, the map, the verdict, the sealed frozen file, the one-time confirmation tied to the study on record; Amendment 60)
+182e89f3ce7d8bb871d8b1521caa73e47f9fdb134326c7cc4e145a22b0b1440f  tests_mrofyt_speed29.py (26 tests: the clock; one row and the two passive orders worked out by hand; stale quotes, interruptions, what does not fill; the reader against the adapter, on stamps of another shape too; which sessions may be read; a break between runs and a damaged run; the panel file and its exact round trip; the 48 inputs by hand and nothing from later; the forecast's algebra against the rows; every trade of T, M and D by hand; the statistics and the bar; the whole study on simulated panels with nothing, with a planted forecast and with planted spikes; the confirmation and its stops; the command end to end on recorder-format runs, once-only, the real ledger untouched; the constants against the registration; Amendment 60)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -212,7 +215,7 @@ dd06c3defe36dab61d3f03028c38355e7fac4deffafc5a6fb6071535341ca2b4  MROF_V1_Engine
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 977/977 + 46/46, identical to the repo
+# run from inside the unzipped package: 1003/1003 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -288,9 +291,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrof_barexport.py` | 12/12 |
 | `tests_mrofyt_exportcheck.py` | 8/8 |
 | `tests_mrofyt_markets28.py` | 17/17 |
-| **wave-one to twenty-eight, tools total** | **977/977** |
+| `tests_mrofyt_speed29.py` | 26/26 |
+| **wave-one to twenty-nine, tools total** | **1003/1003** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **1023/1023** |
+| **package total** | **1049/1049** |
 
 ## Runnable research commands
 
@@ -2196,3 +2200,42 @@ detector hash so registering wave two provably changed nothing.
     script and the export check (227 files). Nothing frozen changed
     (06ce854a…). Battery: 977/977 + 46/46 (`tests_mles_v12.py` and
     `tests_mrof_barexport.py` need the Mono compiler, `mcs`).
+
+60. **Wave twenty-nine: the fastest trade a retail account can win
+    (2026-11-26).** The operator asked for the closest thing to
+    high-frequency trading that a retail account can compete in, and
+    left the rules to the registration. `MROF_YT_WAVE29_SPEED_
+    REGISTRATION.md` was frozen before its tool was written. It sets
+    out why a retail account cannot win below about a second (it sees
+    the market late, it is at the back of every queue, and it pays to
+    trade), and turns what is left into one question: does anything on
+    the recorded tape forecast NQ well enough, between ten seconds and
+    ten minutes, to pay for a retail account's costs and delay?
+
+    Fixed beforehand: the 55 exposed sessions only, as one row every 5
+    seconds from NQ's and MNQ's quotes and trades (the depth files are
+    not opened); a linear forecast from 48 inputs, walked forward by
+    session; three ways to trade it (take, join the best price, rest
+    deep), each with commission, spread, a delay of 0.5 s and of 1.0 s
+    as the stress, and passive fills that are harder than in a real
+    book; the bar (60 seconds or more, 200 trades, a session t of 3.0,
+    both halves, the stress); the best way of each kind frozen and
+    confirmed once on sessions from 2026-11-16, which nothing has
+    read. A pass on the exposed sessions is not evidence by itself.
+
+    `mrofyt_speed29.py` reads the tape once into a panel that is saved
+    before anything is computed; the study is made from that file, so
+    it can be made again without the drives. `tests_mrofyt_speed29.py`
+    (26) works a row, the passive orders, the 48 inputs and every kind
+    of trade out by hand, and runs the whole study and the command on
+    simulated panels and recorder-format runs. The implementation
+    record names one difference from the text, in the map that is never
+    judged: a correlation taken session by session showed a figure
+    below zero for inputs that follow the price on a simulated tape
+    with nothing in it, so the map pools the sessions instead. No
+    recording has been read by this wave; nothing in it is a result.
+
+    Package V52 adds the registration, the tool and the suite (230
+    files). Nothing frozen changed (06ce854a…). Battery: 1003/1003 +
+    46/46 (`tests_mles_v12.py` and `tests_mrof_barexport.py` need the
+    Mono compiler, `mcs`).

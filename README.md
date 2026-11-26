@@ -286,7 +286,7 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 53 suites, 977 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 54 suites, 1003 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
@@ -348,7 +348,7 @@ capture installation and operation.
   inputs uncomputed, so it cannot fire on real data. A4 runs with one of its two
   alternative residual inputs uncomputed.
 - Twenty-three registered waves sit on the runner through observation hooks (see
-  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–59). On DEV, wave
+  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–60). On DEV, wave
   six's L2 (fade the failed break of a daily range level when the order flow turns) is
   the one idea with support: 57 trades, +6.15 points a trade net of costs, most of it from
   one session. Wave fourteen fixes the first L2 signal at each level per session as the
@@ -382,10 +382,14 @@ capture installation and operation.
   (Amendment 58; the script is not compiled here, the F5 compile is the operator's).
   Wave twenty-eight takes A and B, unchanged, to crude oil, natural gas, gold, silver,
   copper, the euro, the yen and bitcoin, frozen before any of their bars was read
-  (Amendment 59).
+  (Amendment 59). Wave twenty-nine asks how fast a retail account can trade and still
+  win: whether anything on the recorded tape forecasts NQ between ten seconds and ten
+  minutes well enough to pay its costs and delay, with three ways to trade it, the bar
+  and a one-time confirmation on unread sessions fixed before the tool was written
+  (Amendment 60); no recording has been read by it yet.
   `mrofyt_checkpoint.py` (V40, extended through V47) runs every recordings test on one
   read, each wave's report byte-identical to its own command; `--nq-only` reads NQ
-  alone, about half the work. Package V51: 977/977 research checks and 46/46
+  alone, about half the work. Package V52: 1003/1003 research checks and 46/46
   dashboard checks from inside the zip.
 - The capture drive recorded file-system damage in two depth files after a disconnect on
   2026-09-22. The audit and recovery tools set those runs aside rather than reading
