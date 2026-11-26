@@ -205,3 +205,25 @@ seven; its stop is the first five minutes, which on most of these
 markets is only a few ticks wide, so costs take a large part of every
 trade. The most likely single outcome is that neither rule holds and no
 class passes, and that the plan then rests on the stock indices alone.
+
+## Implementation record — 2026-11-26
+
+`mrofyt_markets28.py`, `tests_mrofyt_markets28.py` (17 tests), written
+against this file before any bar of its markets was read; verified on
+hand-built days, fabricated series and synthetic exports, never on
+market evidence. Nothing above this line was changed.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| §1 the rules on another day session | `setup` | sets, around wave twenty-four's own functions and the reader, the open, the close, the half-hour and hour marks after the open, the bars a complete session needs, the minutes, B's times, the costs and the tick, and puts them back; the suite checks that on the stock session this path gives wave twenty-four's own sessions and trades |
+| §2 costs | `market_costs` | 5 dollars ÷ dollars a point, plus the spread; a stop one spread more |
+| §2 the tick | `file_tick`, `observed_tick` | changes of the close between following bars of one session, rounded to ten decimals; a file needs 200 non-zero changes to say anything |
+| §3 gates | `run_market`, `break_share`, `cost_share` | in the order 1, 2, 3, the tick, 4. Gates 1 to 3 stop the read with nothing computed and nothing recorded, so an export that is completed can still be read; a market that never passes them is never read. Gate 4 writes a report without results, and that is recorded as the market's read |
+| §4 the numbers | `series_a`, `series_b`, `risk_share`, `stats`, `pool` | A's risk is computed as `trade_a` computes it; B's sessions are the eligible sessions from the 15th on that have s; a report keeps six decimals; a week is the ISO week of the session's date; a half's mean is the plain mean of its sessions |
+| §5 the verdicts | `decide` | p is one-sided, from t with the number of weeks less one; the class tests are every rule and class with a market in it; a test is kept at q of 0.10 or less |
+| §5–6 once | `main`, `_main_decide`, `reads`, `record` | a market's report is written, the read recorded, and only then anything shown; `--decide` alone lists the markets and computes nothing, `--final` decides; it stops when a market that was read has no report among those given, or a report has no read; after the decision no market is read |
+
+Beside, on bars already read: on NQ's own exports the set-up path gave
+the same eligible sessions, daily chain and A and B trades as wave
+twenty-four's untouched functions, the daily break was empty and the
+tick seen was 0.25. An equality check; nothing was judged.
