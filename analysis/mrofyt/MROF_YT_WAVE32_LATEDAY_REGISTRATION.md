@@ -158,3 +158,31 @@ RTY, where B has a profit at all, about one in four. **NQ-MORE:** about
 one chance in two. **BL better than B:** about one chance in seven. The
 most likely outcome: B earns through the day, a little more late, and
 is better left whole.
+
+## Implementation record — 2026-11-27
+
+`mrofyt_lateday32.py`, `tests_mrofyt_lateday32.py` (10 tests), written
+after this file was frozen and before any bar was read by it; verified
+on days worked out by hand and on synthetic exports, never on market
+evidence. Nothing above this line was changed.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| §1 B's own | `leg_table`, `both_rules` | B's bounds and volatility are wave twenty-six's `b_inputs`, its rule at a minute is `b_want`; B and BL as rules are wave thirty's `rule` on their minutes |
+| §2 the legs | `legs` | B's position is one contract long, one short or none, of its own size; a leg's gross is the position times P(end) − P(start). The suite finds that the twelve legs add up to wave twenty-four's `day_b`, gross and cost, on every session |
+| §2 costs | `legs` | at an order the old position is closed whole and the new one opened whole: a reversal charges one contract to the leg that ends and one to the leg that starts; the flat at 16:00 is charged to the last leg |
+| §2 age | `legs`, `age_of` | counted in legs held since the order that set the direction; a leg without a position has no age and no result |
+| §2 what is reported | `summarize`, `_row` | "the sessions in a position" of a group or an age are the sessions with at least one such leg held; beside it the legs held and the result a leg held. The weekly t is wave twenty-eight's (ISO weeks, the week's sum; none under three weeks). A share is of B's whole result on the market and is not given when that is not above 0 |
+| §3 LATE-HEAVY | `summarize` | the sum of the four late legs over B's sessions against half of B's whole sum; "more than" is strict |
+| §3 NQ-MORE | `decide` | the late legs' mean basis points a session, from each market's own report |
+| §4 BL | `RULES`, `both_rules` | wave thirty's `day` on the minutes 270, 300, 330 and 360 after 09:30. The suite finds on every session that its gross is that of B's four late legs, and its cost theirs plus one entry when B was already in at 14:00 |
+| §5 the Sharpe, the fall | `perf` | wave thirty-one's `perf`, written again here so that this tool does not need the RVMR file; the suite sets the two against each other on random series. A session without a trade counts 0 |
+| §5 the verdict | `gains`, `decide` | wave twenty-four's bar is its `judge` on the rule's days with a trade, as in wave thirty. There is no gain on a market where B's Sharpe is not above 0 or a fall ratio does not exist. Without the later months' report a better BL is told with the note that they are still to be read |
+| §6 once | `main`, `read_made`, `record_read` | each market and the later months are read once, recorded in the minute-history ledger before anything is shown; a read that stops before its result uses nothing up |
+| §6 the later months | `run_later` | wave twenty-five's window and its verdicts, for B and for BL; the legs are those of the window's sessions, with B's history built from the sessions before |
+
+**Dry run, on synthetic exports only.** On a tape built so that half
+the days drift at a steady pace from 09:35 to 16:00, every leg earned
+about the same and LATE-HEAVY did not hold, as it must on such a tape.
+This shows that the code measures what this file says; it says nothing
+about the market.

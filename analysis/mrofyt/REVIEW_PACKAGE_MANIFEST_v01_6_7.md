@@ -185,6 +185,9 @@ c85a358f83f6561addb8eda22a9f8302c1d89273b89935b1466f648fc7f3a5b0  MROF_YT_WAVE30
 7ab8199687e1bb0281226a9cfeb3f16ae58a43852c396e9afd8e17023b9733a6  MROF_YT_WAVE31_SIZING_REGISTRATION.md (FROZEN 2026-11-27 before the tool was written, before RVMR's or ATR's state was computed on any trade of A or B, and before any ES or RTY bar was read by anything: how far the market will move, used only for size. Under each of two measures, the frozen RVMR range regime and a plain 20-minute ATR against its usual level, a position of A or B decided in a HIGH state is taken at half size; a measure goes on for a rule when its Sharpe is at least 5 % higher and its fall ratio lower on both ES and RTY, and RVMR only when it also beats the plain ATR; NQ reported, never judged; the implementation record was added with the tool; Amendment 62)
 0574928fc65bab5d31efed818a276794b4236b7876aa90777ef205d24011b406  mrofyt_sizing31.py (MROF-YT-W31-SIZING-1.0: the frozen analysis/rvmr/rvmr_spec.py imported and checked by its hash; the front contracts' bars in time order, overnight included; RVMR's and ATR's states at A's and B's decisions; A and B with each position halved in a HIGH state, unchanged otherwise, on their own as wave twenty-four's functions; the Sharpe, the fall and its ratio; each market read once and recorded before anything is shown; the verdict from the reports; Amendment 62)
 4d6bf2d630d313d54e7386b7e65fa3e853e6b3291204b866a446abac9b4ca1a8  tests_mrofyt_sizing31.py (10 tests: the frozen RVMR file used unchanged and a changed one refused; the bar each decision reads; RVMR's and ATR's states worked out by hand on sixteen sessions; B scaled against wave twenty-four's day_b on every session and by hand on a long and a reversal; A halved; the Sharpe and the fall by hand; a market's report against wave twenty-four's own A and B; the verdict on fabricated reports; the once-only reads and the ledger through the command; the constants against the registration; Amendment 62)
+03e69e320d02a35229be5ee1d938d74c686b225ac5f13bdd8671e75fc87122aa  MROF_YT_WAVE32_LATEDAY_REGISTRATION.md (FROZEN 2026-11-27 before the tool was written, before B's result was split by time of day or by the age of its position on any bar, and before any ES or RTY bar was read by anything: when in the day B earns, and for how long. B's twelve half-hour legs are reported by time of day and by age; two statements are written down beforehand, that the four legs from 14:00 earn more than half of B's result and that they earn more on NQ than on ES and RTY; BL, B's rule from 14:00 only, is better than B when it passes wave twenty-four's bar on NQ, ES and RTY and, on both ES and RTY, its Sharpe is at least 5 % higher and its fall ratio lower, and it is not collapsed in NQ's later months; the implementation record was added with the tool; Amendment 63)
+b5f80f51ac4ea43c38a6bf848da3ad3327e44ef67f1059a674e323824215d9f1  mrofyt_lateday32.py (MROF-YT-W32-LATEDAY-1.0: B's twelve legs with each order's cost split between the leg it ends and the leg it starts, adding up to wave twenty-four's day_b; the tables by time of day, by group and by age with wave twenty-eight's weekly t; BL by wave thirty's rule on 14:00 to 15:30; the Sharpe, the fall and its ratio; each market and NQ's later months read once and recorded before anything is shown; the two statements and BL's verdict from the reports; Amendment 63)
+9d1b7f507a376b54131a3ef2e67696e429c7b881dbffbdeb3c8a5a11365ae4f7  tests_mrofyt_lateday32.py (10 tests: the legs by hand on a long and on a reversal; the legs against wave twenty-four's day_b and against B's own result on every session; BL against B's four late legs on every session; the tables by hand on four sessions; the Sharpe and the fall against wave thirty-one's; a market's report against wave twenty-four's own B; the verdict on fabricated reports; the once-only reads, the later months and the ledger through the command; what is printed; the constants against the registration; Amendment 63)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -221,7 +224,7 @@ from inside it unchanged):
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 1028/1028 + 46/46, identical to the repo
+# run from inside the unzipped package: 1038/1038 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -300,9 +303,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_speed29.py` | 29/29 |
 | `tests_mrofyt_clocks30.py` | 12/12 |
 | `tests_mrofyt_sizing31.py` | 10/10 |
-| **wave-one to thirty-one, tools total** | **1028/1028** |
+| `tests_mrofyt_lateday32.py` | 10/10 |
+| **wave-one to thirty-two, tools total** | **1038/1038** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **1074/1074** |
+| **package total** | **1084/1084** |
 
 ## Runnable research commands
 
@@ -2316,4 +2320,36 @@ detector hash so registering wave two provably changed nothing.
     Package V54 adds the registration, the tool and the suite (236
     files). Nothing frozen changed (06ce854a…, and RVMR's e348f035…).
     Battery: 1028/1028 + 46/46 (`tests_mles_v12.py` and
+    `tests_mrof_barexport.py` need the Mono compiler, `mcs`).
+
+63. **Wave thirty-two: when in the day B earns, and for how long
+    (2026-11-27).** The operator asked for a search of what is known
+    about forecasting which way the market goes and for how long. What
+    was found, in search summaries only: the one direction forecast
+    with a reason behind it is a flow. Option market makers who are
+    short gamma, and leveraged funds, have to trade in the direction
+    the day has gone, near the close; B's own authors tie their rule to
+    those flows; independent re-runs of B's source find it weaker since
+    its publication, and one finds it on NQ futures and not on ES.
+
+    If those flows are what B earns from, B's result should sit late in
+    the day. `MROF_YT_WAVE32_LATEDAY_REGISTRATION.md` was frozen before
+    its tool was written and before any ES or RTY bar was read. It
+    reports B's twelve half-hour legs by time of day and by the age of
+    the position; writes down beforehand that the four legs from 14:00
+    earn more than half of B's result, and more on NQ than on ES and
+    RTY; and judges BL, B's rule from 14:00 only, against B: the bar of
+    wave twenty-four on NQ, ES and RTY, and on both ES and RTY a Sharpe
+    at least 5 % higher with a lower fall ratio. The expectation written
+    down: B earns through the day, a little more late, and is better
+    left whole.
+
+    `mrofyt_lateday32.py` builds the legs so that they add up to wave
+    twenty-four's `day_b`, which `tests_mrofyt_lateday32.py` (10) checks
+    on every session, with BL against B's late legs. No bar has been
+    read by this wave.
+
+    Package V55 adds the registration, the tool and the suite (239
+    files). Nothing frozen changed (06ce854a…, and RVMR's e348f035…).
+    Battery: 1038/1038 + 46/46 (`tests_mles_v12.py` and
     `tests_mrof_barexport.py` need the Mono compiler, `mcs`).
