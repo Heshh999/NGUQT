@@ -173,3 +173,28 @@ better than B, about one chance in five; the published gain is on SPY,
 on the bars it was built on, and B's fills are few. The most likely
 outcome: B does not hang on its clock, and neither change is worth
 making.
+
+## Implementation record — 2026-11-27
+
+`mrofyt_clocks30.py`, `tests_mrofyt_clocks30.py` (12 tests), written
+after this file was frozen and before any bar was read by it; verified
+on days worked out by hand and on synthetic exports, never on market
+evidence. Nothing above this line was changed.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| §1 B's own | `rule`, `day` | B's bounds and volatility are wave twenty-six's `b_inputs` and its rule at a minute is `b_want`, both checked there against wave twenty-four's `rule_b`. On B's own minutes with no timed fill, `day` is wave twenty-four's `day_b` step for step: the suite finds the same result to the last digit on every session |
+| §2 the clocks | `CLOCKS` | minutes after 09:30: B 30, 60, …, 360; B+10 40, …, 370; B+20 50, …, 380; BF 30, 40, …, 380 |
+| §2 BT | `ran`, `day` | a change of exactly 0 is in no direction, so it breaks the run. An order moved to m + 5 pays its cost as B's does; between m and m + 5 the result is the old position's. The suite sets every rule against a second implementation that lists the orders first and then holds the position minute by minute |
+| §3 the give-back | `give_back` | over every eligible session of the market, whether or not B has its bounds there; for four changes in a row the first mark is 09:50, the first that has four changes since the open. Its t is of the weekly sums of the sessions' basis points; the round trip is the market's, in points |
+| §3 how often a rule trades | `_judged` | position changes a day with a trade, the flat at 16:00 counted, and their cost in basis points in B's sizing |
+| §3 the three clocks together | `judge_all` | over the same sessions as §4 |
+| §4 a session's result, D | `session_x`, `paired` | D is 0 on a session where the change and B do the same; a report keeps the sessions on which it is not, to six decimals of a basis point |
+| §4 the bar | `decide`, `pooled` | wave twenty-four's bar is its `judge` on the rule's days with a trade. "Together" is wave twenty-eight's weekly statistic on the sessions' averages. The verdict is made by `--decide` from the three market reports; given the later months' report as well, a change that is COLLAPSED there is not better |
+| §5 once | `main`, `read_made`, `record_read` | each market and the later months are read once, recorded in the minute-history ledger before anything is shown; a read that stops before its result uses nothing up |
+
+**Dry run, on synthetic exports only.** On a tape built so that the day
+goes on in the direction of its first five minutes, with nothing ever
+given back, the faster clock came out ahead of B and the timed fills
+behind it, as they must on such a tape. This shows that the code
+measures what this file says; it says nothing about the market.

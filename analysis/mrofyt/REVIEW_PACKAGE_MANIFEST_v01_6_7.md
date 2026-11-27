@@ -179,6 +179,9 @@ c7ae17e9880ac0602f22e8edabb1069410ebc66c70ef8859b735e57496821dd1  tests_mrofyt_m
 3c516d228c73fe7c98c092dcf8ba151c079504301febd9254b4baf6b87c5573d  MROF_YT_WAVE29_SPEED_REGISTRATION.md (FROZEN 2026-11-26 before the tool was written and before anything of it was computed on any recording: the fastest trade a retail account can win. NQ and MNQ quotes and trades of the 55 exposed sessions as one row every 5 seconds; a linear forecast from 48 inputs walked forward by session, for 10 seconds to 10 minutes; three ways to trade it (take, join the best price, rest deep), each paying commission, spread and a delay of 0.5 s, 1.0 s as the stress, the passive orders filled less easily than in a real book; a way qualifies at 60 seconds or more, 200 trades, a session t of 3.0, both halves and the stress; the best of each kind is frozen and confirmed once on the sessions from 2026-11-16; the implementation record was added with the tool and names the one place the code differs from the text, in the map that is never judged; Amendment 60)
 f84c5291b2d2ab28d000603d55fe22b14ea60cccad0b6c5181693ad5b22d21fb  mrofyt_speed29.py (MROF-YT-W29-SPEED-1.0: the runner's discovery and checks with its own reader of the quote, trade and quality files inside 08:00 to 16:15 New York, the depth file never opened; one book per contract and session into the 5-second panel with the two passive orders; the panel saved before anything is computed and the study always made from the file as read back; the 48 inputs, the ridge forecast from sums of products, T, M and D, the map with what the best of 48 inputs reaches by chance, the verdict, the sealed frozen file, the one-time confirmation tied to the study on record; Amendment 60)
 5dad88bca39c2541377cde83a622df8808de65a6e2481c3b9ff4c280544bce82  tests_mrofyt_speed29.py (29 tests: the clock; one row and the two passive orders worked out by hand; stale quotes, interruptions, what does not fill; the reader against the adapter, on stamps of another shape too; which sessions may be read; a break between runs and a damaged run; the panel file and its exact round trip; every column of every row against a slow second implementation on random tapes; the 48 inputs by hand and nothing from later, and against a slow second implementation on random sessions with holes; the forecast's algebra against the rows; every trade of T, M and D by hand; the statistics and the bar; the chance level of the best input against all 64 ways to sign six sessions; the whole study on simulated panels with nothing, with a planted forecast and with planted spikes; the confirmation and its stops; the command end to end on recorder-format runs, once-only, the real ledger untouched; the constants against the registration; Amendment 60)
+c85a358f83f6561addb8eda22a9f8302c1d89273b89935b1466f648fc7f3a5b0  MROF_YT_WAVE30_CLOCKS_REGISTRATION.md (FROZEN 2026-11-27 before the tool was written and before any ES or RTY bar was read by anything: B several times a day. Three changes to B, each fixed beforehand: the same rule on two other clocks, a check that B does not hang on the minute it looks at; B's rule every ten minutes; and B's fills moved five minutes when the last three five-minute changes ran in the order's direction. The two changes are judged against B itself, session by session, on ES and RTY with a weekly t of 2.5; the five-minute give-back is measured and never judged; the implementation record was added with the tool; Amendment 61)
+03c16f6d68a3211b1b79c2c05c22490f7f3af2b98c7a8b4437c1993fbb1b5bea  mrofyt_clocks30.py (MROF-YT-W30-CLOCKS-1.0: B's rule at any clock with or without timed fills, on its own minutes wave twenty-four's day_b step for step; the give-back after two, three and four five-minute changes; each rule's orders a day; the paired difference against B and its weekly statistic; the three market reads and the later months, each once and recorded before anything is shown; the verdicts from the reports; Amendment 61)
+6ae7af57a330ed82be021d9a56e44a3c96aa12cdb72729a5b0a31a8f766edaf6  tests_mrofyt_clocks30.py (12 tests: B on its own clock against wave twenty-four's day_b and rule_b to the last digit; one day worked out by hand on all four clocks and with timed fills; the timed fill's edges; the give-back by hand; a session's result, the paired difference and the pooled weekly statistic by hand; a market's report against its pieces; every rule against a slow second implementation that holds the position minute by minute; the once-only reads, the later months and the ledger through the command; the verdicts on fabricated reports; the constants against the registration; Amendment 61)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -215,7 +218,7 @@ eb40bbddfd9cdadff697276e8b450f8b6b2da5c8160d7a0fc22dc6e404d037b9  MROF_V1_Engine
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 1006/1006 + 46/46, identical to the repo
+# run from inside the unzipped package: 1018/1018 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -292,9 +295,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_exportcheck.py` | 8/8 |
 | `tests_mrofyt_markets28.py` | 17/17 |
 | `tests_mrofyt_speed29.py` | 29/29 |
-| **wave-one to twenty-nine, tools total** | **1006/1006** |
+| `tests_mrofyt_clocks30.py` | 12/12 |
+| **wave-one to thirty, tools total** | **1018/1018** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **1052/1052** |
+| **package total** | **1064/1064** |
 
 ## Runnable research commands
 
@@ -2242,5 +2246,40 @@ detector hash so registering wave two provably changed nothing.
 
     Package V52 adds the registration, the tool and the suite (230
     files). Nothing frozen changed (06ce854a…). Battery: 1006/1006 +
+    46/46 (`tests_mles_v12.py` and `tests_mrof_barexport.py` need the
+    Mono compiler, `mcs`).
+
+61. **Wave thirty: B several times a day (2026-11-27).** The operator
+    asked for a strategy that trades several times a day, as fast as a
+    retail account can go. Three things decide where to look: a trade's
+    cost is fixed while the move grows with the root of the time held;
+    prices tend to give back below about half an hour and to go on from
+    a few hours (Safari and Schmidhuber); and a fast signal that cannot
+    pay its own costs can still time the fills of a slow rule (Zarattini
+    and Pagani, 2026, on B's kind of rule). So no new fast rule is
+    looked for. `MROF_YT_WAVE30_CLOCKS_REGISTRATION.md` takes the one
+    rule that already decides several times a day and fixes three
+    changes to it, before ES and RTY are read by anything.
+
+    BS runs B on two other clocks, ten and twenty minutes later: a
+    check that B's pass does not hang on the minute it looks at. BF
+    runs B's rule every ten minutes. BT keeps B's decisions and moves a
+    fill five minutes when the last three five-minute changes ran in
+    the order's direction. BF and BT are judged against B itself,
+    session by session, on ES and RTY, with a weekly t of 2.5, and must
+    pass the screen's bar on all three markets. What the next five
+    minutes give back after such a run is measured and never judged.
+
+    `mrofyt_clocks30.py` is wave twenty-four's B step for step on B's
+    own minutes; `tests_mrofyt_clocks30.py` (12) works a day out by
+    hand on every clock and sets every rule against a second
+    implementation. The reads of ES and RTY can be made in the same
+    sitting as waves twenty-five and twenty-six. No bar has been read
+    by this wave; nothing in it is a result. The expectations are in
+    the registration: most likely B does not hang on its clock and
+    neither change is worth making.
+
+    Package V53 adds the registration, the tool and the suite (233
+    files). Nothing frozen changed (06ce854a…). Battery: 1018/1018 +
     46/46 (`tests_mles_v12.py` and `tests_mrof_barexport.py` need the
     Mono compiler, `mcs`).
