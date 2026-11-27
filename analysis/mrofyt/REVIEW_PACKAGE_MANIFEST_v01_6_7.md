@@ -182,6 +182,9 @@ f84c5291b2d2ab28d000603d55fe22b14ea60cccad0b6c5181693ad5b22d21fb  mrofyt_speed29
 c85a358f83f6561addb8eda22a9f8302c1d89273b89935b1466f648fc7f3a5b0  MROF_YT_WAVE30_CLOCKS_REGISTRATION.md (FROZEN 2026-11-27 before the tool was written and before any ES or RTY bar was read by anything: B several times a day. Three changes to B, each fixed beforehand: the same rule on two other clocks, a check that B does not hang on the minute it looks at; B's rule every ten minutes; and B's fills moved five minutes when the last three five-minute changes ran in the order's direction. The two changes are judged against B itself, session by session, on ES and RTY with a weekly t of 2.5; the five-minute give-back is measured and never judged; the implementation record was added with the tool; Amendment 61)
 03c16f6d68a3211b1b79c2c05c22490f7f3af2b98c7a8b4437c1993fbb1b5bea  mrofyt_clocks30.py (MROF-YT-W30-CLOCKS-1.0: B's rule at any clock with or without timed fills, on its own minutes wave twenty-four's day_b step for step; the give-back after two, three and four five-minute changes; each rule's orders a day; the paired difference against B and its weekly statistic; the three market reads and the later months, each once and recorded before anything is shown; the verdicts from the reports; Amendment 61)
 6ae7af57a330ed82be021d9a56e44a3c96aa12cdb72729a5b0a31a8f766edaf6  tests_mrofyt_clocks30.py (12 tests: B on its own clock against wave twenty-four's day_b and rule_b to the last digit; one day worked out by hand on all four clocks and with timed fills; the timed fill's edges; the give-back by hand; a session's result, the paired difference and the pooled weekly statistic by hand; a market's report against its pieces; every rule against a slow second implementation that holds the position minute by minute; the once-only reads, the later months and the ledger through the command; the verdicts on fabricated reports; the constants against the registration; Amendment 61)
+7ab8199687e1bb0281226a9cfeb3f16ae58a43852c396e9afd8e17023b9733a6  MROF_YT_WAVE31_SIZING_REGISTRATION.md (FROZEN 2026-11-27 before the tool was written, before RVMR's or ATR's state was computed on any trade of A or B, and before any ES or RTY bar was read by anything: how far the market will move, used only for size. Under each of two measures, the frozen RVMR range regime and a plain 20-minute ATR against its usual level, a position of A or B decided in a HIGH state is taken at half size; a measure goes on for a rule when its Sharpe is at least 5 % higher and its fall ratio lower on both ES and RTY, and RVMR only when it also beats the plain ATR; NQ reported, never judged; the implementation record was added with the tool; Amendment 62)
+0574928fc65bab5d31efed818a276794b4236b7876aa90777ef205d24011b406  mrofyt_sizing31.py (MROF-YT-W31-SIZING-1.0: the frozen analysis/rvmr/rvmr_spec.py imported and checked by its hash; the front contracts' bars in time order, overnight included; RVMR's and ATR's states at A's and B's decisions; A and B with each position halved in a HIGH state, unchanged otherwise, on their own as wave twenty-four's functions; the Sharpe, the fall and its ratio; each market read once and recorded before anything is shown; the verdict from the reports; Amendment 62)
+4d6bf2d630d313d54e7386b7e65fa3e853e6b3291204b866a446abac9b4ca1a8  tests_mrofyt_sizing31.py (10 tests: the frozen RVMR file used unchanged and a changed one refused; the bar each decision reads; RVMR's and ATR's states worked out by hand on sixteen sessions; B scaled against wave twenty-four's day_b on every session and by hand on a long and a reversal; A halved; the Sharpe and the fall by hand; a market's report against wave twenty-four's own A and B; the verdict on fabricated reports; the once-only reads and the ledger through the command; the constants against the registration; Amendment 62)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -218,7 +221,7 @@ ddcef204163b408567683687b63ff3bf9442dc318b5b6f69d495e7f9e546bd72  MROF_V1_Engine
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 1018/1018 + 46/46, identical to the repo
+# run from inside the unzipped package: 1028/1028 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -296,9 +299,10 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_markets28.py` | 17/17 |
 | `tests_mrofyt_speed29.py` | 29/29 |
 | `tests_mrofyt_clocks30.py` | 12/12 |
-| **wave-one to thirty, tools total** | **1018/1018** |
+| `tests_mrofyt_sizing31.py` | 10/10 |
+| **wave-one to thirty-one, tools total** | **1028/1028** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **1064/1064** |
+| **package total** | **1074/1074** |
 
 ## Runnable research commands
 
@@ -2283,3 +2287,33 @@ detector hash so registering wave two provably changed nothing.
     files). Nothing frozen changed (06ce854a…). Battery: 1018/1018 +
     46/46 (`tests_mles_v12.py` and `tests_mrof_barexport.py` need the
     Mono compiler, `mcs`).
+
+62. **Wave thirty-one: how far, used for size (2026-11-27).** The
+    operator asked whether a forecast of how far the market will move
+    can make A and B steadier, after the account plan on NQ's ten years
+    blew six accounts. `MROF_YT_WAVE31_SIZING_REGISTRATION.md` was
+    frozen before its tool was written. Two measures of how wild the
+    market is at a decision: RVMR, the range regime frozen in August
+    and certified for use as a registered context variable, and a plain
+    20-minute ATR against its usual level at that minute. Under each, a
+    position of A or B decided in a HIGH state is taken at half size;
+    nothing else changes.
+
+    A measure goes on for a rule when, on both ES and RTY, its Sharpe
+    is at least 5 % higher than the unchanged rule's and its largest
+    fall, counted in average sessions, is smaller; RVMR only when it is
+    also at least as good as the plain ATR. NQ's ten years are reported,
+    never judged. The expectation written down: most likely neither
+    goes on, because A already risks a fixed share on each trade, B is
+    already sized by its own volatility, and the account's drops came
+    from runs of ordinary losses.
+
+    `mrofyt_sizing31.py` imports the frozen RVMR file and stops if it
+    has changed; `tests_mrofyt_sizing31.py` (10) works the states out by
+    hand and checks the unchanged rules against wave twenty-four's own
+    functions on every session. No bar has been read by this wave.
+
+    Package V54 adds the registration, the tool and the suite (236
+    files). Nothing frozen changed (06ce854a…, and RVMR's e348f035…).
+    Battery: 1028/1028 + 46/46 (`tests_mles_v12.py` and
+    `tests_mrof_barexport.py` need the Mono compiler, `mcs`).

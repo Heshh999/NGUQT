@@ -161,3 +161,22 @@ A about one in six. **RVMR better for B:** about one in five; for A
 about one in ten. **RVMR beating ATR where both are better:** about one
 in four. The most likely outcome: neither goes on, and the drops are a
 matter for the sizing of the account, not of the trade.
+
+## Implementation record — 2026-11-27
+
+`mrofyt_sizing31.py`, `tests_mrofyt_sizing31.py` (10 tests), written
+after this file was frozen and before any bar was read by it; verified
+on sessions worked out by hand and on synthetic exports, never on
+market evidence. Nothing above this line was changed.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| §3 RVMR, unchanged | `rvmr_unchanged`, `states` | `rvmr_spec.trailing_ratio`, `bucket` and `atr20` are imported from `analysis/rvmr/`; the tool stops before reading a bar when the file's sha256 does not begin `e348f035a9209540` |
+| §3 the bars | `series` | the bars of each day of the daily chain on its front contract, in time order, overnight included. A session that is not a trading day of the chain (a holiday's few bars) is left out of the window, so the 1,440 bars slide over the trading days only |
+| §2 the bar a decision reads | `decision_row` | bars are keyed by their start; the bar ending at minute m starts at m − 1. A minute without a bar reads the last bar before it |
+| §3 ATR's usual level | `states` | the mean of the 20-bar true range at the same minute on the 14 eligible sessions before, each read the same way; true range as `rvmr_spec.atr20` computes it, the first bar of the series its high minus low |
+| §4 B scaled | `day_b_scaled` | the position is the sign of B's rule times the factor of the change that set it; a change pays B's one-way cost on the size bought or sold. With every factor 1 it is wave twenty-four's `day_b` step for step, which the suite checks on every session |
+| §4 A scaled | `a_series` | wave twenty-six's `a_core` (wave twenty-four's trade), its net in the source's sizing times the factor at 09:35 |
+| §5 the numbers | `perf` | the standard deviation of the sessions (n − 1); the halves are wave twenty-four's |
+| §6 the verdict | `better`, `decide` | made by `--decide` from the market reports. A measure is not better on a market where the unchanged rule's Sharpe is not above 0, or where a fall ratio does not exist (a mean not above 0): there is nothing to improve by a share. Whether a rule passed wave twenty-five is the operator's word, given in the decision's reading, not computed here |
+| §7 once | `main`, `read_made`, `record_read` | each market is read once, recorded in the minute-history ledger before anything is shown; a read that stops before its result uses nothing up |
