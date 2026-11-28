@@ -188,6 +188,15 @@ c85a358f83f6561addb8eda22a9f8302c1d89273b89935b1466f648fc7f3a5b0  MROF_YT_WAVE30
 03e69e320d02a35229be5ee1d938d74c686b225ac5f13bdd8671e75fc87122aa  MROF_YT_WAVE32_LATEDAY_REGISTRATION.md (FROZEN 2026-11-27 before the tool was written, before B's result was split by time of day or by the age of its position on any bar, and before any ES or RTY bar was read by anything: when in the day B earns, and for how long. B's twelve half-hour legs are reported by time of day and by age; two statements are written down beforehand, that the four legs from 14:00 earn more than half of B's result and that they earn more on NQ than on ES and RTY; BL, B's rule from 14:00 only, is better than B when it passes wave twenty-four's bar on NQ, ES and RTY and, on both ES and RTY, its Sharpe is at least 5 % higher and its fall ratio lower, and it is not collapsed in NQ's later months; the implementation record was added with the tool; Amendment 63)
 b5f80f51ac4ea43c38a6bf848da3ad3327e44ef67f1059a674e323824215d9f1  mrofyt_lateday32.py (MROF-YT-W32-LATEDAY-1.0: B's twelve legs with each order's cost split between the leg it ends and the leg it starts, adding up to wave twenty-four's day_b; the tables by time of day, by group and by age with wave twenty-eight's weekly t; BL by wave thirty's rule on 14:00 to 15:30; the Sharpe, the fall and its ratio; each market and NQ's later months read once and recorded before anything is shown; the two statements and BL's verdict from the reports; Amendment 63)
 9d1b7f507a376b54131a3ef2e67696e429c7b881dbffbdeb3c8a5a11365ae4f7  tests_mrofyt_lateday32.py (10 tests: the legs by hand on a long and on a reversal; the legs against wave twenty-four's day_b and against B's own result on every session; BL against B's four late legs on every session; the tables by hand on four sessions; the Sharpe and the fall against wave thirty-one's; a market's report against wave twenty-four's own B; the verdict on fabricated reports; the once-only reads, the later months and the ledger through the command; what is printed; the constants against the registration; Amendment 63)
+05eecfbcd5e8d1b18ae02b4831197a4e0cec2dcfd17cfb8b45317fc75c9c4af5  MROF_YT_WAVE33_DEALER_REGISTRATION.md (FROZEN 2026-11-28 before the tool was written, before either reading was computed on any bar, and before any ES or RTY bar was read by anything: when B works, with the dealers' side read from price. FALL: the five trading days before the session fell; MODE: TREND when the autocorrelation of the morning's thirty five-minute changes is above 0, else FIGHT. BFALL, B on FALL sessions only, and BMODE, B flat from 12:00 after a FIGHT morning, are each better than B when they pass wave twenty-four's bar on NQ, ES and RTY and, on both ES and RTY, have a Sharpe at least 5 % higher and a lower fall ratio, and are not collapsed in NQ's later months; three statements are written down beforehand; the implementation record was added with the tool; Amendment 64)
+ca3ffe658d4ae399c31b7939e35e7f70910030ca669eeb7c083e6ac00e2070dd  mrofyt_dealer33.py (MROF-YT-W33-DEALER-1.0: the fall over the five rows of the daily chain before the session; the autocorrelation of the five-minute changes, morning and afternoon; B flat from 12:00 after a FIGHT morning; the three statements with their Welch t, the four cells, the years and B's own last 30 sessions; B, BFALL and BMODE by wave twenty-four's bar and wave thirty-two's Sharpe and fall ratio; each market and NQ's later months read once and recorded before anything is shown; Amendment 64)
+9750e2e064805f5464b65b74157dcb95c0be24df4529edb1b7fcdf379d673706  tests_mrofyt_dealer33.py (10 tests: FALL by hand; the autocorrelation by hand on a climb, a zigzag and a still morning; BMODE by hand; BMODE against wave twenty-four's day_b and against B's legs before 12:00 on every session; the three rules against wave twenty-four's own B; the comparisons and B's last month by hand; a market's report against independent sums; the verdict on fabricated reports; the once-only reads, the later months and the ledger through the command; what is printed and the constants against the registration; Amendment 64)
+ceb9dd0878d22834bb1494e794b5dcfa6f90518b15477f6c71fa2aaabf8c36c3  MROF_YT_WAVE34_RANGE_REGISTRATION.md (FROZEN 2026-11-28 before the tool was written, before any forecast was computed on any bar, and before any ES or RTY bar was read by anything: how far, forecast before the open. The log of the cash range from four linear forecasts, each year fitted on the sessions before it: a 14-session average range, HAR, the options market's index at the last close (VXN, VIX, RVX from FRED), and HAR with the index. IMPLIED ADDS when HAR with the index has the smaller squared error on ES and on RTY and, over both, with a weekly t of 2.5 or more; NQ is reported; downside volatility, RVMR at 09:35, expiry days and event days are reported beside; the implementation record was added with the tool; Amendment 65)
+74acdc8c89f34de6acd30641df20443528161c25a62392349c447e928f35373a  mrofyt_range34.py (MROF-YT-W34-RANGE-1.0: FRED's file checked against the market's series and read with no value from the session's own day or older than 5 calendar days; the inputs from the sessions before only; least squares in plain Python; the walk forward from the third calendar year; the losses, R2, d with wave twenty-eight's weekly t; the calendar and an optional events file of official dates; the frozen RVMR file checked by its hash; each market read once and recorded before anything is shown; the verdict from the three reports; Amendment 65)
+5cb9ef3ca0b089af4be13a006cc59fcc0ad27060de7bbe79d63a87eb0d9fac79  tests_mrofyt_range34.py (10 tests: the index file and the value a session may use; the range and every input by hand; least squares on exact data and a slope by hand; the walk forward against a rule that changes in the forecast year, so that a look ahead would show; a market's numbers against independent sums on a tape whose range follows the index; the calendar and the events by hand; the verdict on fabricated reports; the once-only reads and the ledger through the command, with the wrong index file refused; what is printed; the constants against the registration; Amendment 65)
+32878933b74f57aafb6fb6b06683202ddf560b5f1eb3e54be2b9094a8574aaba  MROF_YT_WAVE35_STRESS_REGISTRATION.md (FROZEN 2026-11-28 before the tool was written: planning only, it judges nothing. Wave twenty-six's account plan on NQ's ten years in another order: years of 252 sessions from blocks of 20 consecutive sessions, 5,000 years from a fixed seed, at the plan's budgets, a half and a quarter, without and with the day stop; reported: the share of years that lose the account, the year's result and its largest fall; the implementation record was added with the tool; Amendment 66)
+f80069c7296a65f5b1d4739d828eb835d368bda9ae99d00a6a6c3c0d093c88e5  mrofyt_stress35.py (MROF-YT-W35-STRESS-1.0: wave twenty-six's plan and account with the budgets scaled; a session's result and lowest value; the account over a sequence; years from blocks; the six lines of sizes; NQ read once and recorded before anything is shown; Amendment 66)
+fec0670061c6d773992bc31398d65b09dde4e478fb26d39d81763456b3038772  tests_mrofyt_stress35.py (8 tests: the sizes against wave twenty-six's own; the plan and the account in the history's order against wave twenty-six's account; the account by hand, at the line too; a year from blocks; the resampling where the answer is known; every size; the once-only read and the ledger through the command; what is printed and the constants against the registration; Amendment 66)
 ```
 
 Frozen DEV results (Amendment 24; shipped in the package from V26 because `tests_mrofyt_costs_risk.py` reproduces them):
@@ -212,6 +221,7 @@ Archived source directives:
 ```
 55d598a3c2e5453b9c47675f76932455dca8689084fddfd4535e5b4907def942  ../../docs/prompts/MROF_ONE_COMPLETE_CLAUDE_PROMPT_1.md
 b2a0122b40e6ef140a1cb6fe7011068bfa3cc52039a75b19da54c9fc1e7ae389  ../../docs/prompts/MROF_GODS_EYE_VIEW_CLAUDE_PROMPT_PINOKIO.md (the dashboard directive, Amendment 12; archived from the upload as it was read — 166 lines — so the hash is of this archived copy)
+764016b03a07115ed94c1616619fd6aaa936ae9c017ee4854100b59e9ef167c1  ../../docs/MROF_RESEARCH_REFERENCE_AND_ROADMAP.md (outside research on which way, when, for how long and how far, on market makers and on option data and its listed prices, with the roadmap of the describing and forecasting tools; no result of this project; Amendment 66)
 ```
 
 Delivered package (239 files, repo layout preserved so every suite runs
@@ -224,7 +234,7 @@ from inside it unchanged):
 ```
 cd analysis/mrofyt && for f in tests_*.py; do python3 "$f" | tail -1; done
 cd ../godseye && python3 tests_godseye.py | tail -1
-# run from inside the unzipped package: 1038/1038 + 46/46, identical to the repo
+# run from inside the unzipped package: 1066/1066 + 46/46, identical to the repo
 ```
 
 ## Predecessors — reverified unmodified
@@ -304,9 +314,12 @@ for f in tests_*.py; do python3 "$f" | tail -1; done
 | `tests_mrofyt_clocks30.py` | 12/12 |
 | `tests_mrofyt_sizing31.py` | 10/10 |
 | `tests_mrofyt_lateday32.py` | 10/10 |
-| **wave-one to thirty-two, tools total** | **1038/1038** |
+| `tests_mrofyt_dealer33.py` | 10/10 |
+| `tests_mrofyt_range34.py` | 10/10 |
+| `tests_mrofyt_stress35.py` | 8/8 |
+| **wave-one to thirty-five, tools total** | **1066/1066** |
 | `../godseye/tests_godseye.py` | 46/46 |
-| **package total** | **1084/1084** |
+| **package total** | **1112/1112** |
 
 ## Runnable research commands
 
@@ -2353,3 +2366,83 @@ detector hash so registering wave two provably changed nothing.
     files). Nothing frozen changed (06ce854a…, and RVMR's e348f035…).
     Battery: 1038/1038 + 46/46 (`tests_mles_v12.py` and
     `tests_mrof_barexport.py` need the Mono compiler, `mcs`).
+
+64. **Wave thirty-three: when B works, the dealers' side read from
+    price (2026-11-28).** The research, read in full where it could
+    be, agrees on one switch: when option dealers are short gamma they
+    have to trade with the move and trends run; when they are long,
+    they trade against it and prices snap back. B's own authors found
+    their rule earned more after a five-day fall and read it that way.
+    The dealers' positions are not on hand; they are sold, and even
+    then estimated. `MROF_YT_WAVE33_DEALER_REGISTRATION.md` was frozen
+    before its tool was written and before any ES or RTY bar was read.
+
+    Two readings from price alone. FALL, known before the open: the
+    five trading days before the session fell. MODE, known at 12:00:
+    TREND when the morning's five-minute changes continue (their
+    autocorrelation is above 0), FIGHT otherwise. Two changes to B are
+    judged against B by wave thirty-two's bar: BFALL, B on FALL
+    sessions only, and BMODE, B flat from 12:00 after a FIGHT morning.
+    Three statements are written down beforehand and reported as held
+    or not: B earns more after a fall; B's afternoon earns more after a
+    TREND morning; the afternoon continues as the morning did. The
+    expectation written down: the readings describe something, and B
+    is better left whole.
+
+    `mrofyt_dealer33.py`; `tests_mrofyt_dealer33.py` (10) checks BMODE
+    against wave twenty-four's `day_b` and against B's legs before
+    12:00 on every session. No bar has been read by this wave.
+
+65. **Wave thirty-four: how far, from the options market
+    (2026-11-28).** How far the market will move is the part of a
+    forecast the research finds most predictable, and the options
+    market's own forecast is free: FRED carries the daily closes of VXN
+    (Nasdaq-100), VIX (S&P 500) and RVX (Russell 2000).
+    `MROF_YT_WAVE34_RANGE_REGISTRATION.md` was frozen before its tool
+    was written and before any ES or RTY bar was read.
+
+    The log of the cash session's range is forecast before the open by
+    four linear models, each calendar year fitted on the sessions
+    before it: a 14-session average range, HAR (the last session, the
+    last 5 and the last 22), the index's last close, and HAR with the
+    index. IMPLIED ADDS when HAR with the index has the smaller squared
+    error on ES and on RTY and, over both together, with a weekly t of
+    2.5 or more; then the describing tool's expected range starts from
+    the options market's forecast, otherwise from HAR. NQ is reported,
+    never judged. Reported beside: downside volatility, RVMR at 09:35,
+    option-expiry days, month and quarter ends, and, from a file of
+    official dates, Fed, CPI and employment-report days. Nothing about
+    trading changes by this wave.
+
+    `mrofyt_range34.py` stops when the index file is not the market's
+    and uses no value from the session's own day;
+    `tests_mrofyt_range34.py` (10) checks the walk forward against a
+    rule that changes in the forecast year. The index files are the
+    operator's copies and are not in the repository or the package. No
+    bar has been read by this wave.
+
+66. **Wave thirty-five: the account plan in another order, and the
+    research reference (2026-11-28).** A prop account is lost by its
+    worst stretch, and ten years are one order of their days.
+    `MROF_YT_WAVE35_STRESS_REGISTRATION.md`, frozen before its tool,
+    resamples wave twenty-six's account plan on NQ: years of 252
+    sessions from blocks of 20 consecutive sessions, 5,000 of them from
+    a fixed seed, at the plan's budgets, a half and a quarter, without
+    and with the day stop. It reports the share of years that lose the
+    account, the year's result and its largest fall. It judges nothing
+    and is not a forecast: planning numbers for the size of the
+    positions. `mrofyt_stress35.py`; `tests_mrofyt_stress35.py` (8)
+    sets the plan and the account, in the history's own order, against
+    wave twenty-six's.
+
+    `docs/MROF_RESEARCH_REFERENCE_AND_ROADMAP.md` collects the outside
+    research behind waves thirty-one to thirty-five (which way, when,
+    for how long, how far, what a trade costs, what option data exists
+    and its listed prices) and the roadmap of the describing and
+    forecasting tools. It holds no result of this project.
+
+    Package V56 adds the three registrations, the three tools, their
+    suites and the reference (249 files). Nothing frozen changed
+    (06ce854a…, and RVMR's e348f035…). Battery: 1066/1066 + 46/46
+    (`tests_mles_v12.py` and `tests_mrof_barexport.py` need the Mono
+    compiler, `mcs`).

@@ -93,3 +93,26 @@ months are not read. Sessions from 2026-07-01 are never read.
 At wave twenty-six's own size a lost account in more than half of the
 years; at a quarter of it, in fewer than one year in four, with the
 year's result a quarter as large. The day stop changes little.
+
+## Implementation record — 2026-11-28
+
+`mrofyt_stress35.py`, `tests_mrofyt_stress35.py` (8 tests), written
+after this file was frozen and before any bar was read by it; verified
+on sequences whose answer is known and on synthetic exports, never on
+market evidence. Nothing above this line was changed.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| §1 the days | `plan`, `paths` | wave twenty-six's `prop_days` and `day_path`; at size 1 the suite finds the plan identical to wave twenty-six's and the account over the history, in its own order, equal to wave twenty-six's `account` in its result, the accounts lost and the largest fall |
+| §2 the sizes | `a_micros`, `b_micros` | wave twenty-six's two formulas with the budget multiplied before rounding; at least one micro, at most 15 |
+| §3 the account | `run` | "at or below" includes the line itself; the session on which the account is lost still counts in the year's result |
+| §4 a year | `a_year` | thirteen blocks, the last cut to twelve sessions; Python's `random.Random(35)`, started again for every size, so every size sees the same years |
+| §5 5 %, median, 95 % | `below` | the value at that share of the sorted years, counted from 0 |
+| §5 the largest fall | `run` | from the highest running sum to the lowest value inside a session, as in wave twenty-six |
+| §5 the history | `history` | the result a year is the whole result times 252 over the number of sessions |
+| §7 once | `main`, `read_made`, `record_read` | NQ is read once, recorded in the minute-history ledger before anything is shown |
+
+**Dry run, on fabricated sequences only.** Days that all win lose no
+account; days that all lose $100 lose it every 45 sessions, five times
+a year. This shows that the code counts what this file says; it says
+nothing about the market.

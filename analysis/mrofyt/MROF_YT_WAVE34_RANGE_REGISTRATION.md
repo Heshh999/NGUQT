@@ -130,3 +130,34 @@ Downside volatility adding a little more: about one in two. RVMR HIGH at
 09:35 marking days wilder than the pre-open forecast: about one in two.
 Event and expiry days wider than the forecast: likely for FOMC and CPI,
 unclear for expiries.
+
+## Implementation record — 2026-11-28
+
+`mrofyt_range34.py`, `tests_mrofyt_range34.py` (10 tests), written
+after this file was frozen and before any bar was read by it; verified
+on days worked out by hand and on synthetic exports, never on market
+evidence. Nothing above this line was changed.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| §1 R | `cash_range` | the highest of the 390 minute highs less the lowest of the 390 minute lows, over wave twenty-four's open; a session without a range has no logarithm and is left out of the sequence |
+| §2 the inputs | `table` | "previous sessions" are the eligible sessions before, in their order: 14 for ATR, 1, 5 and 22 for HAR. A session with fewer before it has no such input |
+| §2 the index | `read_iv`, `iv_before` | FRED's file as downloaded: a first line naming the series, then date and value; a "." is a day without a value. The file's series must be the market's or nothing is read. The value used is the last one dated before the session's date; 5 calendar days back is still used, 6 is not |
+| §2 compared where all four exist | `usable` | a session is fitted on and scored only when ATR, HAR and IMPLIED all exist for it |
+| §2 least squares | `ols` | the normal equations solved by elimination with pivoting, in plain Python; the suite gets back the coefficients data was built from, and a slope worked out by hand |
+| §2 walk-forward | `forecast_years`, `walk`, `fit` | the calendar years are those of the market's eligible sessions; the third and later are forecast, each from one fit on every usable session dated before that year. A fit needs 60 sessions; with fewer the run stops and nothing is recorded |
+| §3 d and the verdict | `evaluate`, `pooled`, `decide` | d per scored session is in each market's report; over ES and RTY a session's d is the average of the markets that have it; the weekly t is wave twenty-eight's `stats`. "Above 0" is strict |
+| §4 R² | `evaluate` | one less the sum of squared errors over the sum of squares of log R around its mean on the scored sessions |
+| §4 downside volatility | `semis`, `x_down` | the 389 changes between the 390 minute closes of the previous eligible session; a change of 0 counts with the rising ones. Fitted and scored on the sessions that have both. Reported only: when its inputs do not determine a fit, the line is empty and the run goes on |
+| §4 RVMR at 09:35 | `run_market` | wave thirty-one's `states` at minute 5, after its check that the frozen RVMR file is unchanged; the two groups' mean errors and their Welch t are wave thirty-three's `compare` |
+| §4 calendar days | `calendar`, `third_friday` | a Friday dated the 15th to the 21st; the last trading day of a month is one followed on file by a trading day of another month, so the last day on file ends nothing. A kind's line is over its scored sessions |
+| §4 event days | `read_events`, `by_kind` | a file of lines date,kind,source; a kind outside the four stops the run before anything is read |
+| beside | `evaluate` | HAR+IMPLIED fitted once on every usable session, with the spread of its out-of-sample errors: what a describing tool would use for the next session. Reported, never judged |
+| §5 once | `main`, `read_made`, `record_read` | each market is read once, recorded in the minute-history ledger before anything is shown; the index file, the events file and the output are checked before the bars are read, and a run that stops uses nothing up |
+
+**Dry run, on synthetic data only.** On a tape built so that a day's
+range follows the index's value of the day before, IMPLIED and
+HAR+IMPLIED beat HAR and the verdict's d was above 0, as it must be on
+such a tape; on random-walk exports the report ran end to end. This
+shows that the code measures what this file says; it says nothing about
+the market.

@@ -154,3 +154,34 @@ eight; flat on half the days, it needs those days to carry far more
 than half of B's result. **BMODE better than B:** about one in six. The
 most likely outcome: the readings describe something, and B is better
 left whole.
+
+## Implementation record — 2026-11-28
+
+`mrofyt_dealer33.py`, `tests_mrofyt_dealer33.py` (10 tests), written
+after this file was frozen and before any bar was read by it; verified
+on days worked out by hand and on synthetic exports, never on market
+evidence. Nothing above this line was changed.
+
+| registered | implemented as | precision |
+| --- | --- | --- |
+| §1 B's own | `rules`, `judge_all` | B's bounds and volatility are wave twenty-six's `b_inputs`, its rule at a minute is `b_want`; B as a rule is wave thirty's `rule` on B's minutes, which the suite sets against wave twenty-four's own `rule_b` trade by trade |
+| §2 FALL | `falls`, `is_fall` | the five rows of the daily chain before the session's own, whatever their contract; fewer than five rows, or a row without a return, is unknown. The session's own day is never in it |
+| §2 MODE | `ac`, `mode` | P at the five-minute marks only (a move inside a five-minute change does not count); a sum of squares that is not above 0 gives no AC and FIGHT |
+| §2 the afternoon's AC | `ac` on k = 31 … 78 | its first change is 12:00–12:05; the change that ends at 12:00 belongs to the morning only |
+| §3 BFALL | `rules` | B's own trades on the sessions with FALL, nothing recomputed |
+| §3 BMODE | `day_bmode` | B's loop with the position wanted set to 0 at 12:00 and at every later decision when the morning is FIGHT. The suite finds on every session that on a TREND morning it is wave twenty-four's `day_b`, and that on a FIGHT morning its gross is that of B's legs before 12:00 and its cost theirs plus the close at 12:00 when B itself did not trade then |
+| §4 the verdict | `gains`, `decide` | wave twenty-four's bar is its `judge` on the change's days with a trade; the Sharpe and the fall ratio are wave thirty-two's `perf` over B's sessions, a session without a trade counting 0. There is no gain on a market where B's Sharpe is not above 0 or a fall ratio does not exist. Without the later months' report a better change is told with the note that they are still to be read |
+| §5 FALL HELPS | `describe`, `compare` | B's x over B's sessions, 0 without a trade; "above" is strict; a statement with an empty group is told as n/a and counts as not held |
+| §5 MODE HELPS | `describe` | the sum of wave thirty-two's legs that start at 12:00 or later, in B's sizing, over B's sessions |
+| §5 MODE PERSISTS | `describe` | over every eligible session, with or without B's bounds; a session whose afternoon has no change has no AC and is left out |
+| §6 the cells, the shares, the years | `describe` | over B's sessions; a cell's standard deviation needs two sessions |
+| §6 B's own last month | `last_month` | the 30 sessions before, in the order of B's sessions; a session with fewer than 30 before it is left out; a sum of exactly 0 counts as at or below 0 |
+| §6 the Welch t | `compare` | the difference of the means over the root of the two variances each over its count; none unless each group has two sessions |
+| §7 once | `main`, `read_made`, `record_read` | each market and the later months are read once, recorded in the minute-history ledger before anything is shown; a read that stops before its result uses nothing up |
+| §7 the later months | `run_later` | wave twenty-five's window and its verdicts for B, BFALL and BMODE; the statements, the cells and B's last month are those of the window's sessions, with B's history built from the sessions before |
+
+**Dry run, on synthetic exports only.** On a tape built so that half
+the days drift at a steady pace from 09:35 to 16:00, the report ran end
+to end and the three rules, the statements and the cells added up to
+the sessions. This shows that the code measures what this file says; it
+says nothing about the market.

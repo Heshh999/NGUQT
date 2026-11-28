@@ -286,7 +286,7 @@ The Level II order-flow package and the dashboard run on the standard library al
 from a fresh clone:
 
 ```bash
-cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 57 suites, 1038 checks
+cd analysis/mrofyt  && for f in tests_*.py; do python3 "$f" | tail -1; done   # 60 suites, 1066 checks
 cd analysis/godseye && python3 tests_godseye.py                               # 46 checks
 ```
 
@@ -348,7 +348,7 @@ capture installation and operation.
   inputs uncomputed, so it cannot fire on real data. A4 runs with one of its two
   alternative residual inputs uncomputed.
 - Twenty-three registered waves sit on the runner through observation hooks (see
-  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–63). On DEV, wave
+  `analysis/mrofyt/REVIEW_PACKAGE_MANIFEST_v01_6_7.md`, Amendments 18–66). On DEV, wave
   six's L2 (fade the failed break of a daily range level when the order flow turns) is
   the one idea with support: 57 trades, +6.15 points a trade net of costs, most of it from
   one session. Wave fourteen fixes the first L2 signal at each level per session as the
@@ -393,10 +393,18 @@ capture installation and operation.
   market will move, the frozen RVMR regime or a plain ATR, makes A and B steadier when it
   halves a position decided in a wild state (Amendment 62). Wave thirty-two asks when in
   the day B earns: its twelve half-hour legs by time of day and by age, and B's rule from
-  14:00 only against B (Amendment 63).
+  14:00 only against B (Amendment 63). Wave thirty-three reads the option dealers' side
+  from price alone, a fall over five days and whether the morning's moves continue or
+  give back, and judges B on those days against B (Amendment 64). Wave thirty-four sets
+  the options market's own forecast of the day's range (VXN, VIX, RVX) against HAR and a
+  plain average range, each year fitted on the years before (Amendment 65). Wave
+  thirty-five resamples the account plan on NQ's ten years to say how often a year of
+  such days loses the account at three sizes; it judges nothing (Amendment 66). The
+  outside research behind these and the roadmap of the describing and forecasting tools
+  are in `docs/MROF_RESEARCH_REFERENCE_AND_ROADMAP.md`, without any result of ours.
   `mrofyt_checkpoint.py` (V40, extended through V47) runs every recordings test on one
   read, each wave's report byte-identical to its own command; `--nq-only` reads NQ
-  alone, about half the work. Package V55: 1038/1038 research checks and 46/46
+  alone, about half the work. Package V56: 1066/1066 research checks and 46/46
   dashboard checks from inside the zip.
 - The capture drive recorded file-system damage in two depth files after a disconnect on
   2026-09-22. The audit and recovery tools set those runs aside rather than reading
